@@ -106,6 +106,9 @@ const visualInfo = {
   control_plane_uptime: 86_400,
   server_host: 'vpn.example.com',
   mode: 'mixed',
+  allow_lan: false,
+  lan_addresses: ['192.168.1.10'],
+  lan_port: 7890,
   proxy: {
     supported: true,
     platform: 'linux-gnome',

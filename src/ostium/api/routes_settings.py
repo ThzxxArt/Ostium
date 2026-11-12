@@ -24,6 +24,7 @@ router = APIRouter(tags=["settings"])
 class SettingsPatch(BaseModel):
     log_level: str | None = None
     mixed_port: int | None = Field(default=None, ge=1024, le=65535)
+    allow_lan: bool | None = None
     routing_mode: str | None = None
     trusted_hosts: list[str] | None = None
     auto_connect: bool | None = None
@@ -63,6 +64,7 @@ async def read_settings(
             "version": __version__,
             "log_level": services.settings.log_level,
             "mixed_port": services.settings.mixed_port,
+            "allow_lan": services.settings.allow_lan,
             "mode": services.settings.mode.value,
             "routing_mode": routing_mode,
             "tun_enabled": services.settings.tun_enabled,
@@ -104,6 +106,8 @@ async def update_settings(
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("mixed_port"):
         services.settings.mixed_port = changes["mixed_port"]
+    if changes.get("allow_lan") is not None:
+        services.settings.allow_lan = bool(changes["allow_lan"])
     if changes.get("log_level"):
         services.settings.log_level = changes["log_level"]
     if "trusted_hosts" in changes and changes["trusted_hosts"] is not None:
@@ -139,7 +143,10 @@ async def update_settings(
     )
     applied: dict[str, Any] = {}
     if services.settings.role.value == "client" and (
-        "mixed_port" in changes or "log_level" in changes or "routing_mode" in changes
+        "mixed_port" in changes
+        or "allow_lan" in changes
+        or "log_level" in changes
+        or "routing_mode" in changes
     ):
         try:
             result = await services.engine.apply_client(session)

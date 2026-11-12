@@ -20,7 +20,7 @@
 - **Home** — 大号连接球、配置/线路选择、实时速率、模式标签。
 - **Profiles** — 导入 URL/分享链接/二维码，刷新，选择线路。
 - **Routing** — 智能/全局/直连/自定义预设和规则。
-- **Network** — 混合/系统代理/TUN、端口、MTU/栈和环境提示。
+- **Network** — 混合/系统代理/TUN、端口、MTU/栈、Allow LAN 和环境提示。
 - **Statistics** — 流量趋势和热门目标。
 - **Diagnostics** — 端口/DNS/路由/TUN/代理/核心检查及修复提示。
 - **Logs / Settings** — 与服务端共用。

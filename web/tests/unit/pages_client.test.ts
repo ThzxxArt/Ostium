@@ -6,7 +6,14 @@ import NetworkPage from '@/pages/NetworkPage.vue'
 import StatsPage from '@/pages/StatsPage.vue'
 import DiagnosticsPage from '@/pages/DiagnosticsPage.vue'
 import { useAuthStore } from '@/stores/auth'
-import { cleanupPage, clickAllButtons, installFetchMock, mountPage, settle } from './helpers'
+import {
+  cleanupPage,
+  clickAllButtons,
+  fixtures,
+  installFetchMock,
+  mountPage,
+  settle,
+} from './helpers'
 
 const pages = [
   ['ClientHomePage', ClientHomePage],
@@ -46,6 +53,24 @@ describe('client pages', () => {
     const { wrapper } = await mountPage(page)
     await settle()
     expect(wrapper.html()).toBeTruthy()
+  })
+
+  it('NetworkPage shows LAN proxy addresses when allow_lan is enabled', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': {
+          ...fixtures.systemInfo,
+          allow_lan: true,
+          lan_addresses: ['192.168.1.10'],
+          lan_port: 7890,
+        },
+      },
+    })
+    const { wrapper } = await mountPage(NetworkPage)
+    await settle()
+    expect(wrapper.text()).toContain('Allow LAN connections')
+    expect(wrapper.text()).toContain('192.168.1.10:7890')
   })
 
   it('HomeGate renders the client home for client roles', async () => {

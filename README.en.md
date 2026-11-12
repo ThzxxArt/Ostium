@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.54%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.84%25%20statements%20%C2%B7%2085.97%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-385%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.51%25%20statements%20%C2%B7%2095.87%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.56%25%20statements%20%C2%B7%2085.64%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-386%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 385 backend tests, 132 frontend tests and 18 Playwright tests; 98.54% backend statements / 95.84% branches. |
+| 🧪 **Verified** | 386 backend tests, 133 frontend tests and 18 Playwright tests; 98.51% backend statements / 95.87% branches. |
 
 ---
 
@@ -102,6 +102,7 @@ and auditable private-network console.
 - Multiple profiles, endpoints, URLTest failover and manual selection.
 - Subscription refresh, share-link import and QR import/display.
 - System proxy and TUN are mutually exclusive; switching cleans up the old state.
+- LAN sharing (Allow LAN): exposes the mixed proxy on `0.0.0.0:7890` so phones/tablets can use this computer as a proxy. Trusted networks only; no authentication.
 
 ### Shared
 
@@ -795,10 +796,10 @@ npx playwright test
 
 Current results:
 
-- Backend: **385 passed / 0 skipped** (379 regular tests + 6 live-engine integration tests),
-  **98.54%** statements / **95.84%** branches.
-- Frontend: **132 passed**, **91.84%** statements / **85.97%** branches /
-  **89.39%** functions / **92.59%** lines.
+- Backend: **386 passed / 0 skipped** (380 regular tests + 6 live-engine integration tests),
+  **98.51%** statements / **95.87%** branches.
+- Frontend: **133 passed**, **91.56%** statements / **85.64%** branches /
+  **89.31%** functions / **92.29%** lines.
 - Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login
   check.
 - `pip-audit` / `npm audit`: 0 known vulnerabilities.

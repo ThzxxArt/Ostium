@@ -205,6 +205,9 @@ export const fixtures = {
     control_plane_uptime: 5000,
     server_host: 'vpn.example.com',
     mode: 'mixed' as const,
+    allow_lan: false,
+    lan_addresses: ['192.168.1.10'],
+    lan_port: 7890,
     proxy: {
       supported: true,
       platform: 'linux-gnome',
@@ -340,6 +343,7 @@ export const fixtures = {
       version: '0.1.0',
       log_level: 'info',
       mixed_port: 7890,
+      allow_lan: false,
       routing_mode: 'smart',
       mode: 'mixed' as const,
       tun_enabled: false,

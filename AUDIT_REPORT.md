@@ -10,18 +10,18 @@
 
 | 项目 | 基线 | 最终 | 门禁 |
 |---|---|---|---|
-| 后端语句覆盖率 | 66.81% | **98.54%** | ≥85% PASS |
-| 后端分支覆盖率 | 39.46% | **95.84%** | ≥85% PASS |
-| `api/` 覆盖 | — | 语句 98.13% / 分支 96.65% | ≥90% PASS |
+| 后端语句覆盖率 | 66.81% | **98.51%** | ≥85% PASS |
+| 后端分支覆盖率 | 39.46% | **95.87%** | ≥85% PASS |
+| `api/` 覆盖 | — | 语句 98.05% / 分支 96.73% | ≥90% PASS |
 | `core/` 覆盖 | — | 语句 99.19% / 分支 95.00% | ≥90% PASS |
 | `services/` 覆盖 | — | 语句 98.06% / 分支 94.17% | ≥90% PASS |
 | `engine/` 覆盖 | — | 语句 99.23% / 分支 97.29% | ≥90% PASS |
-| 前端 statements | 0.92% | **91.84%** | ≥85% PASS |
-| 前端 branches | 1.62% | **85.97%** | ≥85% PASS |
-| 前端 functions | 0.56% | **89.39%** | ≥85% PASS |
-| 前端 lines | 0.83% | **92.59%** | ≥85% PASS |
-| 后端测试 | 69 | **385 passed / 0 skipped** | — |
-| 前端测试 | 5 | **132 passed** | — |
+| 前端 statements | 0.92% | **91.56%** | ≥85% PASS |
+| 前端 branches | 1.62% | **85.64%** | ≥85% PASS |
+| 前端 functions | 0.56% | **89.31%** | ≥85% PASS |
+| 前端 lines | 0.83% | **92.29%** | ≥85% PASS |
+| 后端测试 | 69 | **386 passed / 0 skipped** | — |
+| 前端测试 | 5 | **133 passed** | — |
 | Playwright | 12 passed / 3 skipped | **18 passed / 0 skipped** | — |
 
 覆盖率排除项仅为 `src/ostium/_version.py` 和生成的
@@ -51,12 +51,12 @@
 | Python lint | `uv run ruff check src tests scripts` | PASS |
 | Python format | `uv run ruff format --check src tests scripts` | PASS（132 files） |
 | Python types | `uv run mypy src/ostium` | PASS（69 files） |
-| Backend tests | `uv run pytest -q` | 385 passed, 0 skipped |
+| Backend tests | `uv run pytest -q` | 386 passed, 0 skipped |
 | Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
-| Frontend unit tests | `npm run test` | 132 passed |
-| Frontend coverage | `npm run test:coverage` | 91.84 / 85.97 / 89.39 / 92.59 |
+| Frontend unit tests | `npm run test` | 133 passed |
+| Frontend coverage | `npm run test:coverage` | 91.56 / 85.64 / 89.31 / 92.29 |
 | Frontend build | `npm run build` | PASS |
 | Frontend format | `npm run format:check` | PASS |
 | E2E/a11y/visual | `npx playwright test` | 18 passed |
@@ -134,7 +134,7 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 | 配额/到期自动禁用/重置 | PASS | `test_stats_extended.py`、API/用户测试 |
 | 四种订阅 + QR | PASS | `test_subscriptions_service.py`、API 四格式测试 |
 | 标准分享链接/二维码 | PASS | `test_endpoints_extended.py`、`qr_svg` 测试 |
-| 管理 Web UI 全部页面 | PASS | 132 个 Vitest + 18 个 Playwright |
+| 管理 Web UI 全部页面 | PASS | 133 个 Vitest + 18 个 Playwright |
 | ACME/手动/自签/续期/提醒 | PASS（真实 ACME 外部） | ACME 单元 100%、自签/上传/续期 API 测试；staging 见 MANUAL |
 | 实时流量/连接/日志/WS/Prometheus | PASS | API/WS/事件/指标测试 |
 | 备份/恢复：DB/config/certs/master key，口令加密 | PASS | `test_backup_extended.py`、错误密码/路径逃逸测试 |
@@ -281,12 +281,12 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 uv run ruff check src tests scripts                  -> All checks passed
 uv run ruff format --check src tests scripts         -> 132 files already formatted
 uv run mypy src/ostium                               -> Success: no issues in 69 files
-uv run pytest -q                                     -> 385 passed, 35 warnings
-uv run pytest -m "not integration" --cov=ostium ...  -> 379 passed, coverage 98.54/95.84
+uv run pytest -q                                     -> 386 passed, 37 warnings
+uv run pytest -m "not integration" --cov=ostium ...  -> 380 passed, coverage 98.51/95.87
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass
-npm run test:coverage                                -> 132 passed; 91.84/85.97/89.39/92.59
+npm run test:coverage                                -> 133 passed; 91.56/85.64/89.31/92.29
 npm run build                                        -> built
 npm run format:check                                 -> pass
 npx playwright test                                  -> 18 passed

@@ -162,6 +162,7 @@ class ClientTunSpec:
 class ClientConfigSpec:
     endpoints: list[Endpoint]
     mixed_port: int = 7890
+    allow_lan: bool = False
     mode: str = "mixed"
     selected: str | None = None
     routing_mode: str = "smart"
@@ -362,7 +363,7 @@ def build_client_config(
             {
                 "type": "mixed",
                 "tag": "mixed-in",
-                "listen": "127.0.0.1",
+                "listen": "0.0.0.0" if spec.allow_lan else "127.0.0.1",
                 "listen_port": spec.mixed_port,
             }
         )

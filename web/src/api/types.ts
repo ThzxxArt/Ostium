@@ -253,6 +253,9 @@ export interface SystemInfo {
   control_plane_uptime: number
   server_host: string | null
   mode: ConnectionMode
+  allow_lan: boolean
+  lan_addresses: string[]
+  lan_port: number
   proxy: {
     supported: boolean
     platform: string
@@ -282,6 +285,7 @@ export interface AppSettings {
     version: string
     log_level: string
     mixed_port: number
+    allow_lan: boolean
     routing_mode: string
     mode: ConnectionMode
     tun_enabled: boolean

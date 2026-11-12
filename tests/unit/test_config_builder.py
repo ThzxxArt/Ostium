@@ -83,6 +83,15 @@ def test_client_config_shape() -> None:
     )
     assert config["inbounds"][0]["type"] == "mixed"
     assert config["inbounds"][0]["listen"] == "127.0.0.1"
+    lan = build_client_config(
+        ClientConfigSpec(
+            endpoints=[endpoint],
+            mixed_port=7890,
+            allow_lan=True,
+            clash_secret="secret",
+        )
+    )
+    assert lan["inbounds"][0]["listen"] == "0.0.0.0"
     assert config["outbounds"][-2]["type"] == "selector"
     assert config["route"]["final"] == "proxy"
     assert config["route"]["rule_set"] == []

@@ -22,6 +22,9 @@ SemVer.
 - Client: mixed proxy, Windows/macOS/Linux system proxy, TUN with strict route,
   smart/global/direct/custom routing, FakeIP DNS, URLTest failover, multi-profile
   subscriptions, QR import and diagnostics.
+- Client Allow LAN: exposes the mixed proxy on `0.0.0.0:7890` for trusted LAN
+  devices, with the Network page showing local addresses and an explicit
+  no-authentication warning.
 - Aurora Console Web UI: dark/light themes, command palette, shortcuts, PWA,
   responsive layouts, first-run wizards, live logs/connections/jobs, accessible
   components and visual regression hooks.
@@ -38,7 +41,7 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 385 backend tests, 132 frontend tests
+- Comprehensive audit and coverage suite: 386 backend tests, 133 frontend tests
   and 18 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 

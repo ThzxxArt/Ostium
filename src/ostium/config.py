@@ -141,6 +141,7 @@ class Settings(BaseModel):
     telemetry: bool = False
     mode: Mode = Mode.MIXED
     mixed_port: int = 7890
+    allow_lan: bool = False
     tun_enabled: bool = False
     tun_interface: str = "ostium0"
     proxy_ports: list[int] = Field(default_factory=lambda: [443, 8388])
@@ -203,6 +204,7 @@ class Settings(BaseModel):
             "secure_cookies": self.secure_cookies,
             "mode": self.mode.value,
             "mixed_port": self.mixed_port,
+            "allow_lan": self.allow_lan,
             "tun_enabled": self.tun_enabled,
             "tun_interface": self.tun_interface,
             "proxy_ports": self.proxy_ports,
@@ -272,6 +274,7 @@ class Settings(BaseModel):
             "secure_cookies": raw.get("secure_cookies", False),
             "mode": raw.get("mode", Mode.MIXED.value),
             "mixed_port": raw.get("mixed_port", 7890),
+            "allow_lan": raw.get("allow_lan", False),
             "tun_enabled": raw.get("tun_enabled", False),
             "tun_interface": raw.get("tun_interface", "ostium0"),
             "proxy_ports": raw.get("proxy_ports", [443, 8388]),
@@ -291,6 +294,7 @@ class Settings(BaseModel):
             "OSTIUM_SECURE_COOKIES": ("secure_cookies", _as_bool),
             "OSTIUM_MODE": ("mode", Mode),
             "OSTIUM_MIXED_PORT": ("mixed_port", int),
+            "OSTIUM_ALLOW_LAN": ("allow_lan", _as_bool),
             "OSTIUM_TUN_ENABLED": ("tun_enabled", _as_bool),
             "OSTIUM_TUN_INTERFACE": ("tun_interface", str),
             "OSTIUM_PROXY_PORTS": ("proxy_ports", _as_ports),

@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, useMessage } from 'naive-ui'
-import { Check, Globe2, Info, ShieldCheck, Terminal, Waypoints, Wifi } from 'lucide-vue-next'
+import { NButton, NSwitch, useMessage } from 'naive-ui'
+import {
+  Check,
+  Globe2,
+  Info,
+  Router,
+  ShieldCheck,
+  Terminal,
+  Waypoints,
+  Wifi,
+} from 'lucide-vue-next'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
@@ -17,10 +26,16 @@ const { copy } = useCopy()
 const info = ref<SystemInfo | null>(null)
 const loading = ref(true)
 const busy = ref<string | null>(null)
+const lanBusy = ref(false)
 
 const mode = computed(() => info.value?.mode || 'mixed')
 const proxy = computed(() => info.value?.proxy)
 const tun = computed(() => info.value?.tun)
+const allowLan = computed(() => Boolean(info.value?.allow_lan))
+const lanPort = computed(() => info.value?.lan_port || 7890)
+const lanAddresses = computed(() => info.value?.lan_addresses ?? [])
+const lanAvailable = computed(() => mode.value !== 'tun')
+const proxyHost = computed(() => (allowLan.value ? '0.0.0.0' : '127.0.0.1'))
 
 const modes = computed(() => [
   {
@@ -63,6 +78,26 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function toggleLan(value: boolean) {
+  if (lanBusy.value) return
+  lanBusy.value = true
+  try {
+    await api.settings.update({ allow_lan: value })
+    message.success(value ? t('network.lan_enabled') : t('network.lan_disabled'))
+    await load()
+  } catch (err) {
+    message.error(t('network.lan_failed', { message: (err as Error).message }))
+  } finally {
+    lanBusy.value = false
+  }
+}
+
+function copyLan() {
+  const address = lanAddresses.value[0]
+  const host = address || t('network.lan_placeholder')
+  void copy(`${host}:${lanPort.value}`)
 }
 
 async function switchMode(id: string) {
@@ -136,7 +171,9 @@ onMounted(load)
       <OSectionCard :title="t('network.current')" :icon="Wifi">
         <div class="detail-grid">
           <div>
-            <span>{{ t('network.port') }}</span><strong class="o-mono">127.0.0.1:7890</strong>
+            <span>{{ t('network.port') }}</span><strong class="o-mono"
+              >{{ proxyHost }}:{{ lanPort }}</strong
+            >
           </div>
           <div>
             <span>{{ t('network.tun_interface') }}</span><strong class="o-mono">{{
@@ -177,6 +214,33 @@ onMounted(load)
       </OSectionCard>
     </div>
 
+    <OSectionCard :title="t('network.lan')" :icon="Router" class="lan-card">
+      <div class="lan-head">
+        <div>
+          <strong>{{ t('network.allow_lan') }}</strong>
+          <p class="o-small o-muted">{{ t('network.allow_lan_hint') }}</p>
+        </div>
+        <NSwitch
+          :value="allowLan"
+          :loading="lanBusy"
+          :disabled="!lanAvailable"
+          @update:value="toggleLan"
+        />
+      </div>
+      <div v-if="allowLan && lanAvailable" class="lan-body">
+        <p class="o-small o-muted">{{ t('network.lan_addresses') }}</p>
+        <div class="lan-addresses">
+          <code v-for="address in lanAddresses" :key="address">{{ address }}:{{ lanPort }}</code>
+          <code v-if="!lanAddresses.length">{{ t('network.lan_placeholder') }}:{{ lanPort }}</code>
+        </div>
+        <NButton size="small" secondary @click="copyLan">{{ t('common.copy') }}</NButton>
+        <p class="note">{{ t('network.lan_warning') }}</p>
+      </div>
+      <p v-else class="note">
+        {{ lanAvailable ? t('network.allow_lan_off') : t('network.lan_tun') }}
+      </p>
+    </OSectionCard>
+
     <div class="tip o-card">
       <Info :size="17" />
       <div>
@@ -188,6 +252,34 @@ onMounted(load)
 </template>
 
 <style scoped>
+.lan-card {
+  margin-top: 20px;
+}
+.lan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.lan-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.lan-addresses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lan-addresses code {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+}
 .mode-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

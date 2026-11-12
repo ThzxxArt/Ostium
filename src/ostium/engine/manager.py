@@ -230,6 +230,7 @@ class EngineManager:
         return ClientConfigSpec(
             endpoints=endpoints,
             mixed_port=self.settings.mixed_port,
+            allow_lan=self.settings.allow_lan,
             mode=effective_mode,
             selected=chosen,
             routing_mode=routing_mode or str(stored_routing),

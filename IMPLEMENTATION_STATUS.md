@@ -73,7 +73,7 @@ platform/external validation, `[ ]` not done yet.
       opt-in from Settings, with denied/unsupported/fallback paths tested.
 - [x] Visual regression baselines committed for 1440/1024/390 in dark and light
       themes; axe smoke and no-horizontal-scroll checks run on all three.
-- [x] 132 Vitest tests and 18 Playwright tests pass; see `AUDIT_REPORT.md`.
+- [x] 133 Vitest tests and 18 Playwright tests pass; see `AUDIT_REPORT.md`.
 
 ### Packaging, CI and docs
 
@@ -93,15 +93,15 @@ platform/external validation, `[ ]` not done yet.
 
 - `ruff check` / `ruff format --check`: pass (132 files).
 - `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 385 passed, 0 skipped, 0 failed, including real sing-box config
+- `pytest`: 386 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 98.54%, branches 95.84%; every module ≥85% and
+- Backend coverage: statements 98.51%, branches 95.87%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 91.84%, branches 85.97%, functions 89.39%,
-  lines 92.59% (Vitest v8, thresholds 85).
+- Frontend coverage: statements 91.56%, branches 85.64%, functions 89.31%,
+  lines 92.29% (Vitest v8, thresholds 85).
 - Playwright: 18 passed on desktop 1440, tablet 1024 and mobile 390; login,
   dashboard, command palette, axe smoke, no-horizontal-scroll and six dark/light
   visual baselines pass.

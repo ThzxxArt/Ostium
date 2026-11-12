@@ -36,6 +36,7 @@ def test_settings_read_and_patch(api_client: TestClient, settings: Settings) -> 
         "/api/v1/settings",
         json={
             "mixed_port": 7899,
+            "allow_lan": True,
             "log_level": "debug",
             "trusted_hosts": ["localhost", "example.com"],
             "routing_mode": "global",
@@ -54,12 +55,14 @@ def test_settings_read_and_patch(api_client: TestClient, settings: Settings) -> 
     assert patched.status_code == 200, patched.text
     assert patched.json()["restart_required"] is True
     assert settings.mixed_port == 7899
+    assert settings.allow_lan is True
     assert settings.log_level == "debug"
     assert settings.trusted_hosts == ["localhost", "example.com"]
     assert settings.auto_connect is True
     assert settings.auto_reconnect is False
 
     reread = api_client.get("/api/v1/settings").json()
+    assert reread["general"]["allow_lan"] is True
     assert reread["general"]["routing_mode"] == "global"
     assert reread["notifications"]["has_webhook_secret"] is True
     assert reread["notifications"]["enabled"] is False
@@ -70,6 +73,24 @@ def test_settings_read_and_patch(api_client: TestClient, settings: Settings) -> 
 
     invalid = api_client.patch("/api/v1/settings", json={"mixed_port": 80}, headers=headers)
     assert invalid.status_code == 422
+
+
+def test_allow_lan_applies_client_config(client_api: TestClient, monkeypatch) -> None:
+    token = setup_admin(client_api, role="client")
+    headers = _headers(token)
+    services = client_api.app.state.services
+    calls: list[bool] = []
+
+    async def apply(session) -> dict:  # type: ignore[no-untyped-def]
+        calls.append(True)
+        return {"status": {"revision": "lan-revision"}}
+
+    monkeypatch.setattr(services.engine, "apply_client", apply)
+    response = client_api.patch("/api/v1/settings", json={"allow_lan": True}, headers=headers)
+    assert response.status_code == 200, response.text
+    assert services.settings.allow_lan is True
+    assert calls == [True]
+    assert response.json()["applied"] is True
 
 
 def test_settings_save_failure(api_client: TestClient, monkeypatch) -> None:

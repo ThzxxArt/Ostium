@@ -605,6 +605,18 @@ export default {
     tun_permission: 'TUN 需要核心服务以 root/SYSTEM 运行。',
     switched: '网络模式已切换',
     failed: '切换失败：{message}',
+    lan: '局域网共享',
+    allow_lan: '允许局域网连接',
+    allow_lan_hint: '同一局域网内的其他设备可以把这台电脑当作 HTTP/SOCKS5 代理使用。',
+    allow_lan_off: '当前只有 127.0.0.1 能使用代理。开启后可共享给局域网设备。',
+    lan_addresses: '代理地址',
+    lan_placeholder: '<本机局域网IP>',
+    lan_warning:
+      '仅在可信局域网开启。混合代理没有认证，可能被当作开放代理滥用；请用防火墙限制来源。',
+    lan_enabled: '已开启局域网共享',
+    lan_disabled: '已关闭局域网共享',
+    lan_failed: '局域网共享切换失败：{message}',
+    lan_tun: '局域网共享适用于混合代理/系统代理模式；v0.1.0 不包含 TUN 局域网网关。',
   },
   stats: {
     title: '统计',

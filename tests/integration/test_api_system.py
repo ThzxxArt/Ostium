@@ -81,6 +81,9 @@ def test_server_system_info_doctor_and_diagnostics(
     assert payload["server_host"] == "example.com"
     assert payload["core"]["running"] is True
     assert payload["proxy"]["platform"] == "test"
+    assert payload["allow_lan"] is False
+    assert isinstance(payload["lan_addresses"], list)
+    assert payload["lan_port"] == settings.mixed_port
 
     doctor = api_client.get("/api/v1/system/doctor").json()
     statuses = {(check["id"], check["status"]) for check in doctor["checks"]}

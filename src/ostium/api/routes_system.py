@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import ipaddress
 import json
 import os
 import platform
@@ -33,6 +34,24 @@ from ostium.util.redact import redact
 from ostium.util.time import as_utc, iso, utcnow
 
 router = APIRouter(tags=["system"])
+
+
+def _lan_addresses() -> list[str]:
+    """Return private, non-loopback IPv4 addresses for the LAN sharing hint."""
+
+    addresses: set[str] = set()
+    for entries in psutil.net_if_addrs().values():
+        for entry in entries:
+            if entry.family != socket.AF_INET:
+                continue
+            try:
+                address = ipaddress.ip_address(entry.address)
+            except ValueError:
+                continue
+            if address.is_loopback or address.is_link_local or not address.is_private:
+                continue
+            addresses.add(str(address))
+    return sorted(addresses)
 
 
 class ProxyToggle(BaseModel):
@@ -86,6 +105,9 @@ async def info(
         if services.settings.role is Role.SERVER
         else None,
         "mode": services.settings.mode.value,
+        "allow_lan": services.settings.allow_lan,
+        "lan_addresses": _lan_addresses(),
+        "lan_port": services.settings.mixed_port,
         "proxy": services.proxy.status(),
         "tun": {
             "enabled": services.settings.tun_enabled,

@@ -611,6 +611,20 @@ export default {
     tun_permission: 'TUN requires the core service to run as root/SYSTEM.',
     switched: 'Network mode changed',
     failed: 'Could not switch: {message}',
+    lan: 'LAN sharing',
+    allow_lan: 'Allow LAN connections',
+    allow_lan_hint:
+      'Other devices on the same network can use this computer as an HTTP/SOCKS5 proxy.',
+    allow_lan_off: 'Only 127.0.0.1 can use the proxy. Enable to share it on the LAN.',
+    lan_addresses: 'Proxy addresses',
+    lan_placeholder: '<LAN IP>',
+    lan_warning:
+      'Only enable on a trusted network. The mixed proxy has no authentication and can be abused as an open proxy; restrict it with firewall rules.',
+    lan_enabled: 'LAN sharing enabled',
+    lan_disabled: 'LAN sharing disabled',
+    lan_failed: 'Could not change LAN sharing: {message}',
+    lan_tun:
+      'LAN sharing applies to mixed/system proxy mode. TUN LAN gateway is not included in v0.1.0.',
   },
   stats: {
     title: 'Statistics',
