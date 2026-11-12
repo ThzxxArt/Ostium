@@ -95,8 +95,12 @@ class CoreSupervisor:
             self._last_error = f"last-good config rejected: {exc}"
             self._write_state()
             return
-        await self._spawn()
-        self._running_config_sha = config_digest(config)
+        try:
+            await self._spawn()
+            self._running_config_sha = config_digest(config)
+        except CoreError as exc:
+            self._last_error = str(exc)
+            self._write_state()
 
     async def apply(self, config: dict[str, Any], expected_sha256: str) -> SupervisorStatus:
         if not self.engine.is_file():
@@ -120,9 +124,12 @@ class CoreSupervisor:
             temp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
             if os.name == "posix":
                 temp.chmod(0o600)
+            previous = self.last_good.read_bytes() if self.last_good.is_file() else None
+            replaced = False
             try:
                 await self._check(temp)
                 temp.replace(self.last_good)
+                replaced = True
                 if os.name == "posix":
                     self.last_good.chmod(0o600)
                 if self._process is not None and self._process.returncode is None:
@@ -133,10 +140,14 @@ class CoreSupervisor:
                 self._last_error = None
             except CoreError:
                 temp.unlink(missing_ok=True)
+                if replaced:
+                    await self._rollback(previous)
                 self._write_state()
                 raise
             except Exception as exc:
                 temp.unlink(missing_ok=True)
+                if replaced:
+                    await self._rollback(previous)
                 self._last_error = redact(str(exc))
                 self._write_state()
                 raise EngineStartFailed(f"failed to apply configuration: {exc}") from exc
@@ -255,6 +266,31 @@ class CoreSupervisor:
         self._started_at = utcnow()
         self._last_error = None
         self._append_log("supervisor", f"started sing-box pid={process.pid}")
+
+    async def _rollback(self, previous: bytes | None) -> None:
+        """Restore the previous last-good config and try to start it again."""
+
+        if previous is None:
+            self.last_good.unlink(missing_ok=True)
+            await self._terminate()
+            return
+        self.last_good.write_bytes(previous)
+        if os.name == "posix":
+            self.last_good.chmod(0o600)
+        try:
+            if self._process is not None and self._process.returncode is None:
+                if os.name == "posix":
+                    self._process.send_signal(signal.SIGHUP)
+                    await asyncio.sleep(0.4)
+                else:  # pragma: no cover - Windows restart path
+                    await self._spawn()
+            else:
+                await self._spawn()
+            self._append_log("supervisor", "rollback to previous configuration")
+        except Exception as exc:
+            self._last_error = f"rollback failed: {exc}"
+            self._append_log("supervisor", self._last_error)
+        self._running_config_sha = config_digest(json.loads(previous))
 
     async def _reload_running(self) -> None:
         assert self._process is not None
