@@ -5,6 +5,7 @@ __pycache__/
 .eggs/
 build/
 dist/
+!web/dist/
 .venv/
 venv/
 .mypy_cache/
@@ -20,7 +21,8 @@ src/ostium/_version.py
 
 # Node
 node_modules/
-web/dist/
+web/dist/*
+!web/dist/.gitkeep
 web/.vite/
 web/coverage/
 web/test-results/
