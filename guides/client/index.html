@@ -612,6 +612,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#allow-lan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        局域网共享（Allow LAN）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1400,6 +1411,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#allow-lan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        局域网共享（Allow LAN）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1547,6 +1569,22 @@
 <li>先用 <strong>System proxy</strong>；需要全机 TCP/UDP/DNS 接管时再切 <strong>TUN</strong>。</li>
 <li>连接失败时用 <strong>Diagnostics</strong> 检查端口、DNS、路由、TUN、代理和核心状态。</li>
 </ol>
+<h2 id="allow-lan">局域网共享（Allow LAN）<a class="headerlink" href="#allow-lan" title="Permanent link">&para;</a></h2>
+<p>需要让手机、平板或另一台电脑通过这台客户端上网时：</p>
+<ol>
+<li>打开 <strong>Network</strong> → <strong>允许局域网连接</strong>；</li>
+<li>在其它设备上把 HTTP/SOCKS5 代理设为：</li>
+<li>地址：这台电脑的局域网 IP（页面会直接列出）</li>
+<li>端口：<code>7890</code></li>
+<li>在客户端防火墙/路由器上只允许可信网段访问 7890。</li>
+</ol>
+<p>注意：</p>
+<ul>
+<li>混合代理<strong>没有认证</strong>，开启后同一网络内任何人都可能使用；只建议在可信家庭/实验室网络开启。</li>
+<li>该功能适用于混合代理/系统代理模式；v0.1.0 不包含“TUN 局域网网关”。</li>
+<li>如果开启了系统代理，系统代理本身仍指向 <code>127.0.0.1:7890</code>；局域网设备需要手动填写本机 IP。</li>
+<li>关闭开关后，sing-box 会重新监听 <code>127.0.0.1</code>，局域网设备立即断开。</li>
+</ul>
 <h2 id="_5">模式<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
