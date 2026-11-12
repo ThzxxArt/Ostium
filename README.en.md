@@ -1,0 +1,691 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ThzxxArt/Ostium/main/assets/brand/ostium-banner.svg" alt="Ostium — dual-role personal VPN and universal proxy console" width="100%">
+</p>
+
+<h1 align="center">Ostium</h1>
+
+<p align="center">
+  <strong>One app, two roles: a private VPN and universal proxy console for servers and devices.</strong><br>
+  The same Python package, the same Web UI, the same CLI — one install.
+</p>
+
+<p align="center">
+  <a href="README.md">简体中文</a> ·
+  <a href="README.en.md">English</a> ·
+  <a href="https://github.com/ThzxxArt/Ostium/tree/main/docs">Documentation</a> ·
+  <a href="https://github.com/ThzxxArt/Ostium/issues">Issues</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-5EEAD4?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.162-009688?style=flat-square&logo=fastapi&logoColor=white">
+  <img alt="Vue" src="https://img.shields.io/badge/Vue-3.5-42B883?style=flat-square&logo=vuedotjs&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="sing-box" src="https://img.shields.io/badge/sing--box-1.14.4--ostium.1-00A3FF?style=flat-square">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748B?style=flat-square&logo=linux&logoColor=white">
+</p>
+
+<p align="center">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.55%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.84%25%20statements%20%C2%B7%2085.97%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-384%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+</p>
+
+> [!NOTE]
+> **v0.1.0** code and automated tests are ready. PyPI, GHCR and GitHub Releases are not published yet.
+> Download links will be added after the release. Every install command below assumes a release
+> artifact or a local source build.
+
+---
+
+## Why Ostium
+
+Ostium is not another proxy shell script. It is an installable, upgradeable, backup-friendly
+and auditable private-network console.
+
+| | Capability |
+|---|---|
+| 🧭 **One app, two roles** | Server and client share one package, one SPA and one CLI. Learn once, use both. |
+| 🛡️ **Two-service isolation** | `ostium.service` runs the Web/API/database. `ostium-core.service` only validates, starts and supervises sing-box. The UI never holds root/TUN privileges. |
+| 📊 **Real traffic accounting** | A custom `sing-box` build with `with_v2ray_api` tracks per-user up/down, daily/monthly totals, quotas and expiry. |
+| 🌐 **A real desktop client** | Windows 11, macOS 14+ and Linux with mixed proxy, system proxy, TUN, URLTest and multiple subscriptions. |
+| 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
+| 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller, Inno Setup, DEB and AppImage assets. |
+| 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
+| 🧪 **Verified** | 384 backend tests, 132 frontend tests and 18 Playwright tests; 98.55% backend statements / 95.84% branches. |
+
+---
+
+## Features
+
+### Server
+
+- Reality (VLESS + XTLS Vision), Hysteria2, Trojan and Shadowsocks 2022.
+- Multi-user lifecycle: create, disable, delete, expiry, notes, credential rotation, usage reset.
+- Per-user quotas: total/monthly, automatic disable on expiry or quota exhaustion.
+- Subscriptions: Ostium JSON, Base64, Clash Meta YAML, sing-box JSON; share links and QR codes.
+- ACME HTTP-01, manual certificate upload, self-signed certificates, renewal and expiry alerts.
+- Live traffic, connections, logs, WebSocket events and Prometheus text metrics.
+- Backups: SQLite online backup, master key, config and certificates with scrypt + AES-256-GCM.
+- Audit log, webhook alerts, redacted diagnostics, IP allow-list and login throttling.
+- Public admin UI: mandatory TLS + TOTP; loopback-only by default.
+
+### Client
+
+- Mixed proxy on `127.0.0.1:7890` (SOCKS5 + HTTP).
+- System proxy: Windows WinINET, macOS `networksetup`, Linux GNOME/KDE, with crash recovery.
+- TUN: Windows Wintun, macOS utun, Linux TUN; IPv4/IPv6, TCP/UDP and DNS capture.
+- Routing presets: smart (direct for China), global proxy, direct only and custom rules.
+- Rules: domain/suffix/keyword/regex, IP CIDR, port, process name, GeoSite/GeoIP/rule sets.
+- DNS: FakeIP + remote DoH + local DNS; clear limitations in mixed mode.
+- Multiple profiles, endpoints, URLTest failover and manual selection.
+- Subscription refresh, share-link import and QR import/display.
+- System proxy and TUN are mutually exclusive; switching cleans up the old state.
+
+### Shared
+
+- Vue 3 SPA, FastAPI, SQLAlchemy/Alembic, SQLite WAL.
+- Chinese/English UI, dark/light themes, desktop/tablet/mobile layouts.
+- Command palette (`Ctrl/Cmd + K`), keyboard shortcuts and global search.
+- First-run wizards: four server steps, three client steps.
+- Browser notifications, PWA offline shell and update prompt.
+- Backup, upgrade, rollback, diagnostics and service management.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph UI["ostium.service · control plane"]
+    WEB["Web UI / REST / WS"]
+    SVC["users / subscriptions / rules / certs / stats"]
+    DB[("SQLite")]
+    WEB --> SVC --> DB
+  end
+
+  subgraph CORE["ostium-core.service · core"]
+    API["127.0.0.1:8788 · Bearer"]
+    SUP["Core Supervisor"]
+    SB["sing-box 1.14.4-ostium.1"]
+    API --> SUP --> SB
+  end
+
+  SVC -->|"validate + apply"| API
+  SVC -->|"gRPC / HTTP"| SB
+  SB --> IN["Reality · Hysteria2<br>Trojan · SS2022"]
+  SB --> OUT["direct / DNS"]
+```
+
+- The **control plane** runs unprivileged. Only the **core** can bind port 443 or create TUN devices.
+- Restarting or upgrading the UI does not interrupt the tunnel; a crashed core is restarted by
+  systemd, launchd or the Windows SCM.
+- Configurations pass a role/port/path allow-list and `sing-box check`; failures keep the last-good
+  configuration and binary.
+
+---
+
+## Requirements
+
+| Role | Requirement |
+|---|---|
+| Server | Ubuntu 24.04 / Debian 13, 1 vCPU / 1 GB minimum, 20 GB SSD; ports 80/tcp, 443/tcp and 443/udp |
+| Windows client | Windows 10 22H2+ / 11 x64; administrator rights for the TUN service |
+| macOS client | macOS 14+, arm64/x64; `sudo` for the LaunchDaemon |
+| Linux client | x64/arm64; TUN requires root or `CAP_NET_ADMIN` |
+| Development | Python 3.13, uv 0.11+, Node 24.19+, Go 1.25.5 (only for the custom core) |
+
+> The server UI listens on `127.0.0.1:8443` by default. For public access, configure a certificate
+> and TOTP first, enable it explicitly in Settings, then restart `ostium.service`.
+
+---
+
+## Installation
+
+### Option 1 — Linux server (recommended)
+
+Download the release artifacts (after publication):
+
+- `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
+- `SHA256SUMS`
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+
+sudo ./install.sh --role server \
+  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+  --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
+  --domain vpn.example.com
+```
+
+The installer will:
+
+1. create the `ostium` system user;
+2. install to `/opt/ostium` and link `ostium` into `/usr/local/bin`;
+3. initialise the database, Reality inbound and administrator;
+4. register and start `ostium-core.service` and `ostium.service`;
+5. print a one-time administrator password.
+
+Open an SSH tunnel:
+
+```bash
+ssh -L 8443:127.0.0.1:8443 root@your-server
+```
+
+Browse to <http://127.0.0.1:8443>. **Enable TOTP immediately after the first login.**
+
+Firewall (configure the cloud security group too):
+
+```bash
+sudo ufw default deny incoming
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 443/udp
+sudo ufw enable
+```
+
+Service status and logs:
+
+```bash
+systemctl status ostium-core ostium
+journalctl -u ostium -u ostium-core -f
+```
+
+### Option 2 — Linux client
+
+```bash
+sudo ./install.sh --role client \
+  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+  --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
+```
+
+Log out and back in so your user picks up the `ostium` group, then start the user UI:
+
+```bash
+systemctl --user enable --now ostium
+```
+
+Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
+
+### Option 3 — Windows client
+
+1. Run `Ostium-0.1.0-windows-x64-setup.exe`.
+2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
+   and starts the UI at logon.
+3. Data lives in `%ProgramData%\Ostium`.
+4. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
+   trust the source.
+
+You can also run the PowerShell installer from the release directory:
+
+```powershell
+.\install.ps1
+```
+
+### Option 4 — macOS client
+
+1. Open the DMG and keep `install-macos.sh` beside the release files.
+2. Run:
+
+```bash
+sudo ./install-macos.sh client
+```
+
+The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` LaunchAgent,
+and links the `ostium` command. Unsigned/unnotarised builds trigger Gatekeeper; verify checksums
+first.
+
+### Option 5 — Docker server
+
+Once published, use the GHCR image:
+
+```bash
+OSTIUM_ADMIN_PASSWORD='change-me-now' \
+OSTIUM_DOMAIN='vpn.example.com' \
+docker compose -f deploy/docker/docker-compose.yml up -d
+```
+
+Local build:
+
+```bash
+docker build -t ostium:0.1.0 .
+docker run -d --name ostium --network host \
+  -e OSTIUM_ROLE=server \
+  -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
+  -e OSTIUM_DOMAIN='vpn.example.com' \
+  -v ostium-data:/var/lib/ostium \
+  -v ostium-etc:/etc/ostium \
+  ostium:0.1.0
+```
+
+> Docker uses host networking so it can bind 443/80. Configure the firewall, TLS and off-host
+> backups yourself.
+
+### Option 6 — PyPI (after publication)
+
+The PyPI distribution is **`ostium-ctl`**; the import name and CLI remain `ostium`:
+
+```bash
+uv tool install ostium-ctl
+# or
+pipx install ostium-ctl
+# or
+pip install ostium-ctl
+```
+
+Then:
+
+```bash
+sudo ostium init --role server --no-input --password 'change-me-now'
+sudo ostium serve
+```
+
+### Option 7 — From source
+
+```bash
+git clone https://github.com/ThzxxArt/Ostium.git
+cd Ostium
+uv sync
+
+uv run ostium init --role server --dev --no-input --password 'change-me-now'
+uv run ostium serve          # terminal 1: control plane + SPA
+uv run ostium core-run       # terminal 2: core service
+```
+
+Frontend development:
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Build the custom core:
+
+```bash
+./scripts/build-core.sh --os linux amd64
+```
+
+---
+
+## First Run
+
+### Server
+
+1. Open the UI and sign in with the generated administrator account.
+2. Go to **Settings → Security**:
+   - change the password;
+   - enable TOTP and store the recovery codes;
+   - optionally create an API token.
+3. Go to **Users → Add user** and set quota, cycle and expiry.
+4. Open **Subscriptions**, copy any of the four formats or show the QR code.
+5. For Hysteria2/Trojan:
+   - issue an ACME certificate, upload one, or create a self-signed certificate in **Certificates**;
+   - enable the inbound in **Inbounds** and assign the certificate.
+6. For a public admin UI:
+   - confirm TOTP is enabled;
+   - configure the domain and certificate;
+   - enable **Settings → Public admin UI**;
+   - `sudo systemctl restart ostium` and use HTTPS.
+
+### Client
+
+1. Open <http://127.0.0.1:8787> and complete the three-step wizard.
+2. **Profiles → Import**: paste a subscription URL, share link, Clash/sing-box config, or scan a
+   QR code.
+3. Select a profile and endpoint on **Home**.
+4. Start with **System proxy**; switch to **TUN** only when you need full TCP/UDP/DNS capture.
+5. Tune routing in **Routing** and use **Diagnostics** when something fails.
+
+---
+
+## Usage
+
+### Server operations
+
+```bash
+# Users
+sudo -u ostium ostium user list
+sudo -u ostium ostium user add alice --quota 100G --cycle monthly
+sudo -u ostium ostium user subscription alice
+sudo -u ostium ostium user disable alice
+sudo -u ostium ostium user rotate alice --subscription
+
+# Backups
+sudo -u ostium ostium backup create --password 'a long passphrase'
+sudo -u ostium ostium backup list
+
+# Diagnostics
+sudo ostium doctor
+sudo ostium logs --source core -f
+sudo ostium diagnostics export --output /tmp/ostium-diagnostics.tar.gz
+
+# Certificates (local testing)
+sudo -u ostium ostium cert issue local.example.com --self-signed
+```
+
+### Client modes
+
+| Mode | What it captures | Limits |
+|---|---|---|
+| Mixed | Apps explicitly configured for `127.0.0.1:7890` | No DNS takeover |
+| System proxy | Apps that honour the OS proxy | Some apps bypass it; no DNS takeover |
+| TUN | Whole-machine TCP/UDP/DNS | Requires admin/root; no standalone kill switch in v0.1.0 |
+
+System proxy and TUN are mutually exclusive. Switching cleans up the old proxy, routes and
+virtual interface.
+
+### CLI cheat sheet
+
+| Command | Purpose |
+|---|---|
+| `ostium init --role server\|client` | Initialise data, config, admin and default inbounds |
+| `ostium serve` | Run the control plane / Web UI |
+| `ostium core-run` | Run the core service (internal) |
+| `ostium status [--json]` | Role, paths, database and core status |
+| `ostium open` | Open the local Web UI |
+| `ostium doctor [--json] [--fix]` | Local diagnostics |
+| `ostium logs [-f] [--source ostium\|core]` | Tail logs |
+| `ostium connect` / `disconnect` | Client connect/disconnect |
+| `ostium proxy on\|off\|status` | System proxy |
+| `ostium tun on\|off\|status` | TUN |
+| `ostium update [--check]` | Check for updates (install stays explicit) |
+| `ostium diagnostics export` | Export a redacted diagnostics bundle |
+| `ostium user ...` | Server-side user management |
+| `ostium profile ...` | Client profiles and subscriptions |
+| `ostium core install/update/status/version` | Core binary management |
+| `ostium backup create/list/restore` | Backup and restore |
+| `ostium cert list/issue` | Certificate management |
+| `ostium service install/uninstall` | systemd units (Linux root) |
+
+Exit codes: `0` success, `1` general, `2` usage, `3` not initialised, `4` service unavailable,
+`5` permission, `6` core error.
+
+### API and automation
+
+- API prefix: `/api/v1`; OpenAPI: `/api/docs`.
+- Browsers use a session cookie + CSRF. Automation uses `Authorization: Bearer <API token>`.
+- Create scoped `read`/`write` tokens in **Settings → API tokens**.
+- Local CLI requests use `<data>/runtime/cli.token` and are restricted to loopback.
+
+```bash
+curl -H "Authorization: Bearer $OSTIUM_TOKEN" \
+  http://127.0.0.1:8443/api/v1/system/services
+```
+
+### Backup and restore
+
+**Recommended:** Settings → Maintenance → Backups → Create / Apply. A restore is staged first and
+applies only after both services restart.
+
+CLI restore (stop the services first):
+
+```bash
+sudo systemctl stop ostium ostium-core
+sudo -u ostium ostium backup restore ./ostium-backup-....ostb --password '...'
+sudo systemctl start ostium-core ostium
+```
+
+> Backups include the master key. Without the backup password or master key, user passwords,
+> subscription tokens and certificate private keys cannot be recovered.
+
+### HTTPS / ACME
+
+1. Point the domain A/AAAA record at the server.
+2. Open 80/tcp.
+3. Set the ACME email in Settings.
+4. Certificates → Issue → ACME.
+5. Assign the certificate to Hysteria2/Trojan.
+6. Enable TOTP, then enable the public admin UI.
+7. Restart `ostium.service`.
+
+v0.1.0 supports HTTP-01 only; DNS-01 and TLS-ALPN-01 are intentionally out of scope.
+
+---
+
+## Upgrade and Rollback
+
+### Application upgrade (server)
+
+```bash
+# 1. Back up first
+sudo -u ostium ostium backup create --password '...'
+
+# 2. Stop only the control plane; the core keeps the tunnel alive
+sudo systemctl stop ostium
+
+# 3. Install the new wheel
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.0-py3-none-any.whl
+
+# 4. Start; migrations run at startup
+sudo systemctl start ostium
+curl -fsS http://127.0.0.1:8443/readyz
+```
+
+### Core upgrade
+
+```bash
+sudo ostium core install --binary ./sing-box
+# or
+sudo ostium core install --url https://.../ostium-core-....tar.gz --sha256 <hash>
+sudo ostium core update
+```
+
+The supervisor runs `sing-box check` before switching. On failure the previous binary and
+configuration remain active.
+
+### Rollback
+
+1. Stop `ostium.service`.
+2. Install the previous wheel.
+3. If a migration is incompatible, restore the database from backup.
+4. Start and verify `/readyz`, login, subscriptions and core status.
+
+### Client upgrade
+
+Windows/macOS installers replace the app in place and preserve data and profiles. On Linux,
+re-run `install.sh --role client`. A core upgrade briefly interrupts the tunnel; a UI upgrade does
+not.
+
+> Ostium never silently auto-updates. Every upgrade is downloaded, verified and installed
+> explicitly.
+
+---
+
+## Uninstall
+
+### Linux server
+
+```bash
+sudo systemctl disable --now ostium ostium-core
+sudo rm -f /etc/systemd/system/ostium.service /etc/systemd/system/ostium-core.service
+sudo systemctl daemon-reload
+sudo rm -f /usr/local/bin/ostium
+sudo rm -rf /opt/ostium
+
+# Data is preserved by default. Remove only when you are sure:
+# sudo rm -rf /var/lib/ostium /etc/ostium
+# sudo userdel ostium
+```
+
+### Linux client
+
+```bash
+systemctl --user disable --now ostium
+sudo systemctl disable --now ostium-core
+sudo rm -f /etc/systemd/system/ostium-core.service
+rm -f ~/.config/systemd/user/ostium.service
+sudo systemctl daemon-reload
+systemctl --user daemon-reload
+
+# Restore the system proxy / clean TUN first if the service is still running:
+# ostium proxy off
+# sudo ostium tun off
+
+sudo rm -rf /opt/ostium
+sudo rm -f /usr/local/bin/ostium
+# Data remains by default. Remove only when you are sure:
+# sudo rm -rf /var/lib/ostium-core /etc/ostium/client.toml
+```
+
+### Windows
+
+Settings → Apps → Ostium → Uninstall. The uninstaller stops `OstiumCore`, removes the logon task
+and attempts to restore the system proxy. Data in `%ProgramData%\Ostium` is preserved by default.
+
+### macOS
+
+```bash
+sudo launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist
+sudo launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist
+sudo rm -f /Library/LaunchDaemons/com.ostium.core.plist
+sudo rm -f /Library/LaunchAgents/com.ostium.ui.plist
+sudo rm -rf /opt/ostium
+# Data: /Library/Application Support/Ostium (remove only when sure)
+```
+
+### Docker
+
+```bash
+docker compose -f deploy/docker/docker-compose.yml down
+# Also remove volumes (irreversible):
+# docker compose -f deploy/docker/docker-compose.yml down -v
+```
+
+---
+
+## Security
+
+- The admin UI is loopback-only by default. Never expose it without TLS + TOTP.
+- Change the password and enable TOTP immediately after first login; store recovery codes.
+- Open only the ports you need: 22, 80, 443/tcp and 443/udp. Do not expose 8388/8443 by default.
+- Run the control plane as an unprivileged user; only the core needs low ports or TUN privileges.
+- Keep encrypted backups off-host. A backup contains the master key and is highly sensitive.
+- Subscription tokens are shown once; rotate them immediately if leaked.
+- Never paste diagnostics, logs, `.env` files or `master.key` into a public issue.
+- Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
+
+---
+
+## Data Locations
+
+| Platform | Control plane | Core |
+|---|---|---|
+| Linux server | `/var/lib/ostium`, `/etc/ostium` | same |
+| Linux client | `~/.local/share/ostium` (user UI) | `/var/lib/ostium-core` |
+| Windows | `%LOCALAPPDATA%\Ostium` (UI) | `%ProgramData%\Ostium` |
+| macOS | `~/Library/Application Support/Ostium` (UI) | `/Library/Application Support/Ostium` |
+
+Key files: `ostium.db`, `master.key`, `config.toml`, `certs/`, `runtime/last-good.json`,
+`runtime/core.token`, `logs/` and `backups/`.
+
+---
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| UI does not open | `systemctl status ostium`; confirm `127.0.0.1:8443`; read `journalctl -u ostium` |
+| Core not running | `ostium core status`; `ostium logs --source core`; verify the core binary path and permissions |
+| Port 443 busy | `ss -lntup \| grep :443`; stop a conflicting nginx/caddy or change the port |
+| Subscription 403 | User disabled/expired/over quota; check `status` and `disabled_reason` in Users |
+| Subscription 404 | Token rotated or user deleted; copy the subscription link again |
+| TUN fails | Requires root/CAP_NET_ADMIN; verify `/dev/net/tun` or Wintun is installed |
+| System proxy not restored | `ostium proxy off`; inspect `runtime/system-proxy.json` and the platform commands |
+| ACME fails | Is 80/tcp reachable? Does DNS point to this host? Check `last_error` on the certificate |
+| Broken after upgrade | Check `/readyz`; roll back the wheel/database; see `AUDIT_REPORT.md` |
+
+Export diagnostics:
+
+```bash
+sudo ostium diagnostics export --output /tmp/ostium-diagnostics.tar.gz
+```
+
+The bundle redacts tokens, passwords, UUIDs, private keys and share links.
+
+---
+
+## Testing and Quality
+
+```bash
+# Backend
+uv run ruff check src tests scripts
+uv run ruff format --check src tests scripts
+uv run mypy src/ostium
+uv run pytest -q
+
+# Frontend
+cd web
+npm run lint
+npm run typecheck
+npm run test:coverage
+npm run build
+npm run format:check
+
+# E2E / accessibility / visual regression
+npx playwright test
+```
+
+Current results:
+
+- Backend: **384 passed / 0 skipped**, **98.55%** statements / **95.84%** branches.
+- Frontend: **132 passed**, **91.84%** statements / **85.97%** branches /
+  **89.39%** functions / **92.59%** lines.
+- Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login
+  check.
+- `pip-audit` / `npm audit`: 0 known vulnerabilities.
+- Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).
+
+---
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Server guide](docs/guides/server.md)
+- [Client guide](docs/guides/client.md)
+- [TUN guide](docs/guides/tun.md)
+- [ACME / TLS](docs/guides/acme.md)
+- [Subscription formats](docs/guides/subscription.md)
+- [Web UI guide](docs/guides/ui.md)
+- [CLI reference](docs/reference/cli.md)
+- [API reference](docs/reference/api.md)
+- [Profile v1](docs/reference/profile.md)
+- [Ports and paths](docs/reference/ports.md)
+- [Backup and restore](docs/operations/backup.md)
+- [Upgrade and rollback](docs/operations/upgrade.md)
+- [Troubleshooting](docs/operations/troubleshooting.md)
+- [Security model](docs/security/threat-model.md)
+- [Design system](docs/design-system.md)
+- [UX guidelines](docs/ux.md)
+
+---
+
+## Contributing
+
+Issues, documentation fixes and test improvements are welcome. Before submitting:
+
+1. Read [`CONTRIBUTING.md`](CONTRIBUTING.md).
+2. Run the full backend and frontend checks.
+3. Never commit keys, certificates, subscription tokens, diagnostics bundles or personal configs.
+4. Report security issues privately through the process in [`SECURITY.md`](SECURITY.md).
+
+---
+
+## License
+
+- Code: **GPL-3.0-or-later**, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+- Documentation: CC BY-SA 4.0.
+- The bundled sing-box binary is built from unmodified upstream source and remains GPL-3.0.
+
+Ostium is intended for personal learning, privacy and self-hosted network management. Follow
+applicable laws and your hosting provider's AUP. This project does not provide legal advice.

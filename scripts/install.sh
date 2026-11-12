@@ -105,6 +105,7 @@ install -d -m 0755 "$PREFIX"
 "$PYTHON_BIN" -m venv "$PREFIX/venv"
 "$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
 "$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
+ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
 CORE_TMP="$(mktemp -d)"
 tar -xzf "$CORE" -C "$CORE_TMP"

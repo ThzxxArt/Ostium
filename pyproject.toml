@@ -117,6 +117,8 @@ include = [
   "/web/tsconfig.json",
   "/pyproject.toml",
   "/README.md",
+  "/README.en.md",
+  "/assets",
   "/LICENSE",
   "/NOTICE",
   "/CHANGELOG.md",

@@ -22,6 +22,7 @@ mkdir -p "$PREFIX" "$DATA" "$DATA/logs" "$CORE_DATA"
 python3 -m venv "$PREFIX/venv"
 "$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip
 "$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
+ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
 if [[ "$ROLE" == "server" ]]; then
   echo "macOS is supported as a client; run the Linux installer for the server." >&2
