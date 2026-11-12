@@ -15,6 +15,7 @@ venv/
 htmlcov/
 coverage.xml
 .hypothesis/
+site/
 src/ostium/_version.py
 
 # Node

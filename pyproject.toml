@@ -56,7 +56,7 @@ dependencies = [
   "grpcio==1.85.1",
   "protobuf==7.36.2",
   "PyYAML==6.0.3",
-  "python-multipart==0.0.20",
+  "python-multipart==0.0.31",
   "aiofiles==25.1.0",
   "pywin32==312; sys_platform == 'win32'",
 ]
@@ -121,6 +121,7 @@ include = [
   "/NOTICE",
   "/CHANGELOG.md",
   "/PLAN.md",
+  "/AUDIT_REPORT.md",
 ]
 
 [tool.hatch.build.targets.sdist.force-include]
@@ -142,7 +143,14 @@ markers = [
 [tool.coverage.run]
 source = ["ostium"]
 branch = true
-omit = ["src/ostium/_version.py", "src/ostium/api/static.py"]
+# SQLAlchemy's async bridge uses greenlets; without this coverage loses line
+# events after awaited database calls and under-reports real test coverage.
+concurrency = ["greenlet", "thread"]
+omit = [
+  "src/ostium/_version.py",
+  "src/ostium/engine/singbox/v2ray_stats_pb2.py",
+  "src/ostium/engine/singbox/v2ray_stats_pb2_grpc.py",
+]
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

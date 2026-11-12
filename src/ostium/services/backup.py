@@ -20,7 +20,7 @@ from typing import Any
 
 from ostium import __version__
 from ostium.config import Settings
-from ostium.util.security import decrypt_blob, encrypt_blob
+from ostium.util.security import CryptoError, decrypt_blob, encrypt_blob
 from ostium.util.time import iso, utcnow
 
 BACKUP_PREFIX = "ostium-backup-"
@@ -121,7 +121,10 @@ def restore_backup(
             raise BackupError(
                 "this backup is encrypted; a password is required", "password_required"
             )
-        raw = decrypt_blob(raw, password)
+        try:
+            raw = decrypt_blob(raw, password)
+        except CryptoError as exc:
+            raise BackupError(str(exc), "invalid_password", 400) from exc
     with tempfile.TemporaryDirectory(prefix="ostium-restore-") as temp:
         staging = Path(temp)
         try:
@@ -214,6 +217,11 @@ def stage_restore(
     encrypted = raw.startswith(b"OSTB1")
     if encrypted and not password:
         raise BackupError("this backup is encrypted; a password is required", "password_required")
+    if encrypted and password:
+        try:
+            decrypt_blob(raw, password)
+        except CryptoError as exc:
+            raise BackupError(str(exc), "invalid_password", 400) from exc
     store = SecretStore.from_data_dir(settings.data_dir)
     password_token = (
         store.encrypt(password, table="settings", record_id="restore", field="password")

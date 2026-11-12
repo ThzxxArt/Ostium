@@ -20,9 +20,10 @@ from ostium.engine.singbox.config import (
 )
 
 
-def _engine(settings: Settings) -> Path | None:
+def _engine(settings: Settings) -> Path:
     path = Path(settings.engine_path or settings.paths.engine_binary)
-    return path if path.is_file() else None
+    assert path.is_file(), f"sing-box binary not found at {path}"
+    return path
 
 
 def _server_config() -> dict:
@@ -56,8 +57,7 @@ def _server_config() -> dict:
 
 @pytest.mark.integration
 def test_core_api_apply_and_stop(settings: Settings) -> None:
-    if _engine(settings) is None:
-        pytest.skip("sing-box binary not available")
+    _engine(settings)
     app = create_core_app(settings)
     with TestClient(app) as client:
         assert client.get("/v1/health").status_code == 200
@@ -87,8 +87,7 @@ def test_core_api_apply_and_stop(settings: Settings) -> None:
 
 @pytest.mark.integration
 def test_core_rejects_digest_mismatch(settings: Settings) -> None:
-    if _engine(settings) is None:
-        pytest.skip("sing-box binary not available")
+    _engine(settings)
     app = create_core_app(settings)
     with TestClient(app) as client:
         token = settings.paths.core_token_path.read_text().strip()
@@ -104,8 +103,7 @@ def test_core_rejects_digest_mismatch(settings: Settings) -> None:
 
 @pytest.mark.integration
 def test_core_rejects_wrong_role(settings: Settings) -> None:
-    if _engine(settings) is None:
-        pytest.skip("sing-box binary not available")
+    _engine(settings)
     app = create_core_app(settings)
     with TestClient(app) as client:
         token = settings.paths.core_token_path.read_text().strip()

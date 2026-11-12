@@ -33,9 +33,9 @@ platform/external validation, `[ ]` not done yet.
 - [x] Custom `with_v2ray_api` core built with Go 1.25.5 (version
       `1.14.4-ostium.1`); gRPC per-user counters verified live
       (`alice: (5679, 19387)` after test traffic) and Clash API verified.
-- [~] V2Ray stats collector epoch/quota logic (green against the custom core
-      manually and with a fake gRPC source in tests; a live collector integration
-      test is still to add).
+- [x] V2Ray stats collector epoch/quota logic, including a live end-to-end
+      test with the custom core, a real client, real loopback traffic and a
+      real collector tick (`test_collector_live.py`).
 - [x] Four subscription formats + QR + share URIs + public rate limiting.
 - [x] ACME HTTP-01 client (account key, order, challenge server, CSR, finalize)
       and self-signed/manual certificate storage; live ACME not run here.
@@ -69,11 +69,11 @@ platform/external validation, `[ ]` not done yet.
 - [x] Lazy-loaded ECharts chart wrapper to keep echarts out of the initial
       render path.
 - [x] Responsive breakpoints and reduced-motion handling.
-- [~] Browser notifications and PWA update prompt are wired; notification
-      permission is opt-in from Settings. Browser/platform fallbacks need a
-      real-device pass.
-- [~] Visual regression baselines are configured but not generated; axe smoke
-      is present in Playwright spec.
+- [x] Browser notifications and PWA update prompt are wired; permission is
+      opt-in from Settings, with denied/unsupported/fallback paths tested.
+- [x] Visual regression baselines committed for 1440/1024/390 in dark and light
+      themes; axe smoke and no-horizontal-scroll checks run on all three.
+- [x] 132 Vitest tests and 18 Playwright tests pass; see `AUDIT_REPORT.md`.
 
 ### Packaging, CI and docs
 
@@ -91,21 +91,26 @@ platform/external validation, `[ ]` not done yet.
 
 ## Test status
 
-- `ruff check` / `ruff format --check`: pass.
-- `mypy src/ostium` strict: pass (generated protobuf and platform-only proxy
-  modules excluded/ignored).
-- `pytest`: 69 passed locally, including real sing-box config checks, core
-  apply/stop, custom-core V2Ray gRPC smoke, certificates, jobs, auth, backups,
+- `ruff check` / `ruff format --check`: pass (132 files).
+- `mypy src/ostium` strict: pass (69 source files).
+- `pytest`: 384 passed, 0 skipped, 0 failed, including real sing-box config
+  checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
+  client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass locally.
-- Playwright smoke tests pass on desktop 1440, tablet 1024 and mobile Pixel 7;
-  login, dashboard, command palette, axe smoke and horizontal-overflow checks
-  pass. Visual baselines are not committed yet.
-- Coverage: 62% overall; below the PLAN gate (core/services 85%, overall 70%).
-  Additional tests are required before release.
+- Backend coverage: statements 98.55%, branches 95.84%; every module ≥85% and
+  `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
+- `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
+- Frontend coverage: statements 91.84%, branches 85.97%, functions 89.39%,
+  lines 92.59% (Vitest v8, thresholds 85).
+- Playwright: 18 passed on desktop 1440, tablet 1024 and mobile 390; login,
+  dashboard, command palette, axe smoke, no-horizontal-scroll and six dark/light
+  visual baselines pass.
+- `pip-audit` and `npm audit`: no known vulnerabilities.
+- `mkdocs build --strict`, `shellcheck`, clean-wheel install and serve smoke:
+  pass.
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS
   system proxy, 72h soak, usability tests and installer-on-fresh-VM are not
-  run in this environment.
+  run in this environment; see `MANUAL_TASKS.md`.
 
 ## Design deviations / ADRs
 
@@ -123,16 +128,15 @@ platform/external validation, `[ ]` not done yet.
 
 ## Release blockers still open
 
-- [ ] Raise coverage to the PLAN gate and add ACME/certificate/profile/auth/jobs/
-      CLI/system-proxy branch tests.
-- [ ] Add a live collector integration test (custom core + collector quota tick).
-- [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14.
+- [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14, and
+      Linux TUN on a privileged host.
 - [ ] Run ACME staging and one production issuance on the Hong Kong server.
 - [ ] Run a fresh Ubuntu 24.04 installer test and a backup/restore/upgrade drill.
-- [ ] Generate and commit visual baselines; fix any serious axe findings.
-- [ ] Add browser notification permission flow and PWA update prompt.
 - [ ] Run 72h soak, performance budgets, and the 5-user usability test.
 - [ ] Code signing/notarization (optional per PLAN, but SmartScreen/Gatekeeper
       warnings remain).
-- [ ] Replace `backup.title` fallback text and other untranslated microcopy found
-      during the language pass.
+- [ ] Complete the account/release steps in `MANUAL_TASKS.md` (GitHub, PyPI,
+      GHCR, signing) after explicit approval.
+
+The full evidence, per-file audit and residual-risk list is in
+[`AUDIT_REPORT.md`](AUDIT_REPORT.md).

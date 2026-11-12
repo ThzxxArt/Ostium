@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 import yaml
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,12 +35,21 @@ def parse_subscription_text(text: str) -> list[Endpoint]:
         except json.JSONDecodeError as exc:
             raise ProfileError("invalid JSON subscription") from exc
         if isinstance(payload, dict) and "endpoints" in payload:
-            return ProfileDocument.model_validate(payload).endpoints
+            try:
+                return ProfileDocument.model_validate(payload).endpoints
+            except ValidationError as exc:
+                raise ProfileError("invalid Ostium profile subscription") from exc
         if isinstance(payload, dict) and "outbounds" in payload:
-            return _from_singbox_outbounds(payload["outbounds"])
+            try:
+                return _from_singbox_outbounds(payload["outbounds"])
+            except (ValidationError, TypeError, ValueError) as exc:
+                raise ProfileError("invalid sing-box subscription") from exc
         raise ProfileError("JSON subscription does not contain endpoints or outbounds")
     if stripped.startswith("proxies:") or "\nproxies:" in stripped:
-        return _from_clash(stripped)
+        try:
+            return _from_clash(stripped)
+        except (TypeError, ValueError) as exc:
+            raise ProfileError("invalid Clash subscription") from exc
     decoded = _maybe_base64(stripped)
     if decoded is not None and "://" in decoded:
         stripped = decoded
@@ -267,8 +277,10 @@ async def create_profile(
 
 
 def endpoints_from_profile(profile: Profile, store: SecretStore) -> list[Endpoint]:
-    raw = store.decrypt(profile.config_enc, table="profiles", record_id=profile.id, field="config")
     try:
+        raw = store.decrypt(
+            profile.config_enc, table="profiles", record_id=profile.id, field="config"
+        )
         return ProfileDocument.model_validate_json(raw).endpoints
     except Exception as exc:
         raise ProfileError(

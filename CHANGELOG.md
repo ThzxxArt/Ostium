@@ -31,6 +31,34 @@ SemVer.
   GitHub Actions CI, core build, security scans and release automation.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
+- Comprehensive audit and coverage suite: 384 backend tests, 132 frontend tests
+  and 18 Playwright tests, with per-module coverage gates and six committed
+  dark/light visual baselines.
+
+### Fixed
+
+- Local one-time login tokens no longer fail intermittently when the binary
+  signature contains a `.` byte.
+- Failed login counters and audit entries are persisted before the error
+  response, restoring account lockout and failed-login auditing.
+- Setup now requires CSRF, matching every other cookie-authenticated mutation.
+- Diagnostics redaction handles quoted JSON keys, so tokens/passwords cannot
+  leak through `/system/diagnostics`.
+- Timezone-naive SQLite timestamps are normalised before expiry, quota and
+  certificate comparisons across users, stats, doctor, housekeeping and ACME
+  renewal.
+- Duplicate usernames now return `409 name_taken` instead of a 500.
+- Invalid or corrupted profile subscriptions return controlled `ProfileError`
+  responses instead of 500s.
+- Backups with a wrong password return `400 invalid_password`; staged restores
+  validate the password immediately instead of silently failing at restart.
+- The Web UI now parses `application/problem+json`, preserving `code`/`detail`
+  for TOTP, rate-limit and validation errors.
+- CLI URL profile imports retain their subscription URL so `profile refresh`
+  works.
+- `python-multipart` upgraded to 0.0.31 (security advisories).
+- Mobile viewport aligned to 390px; visual baselines and light theme added.
+- Removed dead quota-flush branch and fixed docs/nav/shellcheck issues.
 
 ### Known boundaries
 

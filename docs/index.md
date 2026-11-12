@@ -20,7 +20,7 @@ FastAPI + Vue 3.
 
 ## Scope
 
-The locked v0.1.0 scope is in [`PLAN.md`](../PLAN.md). It includes server
+The locked v0.1.0 scope is in [`PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/PLAN.md). It includes server
 Reality/Hysteria2/Trojan/SS2022, per-user quotas, ACME, four subscription
 formats, client mixed/system-proxy/TUN, full Web UI/CLI, Docker, installers,
 tests and release gates. It intentionally does not include NaiveProxy, a

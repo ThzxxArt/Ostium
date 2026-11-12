@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ostium.db.models import ProxyUser, StatsEpoch, TrafficDaily
 from ostium.engine.singbox.v2ray_stats import StatsUnavailable, V2RayStatsClient
 from ostium.services.events import EventBus
-from ostium.util.time import iso, utcnow
+from ostium.util.time import as_utc, iso, utcnow
 
 
 @dataclass
@@ -151,7 +151,6 @@ class StatsCollector:
             self._last_flush = time.monotonic()
             return
         today = utcnow().date()
-        disabled: list[str] = []
         async with self.session_factory() as session:
             users = (
                 (await session.execute(select(ProxyUser).where(ProxyUser.id.in_(pending.keys()))))
@@ -187,8 +186,6 @@ class StatsCollector:
             await session.commit()
         self._pending.clear()
         self._last_flush = time.monotonic()
-        if disabled:
-            await self._disable(disabled)
         if self.usage:
             await self.bus.publish(
                 "stats.tick",
@@ -219,7 +216,7 @@ class StatsCollector:
                     if started.year != now.year or started.month != now.month:
                         user.used_bytes = 0
                         user.cycle_started_at = now
-                if user.expires_at is not None and user.expires_at <= now:
+                if user.expires_at is not None and as_utc(user.expires_at) <= now:
                     user.enabled = False
                     user.disabled_reason = "expired"
                     to_disable.append(user.name)

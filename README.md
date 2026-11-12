@@ -31,6 +31,9 @@ uv run ostium serve
 
 PyPI distribution name: `ostium-ctl` (the import/CLI remains `ostium`).
 
+Quality evidence, coverage numbers and remaining external blockers are in
+[`AUDIT_REPORT.md`](AUDIT_REPORT.md).
+
 Open <http://127.0.0.1:8443>. In a second terminal start the core service:
 
 ```bash

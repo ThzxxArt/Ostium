@@ -171,8 +171,7 @@ def test_validation_rejects_forbidden_experimental() -> None:
 @pytest.mark.integration
 def test_generated_configs_pass_singbox_check(tmp_path: Path) -> None:
     engine = _engine()
-    if engine is None:
-        pytest.skip("sing-box binary not available")
+    assert engine is not None, "sing-box binary is required for integration checks"
     endpoint = Endpoint(
         tag="reality",
         protocol=Protocol.VLESS_REALITY,

@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
@@ -42,6 +43,7 @@
     "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typescript-eslint/parser": "^8.72.2",
     "@vitejs/plugin-vue": "6.0.10",
+    "@vitest/coverage-v8": "^5.1.0",
     "@vue/test-utils": "2.5.1",
     "eslint": "10.14.0",
     "eslint-plugin-vue": "10.12.1",

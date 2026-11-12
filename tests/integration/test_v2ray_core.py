@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from ostium.config import Settings
@@ -17,12 +17,11 @@ from ostium.engine.singbox.config import (
 )
 from ostium.engine.singbox.v2ray_stats import V2RayStatsClient
 
-CUSTOM_CORE = Path("/tmp/opencode/sing-box-v2ray")
+CUSTOM_CORE = Path(os.environ.get("OSTIUM_TEST_CUSTOM_ENGINE", "/tmp/opencode/sing-box-v2ray"))
 
 
 def test_custom_core_exposes_v2ray_stats(settings: Settings) -> None:
-    if not CUSTOM_CORE.is_file():
-        pytest.skip("custom with_v2ray_api core is not available")
+    assert CUSTOM_CORE.is_file(), f"custom core not found at {CUSTOM_CORE}"
     settings.engine_path = str(CUSTOM_CORE)
     config = build_server_config(
         ServerConfigSpec(

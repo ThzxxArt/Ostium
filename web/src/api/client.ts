@@ -67,7 +67,9 @@ async function request<T>(
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   })
   const contentType = response.headers.get('content-type') || ''
-  const payload = contentType.includes('application/json')
+  // RFC 9457 errors use application/problem+json; match any JSON media type
+  // so `code` and `detail` survive instead of being collapsed into text.
+  const payload = contentType.includes('json')
     ? await response.json().catch(() => ({}))
     : await response.text()
   if (!response.ok) {

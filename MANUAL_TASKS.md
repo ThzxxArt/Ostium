@@ -23,9 +23,12 @@ hardware or accounts.
 
 ## Custom core
 
-- [ ] Install Go 1.25.5 and run `scripts/build-core.sh` for all five targets.
-- [ ] Confirm `sing-box version` reports `1.14.4-ostium.1` and tags include
-      `with_v2ray_api`, not `with_naive_outbound`.
+- [x] Linux amd64 core built locally with Go 1.25.5; `sing-box version` reports
+      `1.14.4-ostium.1`, tags include `with_v2ray_api`, and the live collector
+      test passes.
+- [ ] Build and sign the remaining four release targets
+      (`linux/arm64`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`) with
+      `scripts/build-core.sh --all`.
 - [ ] Start the server core and query `127.0.0.1:19091` gRPC stats for two users;
       verify counters increase and reset correctly after SIGHUP.
 - [ ] Publish the core tarballs, checksums, SBOM and manifest to the GitHub
@@ -38,6 +41,8 @@ hardware or accounts.
       `OstiumCore` service exists and starts, and the UI starts at logon.
 - [ ] Test TUN with Wintun, system proxy, reconnect after sleep/network change,
       and uninstall cleanup (routes, proxy, service, startup task).
+- [ ] Run `scripts/build-windows.ps1` and verify the signed/unsigned artifacts,
+      service wrapper and Inno Setup output.
 - [ ] Verify SmartScreen behavior and document the checksum/bypass steps.
 
 ## macOS
@@ -57,10 +62,14 @@ hardware or accounts.
 
 - [ ] Run the 5-user usability test described in `docs/ux.md`; record times and
       failure points.
-- [ ] Generate Playwright visual baselines at 1440/1024/390 in dark and light;
-      review diffs.
+- [x] Playwright visual baselines generated and committed for 1440/1024/390 in
+      dark and light; reviewed locally.
+- [ ] Review the committed baselines on real Windows/macOS/Linux browsers and
+      confirm font rendering differences are acceptable.
 - [ ] Run axe on every page and keyboard-only walkthroughs; fix serious/critical
       findings and 200% zoom/long-text issues.
+- [ ] Validate browser notification permission on Chrome/Edge/Safari and PWA
+      install/update on a real device.
 - [ ] Validate English/Chinese switching on every page, including long error
       messages and timezone formatting.
 

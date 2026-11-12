@@ -13,8 +13,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WHEEL="$(ls "$SCRIPT_DIR"/ostium_ctl-*.whl | head -1)"
-CORE_TARBALL="$(ls "$SCRIPT_DIR"/ostium-core-*-darwin-*.tar.gz | head -1)"
+WHEEL="$(find "$SCRIPT_DIR" -maxdepth 1 -name 'ostium_ctl-*.whl' | head -1)"
+CORE_TARBALL="$(find "$SCRIPT_DIR" -maxdepth 1 -name 'ostium-core-*-darwin-*.tar.gz' | head -1)"
 CORE_DIR="$(mktemp -d)"
 tar -xzf "$CORE_TARBALL" -C "$CORE_DIR"
 

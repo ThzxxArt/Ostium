@@ -195,6 +195,9 @@ async def login(
             user_agent=request.headers.get("user-agent", ""),
             detail={"code": exc.code},
         )
+        # Persist the failed-attempt counter and audit trail even though the
+        # request fails; the generic dependency would otherwise roll them back.
+        await session.commit()
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     token, _ = await auth_service.create_session(
         session,

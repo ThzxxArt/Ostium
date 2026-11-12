@@ -45,8 +45,20 @@ test('responsive layout has no horizontal scroll', async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(2)
 })
 
-test('visual baseline @visual', async ({ page }) => {
-  test.skip(!process.env.OSTIUM_VISUAL, 'set OSTIUM_VISUAL=1 to write visual baselines')
-  await login(page)
-  await expect(page).toHaveScreenshot('dashboard.png', { fullPage: true, maxDiffPixelRatio: 0.02 })
-})
+for (const theme of ['dark', 'light'] as const) {
+  test(`visual dashboard ${theme} @visual`, async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-12T10:00:00Z') })
+    await page.addInitScript((value) => {
+      localStorage.setItem('ostium.theme', value)
+    }, theme)
+    await login(page)
+    await expect(page.getByText(/Server pulse|服务脉搏/)).toBeVisible()
+    await expect(page).toHaveScreenshot(`dashboard-${theme}.png`, {
+      fullPage: true,
+      animations: 'disabled',
+      caret: 'hide',
+      maxDiffPixelRatio: 0.02,
+      mask: [page.locator('.recent')],
+    })
+  })
+}

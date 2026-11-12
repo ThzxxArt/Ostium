@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from ostium.api.app import build_app
 from ostium.config import Role, Settings
+from ostium.services import auth as auth_service
 
 
 def _engine_path() -> Path | None:
@@ -19,6 +20,14 @@ def _engine_path() -> Path | None:
         Path("/usr/bin/sing-box"),
     ]
     return next((path for path in candidates if path.is_file()), None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_state() -> None:
+    """Keep process-global login throttling and activity clocks test-isolated."""
+
+    auth_service.LIMITER.failures.clear()
+    auth_service.ACTIVITY.clear()
 
 
 @pytest.fixture

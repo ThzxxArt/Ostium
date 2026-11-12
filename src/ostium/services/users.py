@@ -18,7 +18,7 @@ from ostium.domain.endpoints import Endpoint, Protocol, TLSConfig
 from ostium.services.crypto import SecretStore
 from ostium.util.ids import new_short_id, new_ss2022_key, new_token, new_uuid
 from ostium.util.security import hash_token
-from ostium.util.time import iso, utcnow
+from ostium.util.time import as_utc, iso, utcnow
 
 USER_FIELDS = ("password", "ss_password", "subscription_token")
 
@@ -59,7 +59,11 @@ async def create_user(
         note=note[:500],
     )
     session.add(user)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise UserError("a user with this name already exists", "name_taken", 409) from exc
     _write_credentials(user, store, new_token(24), new_ss2022_key())
     token = new_token(32)
     user.subscription_token_hash = hash_token(token)
@@ -141,7 +145,7 @@ def effective_used(user: ProxyUser, pending: int = 0) -> int:
 def status_of(user: ProxyUser, *, online: bool = False) -> str:
     if not user.enabled:
         return user.disabled_reason or "disabled"
-    if user.expires_at is not None and user.expires_at <= utcnow():
+    if user.expires_at is not None and as_utc(user.expires_at) <= utcnow():
         return "expired"
     if user.quota_bytes > 0 and user.used_bytes >= user.quota_bytes:
         return "quota_exceeded"

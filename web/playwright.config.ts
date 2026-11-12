@@ -24,7 +24,10 @@ export default defineConfig({
       name: 'tablet',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1024, height: 768 } },
     },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
+    },
   ],
   webServer: process.env.OSTIUM_BASE_URL
     ? undefined

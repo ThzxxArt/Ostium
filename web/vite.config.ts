@@ -68,5 +68,20 @@ export default defineConfig({
     globals: true,
     include: ['tests/unit/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/env.d.ts', 'src/api/types.ts'],
+      thresholds: {
+        statements: 85,
+        branches: 85,
+        functions: 85,
+        lines: 85,
+      },
+    },
   },
 })

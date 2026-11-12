@@ -76,6 +76,50 @@ def test_totp_and_recovery_codes() -> None:
     assert len(remaining_again) == 9
 
 
+def test_crypto_error_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    from ostium.util.security import (
+        CryptoError,
+        FieldCipher,
+        _tighten,
+        load_or_create_master_key,
+        needs_rehash,
+    )
+
+    bad_key = tmp_path / "bad.key"
+    bad_key.write_bytes(b"short")
+    with pytest.raises(CryptoError, match="must be exactly 32 bytes"):
+        load_or_create_master_key(bad_key)
+
+    with pytest.raises(CryptoError, match="32 bytes"):
+        FieldCipher(b"short")
+
+    cipher = FieldCipher(b"x" * 32)
+    with pytest.raises(CryptoError, match="unsupported ciphertext version"):
+        cipher.decrypt("v9.payload", "aad")
+    with pytest.raises(CryptoError, match="malformed ciphertext"):
+        cipher.decrypt("no-version", "aad")
+    with pytest.raises(CryptoError, match="authentication failed"):
+        cipher.decrypt("v1." + "A" * 40, "aad")
+
+    assert needs_rehash("not-a-hash") is True
+    from ostium.util.security import hash_password
+
+    assert needs_rehash(hash_password("password")) is False
+
+    # chmod failures during key creation and tightening are best-effort.
+    monkeypatch.setattr("os.chmod", lambda *args, **kwargs: (_ for _ in ()).throw(OSError()))
+    _tighten(tmp_path / "missing")
+    path = tmp_path / "new.key"
+    assert len(load_or_create_master_key(path)) == 32
+
+    # A valid ciphertext with a tampered nonce length still fails closed.
+    raw = AESGCM(b"x" * 32).encrypt(b"0" * 12, b"data", b"aad")
+    with pytest.raises(CryptoError):
+        cipher.decrypt("v1." + __import__("base64").urlsafe_b64encode(raw[:5]).decode(), "aad")
+
+
 def test_backup_blob_encryption() -> None:
     payload = b"database-bytes" * 100
     encrypted = encrypt_blob(payload, "a-strong-password")

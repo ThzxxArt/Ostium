@@ -52,4 +52,5 @@ nav:
   - Design:
       - Design system: design-system.md
       - UX: ux.md
+      - ADR 0001 - TypeScript 6: adr/0001-typescript-6.md
   - Security: security/threat-model.md

@@ -901,7 +901,9 @@ def profile_import(
 
     settings = _load_settings()
     text: str
+    subscription_url: str | None = None
     if source.startswith(("http://", "https://")):
+        subscription_url = source
         response = httpx.get(source, timeout=20, follow_redirects=True, trust_env=False)
         response.raise_for_status()
         text = response.text
@@ -913,7 +915,14 @@ def profile_import(
         engine, factory, store = await _database(settings)
         async with factory() as session:
             endpoints = parse_subscription_text(text)
-            await create_profile(session, store, name=name, endpoints=endpoints, kind="manual")
+            await create_profile(
+                session,
+                store,
+                name=name,
+                endpoints=endpoints,
+                kind="subscription" if subscription_url else "manual",
+                subscription_url=subscription_url,
+            )
             await session.commit()
         await engine.dispose()
         return len(endpoints)

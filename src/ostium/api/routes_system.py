@@ -30,7 +30,7 @@ from ostium.db.models import AdminUser, Certificate
 from ostium.services.audit import audit
 from ostium.services.users import server_hostname
 from ostium.util.redact import redact
-from ostium.util.time import iso, utcnow
+from ostium.util.time import as_utc, iso, utcnow
 
 router = APIRouter(tags=["system"])
 
@@ -151,7 +151,7 @@ async def doctor(
     certs = (await session.execute(select(Certificate))).scalars().all()
     for cert in certs:
         if cert.expires_at is not None:
-            days = (cert.expires_at - utcnow()).days
+            days = (as_utc(cert.expires_at) - utcnow()).days
             add(
                 f"certificate:{cert.domain}",
                 "pass" if days > 14 else ("warn" if days >= 0 else "fail"),

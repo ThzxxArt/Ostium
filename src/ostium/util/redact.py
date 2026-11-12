@@ -9,7 +9,7 @@ _UUID_RE = re.compile(
 )
 _TOKEN_RE = re.compile(
     r"(?i)\b(token|secret|password|passwd|authorization|api[_-]?key|private[_-]?key|cookie)"
-    r"(\s*[:=]\s*|\s+)(\"[^\"]*\"|'[^']*'|[^\s,;]+)"
+    r"\"?(\s*[:=]\s*|\s+)(\"[^\"]*\"|'[^']*'|[^\s,;]+)"
 )
 _AUTH_HEADER_RE = re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+")
 _SS_URI_RE = re.compile(r"ss://[^\s]+")

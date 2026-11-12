@@ -164,7 +164,6 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 return JSONResponse(status_code=413, content={"detail": "body too large"})
             if request.url.path not in {
                 "/api/v1/auth/login",
-                "/api/v1/setup",
             } and not request.headers.get("authorization"):
                 cookie = request.cookies.get(CSRF_COOKIE)
                 header = request.headers.get("x-csrf-token")
@@ -338,7 +337,7 @@ async def _run_housekeeping(services: Services) -> None:
 
     from ostium.db.models import Certificate, Job, Session
     from ostium.services.audit import create_alert
-    from ostium.util.time import utcnow
+    from ostium.util.time import as_utc, utcnow
 
     now = utcnow()
     async with services.session_factory() as session:
@@ -364,7 +363,7 @@ async def _run_housekeeping(services: Services) -> None:
         certs = (await session.execute(select(Certificate))).scalars().all()
         for cert in certs:
             if cert.expires_at is not None:
-                days = (cert.expires_at - now).days
+                days = (as_utc(cert.expires_at) - now).days
                 if days < 14:
                     await create_alert(
                         session,
@@ -398,7 +397,7 @@ async def _cert_renewal(services: Services) -> None:
     from ostium.acme.client import AcmeIssuer
     from ostium.db.models import Certificate
     from ostium.services.certificates import import_manual
-    from ostium.util.time import utcnow
+    from ostium.util.time import as_utc, utcnow
 
     while True:
         try:
@@ -408,7 +407,7 @@ async def _cert_renewal(services: Services) -> None:
                 for cert in certs:
                     if not cert.auto_renew or cert.source != "acme" or cert.expires_at is None:
                         continue
-                    if (cert.expires_at - utcnow()).days >= 30:
+                    if (as_utc(cert.expires_at) - utcnow()).days >= 30:
                         continue
                     issuer = AcmeIssuer(services.settings, services.store)
                     fullchain, key_pem = await issuer.issue(cert.domain)

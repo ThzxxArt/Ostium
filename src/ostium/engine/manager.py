@@ -31,7 +31,7 @@ from ostium.services.users import (
     inbound_params,
 )
 from ostium.util.ids import new_token
-from ostium.util.time import utcnow
+from ostium.util.time import as_utc, utcnow
 
 
 class EngineError(Exception):
@@ -135,7 +135,7 @@ class EngineManager:
         ready = [
             cert
             for cert in certs
-            if cert.status == "ready" and cert.expires_at and cert.expires_at > utcnow()
+            if cert.status == "ready" and cert.expires_at and as_utc(cert.expires_at) > utcnow()
         ]
         inbound_rows = (await session.execute(select(Inbound))).scalars().all()
         inbounds: list[ServerInbound] = []

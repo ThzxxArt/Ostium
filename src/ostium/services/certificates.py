@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ostium.config import Settings
 from ostium.db.models import Certificate, Inbound
-from ostium.util.time import as_utc, utcnow
+from ostium.util.time import as_utc, iso, utcnow
 
 
 class CertificateError(Exception):
@@ -250,12 +250,12 @@ def serialize_certificate(certificate: Certificate) -> dict[str, Any]:
         "id": certificate.id,
         "domain": certificate.domain,
         "issuer": certificate.issuer,
-        "expires_at": certificate.expires_at.isoformat() if certificate.expires_at else None,
+        "expires_at": iso(certificate.expires_at),
         "auto_renew": certificate.auto_renew,
         "status": certificate.status,
         "source": certificate.source,
         "last_error": certificate.last_error,
-        "created_at": certificate.created_at.isoformat() if certificate.created_at else None,
+        "created_at": iso(certificate.created_at),
         "days_remaining": (
             (as_utc(certificate.expires_at) - utcnow()).days if certificate.expires_at else None
         ),

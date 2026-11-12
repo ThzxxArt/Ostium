@@ -301,8 +301,16 @@ def verify_local_login_token(settings: Settings, token: str) -> bool:
         raw = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
     except Exception:
         return False
+    # The signature is raw binary and may itself contain 0x2e (b"."), so a
+    # delimiter split is ambiguous.  It is always the final 32 bytes; the
+    # payload is everything before it and must end with the separator byte.
+    if len(raw) <= 32:
+        return False
+    payload_bytes, signature = raw[:-32], raw[-32:]
+    if not payload_bytes.endswith(b"."):
+        return False
+    payload_bytes = payload_bytes[:-1]
     try:
-        payload_bytes, signature = raw.rsplit(b".", 1)
         payload = payload_bytes.decode("utf-8")
         expiry_text, _nonce = payload.split(":", 1)
         expiry = int(expiry_text)
