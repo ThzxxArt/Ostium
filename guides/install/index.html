@@ -1602,7 +1602,8 @@
 <li><code>ostium-core-1.14.4-ostium.1-&lt;os&gt;-&lt;arch&gt;.tar.gz</code></li>
 <li><code>SHA256SUMS</code></li>
 <li>校验通过后调用仓库内的 <code>scripts/install.sh</code> 或 <code>deploy/launchd/install-macos.sh</code>。</li>
-<li>创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动。</li>
+<li>服务端创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动，打印一次性管理员密码。</li>
+<li>客户端不预置管理员密码；首次打开 UI 时完成客户端设置向导。</li>
 </ol>
 <h2 id="_3">常用参数<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <table>

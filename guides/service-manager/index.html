@@ -1701,7 +1701,10 @@ sudo<span class="w"> </span><span class="nv">OSTIUM_ROLE</span><span class="o">=
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span><span class="nv">OSTIUM_ROLE</span><span class="o">=</span>client<span class="w"> </span><span class="nv">OSTIUM_CONFIG_FILE</span><span class="o">=</span>/etc/ostium/client.toml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>/opt/ostium/venv/bin/ostium<span class="w"> </span>core-run
 
-<span class="nv">OSTIUM_ROLE</span><span class="o">=</span>client<span class="w"> </span><span class="nv">OSTIUM_CORE_URL</span><span class="o">=</span>http://127.0.0.1:8788<span class="w"> </span><span class="se">\</span>
+<span class="nv">OSTIUM_ROLE</span><span class="o">=</span>client<span class="w"> </span><span class="nv">OSTIUM_CONFIG_FILE</span><span class="o">=</span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.local/share/ostium/config.toml"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OSTIUM_CONFIG_DIR</span><span class="o">=</span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.local/share/ostium"</span><span class="w"> </span><span class="nv">OSTIUM_DATA_DIR</span><span class="o">=</span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.local/share/ostium"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OSTIUM_CORE_TOKEN_FILE</span><span class="o">=</span>/var/lib/ostium-core/runtime/core.token<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OSTIUM_CORE_URL</span><span class="o">=</span>http://127.0.0.1:8788<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>/opt/ostium/venv/bin/ostium<span class="w"> </span>serve
 </code></pre></div>
 <h2 id="_5">升级与卸载<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
