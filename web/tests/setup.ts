@@ -24,7 +24,13 @@ beforeAll(() => {
       unobserve() {}
       disconnect() {}
     }
-    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    // Define on the global object instead of vi.stubGlobal so
+    // vi.unstubAllGlobals() in individual suites cannot remove it.
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      writable: true,
+      value: ResizeObserverStub,
+    })
   }
   if (!('IntersectionObserver' in globalThis)) {
     class IntersectionObserverStub {
@@ -35,7 +41,11 @@ beforeAll(() => {
         return []
       }
     }
-    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub)
+    Object.defineProperty(globalThis, 'IntersectionObserver', {
+      configurable: true,
+      writable: true,
+      value: IntersectionObserverStub,
+    })
   }
 
   if (!URL.createObjectURL) {

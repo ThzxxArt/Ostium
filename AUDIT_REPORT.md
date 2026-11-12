@@ -10,10 +10,10 @@
 
 | 项目 | 基线 | 最终 | 门禁 |
 |---|---|---|---|
-| 后端语句覆盖率 | 66.81% | **98.55%** | ≥85% PASS |
+| 后端语句覆盖率 | 66.81% | **98.54%** | ≥85% PASS |
 | 后端分支覆盖率 | 39.46% | **95.84%** | ≥85% PASS |
 | `api/` 覆盖 | — | 语句 98.13% / 分支 96.65% | ≥90% PASS |
-| `core/` 覆盖 | — | 语句 100.00% / 分支 95.00% | ≥90% PASS |
+| `core/` 覆盖 | — | 语句 99.19% / 分支 95.00% | ≥90% PASS |
 | `services/` 覆盖 | — | 语句 98.06% / 分支 94.17% | ≥90% PASS |
 | `engine/` 覆盖 | — | 语句 99.23% / 分支 97.29% | ≥90% PASS |
 | 前端 statements | 0.92% | **91.84%** | ≥85% PASS |
@@ -282,7 +282,7 @@ uv run ruff check src tests scripts                  -> All checks passed
 uv run ruff format --check src tests scripts         -> 132 files already formatted
 uv run mypy src/ostium                               -> Success: no issues in 69 files
 uv run pytest -q                                     -> 384 passed, 35 warnings
-uv run pytest -m "not integration" --cov=ostium ...  -> 379 passed, coverage 98.55/95.84
+uv run pytest -m "not integration" --cov=ostium ...  -> 378 passed, coverage 98.54/95.84
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass

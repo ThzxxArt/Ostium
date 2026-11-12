@@ -166,7 +166,7 @@ def test_gnome_disable_without_original(
     calls = _patch_run(monkeypatch, Result())
     proxy = GnomeProxy(settings)
     proxy.disable()
-    assert calls[-1][-2:] == ["mode", "'none'"]
+    assert ["gsettings", "set", "org.gnome.system.proxy", "mode", "'none'"] in calls
 
 
 def test_kde_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:

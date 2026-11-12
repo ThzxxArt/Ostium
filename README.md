@@ -20,7 +20,8 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-5EEAD4?style=flat-square">
+  <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -34,14 +35,19 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.55%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.54%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.84%25%20statements%20%C2%B7%2085.97%25%20branches-brightgreen?style=flat-square">
   <img alt="Tests" src="https://img.shields.io/badge/tests-384%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
-> [!NOTE]
-> 当前版本为 **v0.1.0**，代码与自动化测试已就绪；PyPI、GHCR 和 GitHub Release 尚未发布。
-> 发布后会在此更新下载入口。所有安装命令均以“发布包”或源码构建为前提。
+> [!TIP]
+> **当前稳定版本：v0.1.0。** 可通过 PyPI、GitHub Release、GHCR Docker、Linux/Windows/macOS
+> 安装包或源码安装。只想先跑起来：
+>
+> ```bash
+> uv tool install ostium-ctl
+> ostium version
+> ```
 
 ---
 
@@ -58,7 +64,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / PyInstaller / Inno Setup / DEB / AppImage 资产齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 384 个后端测试、132 个前端测试、18 个 Playwright 测试；后端 98.55% 语句 / 95.84% 分支。 |
+| 🧪 **可验证** | 384 个后端测试、132 个前端测试、18 个 Playwright 测试；后端 98.54% 语句 / 95.84% 分支。 |
 
 ---
 
@@ -145,13 +151,25 @@ flowchart LR
 
 ## 安装
 
-### 方式一：Linux 服务器（推荐）
+| 安装方式 | 适合场景 |
+|---|---|
+| **PyPI / uv / pipx** | 服务端、CLI、自动化、已有 Python 环境；升级最简单 |
+| **GitHub Release 安装包** | 需要 systemd/launchd/Windows 服务、TUN 和桌面客户端 |
+| **Docker / GHCR** | 容器化服务端、不可变基础设施 |
+| **源码** | 开发、审计、定制构建 |
 
-从 GitHub Release 下载三个文件（发布后）：
+> PyPI 包名是 **`ostium-ctl`**，安装后的命令仍然是 **`ostium`**。原生安装包内置对应的
+> sing-box 定制核心和平台服务文件，适合不想自己管理 Python 环境的用户。
+
+### 方式一：Linux 服务器（推荐原生安装包）
+
+从 GitHub Release 下载三个文件：
 
 - `ostium_ctl-0.1.0-py3-none-any.whl`
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
+
+下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -219,7 +237,7 @@ systemctl --user enable --now ostium
 3. 数据保存在 `%ProgramData%\Ostium`。
 4. 未签名构建会触发 SmartScreen；请先校验 `SHA256SUMS`，确认来源可信后再选择“仍要运行”。
 
-也可以从发布目录运行 PowerShell：
+也可以从安装目录运行 PowerShell：
 
 ```powershell
 .\install.ps1
@@ -227,7 +245,7 @@ systemctl --user enable --now ostium
 
 ### 方式四：macOS 客户端
 
-1. 打开 DMG，将 `install-macos.sh` 与发布文件放在同一目录。
+1. 打开 DMG，将 `install-macos.sh` 与安装文件放在同一目录。
 2. 执行：
 
 ```bash
@@ -238,7 +256,7 @@ sudo ./install-macos.sh client
 
 ### 方式五：Docker 服务端
 
-发布后可直接使用 GHCR 镜像：
+直接使用 GHCR 镜像：
 
 ```bash
 OSTIUM_ADMIN_PASSWORD='change-me-now' \
@@ -261,24 +279,39 @@ docker run -d --name ostium --network host \
 
 > Docker 使用 host 网络，以便绑定 443/80；请自行配置防火墙、TLS 和持久化备份。
 
-### 方式六：PyPI（发布后）
+### 方式六：PyPI / uv / pipx（服务端、CLI 与开发环境）
 
 PyPI 分发名为 **`ostium-ctl`**，导入名和 CLI 仍为 `ostium`：
 
 ```bash
+# 推荐：隔离安装，不污染系统 Python
 uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
-# 或
-pip install ostium-ctl
+# 或指定版本
+uv tool install "ostium-ctl==0.1.0"
 ```
 
-然后：
+服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
-sudo ostium init --role server --no-input --password 'change-me-now'
-sudo ostium serve
+sudo python3.13 -m venv /opt/ostium/venv
+sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
+sudo /opt/ostium/venv/bin/ostium serve
 ```
+
+升级：
+
+```bash
+uv tool upgrade ostium-ctl
+# 或
+sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.0"
+```
+
+> PyPI 版本包含完整 SPA 静态资源。生产环境仍建议使用原生安装包：它会创建非 root 的
+> `ostium` 用户、注册 `ostium-core.service`/`ostium.service`，并正确处理 TUN、低端口和
+> 平台服务权限。
 
 ### 方式七：源码开发
 
@@ -601,7 +634,10 @@ sudo ostium diagnostics export --output /tmp/ostium-diagnostics.tar.gz
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts
 uv run mypy src/ostium
-uv run pytest -q
+uv run pytest -m "not integration" -q
+
+# 真实核心集成测试（需要 sing-box 与定制核心）
+# uv run pytest -m integration -q
 
 # 前端
 cd web
@@ -617,7 +653,7 @@ npx playwright test
 
 当前结果：
 
-- 后端：**384 passed / 0 skipped**，语句 **98.55%**、分支 **95.84%**；
+- 后端：**384 passed / 0 skipped**（378 个常规测试 + 6 个真实核心集成测试），语句 **98.54%**、分支 **95.84%**；
 - 前端：**132 passed**，语句 **91.84%**、分支 **85.97%**、函数 **89.39%**、行 **92.59%**；
 - Playwright：**18 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线和 axe 登录页检查；
 - `pip-audit` / `npm audit`：0 已知漏洞；

@@ -190,9 +190,13 @@ def test_readyz_success_and_failure(tmp_path: Path) -> None:
         assert ready.json()["ready"] is False
 
 
-def test_spa_serving_and_traversal(tmp_path: Path) -> None:
-    settings = _settings(tmp_path)
-    assert settings.paths.web_dist is not None
+def test_spa_serving_and_traversal(tmp_path: Path, monkeypatch) -> None:
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html><title>Ostium</title>", encoding="utf-8")
+    monkeypatch.setattr("ostium.config._locate_web_dist", lambda: dist)
+    settings = _settings(tmp_path / "app")
+    assert settings.paths.web_dist == dist
     app = build_app(settings)
     with TestClient(app) as client:
         root = client.get("/")

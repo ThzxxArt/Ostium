@@ -97,7 +97,7 @@ platform/external validation, `[ ]` not done yet.
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 98.55%, branches 95.84%; every module ≥85% and
+- Backend coverage: statements 98.54%, branches 95.84%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
 - Frontend coverage: statements 91.84%, branches 85.97%, functions 89.39%,

@@ -20,7 +20,8 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ThzxxArt/Ostium/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-5EEAD4?style=flat-square">
+  <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -34,15 +35,19 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.55%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.54%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.84%25%20statements%20%C2%B7%2085.97%25%20branches-brightgreen?style=flat-square">
   <img alt="Tests" src="https://img.shields.io/badge/tests-384%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
-> [!NOTE]
-> **v0.1.0** code and automated tests are ready. PyPI, GHCR and GitHub Releases are not published yet.
-> Download links will be added after the release. Every install command below assumes a release
-> artifact or a local source build.
+> [!TIP]
+> **Current stable release: v0.1.0.** Install from PyPI, GitHub Releases, GHCR Docker,
+> native Linux/Windows/macOS packages, or source. To try it in seconds:
+>
+> ```bash
+> uv tool install ostium-ctl
+> ostium version
+> ```
 
 ---
 
@@ -60,7 +65,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller, Inno Setup, DEB and AppImage assets. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 384 backend tests, 132 frontend tests and 18 Playwright tests; 98.55% backend statements / 95.84% branches. |
+| 🧪 **Verified** | 384 backend tests, 132 frontend tests and 18 Playwright tests; 98.54% backend statements / 95.84% branches. |
 
 ---
 
@@ -150,13 +155,26 @@ flowchart LR
 
 ## Installation
 
-### Option 1 — Linux server (recommended)
+| Method | Best for |
+|---|---|
+| **PyPI / uv / pipx** | Servers, CLI, automation and existing Python environments; easiest upgrades |
+| **GitHub Release packages** | systemd/launchd/Windows services, TUN and desktop clients |
+| **Docker / GHCR** | Containerised servers and immutable infrastructure |
+| **Source** | Development, audit, and custom builds |
 
-Download the release artifacts (after publication):
+> The PyPI distribution is **`ostium-ctl`**; the installed command is still **`ostium`**. Native
+> packages bundle the matching custom sing-box core and platform service files, which is the
+> simplest choice if you do not want to manage Python yourself.
+
+### Option 1 — Linux server (native package, recommended)
+
+Download the release artifacts:
 
 - `ostium_ctl-0.1.0-py3-none-any.whl`
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
+
+Download: <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -226,7 +244,7 @@ Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 4. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
    trust the source.
 
-You can also run the PowerShell installer from the release directory:
+You can also run the PowerShell installer from the installation directory:
 
 ```powershell
 .\install.ps1
@@ -234,7 +252,7 @@ You can also run the PowerShell installer from the release directory:
 
 ### Option 4 — macOS client
 
-1. Open the DMG and keep `install-macos.sh` beside the release files.
+1. Open the DMG and keep `install-macos.sh` beside the installation files.
 2. Run:
 
 ```bash
@@ -247,7 +265,7 @@ first.
 
 ### Option 5 — Docker server
 
-Once published, use the GHCR image:
+Use the GHCR image directly:
 
 ```bash
 OSTIUM_ADMIN_PASSWORD='change-me-now' \
@@ -271,24 +289,39 @@ docker run -d --name ostium --network host \
 > Docker uses host networking so it can bind 443/80. Configure the firewall, TLS and off-host
 > backups yourself.
 
-### Option 6 — PyPI (after publication)
+### Option 6 — PyPI / uv / pipx (servers, CLI and development)
 
 The PyPI distribution is **`ostium-ctl`**; the import name and CLI remain `ostium`:
 
 ```bash
+# Recommended: isolated install, no system Python pollution
 uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
-# or
-pip install ostium-ctl
+# or pin the release
+uv tool install "ostium-ctl==0.1.0"
 ```
 
-Then:
+Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 
 ```bash
-sudo ostium init --role server --no-input --password 'change-me-now'
-sudo ostium serve
+sudo python3.13 -m venv /opt/ostium/venv
+sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
+sudo /opt/ostium/venv/bin/ostium serve
 ```
+
+Upgrade:
+
+```bash
+uv tool upgrade ostium-ctl
+# or
+sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.0"
+```
+
+> The PyPI wheel contains the complete SPA assets. For production, prefer the native packages:
+> they create an unprivileged `ostium` user, register `ostium-core.service`/`ostium.service`
+> and handle TUN, low ports and platform service privileges correctly.
 
 ### Option 7 — From source
 
@@ -622,7 +655,10 @@ The bundle redacts tokens, passwords, UUIDs, private keys and share links.
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts
 uv run mypy src/ostium
-uv run pytest -q
+uv run pytest -m "not integration" -q
+
+# Live engine integration tests (requires sing-box and the custom core)
+# uv run pytest -m integration -q
 
 # Frontend
 cd web
@@ -638,7 +674,8 @@ npx playwright test
 
 Current results:
 
-- Backend: **384 passed / 0 skipped**, **98.55%** statements / **95.84%** branches.
+- Backend: **384 passed / 0 skipped** (378 regular tests + 6 live-engine integration tests),
+  **98.54%** statements / **95.84%** branches.
 - Frontend: **132 passed**, **91.84%** statements / **85.97%** branches /
   **89.39%** functions / **92.59%** lines.
 - Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login

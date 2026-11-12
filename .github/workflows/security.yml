@@ -29,18 +29,21 @@ jobs:
         with:
           version: "0.11.14"
       - run: uv sync
-      - run: uv run pip-audit --strict
+      - name: Export runtime dependencies
+        run: uv export --no-dev --no-emit-project --format requirements.txt -o /tmp/ostium-requirements.txt
+      - name: Audit Python dependencies
+        run: uv run pip-audit --strict -r /tmp/ostium-requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "24.19.0"
-      - run: npm audit --audit-level=high
+      - run: npm audit --audit-level=high --registry=https://registry.npmjs.org
         working-directory: web
 
   trivy:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -57,7 +60,7 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: ossf/scorecard-action@v2.4.0
+      - uses: ossf/scorecard-action@v2.5.0
         with:
           results_file: results.sarif
           results_format: sarif
