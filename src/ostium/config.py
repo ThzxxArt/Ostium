@@ -292,6 +292,8 @@ class Settings(BaseModel):
             "OSTIUM_MODE": ("mode", Mode),
             "OSTIUM_MIXED_PORT": ("mixed_port", int),
             "OSTIUM_TUN_ENABLED": ("tun_enabled", _as_bool),
+            "OSTIUM_TUN_INTERFACE": ("tun_interface", str),
+            "OSTIUM_PROXY_PORTS": ("proxy_ports", _as_ports),
             "OSTIUM_DEV": ("dev", _as_bool),
         }
         for env_name, (field, caster) in env_map.items():
@@ -308,6 +310,10 @@ class Settings(BaseModel):
 
 def _as_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _as_ports(value: str) -> list[int]:
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def _locate_web_dist() -> Path | None:

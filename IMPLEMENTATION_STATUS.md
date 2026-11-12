@@ -24,6 +24,9 @@ platform/external validation, `[ ]` not done yet.
       Clash API, egress blocks.
 - [x] Client config generation: mixed, TUN, smart/global/direct/custom routing,
       FakeIP DNS, URLTest, selector, cache file.
+- [x] Two-service IPC validated end-to-end: EngineManager → `/v1/apply` →
+      `sing-box check` → supervisor start; V2Ray gRPC and Clash API listeners
+      came up on the custom core, with the UI showing Connected.
 - [x] Real sing-box 1.14.4 config checks and a local Reality loopback traffic
       test (curl → client mixed → server Reality → example.com).
 - [x] Users, credentials, quotas, expiry, subscription tokens, token rotation.
