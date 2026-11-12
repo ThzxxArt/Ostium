@@ -328,14 +328,16 @@ def _origin_allowed(origin: str, host_header: str) -> bool:
     return parsed.netloc.lower() == host_header.lower()
 
 
-async def _housekeeping(services: Services) -> None:
+async def _housekeeping(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
     while True:
         try:
             await _run_housekeeping(services)
         except Exception as exc:
             services.bus.log("error", "housekeeping failed", error=str(exc))
         try:
-            await asyncio.sleep(3600)
+            await sleep(3600)
         except asyncio.CancelledError:
             return
 
@@ -399,7 +401,9 @@ async def _run_housekeeping(services: Services) -> None:
         pass
 
 
-async def _cert_renewal(services: Services) -> None:
+async def _cert_renewal(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
     from sqlalchemy import select
 
     from ostium.acme.client import AcmeIssuer
@@ -409,7 +413,7 @@ async def _cert_renewal(services: Services) -> None:
 
     while True:
         try:
-            await asyncio.sleep(6 * 3600)
+            await sleep(6 * 3600)
             async with services.session_factory() as session:
                 certs = (await session.execute(select(Certificate))).scalars().all()
                 for cert in certs:
@@ -441,7 +445,9 @@ async def _cert_renewal(services: Services) -> None:
             services.bus.log("error", "certificate renewal loop failed", error=str(exc))
 
 
-async def _profile_refresh(services: Services) -> None:
+async def _profile_refresh(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
     from sqlalchemy import select
 
     from ostium.db.models import Profile
@@ -449,7 +455,7 @@ async def _profile_refresh(services: Services) -> None:
 
     while True:
         try:
-            await asyncio.sleep(24 * 3600)
+            await sleep(24 * 3600)
             async with services.session_factory() as session:
                 profiles = (
                     (

@@ -393,8 +393,7 @@ def test_housekeeping_loop_logs_failure(tmp_path: Path, monkeypatch) -> None:
                 return
             raise asyncio.CancelledError
 
-        monkeypatch.setattr(app_module.asyncio, "sleep", sleep)
-        client.portal.call(app_module._housekeeping, services)
+        client.portal.call(app_module._housekeeping, services, sleep)
         assert any("housekeeping failed" in item["message"] for item in services.bus.logs())
 
 
@@ -481,8 +480,7 @@ def test_cert_renewal_loop(tmp_path: Path, monkeypatch) -> None:
                 return
             raise asyncio.CancelledError
 
-        monkeypatch.setattr(app_module.asyncio, "sleep", sleep)
-        client.portal.call(app_module._cert_renewal, services)
+        client.portal.call(app_module._cert_renewal, services, sleep)
         assert renewed == ["renew.example.com"]
         assert any("certificate renewed" in item["message"] for item in services.bus.logs())
 
@@ -539,8 +537,7 @@ def test_profile_refresh_loop(tmp_path: Path, monkeypatch) -> None:
                 return
             raise asyncio.CancelledError
 
-        monkeypatch.setattr(app_module.asyncio, "sleep", sleep)
-        client.portal.call(app_module._profile_refresh, services)
+        client.portal.call(app_module._profile_refresh, services, sleep)
         logs = [item["message"] for item in services.bus.logs()]
         assert "subscription refreshed" in logs
         assert any("subscription refresh failed" in item for item in logs)
@@ -559,10 +556,9 @@ def test_cert_renewal_and_profile_refresh_outer_errors(tmp_path: Path, monkeypat
                 raise RuntimeError("sleep exploded")
             raise asyncio.CancelledError
 
-        monkeypatch.setattr(app_module.asyncio, "sleep", failing_sleep)
         # The first iteration raises inside the try before the certificate
         # query; the loop catches, logs, then exits on CancelledError.
-        client.portal.call(app_module._cert_renewal, services)
+        client.portal.call(app_module._cert_renewal, services, failing_sleep)
         assert any(
             "certificate renewal loop failed" in item["message"] for item in services.bus.logs()
         )
@@ -579,6 +575,5 @@ def test_cert_renewal_and_profile_refresh_outer_errors(tmp_path: Path, monkeypat
                 raise RuntimeError("sleep exploded")
             raise asyncio.CancelledError
 
-        monkeypatch.setattr(app_module.asyncio, "sleep", failing_sleep)
-        client.portal.call(app_module._profile_refresh, services)
+        client.portal.call(app_module._profile_refresh, services, failing_sleep)
         assert any("profile refresh loop failed" in item["message"] for item in services.bus.logs())
