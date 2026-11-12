@@ -111,7 +111,6 @@ include = [
   "/protos",
   "/web/src",
   "/web/public",
-  "/web/dist",
   "/web/package.json",
   "/web/package-lock.json",
   "/web/vite.config.ts",
@@ -123,6 +122,9 @@ include = [
   "/CHANGELOG.md",
   "/PLAN.md",
 ]
+
+[tool.hatch.build.targets.sdist.force-include]
+"web/dist" = "web/dist"
 
 [tool.uv]
 default-groups = ["dev"]
