@@ -37,17 +37,17 @@ jobs:
           nohup .venv/bin/ostium serve > /tmp/ostium-e2e.log 2>&1 &
           echo $! > /tmp/ostium-e2e.pid
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18443/healthz && break; sleep 1; done
+      - run: npx playwright test
+        working-directory: web
+        env:
+          OSTIUM_BASE_URL: http://127.0.0.1:18443
+          OSTIUM_ADMIN_PASSWORD: verysecret123
       - name: Stop Ostium
         if: always()
         run: |
           if [ -f /tmp/ostium-e2e.pid ]; then
             kill "$(cat /tmp/ostium-e2e.pid)" 2>/dev/null || true
           fi
-      - run: npx playwright test
-        working-directory: web
-        env:
-          OSTIUM_BASE_URL: http://127.0.0.1:18443
-          OSTIUM_ADMIN_PASSWORD: verysecret123
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
