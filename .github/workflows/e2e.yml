@@ -1,0 +1,47 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+      - run: uv sync
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Start Ostium
+        run: |
+          export OSTIUM_ROLE=server
+          export OSTIUM_DATA_DIR=/tmp/ostium-e2e
+          export OSTIUM_PORT=18443
+          export OSTIUM_DEV=1
+          uv run ostium init --role server --no-input --password 'verysecret123' --domain example.com
+          uv run ostium serve > /tmp/ostium-e2e.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18443/healthz && break; sleep 1; done
+      - run: npx playwright test
+        working-directory: web
+        env:
+          OSTIUM_BASE_URL: http://127.0.0.1:18443
+          OSTIUM_ADMIN_PASSWORD: verysecret123
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report

@@ -1,0 +1,90 @@
+:root {
+  color-scheme: dark;
+  --bg: #060911;
+  --surface: rgba(13, 21, 36, 0.78);
+  --surface-solid: #0d1524;
+  --surface-2: #101a2b;
+  --surface-3: #16223a;
+  --border: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
+  --text: #edf3ff;
+  --text-2: #a7b6ce;
+  --text-3: #6f819b;
+  --accent: #5eead4;
+  --accent-strong: #2dd4bf;
+  --accent-2: #60a5fa;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #60a5fa;
+  --accent-soft: rgba(94, 234, 212, 0.12);
+  --accent-soft-2: rgba(96, 165, 250, 0.12);
+  --danger-soft: rgba(251, 113, 133, 0.12);
+  --warning-soft: rgba(251, 191, 36, 0.12);
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --shadow-3: 0 24px 80px rgba(2, 6, 23, 0.55);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --sidebar-width: 248px;
+  --sidebar-collapsed: 76px;
+  --topbar-height: 64px;
+  --content-max: 1600px;
+  --font-sans:
+    'Inter Variable', 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', system-ui,
+    sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur: 180ms;
+  --focus: 0 0 0 3px rgba(94, 234, 212, 0.35);
+  --glass-blur: 18px;
+  --hero-glow-a: rgba(45, 212, 191, 0.18);
+  --hero-glow-b: rgba(96, 165, 250, 0.16);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f7fc;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --surface-2: #edf2fa;
+  --surface-3: #e3eaf5;
+  --border: rgba(15, 23, 42, 0.1);
+  --border-strong: rgba(15, 23, 42, 0.2);
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #64748b;
+  --accent: #0f766e;
+  --accent-strong: #0d9488;
+  --accent-2: #2563eb;
+  --success: #047857;
+  --warning: #b45309;
+  --danger: #be123c;
+  --info: #1d4ed8;
+  --accent-soft: rgba(15, 118, 110, 0.09);
+  --accent-soft-2: rgba(37, 99, 235, 0.08);
+  --danger-soft: rgba(190, 18, 60, 0.08);
+  --warning-soft: rgba(180, 83, 9, 0.09);
+  --success-soft: rgba(4, 120, 87, 0.08);
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-2: 0 10px 30px rgba(15, 23, 42, 0.1);
+  --shadow-3: 0 24px 70px rgba(15, 23, 42, 0.14);
+  --hero-glow-a: rgba(45, 212, 191, 0.12);
+  --hero-glow-b: rgba(96, 165, 250, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 1ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface: var(--surface-solid);
+    --glass-blur: 0px;
+  }
+}

@@ -1,0 +1,55 @@
+site_name: Ostium
+site_description: Dual-role personal VPN and universal proxy console
+repo_url: https://github.com/ThzxxArt/Ostium
+repo_name: ThzxxArt/Ostium
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to light
+    - scheme: default
+      primary: teal
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Guides:
+      - Server: guides/server.md
+      - Client: guides/client.md
+      - TUN: guides/tun.md
+      - ACME: guides/acme.md
+      - Subscriptions: guides/subscription.md
+      - Web UI: guides/ui.md
+  - Reference:
+      - CLI: reference/cli.md
+      - API: reference/api.md
+      - Profile v1: reference/profile.md
+      - Ports and paths: reference/ports.md
+  - Operations:
+      - Backup: operations/backup.md
+      - Upgrade: operations/upgrade.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Design:
+      - Design system: design-system.md
+      - UX: ux.md
+  - Security: security/threat-model.md

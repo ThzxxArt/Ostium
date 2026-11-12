@@ -1,0 +1,19 @@
+[Unit]
+Description=Ostium client console
+Documentation=https://github.com/ThzxxArt/Ostium
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=OSTIUM_ROLE=client
+Environment=OSTIUM_CORE_TOKEN_FILE=/var/lib/ostium-core/core.token
+Environment=OSTIUM_CORE_URL=http://127.0.0.1:8788
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ostium/venv/bin/ostium serve
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

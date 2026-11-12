@@ -1,0 +1,37 @@
+[Unit]
+Description=Ostium proxy core (sing-box supervisor)
+Documentation=https://github.com/ThzxxArt/Ostium
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ostium
+Group=ostium
+WorkingDirectory=/var/lib/ostium
+Environment=OSTIUM_ROLE=server
+Environment=OSTIUM_CONFIG_FILE=/etc/ostium/config.toml
+Environment=OSTIUM_DATA_DIR=/var/lib/ostium
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ostium/venv/bin/ostium core-run
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/ostium/runtime /var/lib/ostium/logs /var/lib/ostium/core
+LimitNOFILE=65535
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

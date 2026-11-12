@@ -1,0 +1,36 @@
+[Unit]
+Description=Ostium proxy core (client TUN)
+Documentation=https://github.com/ThzxxArt/Ostium
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ostium-core
+Group=ostium
+Environment=OSTIUM_ROLE=client
+Environment=OSTIUM_CONFIG_FILE=/etc/ostium/client.toml
+Environment=OSTIUM_DATA_DIR=/var/lib/ostium-core
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ostium/venv/bin/ostium core-run
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+DeviceAllow=/dev/net/tun rw
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+ReadWritePaths=/var/lib/ostium-core
+LimitNOFILE=65535
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+Ostium
+Copyright (C) 2026 Ostium Contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+Bundled data plane
+------------------
+Ostium builds and distributes an unmodified upstream sing-box binary:
+
+  sing-box v1.14.4
+  Copyright (C) 2022 nekohasekai and contributors
+  Licensed under GPL-3.0
+  Source: https://github.com/SagerNet/sing-box/tree/v1.14.4
+
+The exact build tags and source revision used for each release are published in
+scripts/build-core.sh, the release SBOM and the core manifest. No upstream
+source files are modified; only Go build tags are selected.
+
+Trademarks and third-party assets
+---------------------------------
+All third-party Python and npm dependencies retain their respective licenses.
+See the generated SBOM for the complete dependency inventory.

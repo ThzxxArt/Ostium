@@ -1,0 +1,194 @@
+[build-system]
+requires = ["hatchling==1.27.0", "hatch-vcs==0.5.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ostium-art"
+dynamic = ["version"]
+description = "Ostium — a dual-role personal VPN and universal proxy console"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Ostium Contributors" }]
+keywords = ["vpn", "proxy", "sing-box", "reality", "hysteria2", "fastapi"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Web Environment",
+  "Framework :: FastAPI",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: Proxy Servers",
+  "Topic :: System :: Networking",
+]
+dependencies = [
+  "fastapi==0.162.5",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.14.3",
+  "pydantic-settings==2.16.2",
+  "email-validator==2.3.0",
+  "SQLAlchemy==2.1.8",
+  "greenlet==3.3.0",
+  "alembic==1.20.1",
+  "aiosqlite==0.22.1",
+  "typer==0.29.1",
+  "rich==15.0.0",
+  "structlog==26.1.0",
+  "cryptography==50.0.2",
+  "argon2-cffi==25.1.0",
+  "pyotp==2.10.0",
+  "segno==1.6.6",
+  "httpx==0.28.1",
+  "psutil==7.2.2",
+  "orjson==3.13.0",
+  "msgspec==0.22.0",
+  "platformdirs==4.14.5",
+  "tenacity==9.2.1",
+  "filelock==4.2.10",
+  "packaging==26.3",
+  "tomli-w==1.2.0",
+  "acme==5.10.0",
+  "josepy==2.3.0",
+  "grpcio==1.85.1",
+  "protobuf==7.36.2",
+  "PyYAML==6.0.3",
+  "python-multipart==0.0.20",
+  "aiofiles==25.1.0",
+  "pywin32==312; sys_platform == 'win32'",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.2.0",
+  "pytest-asyncio==1.4.1.post1",
+  "pytest-cov==7.0.0",
+  "hypothesis==6.170.15",
+  "respx==0.22.0",
+  "ruff==0.17.4",
+  "mypy==2.4.1",
+  "pip-audit==2.9.0",
+  "grpcio-tools==1.85.1",
+  "pyinstaller==6.22.3",
+  "types-PyYAML==6.0.12.20250915",
+]
+
+[project.scripts]
+ostium = "ostium.cli.main:app"
+ostium-service = "ostium.system.windows_service:main"
+
+[project.urls]
+Homepage = "https://github.com/ThzxxArt/Ostium"
+Documentation = "https://github.com/ThzxxArt/Ostium/tree/main/docs"
+Repository = "https://github.com/ThzxxArt/Ostium"
+Issues = "https://github.com/ThzxxArt/Ostium/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+fallback_version = "0.1.0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/ostium/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ostium"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"web/dist" = "ostium/web/dist"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/docs",
+  "/scripts",
+  "/deploy",
+  "/protos",
+  "/web/src",
+  "/web/public",
+  "/web/dist",
+  "/web/package.json",
+  "/web/package-lock.json",
+  "/web/vite.config.ts",
+  "/web/tsconfig.json",
+  "/pyproject.toml",
+  "/README.md",
+  "/LICENSE",
+  "/NOTICE",
+  "/CHANGELOG.md",
+  "/PLAN.md",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+  "integration: requires a real sing-box binary",
+  "slow: long-running test",
+]
+
+[tool.coverage.run]
+source = ["ostium"]
+branch = true
+omit = ["src/ostium/_version.py", "src/ostium/api/static.py"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+exclude = ["src/ostium/_version.py", "src/ostium/engine/singbox/v2ray_stats_pb2*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "PTH", "RUF", "S"]
+ignore = [
+  "S101",   # asserts in tests
+  "S104",   # binding all interfaces is explicit and validated
+  "B008",   # FastAPI Depends() in defaults is the documented pattern
+  "N802",   # BaseHTTPRequestHandler do_GET/do_POST naming
+  "S603",   # fixed argv lists, never shell=True
+  "S607",   # commands are resolved from PATH on purpose
+  "S110",   # best-effort cleanup must not mask the original error
+  "SIM102", # separate guards are more readable in validation code
+  "SIM105", # explicit try/except/pass is clearer in cleanup paths
+  "RUF006", # fire-and-forget event publish tasks
+  "RUF001", # Chinese punctuation in strings
+  "RUF002",
+  "RUF003",
+  "N818",   # domain exceptions can end with Error
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "DTZ", "T20"]
+"src/ostium/system/proxy_windows.py" = ["S", "PTH"]
+"src/ostium/cli/**" = ["T20"]
+"scripts/**" = ["T20", "S"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src/ostium"]
+ignore_missing_imports = false
+warn_unused_ignores = true
+disable_error_code = ["import-untyped"]
+plugins = []
+exclude = "src/ostium/engine/singbox/v2ray_stats_pb2"
+
+[[tool.mypy.overrides]]
+module = [
+  "ostium.engine.singbox.v2ray_stats",
+  "ostium.system.proxy",
+]
+ignore_errors = true

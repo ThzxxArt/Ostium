@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ostium.core</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/ostium/venv/bin/ostium</string>
+    <string>core-run</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OSTIUM_ROLE</key>
+    <string>client</string>
+    <key>OSTIUM_DATA_DIR</key>
+    <string>/Library/Application Support/Ostium</string>
+    <key>OSTIUM_CONFIG_FILE</key>
+    <string>/Library/Application Support/Ostium/config.toml</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Library/Application Support/Ostium/logs/core.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Library/Application Support/Ostium/logs/core.log</string>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+</dict>
+</plist>
