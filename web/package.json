@@ -52,8 +52,12 @@
     "prettier": "3.10.0",
     "typescript": "^6.0.3",
     "vite": "8.3.8",
-    "vite-plugin-pwa": "2.0.0",
     "vitest": "5.1.0",
     "vue-tsc": "^3.3.14"
+  },
+  "overrides": {
+    "editorconfig": "4.0.0",
+    "glob": "14.0.2",
+    "minimatch": "11.0.8"
   }
 }

@@ -73,7 +73,7 @@ platform/external validation, `[ ]` not done yet.
       opt-in from Settings, with denied/unsupported/fallback paths tested.
 - [x] Visual regression baselines committed for 1440/1024/390 in dark and light
       themes; axe smoke and no-horizontal-scroll checks run on all three.
-- [x] 133 Vitest tests and 18 Playwright tests pass; see `AUDIT_REPORT.md`.
+- [x] 136 Vitest tests and 21 Playwright tests pass; see `AUDIT_REPORT.md`.
 - [x] Second audit fixed client token/config paths, API token scopes,
       recovery-code login, Allow LAN rollback, installer upgrade rollback,
       Windows/macOS installer paths, Docker SPA assets, core manifest URLs and
@@ -104,14 +104,13 @@ platform/external validation, `[ ]` not done yet.
 - Backend coverage: statements 98.34%, branches 95.79%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 91.46%, branches 85.43%, functions 89.14%,
-  lines 92.17% (Vitest v8, thresholds 85).
-- Playwright: 18 passed on desktop 1440, tablet 1024 and mobile 390; login,
-  dashboard, command palette, axe smoke, no-horizontal-scroll and six dark/light
-  visual baselines pass.
-- `pip-audit` and production `npm audit`: 0 known vulnerabilities. The dev
-  toolchain reports 16 low/moderate advisories (no high/critical); CI keeps the
-  `--audit-level=high` gate.
+- Frontend coverage: statements 91.38%, branches 85.27%, functions 89.04%,
+  lines 92.13% (Vitest v8, thresholds 85).
+- Playwright: 21 passed on desktop 1440, tablet 1024 and mobile 390; login,
+  dashboard, command palette, PWA service worker, axe smoke,
+  no-horizontal-scroll and six dark/light visual baselines pass.
+- `pip-audit` and full `npm audit`: 0 known vulnerabilities after the PWA
+  toolchain replacement and dependency overrides.
 - `mkdocs build --strict`, `shellcheck`, clean-wheel install and serve smoke:
   pass.
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS

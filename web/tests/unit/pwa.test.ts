@@ -10,7 +10,7 @@ const pwa = vi.hoisted(() => ({
   updateServiceWorker: vi.fn(async () => undefined),
 }))
 
-vi.mock('virtual:pwa-register/vue', async () => {
+vi.mock('@/composables/usePwa', async () => {
   const { ref: vueRef } = await import('vue')
   pwa.needRefresh = vueRef(true)
   return {

@@ -17,13 +17,13 @@
 | `core/` 覆盖 | — | 语句 99.21% / 分支 95.45% | ≥90% PASS |
 | `services/` 覆盖 | — | 语句 98.09% / 分支 94.26% | ≥90% PASS |
 | `engine/` 覆盖 | — | 语句 99.23% / 分支 97.29% | ≥90% PASS |
-| 前端 statements | 0.92% | **91.46%** | ≥85% PASS |
-| 前端 branches | 1.62% | **85.43%** | ≥85% PASS |
-| 前端 functions | 0.56% | **89.14%** | ≥85% PASS |
-| 前端 lines | 0.83% | **92.17%** | ≥85% PASS |
+| 前端 statements | 0.92% | **91.38%** | ≥85% PASS |
+| 前端 branches | 1.62% | **85.27%** | ≥85% PASS |
+| 前端 functions | 0.56% | **89.04%** | ≥85% PASS |
+| 前端 lines | 0.83% | **92.13%** | ≥85% PASS |
 | 后端测试 | 69 | **391 passed / 0 skipped** | — |
-| 前端测试 | 5 | **133 passed** | — |
-| Playwright | 12 passed / 3 skipped | **18 passed / 0 skipped** | — |
+| 前端测试 | 5 | **136 passed** | — |
+| Playwright | 12 passed / 3 skipped | **21 passed / 0 skipped** | — |
 
 覆盖率排除项仅为 `src/ostium/_version.py` 和生成的
 `v2ray_stats_pb2*.py`。逐文件/逐目录检查由 `scripts/coverage_gate.py`
@@ -56,15 +56,15 @@
 | Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
-| Frontend unit tests | `npm run test` | 133 passed |
-| Frontend coverage | `npm run test:coverage` | 91.46 / 85.43 / 89.14 / 92.17 |
+| Frontend unit tests | `npm run test` | 136 passed |
+| Frontend coverage | `npm run test:coverage` | 91.38 / 85.27 / 89.04 / 92.13 |
 | Frontend build | `npm run build` | PASS |
 | Frontend format | `npm run format:check` | PASS |
-| E2E/a11y/visual | `npx playwright test` | 18 passed |
+| E2E/a11y/visual | `npx playwright test` | 21 passed |
 | Shell scripts | `shellcheck scripts/*.sh deploy/**/*.sh install.sh` | PASS |
 | Docs | `mkdocs build --strict` | PASS |
 | Python audit | `uv run pip-audit` | 0 known vulnerabilities |
-| npm audit | `npm audit --omit=dev --registry=https://registry.npmjs.org` | 0 vulnerabilities |
+| npm audit | `npm audit --registry=https://registry.npmjs.org` | 0 vulnerabilities |
 | Wheel | `SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0 uv build` | `ostium_ctl-0.1.0` wheel + sdist |
 | Clean install | fresh venv + wheel install + `ostium init` + `ostium serve` | `Ostium 0.1.0`, `/healthz` 200 |
 | Real data plane | real sing-box checks, custom core, live Reality traffic | PASS |
@@ -90,7 +90,7 @@
 | AUD-012 | P2 | `pyproject.toml` | `python-multipart 0.0.20` 6 个已知 CVE | 依赖过期 | 升级 0.0.31，重建 lock | `pip-audit` 0 漏洞 |
 | AUD-013 | P2 | `mkdocs.yml`、`docs/index.md` | `mkdocs --strict` 失败 | 指向 docs 外的 PLAN.md；ADR 未入 nav | 外部链接 + ADR nav | `mkdocs build --strict` |
 | AUD-014 | P2 | `deploy/launchd/install-macos.sh` | shellcheck SC2012 | `ls` 解析文件名 | 使用 `find` | `shellcheck` 0 |
-| AUD-015 | P2 | `web/playwright.config.ts`、`tests/e2e` | 移动端 412px、视觉基线缺失 | 未对齐 390px；visual skip | 390px + 6 张深浅色基线，移除 skip | Playwright 18 passed |
+| AUD-015 | P2 | `web/playwright.config.ts`、`tests/e2e` | 移动端 412px、视觉基线缺失 | 未对齐 390px；visual skip | 390px + 6 张深浅色基线，移除 skip | Playwright 基线通过（当前 21） |
 | AUD-016 | P3 | `services/stats.py` | 死代码 `disabled` 列表永不使用 | 历史遗留 | 删除无效分支 | 全量覆盖门禁 |
 
 ---
@@ -135,7 +135,7 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 | 配额/到期自动禁用/重置 | PASS | `test_stats_extended.py`、API/用户测试 |
 | 四种订阅 + QR | PASS | `test_subscriptions_service.py`、API 四格式测试 |
 | 标准分享链接/二维码 | PASS | `test_endpoints_extended.py`、`qr_svg` 测试 |
-| 管理 Web UI 全部页面 | PASS | 133 个 Vitest + 18 个 Playwright |
+| 管理 Web UI 全部页面 | PASS | 136 个 Vitest + 21 个 Playwright |
 | ACME/手动/自签/续期/提醒 | PASS（真实 ACME 外部） | ACME 单元 100%、自签/上传/续期 API 测试；staging 见 MANUAL |
 | 实时流量/连接/日志/WS/Prometheus | PASS | API/WS/事件/指标测试 |
 | 备份/恢复：DB/config/certs/master key，口令加密 | PASS | `test_backup_extended.py`、错误密码/路径逃逸测试 |
@@ -287,14 +287,14 @@ uv run pytest -m "not integration" --cov=ostium ...  -> 385 passed, coverage 98.
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass
-npm run test:coverage                                -> 133 passed; 91.46/85.43/89.14/92.17
+npm run test:coverage                                -> 136 passed; 91.38/85.27/89.04/92.13
 npm run build                                        -> built
 npm run format:check                                 -> pass
-npx playwright test                                  -> 18 passed
+npx playwright test                                  -> 21 passed
 shellcheck scripts/*.sh deploy/**/*.sh install.sh    -> exit 0
 uv run --with mkdocs-material==9.7.0 mkdocs build --strict -> built
 uv run pip-audit                                     -> No known vulnerabilities
-npm audit --omit=dev --registry=https://registry.npmjs.org -> found 0 vulnerabilities
+npm audit --registry=https://registry.npmjs.org          -> found 0 vulnerabilities
 SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0 uv build        -> ostium_ctl-0.1.0 wheel/sdist
 clean venv install + ostium init + ostium serve      -> Ostium 0.1.0; /healthz 200
 ```
@@ -365,7 +365,7 @@ clean venv install + ostium init + ostium serve      -> Ostium 0.1.0; /healthz 2
 - **真实 TUN/系统代理/ACME/72h soak/5 用户可用性**：仍属外部环境。
 - **数据库升级**：当前 `create_schema` 是 `create_all + stamp`，v0.1.0 只有初始迁移；后续版本若新增 Alembic 迁移，需要补“已有库执行 upgrade”路径，本轮未虚构已验证。
 - **macOS DMG**：`build-macos.sh` 存在，但 Release workflow 未构建/上传 DMG；已把升级文档中“使用新版 DMG”改为重新运行安装器，避免误导。
-- **npm dev toolchain advisories**：`npm audit --omit=dev` 为 0；完整 `npm audit` 有 16 个 low/moderate（`deepmerge`、`glob`、`js-beautify` 等开发依赖），无 high/critical。`npm audit --audit-level=high` 门禁通过；`npm audit fix --force` 会引入 `vite-plugin-pwa`/`@vue/test-utils` 破坏性升级，本轮未强行升级。
+- **npm audit**：破坏性升级 + `overrides`（`editorconfig@4.0.0`、`glob@14.0.2`、`minimatch@11.0.8`）后，完整 `npm audit` 为 **0 vulnerabilities**；同时用仓库内 `web/build/pwa.ts` 替换了会引入 `deepmerge` 漏洞的 `vite-plugin-pwa/workbox-build`，PWA 由 136 个单测和真实注册 E2E 覆盖。
 - **Windows 卸载脚本**：Inno 卸载与脚本删除目录的交互未实机验证；已避免安装阶段自复制错误。
 
 ### 12.4 本轮验证证据
@@ -383,8 +383,8 @@ gh release list                                       -> 空（无 GitHub Releas
 Docker 布局模拟 wheel                                 -> 包含 ostium/web/dist/index.html
 uv run pytest -m "not integration" ...                -> 385 passed，98.34/95.79
 uv run pytest -m integration                         -> 6 passed
-npm run test                                          -> 133 passed
-npx playwright test                                   -> 18 passed
+npm run test                                          -> 136 passed
+npx playwright test                                   -> 21 passed
 mkdocs build --strict                                 -> PASS
 shellcheck + bash -n                                  -> PASS
 ```

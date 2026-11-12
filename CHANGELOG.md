@@ -41,8 +41,8 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 391 backend tests, 133 frontend tests
-  and 18 Playwright tests, with per-module coverage gates and six committed
+- Comprehensive audit and coverage suite: 391 backend tests, 136 frontend tests
+  and 21 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 
 ### Fixed
@@ -95,6 +95,9 @@ SemVer.
   placeholder.
 - GitHub Actions updated to current major versions (Node 24-era actions and
   CodeQL v4).
+- Replaced `vite-plugin-pwa`/`workbox-build` with a small in-repo service
+  worker generator and added npm overrides; full `npm audit` is now 0
+  vulnerabilities, and PWA registration is covered by Playwright.
 
 ### Known boundaries
 

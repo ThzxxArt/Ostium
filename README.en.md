@@ -36,8 +36,8 @@
 
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.34%25%20statements%20%C2%B7%2095.79%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.46%25%20statements%20%C2%B7%2085.43%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20136%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 391 backend tests, 133 frontend tests and 18 Playwright tests; 98.34% backend statements / 95.79% branches. |
+| 🧪 **Verified** | 391 backend tests, 136 frontend tests and 21 Playwright tests; 98.34% backend statements / 95.79% branches. |
 
 ---
 
@@ -798,11 +798,12 @@ Current results:
 
 - Backend: **391 passed / 0 skipped** (385 regular tests + 6 live-engine integration tests),
   **98.34%** statements / **95.79%** branches.
-- Frontend: **133 passed**, **91.46%** statements / **85.43%** branches /
-  **89.14%** functions / **92.17%** lines.
-- Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login
-  check.
-- `pip-audit` / production `npm audit`: 0 known vulnerabilities. The dev toolchain has 16 low/moderate advisories and no high/critical; the `--audit-level=high` gate passes.
+- Frontend: **136 passed**, **91.38%** statements / **85.27%** branches /
+  **89.04%** functions / **92.13%** lines.
+- Playwright: **21 passed**, covering 1440/1024/390, dark/light visual baselines,
+  PWA service-worker registration and an axe login check.
+- `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev
+  toolchain audit is also clean after breaking upgrades/overrides.
 - Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).
 
 ---

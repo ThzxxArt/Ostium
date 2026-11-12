@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRegisterSW } from 'virtual:pwa-register/vue'
+import { useRegisterSW } from '@/composables/usePwa'
 import { NButton } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw, X } from 'lucide-vue-next'

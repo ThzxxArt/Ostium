@@ -176,6 +176,20 @@ test('command palette opens and navigates', async ({ page }) => {
   await expect(page).toHaveURL(/users/)
 })
 
+test('PWA service worker registers and precaches the shell', async ({ page }) => {
+  await page.goto('/login')
+  const result = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return null
+    const registration = await navigator.serviceWorker.ready
+    return {
+      active: Boolean(registration.active),
+      caches: await caches.keys(),
+    }
+  })
+  expect(result?.active).toBe(true)
+  expect(result?.caches.some((name) => name.startsWith('ostium-'))).toBe(true)
+})
+
 test('login page has no serious accessibility violations', async ({ page }) => {
   await page.goto('/login')
   const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze()
