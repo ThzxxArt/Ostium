@@ -173,19 +173,19 @@ proxy_pass http://127.0.0.1:8443;
 proxy_http_version 1.1;
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-For $remote_addr;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header Upgrade $http_upgrade;
 proxy_set_header Connection $ostium_connection_upgrade;
 proxy_read_timeout 3600s;
 proxy_buffering off;
-client_max_body_size 100m;
+client_max_body_size 20m;
 ```
 
 - `Host` 必须保留域名，否则 Ostium 返回 `400 invalid Host header`，或 CSRF Origin 校验失败。
-- `X-Forwarded-For` 让审计日志拿到真实 IP；Ostium 只在直连方是回环时信任它。
+- `X-Forwarded-For` 让审计日志拿到真实 IP；Ostium 只信任来自回环的最后一跳，示例配置用 `$remote_addr` 覆盖客户端自带的头，防止伪造。
 - WebSocket `/api/v1/events` 需要 `Upgrade`/`Connection`。
-- 备份/恢复/诊断上传可能较大，`client_max_body_size` 建议 100m。
+- 控制面请求体上限是 20 MiB，示例 Nginx 配置保持一致；超过 20 MiB 的备份请用命令行/文件系统方式处理。
 - `proxy_buffering off` 对实时事件更友好。
 
 ## 验证

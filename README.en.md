@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.51%25%20statements%20%C2%B7%2095.87%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.56%25%20statements%20%C2%B7%2085.64%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-386%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.34%25%20statements%20%C2%B7%2095.79%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.46%25%20statements%20%C2%B7%2085.43%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 386 backend tests, 133 frontend tests and 18 Playwright tests; 98.51% backend statements / 95.87% branches. |
+| 🧪 **Verified** | 391 backend tests, 133 frontend tests and 18 Playwright tests; 98.34% backend statements / 95.79% branches. |
 
 ---
 
@@ -204,8 +204,8 @@ The installer:
 1. installs missing `curl`/`tar` on Linux;
 2. downloads static `uv` and installs a **managed Python 3.13** (system Python is untouched);
 3. downloads and verifies the wheel, sing-box core and `SHA256SUMS`;
-4. creates service users, initialises the database and registers systemd/launchd/Windows services;
-5. prints a one-time administrator password.
+4. the server creates service users, initialises the database and registers systemd/launchd/Windows services;
+5. the server prints a one-time administrator password; Linux/macOS clients have no preset password and complete the client wizard on first UI visit.
 
 #### Run everything as root (no `ostium` user)
 
@@ -690,7 +690,7 @@ systemctl --user daemon-reload
 sudo rm -rf /opt/ostium
 sudo rm -f /usr/local/bin/ostium
 # Data remains by default. Remove only when you are sure:
-# sudo rm -rf /var/lib/ostium-core /etc/ostium/client.toml
+# sudo rm -rf /var/lib/ostium-core /etc/ostium/client.toml ~/.local/share/ostium
 ```
 
 ### Windows
@@ -706,7 +706,7 @@ sudo launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -f /Library/LaunchDaemons/com.ostium.core.plist
 sudo rm -f /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -rf /opt/ostium
-# Data: /Library/Application Support/Ostium (remove only when sure)
+# Data: /Library/Application Support/Ostium and Ostium UI (remove only when sure)
 ```
 
 ### Docker
@@ -722,7 +722,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 ## Security
 
 - The admin UI is loopback-only by default. Never expose it without TLS + TOTP.
-- Change the password and enable TOTP immediately after first login; store recovery codes.
+- Change the password and enable TOTP immediately after first login; store recovery codes. If you lose the authenticator, switch to recovery-code login on the sign-in page.
 - Open only the ports you need: 22, 80, 443/tcp and 443/udp. Do not expose 8388/8443 by default.
 - Run the control plane as an unprivileged user; only the core needs low ports or TUN privileges.
 - Keep encrypted backups off-host. A backup contains the master key and is highly sensitive.
@@ -736,10 +736,10 @@ docker compose -f deploy/docker/docker-compose.yml down
 
 | Platform | Control plane | Core |
 |---|---|---|
-| Linux server | `/var/lib/ostium`, `/etc/ostium` | same |
-| Linux client | `~/.local/share/ostium` (user UI) | `/var/lib/ostium-core` |
-| Windows | `%LOCALAPPDATA%\Ostium` (UI) | `%ProgramData%\Ostium` |
-| macOS | `~/Library/Application Support/Ostium` (UI) | `/Library/Application Support/Ostium` |
+| Linux server | `/var/lib/ostium`, `/etc/ostium/config.toml` | same |
+| Linux client | `~/.local/share/ostium` (UI data and `config.toml`) | `/var/lib/ostium-core`, `/etc/ostium/client.toml` |
+| Windows | `%ProgramData%\Ostium` (UI) | `%ProgramData%\Ostium` |
+| macOS | `/Library/Application Support/Ostium UI` (UI) | `/Library/Application Support/Ostium` |
 
 Key files: `ostium.db`, `master.key`, `config.toml`, `certs/`, `runtime/last-good.json`,
 `runtime/core.token`, `logs/` and `backups/`.
@@ -796,10 +796,10 @@ npx playwright test
 
 Current results:
 
-- Backend: **386 passed / 0 skipped** (380 regular tests + 6 live-engine integration tests),
-  **98.51%** statements / **95.87%** branches.
-- Frontend: **133 passed**, **91.56%** statements / **85.64%** branches /
-  **89.31%** functions / **92.29%** lines.
+- Backend: **391 passed / 0 skipped** (385 regular tests + 6 live-engine integration tests),
+  **98.34%** statements / **95.79%** branches.
+- Frontend: **133 passed**, **91.46%** statements / **85.43%** branches /
+  **89.14%** functions / **92.17%** lines.
 - Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login
   check.
 - `pip-audit` / `npm audit`: 0 known vulnerabilities.

@@ -63,10 +63,17 @@ async def issue_certificate(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     domain = payload.domain.strip().lower()
+    try:
+        domain = cert_service.validate_domain(domain)
+    except cert_service.CertificateError as exc:
+        raise ApiError(exc.status_code, str(exc), exc.code) from exc
     if payload.method == "self-signed":
-        certificate = await cert_service.create_self_signed(
-            session, services.settings, domain=domain
-        )
+        try:
+            certificate = await cert_service.create_self_signed(
+                session, services.settings, domain=domain
+            )
+        except cert_service.CertificateError as exc:
+            raise ApiError(exc.status_code, str(exc), exc.code) from exc
         certificate.auto_renew = False
         await session.flush()
         await cert_service.use_for_inbounds(session, certificate)

@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/instal
   | sudo bash -s -- install --role client
 ```
 
-默认安装核心 LaunchDaemon 和当前用户 UI LaunchAgent。root 模式：
+默认安装核心 LaunchDaemon 和当前用户 UI LaunchAgent。首次打开 <http://127.0.0.1:8787> 时完成客户端设置向导（客户端不预置管理员密码）。root 模式：
 
 ```bash
 curl -fsSL .../install-online.sh | sudo bash -s -- install --role client --run-as-root
@@ -144,7 +144,7 @@ sudo launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -f /Library/LaunchDaemons/com.ostium.core.plist
 sudo rm -f /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -rf /opt/ostium
-# 数据：/Library/Application Support/Ostium（确认后再删）
+# 数据：/Library/Application Support/Ostium 和 Ostium UI（确认后再删）
 ```
 
 ### Linux
@@ -163,7 +163,7 @@ sudo ostium tun off
 
 sudo rm -rf /opt/ostium
 sudo rm -f /usr/local/bin/ostium
-# 数据默认保留：/var/lib/ostium-core、/etc/ostium/client.toml
+# 数据默认保留：/var/lib/ostium-core、/etc/ostium/client.toml、~/.local/share/ostium
 ```
 
 一键卸载：

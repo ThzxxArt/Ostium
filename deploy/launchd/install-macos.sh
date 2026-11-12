@@ -46,6 +46,10 @@ fi
 CORE_DIR="$(mktemp -d)"
 trap 'rm -rf "$CORE_DIR"' EXIT
 tar -xzf "$CORE_TARBALL" -C "$CORE_DIR" --no-same-owner
+if [[ ! -x "$CORE_DIR/sing-box" ]] || ! "$CORE_DIR/sing-box" version >/dev/null 2>&1; then
+  echo "核心包内缺少可运行的 sing-box" >&2
+  exit 2
+fi
 
 mkdir -p "$PREFIX" "$DATA" "$DATA/logs" "$DATA/core" "$UI_DATA" "$UI_DATA/logs"
 "$PYTHON_BIN" -m venv "$PREFIX/venv"
@@ -56,19 +60,72 @@ ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 install -m 0755 "$CORE_DIR/sing-box" "$PREFIX/sing-box"
 install -m 0755 "$CORE_DIR/sing-box" "$DATA/core/sing-box"
 
-if [[ ! -f "$DATA/ostium.db" ]]; then
-  OSTIUM_ROLE=client OSTIUM_DATA_DIR="$DATA" \
-    "$PREFIX/venv/bin/ostium" init --role client --no-input \
-    --password "$(openssl rand -base64 18)" || true
+# Clients do not have an installer-created administrator: the first visit to
+# the UI runs the setup wizard, exactly like the Linux client.  Keep the core
+# configuration separate from the UI database so the privileged core never
+# needs to own the admin database.
+if [[ ! -f "$DATA/config.toml" ]]; then
+  cat >"$DATA/config.toml" <<EOF
+role = "client"
+host = "127.0.0.1"
+port = 8787
+data_dir = "$DATA"
+config_dir = "$DATA"
+log_level = "info"
+engine_version = "1.14.4-ostium.1"
+core_url = "http://127.0.0.1:8788"
+mode = "system_proxy"
+EOF
+  chmod 0600 "$DATA/config.toml"
 fi
+
+# The UI persists its own settings (Allow LAN, port, mode) in its data dir.
+# Keep that file writable by the logged-in user without granting write access
+# to the privileged core configuration.
+if [[ ! -f "$UI_DATA/config.toml" ]]; then
+  cat >"$UI_DATA/config.toml" <<EOF
+role = "client"
+host = "127.0.0.1"
+port = 8787
+data_dir = "$UI_DATA"
+config_dir = "$UI_DATA"
+log_level = "info"
+engine_version = "1.14.4-ostium.1"
+core_url = "http://127.0.0.1:8788"
+mode = "system_proxy"
+EOF
+fi
+
+# The unprivileged UI user needs to read the core token.  A dedicated local
+# group is the macOS equivalent of the Linux ostium group.
+if ! dseditgroup -o read ostium >/dev/null 2>&1; then
+  if ! dseditgroup -o create ostium >/dev/null 2>&1; then
+    echo "无法创建 ostium 组；UI 将无法读取核心 token" >&2
+    exit 1
+  fi
+fi
+UI_OWNER="${SUDO_USER:-root}"
+if [[ "$UI_OWNER" != "root" ]]; then
+  if ! dseditgroup -o edit -a "$UI_OWNER" -t user ostium >/dev/null 2>&1; then
+    echo "无法把 $UI_OWNER 加入 ostium 组；UI 将无法读取核心 token" >&2
+    exit 1
+  fi
+fi
+chown -R "$UI_OWNER" "$UI_DATA"
+chmod 0750 "$UI_DATA"
+[[ -f "$UI_DATA/config.toml" ]] && chmod 0600 "$UI_DATA/config.toml"
 
 if [[ "$NO_SERVICE" == "true" ]]; then
   cat <<EOF
 
 Ostium macOS client installed without launchd.
 
-  Core:  sudo OSTIUM_ROLE=client OSTIUM_DATA_DIR="$DATA" $PREFIX/venv/bin/ostium core-run
-  UI:    OSTIUM_ROLE=client OSTIUM_CORE_URL=http://127.0.0.1:8788 $PREFIX/venv/bin/ostium serve
+  Core:  sudo OSTIUM_ROLE=client OSTIUM_DATA_DIR="$DATA" OSTIUM_SHARED_DATA=1 \\
+           OSTIUM_CONFIG_FILE="$DATA/config.toml" $PREFIX/venv/bin/ostium core-run
+  UI:    OSTIUM_ROLE=client OSTIUM_DATA_DIR="$UI_DATA" OSTIUM_CONFIG_DIR="$UI_DATA" \\
+           OSTIUM_CONFIG_FILE="$UI_DATA/config.toml" \\
+           OSTIUM_CORE_TOKEN_FILE="$DATA/runtime/core.token" OSTIUM_CORE_URL=http://127.0.0.1:8788 \\
+           $PREFIX/venv/bin/ostium serve
 
   Data:  $DATA
   UI data: $UI_DATA
@@ -77,9 +134,16 @@ EOF
 fi
 
 # Remove previous registrations before switching modes.
+unload_agent() {
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    launchctl asuser "$(id -u "$SUDO_USER")" launchctl unload -w "$1" 2>/dev/null || true
+  else
+    launchctl unload -w "$1" 2>/dev/null || true
+  fi
+}
 launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
 launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
-launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+unload_agent /Library/LaunchAgents/com.ostium.ui.plist
 
 install -m 0644 "$SCRIPT_DIR/com.ostium.core.plist" /Library/LaunchDaemons/
 if [[ "$RUN_AS_ROOT" == "true" ]]; then
@@ -94,6 +158,8 @@ if [[ "$NO_START" != "true" ]]; then
   launchctl load -w /Library/LaunchDaemons/com.ostium.core.plist
   if [[ "$RUN_AS_ROOT" == "true" ]]; then
     launchctl load -w /Library/LaunchDaemons/com.ostium.ui.plist
+  elif [[ -n "${SUDO_USER:-}" ]]; then
+    launchctl asuser "$(id -u "$SUDO_USER")" launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
   else
     launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
   fi
@@ -107,4 +173,6 @@ Ostium macOS client installed.
   UI data:    $UI_DATA
   UI:         http://127.0.0.1:8787
   Run as:     $([[ "$RUN_AS_ROOT" == "true" ]] && echo root || echo "root core + logged-in user UI")
+
+Open the UI to complete the client setup wizard.
 EOF

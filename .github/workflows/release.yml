@@ -14,22 +14,23 @@ jobs:
   wheel:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
       - run: npm ci --no-audit --no-fund
         working-directory: web
       - run: npm run build
         working-directory: web
-      - uses: astral-sh/setup-uv@v6
+      - run: test -f web/dist/index.html
+      - uses: astral-sh/setup-uv@v10
         with:
           version: "0.11.14"
       - run: uv build
       - run: sha256sum dist/* > dist/SHA256SUMS-wheel.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel
           path: dist/*
@@ -43,15 +44,15 @@ jobs:
     needs: [wheel, core]
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10
         with:
           version: "0.11.14"
       - name: Download core artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: core-windows-amd64
           path: dist/core-artifact
@@ -74,7 +75,7 @@ jobs:
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           $version = "${{ github.ref_name }}".TrimStart("v")
           & $iscc deploy/windows/ostium.iss /DAppVersion=$version
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: dist/windows/*-setup.exe
@@ -82,15 +83,15 @@ jobs:
   docker:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -103,32 +104,35 @@ jobs:
     needs: [wheel, core, windows]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: wheel
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: core-*
           merge-multiple: true
           path: dist/core
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: windows-installer
           path: dist/windows
-      - run: python3 scripts/build-core-manifest.py --dir dist/core --output dist/core-manifest.json
+      - run: >-
+          python3 scripts/build-core-manifest.py --dir dist/core
+          --release-version "${{ github.ref_name }}"
+          --output dist/core-manifest.json
       - name: Checksums
         run: |
           cd dist
           sha256sum $(find . -type f ! -name SHA256SUMS ! -name '*.sig' | sort) > SHA256SUMS
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: "dist/**"
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*.whl

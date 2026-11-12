@@ -11,6 +11,7 @@ Group=ostium
 Environment=OSTIUM_ROLE=client
 Environment=OSTIUM_CONFIG_FILE=/etc/ostium/client.toml
 Environment=OSTIUM_DATA_DIR=/var/lib/ostium-core
+Environment=OSTIUM_SHARED_DATA=1
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/ostium/venv/bin/ostium core-run
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW

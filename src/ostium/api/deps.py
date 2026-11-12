@@ -83,7 +83,13 @@ async def get_session(services: Services = Depends(get_services)) -> AsyncIterat
 def client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded and request.client and request.client.host in {"127.0.0.1", "::1"}:
-        return forwarded.split(",", 1)[0].strip()
+        # Only the hop added by our own reverse proxy is trusted.  Taking the
+        # last entry prevents a client from spoofing the first entry to bypass
+        # login/subscription rate limits or poison audit logs.  The shipped
+        # Nginx config also overwrites the header with $remote_addr.
+        candidate = forwarded.rsplit(",", 1)[-1].strip()
+        if candidate:
+            return candidate
     return request.client.host if request.client else "unknown"
 
 
@@ -113,6 +119,11 @@ async def get_current_admin(
                     return admin
         api_token = await resolve_api_token(session, token)
         if api_token is not None:
+            scopes = set(api_token.scopes or [])
+            if not scopes.intersection({"read", "write"}):
+                raise ApiError(403, "API token has no usable scope", "insufficient_scope")
+            if request.method not in {"GET", "HEAD", "OPTIONS"} and "write" not in scopes:
+                raise ApiError(403, "API token lacks the write scope", "insufficient_scope")
             admin = await get_admin(session)
             if admin is not None:
                 return admin

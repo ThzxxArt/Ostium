@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -43,9 +43,15 @@ class PublicUiRequest(BaseModel):
     domain: str | None = None
 
 
+def _default_scopes() -> list[Literal["read", "write"]]:
+    return ["read", "write"]
+
+
 class TokenRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    scopes: list[str] = Field(default_factory=lambda: ["read", "write"])
+    scopes: list[Literal["read", "write"]] = Field(
+        default_factory=_default_scopes, min_length=1, max_length=2
+    )
     expires_at: datetime | None = None
 
 
@@ -104,6 +110,15 @@ async def update_settings(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     changes = payload.model_dump(exclude_unset=True)
+    previous_allow_lan = services.settings.allow_lan
+    if changes.get("allow_lan") is True and (
+        services.settings.tun_enabled or services.settings.mode.value == "tun"
+    ):
+        raise ApiError(
+            409,
+            "LAN sharing is only available in mixed or system-proxy mode; disable TUN first",
+            "mode_conflict",
+        )
     if changes.get("mixed_port"):
         services.settings.mixed_port = changes["mixed_port"]
     if changes.get("allow_lan") is not None:
@@ -152,6 +167,19 @@ async def update_settings(
             result = await services.engine.apply_client(session)
             applied = {"applied": True, "revision": result["status"].get("revision")}
         except Exception as exc:
+            if "allow_lan" in changes:
+                # The switch must reflect reality: never leave the UI showing
+                # "off" while sing-box still listens on 0.0.0.0 (or vice versa).
+                services.settings.allow_lan = previous_allow_lan
+                try:
+                    services.settings.save()
+                except OSError:
+                    pass
+                raise ApiError(
+                    502,
+                    f"LAN sharing could not be applied: {exc}",
+                    "lan_apply_failed",
+                ) from exc
             applied = {"applied": False, "warning": str(exc)}
     return {"ok": True, "restart_required": "mixed_port" in changes, **applied}
 

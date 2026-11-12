@@ -41,7 +41,7 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 386 backend tests, 133 frontend tests
+- Comprehensive audit and coverage suite: 391 backend tests, 133 frontend tests
   and 18 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 
@@ -69,6 +69,32 @@ SemVer.
 - `python-multipart` upgraded to 0.0.31 (security advisories).
 - Mobile viewport aligned to 390px; visual baselines and light theme added.
 - Removed dead quota-flush branch and fixed docs/nav/shellcheck issues.
+- Client config saves now return to the exact loaded file (`client.toml`, UI
+  config, or `config.toml`) instead of a generic path; UI and core configs are
+  separated on Linux and macOS.
+- API tokens now enforce their documented `read`/`write` scopes.
+- TOTP recovery codes are single-use and can be entered from the login page.
+- Allow LAN changes roll back and return `502` if sing-box cannot be applied;
+  TUN mode rejects LAN sharing.
+- Trusted proxy client IPs use the last `X-Forwarded-For` hop; the Nginx sample
+  overwrites the header with `$remote_addr`.
+- Installer upgrades use a new venv with atomic switch and rollback; dangerous
+  `--prefix`/`--purge` roots are rejected.
+- Client core token paths now consistently use `runtime/core.token`; Linux
+  client UI and core configs no longer overwrite each other.
+- macOS client installs no longer create an unusable administrator before the
+  setup wizard; launchd UI config/token/group handling was corrected.
+- Windows installer no longer copies its install directory onto itself;
+  checksum matching handles nested `./windows/...` paths.
+- Core release archives use `sing-box.exe` on Windows; manifest URLs point at
+  the Ostium release tag instead of the sing-box version.
+- Docker includes the built SPA and grants bind capability to both Python and
+  sing-box; `.dockerignore` keeps local data out of the build context.
+- Logs redact UUIDs, certificate domains reject path separators, and the
+  nightly workflow runs a real config-generation/validation smoke instead of a
+  placeholder.
+- GitHub Actions updated to current major versions (Node 24-era actions and
+  CodeQL v4).
 
 ### Known boundaries
 

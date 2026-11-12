@@ -93,6 +93,37 @@ def test_allow_lan_applies_client_config(client_api: TestClient, monkeypatch) ->
     assert response.json()["applied"] is True
 
 
+def test_allow_lan_apply_failure_restores_previous_state(
+    client_api: TestClient, monkeypatch
+) -> None:
+    token = setup_admin(client_api, role="client")
+    headers = _headers(token)
+    services = client_api.app.state.services
+
+    async def apply(session) -> dict:  # type: ignore[no-untyped-def]
+        raise RuntimeError("core unreachable")
+
+    monkeypatch.setattr(services.engine, "apply_client", apply)
+    response = client_api.patch("/api/v1/settings", json={"allow_lan": True}, headers=headers)
+    assert response.status_code == 502, response.text
+    assert response.json()["code"] == "lan_apply_failed"
+    assert services.settings.allow_lan is False
+    # The on-disk value must match the in-memory switch.
+    assert "allow_lan = true" not in services.settings.config_file.read_text()
+
+
+def test_allow_lan_rejects_tun_mode(client_api: TestClient) -> None:
+    token = setup_admin(client_api, role="client")
+    headers = _headers(token)
+    services = client_api.app.state.services
+    services.settings.tun_enabled = True
+
+    response = client_api.patch("/api/v1/settings", json={"allow_lan": True}, headers=headers)
+    assert response.status_code == 409
+    assert response.json()["code"] == "mode_conflict"
+    assert services.settings.allow_lan is False
+
+
 def test_settings_save_failure(api_client: TestClient, monkeypatch) -> None:
     token = setup_admin(api_client)
     headers = _headers(token)
@@ -204,9 +235,37 @@ def test_api_tokens(api_client: TestClient) -> None:
     assert listing[0]["name"] == "ci"
     assert listing[0]["revoked"] is False
 
+    invalid_scope = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "bad", "scopes": ["admin"]},
+        headers=headers,
+    )
+    assert invalid_scope.status_code == 422
+
+    read_only = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "readonly", "scopes": ["read"]},
+        headers=headers,
+    )
+    read_token = read_only.json()["token"]
+    assert (
+        api_client.get(
+            "/api/v1/auth/me", headers={"Authorization": f"Bearer {read_token}"}
+        ).status_code
+        == 200
+    )
+    denied = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "nope", "scopes": ["read"]},
+        headers={"Authorization": f"Bearer {read_token}"},
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "insufficient_scope"
+
     revoked = api_client.delete(f"/api/v1/api-tokens/{created.json()['id']}", headers=headers)
     assert revoked.status_code == 200
-    assert api_client.get("/api/v1/api-tokens").json()["tokens"][0]["revoked"] is True
+    tokens = {item["name"]: item for item in api_client.get("/api/v1/api-tokens").json()["tokens"]}
+    assert tokens["ci"]["revoked"] is True
 
     missing = api_client.delete("/api/v1/api-tokens/missing", headers=headers)
     assert missing.status_code == 404

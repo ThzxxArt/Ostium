@@ -30,9 +30,31 @@ def _request(
     return Request(scope)
 
 
+def _request(
+    *,
+    headers: dict[str, str] | None = None,
+    cookies: dict[str, str] | None = None,
+    client_host: str | None = "127.0.0.1",
+    method: str = "GET",
+) -> Request:
+    merged = dict(headers or {})
+    if cookies:
+        merged["cookie"] = "; ".join(f"{key}={value}" for key, value in cookies.items())
+    scope = {
+        "type": "http",
+        "method": method,
+        "path": "/",
+        "headers": [(key.lower().encode(), value.encode()) for key, value in merged.items()],
+        "client": (client_host, 1234) if client_host else None,
+    }
+    return Request(scope)
+
+
 def test_client_ip_and_loopback() -> None:
     forwarded = _request(headers={"x-forwarded-for": "203.0.113.5, 10.0.0.1"})
-    assert deps.client_ip(forwarded) == "203.0.113.5"
+    # The last hop is the one appended by our own reverse proxy; the first
+    # value may be attacker-controlled.
+    assert deps.client_ip(forwarded) == "10.0.0.1"
     direct = _request(client_host="198.51.100.7")
     assert deps.client_ip(direct) == "198.51.100.7"
     unknown = _request(client_host=None)
@@ -57,7 +79,7 @@ def test_get_current_admin_branches(monkeypatch) -> None:
         return None
 
     async def fake_resolve_token(session, token):  # type: ignore[no-untyped-def]
-        return SimpleNamespace(id="token")
+        return SimpleNamespace(id="token", scopes=["read", "write"])
 
     async def no_token(session, token):  # type: ignore[no-untyped-def]
         return None
@@ -124,6 +146,40 @@ def test_get_current_admin_branches(monkeypatch) -> None:
             is admin
         )
         assert deps.actor_name(admin) == "admin"  # type: ignore[arg-type]
+
+        # Read-only API tokens cannot perform writes.
+        async def read_token(session, token):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(id="token", scopes=["read"])
+
+        monkeypatch.setattr(deps, "resolve_api_token", read_token)
+        monkeypatch.setattr(deps, "get_admin", fake_get_admin)
+        with pytest.raises(ApiError) as insufficient:
+            await deps.get_current_admin(
+                _request(
+                    headers={"authorization": "Bearer api-token"},
+                    client_host="203.0.113.9",
+                    method="POST",
+                ),
+                services,
+                session,  # type: ignore[arg-type]
+            )
+        assert insufficient.value.status_code == 403
+        assert insufficient.value.code == "insufficient_scope"
+
+        async def empty_token(session, token):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(id="token", scopes=[])
+
+        monkeypatch.setattr(deps, "resolve_api_token", empty_token)
+        with pytest.raises(ApiError) as no_scope:
+            await deps.get_current_admin(
+                _request(
+                    headers={"authorization": "Bearer api-token"},
+                    client_host="203.0.113.9",
+                ),
+                services,
+                session,  # type: ignore[arg-type]
+            )
+        assert no_scope.value.status_code == 403
 
     asyncio.run(entrypoint())
 

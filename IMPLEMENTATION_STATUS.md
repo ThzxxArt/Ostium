@@ -74,6 +74,10 @@ platform/external validation, `[ ]` not done yet.
 - [x] Visual regression baselines committed for 1440/1024/390 in dark and light
       themes; axe smoke and no-horizontal-scroll checks run on all three.
 - [x] 133 Vitest tests and 18 Playwright tests pass; see `AUDIT_REPORT.md`.
+- [x] Second audit fixed client token/config paths, API token scopes,
+      recovery-code login, Allow LAN rollback, installer upgrade rollback,
+      Windows/macOS installer paths, Docker SPA assets, core manifest URLs and
+      CI action versions (see `AUDIT_REPORT.md` §12).
 
 ### Packaging, CI and docs
 
@@ -91,17 +95,17 @@ platform/external validation, `[ ]` not done yet.
 
 ## Test status
 
-- `ruff check` / `ruff format --check`: pass (132 files).
+- `ruff check` / `ruff format --check`: pass (134 files).
 - `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 386 passed, 0 skipped, 0 failed, including real sing-box config
+- `pytest`: 391 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 98.51%, branches 95.87%; every module ≥85% and
+- Backend coverage: statements 98.34%, branches 95.79%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 91.56%, branches 85.64%, functions 89.31%,
-  lines 92.29% (Vitest v8, thresholds 85).
+- Frontend coverage: statements 91.46%, branches 85.43%, functions 89.14%,
+  lines 92.17% (Vitest v8, thresholds 85).
 - Playwright: 18 passed on desktop 1440, tablet 1024 and mobile 390; login,
   dashboard, command palette, axe smoke, no-horizontal-scroll and six dark/light
   visual baselines pass.
@@ -128,15 +132,16 @@ platform/external validation, `[ ]` not done yet.
 
 ## Release blockers still open
 
+- [ ] Create the `v0.1.0` tag and run the Release workflow; verify Windows
+      setup, five core archives, Docker image, PyPI wheel, `SHA256SUMS` and
+      attestations. No publication has been performed without approval.
 - [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14, and
       Linux TUN on a privileged host.
 - [ ] Run ACME staging and one production issuance on the Hong Kong server.
-- [ ] Run a fresh Ubuntu 24.04 installer test and a backup/restore/upgrade drill.
+- [ ] Run a fresh Ubuntu 24.04 systemd installer test and a backup/restore/upgrade drill.
 - [ ] Run 72h soak, performance budgets, and the 5-user usability test.
 - [ ] Code signing/notarization (optional per PLAN, but SmartScreen/Gatekeeper
       warnings remain).
-- [ ] Complete the account/release steps in `MANUAL_TASKS.md` (GitHub, PyPI,
-      GHCR, signing) after explicit approval.
 
 The full evidence, per-file audit and residual-risk list is in
 [`AUDIT_REPORT.md`](AUDIT_REPORT.md).

@@ -12,8 +12,8 @@ jobs:
   soak-smoke:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           version: "0.11.14"
       - name: Fetch pinned core
@@ -23,9 +23,8 @@ jobs:
           install -m 0755 /tmp/sing-box-1.14.4-linux-amd64/sing-box /usr/local/bin/sing-box
       - run: uv sync
       - run: OSTIUM_TEST_ENGINE=/usr/local/bin/sing-box uv run pytest -m "integration or slow" --durations=20
-      - name: Config apply soak (100 iterations)
+      - name: Config generation and validation soak
         run: |
-          uv run python - <<'PY'
-          import asyncio, json, time
-          print("soak placeholder: run the real 72h soak on a release runner")
-          PY
+          uv run python scripts/soak-config.py \
+            --engine /usr/local/bin/sing-box \
+            --iterations 100

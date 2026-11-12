@@ -242,7 +242,10 @@ sudo OSTIUM_ROLE=server OSTIUM_CONFIG_FILE=/etc/ostium/config.toml \
 sudo OSTIUM_ROLE=client OSTIUM_CONFIG_FILE=/etc/ostium/client.toml \
   /opt/ostium/venv/bin/ostium core-run
 
-OSTIUM_ROLE=client OSTIUM_CORE_URL=http://127.0.0.1:8788 \
+OSTIUM_ROLE=client OSTIUM_CONFIG_FILE="$HOME/.local/share/ostium/config.toml" \
+  OSTIUM_CONFIG_DIR="$HOME/.local/share/ostium" OSTIUM_DATA_DIR="$HOME/.local/share/ostium" \
+  OSTIUM_CORE_TOKEN_FILE=/var/lib/ostium-core/runtime/core.token \
+  OSTIUM_CORE_URL=http://127.0.0.1:8788 \
   /opt/ostium/venv/bin/ostium serve
 ```
 

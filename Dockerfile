@@ -36,14 +36,18 @@ COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src ./src
 COPY alembic.ini ./
 COPY alembic ./alembic
-COPY --from=web /build/web/dist ./src/ostium/web/dist
+# The wheel force-includes web/dist, so this must live at the project root
+# (the same layout used by CI and release builds).  Copying it into the
+# package directory instead silently ships a UI-less wheel.
+COPY --from=web /build/web/dist ./web/dist
 RUN SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0 pip install .
 
 COPY --from=core /out/sing-box /opt/ostium/core/sing-box
 RUN chmod 0755 /opt/ostium/core/sing-box \
+    && setcap cap_net_bind_service=+ep /usr/local/bin/python3.13 \
+    && setcap cap_net_bind_service=+ep /opt/ostium/core/sing-box \
     && mkdir -p /var/lib/ostium /etc/ostium \
-    && chown -R ostium:ostium /var/lib/ostium /etc/ostium \
-    && setcap cap_net_bind_service=+ep /usr/local/bin/python3.13
+    && chown -R ostium:ostium /var/lib/ostium /etc/ostium
 
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod 0755 /entrypoint.sh

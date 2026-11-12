@@ -60,6 +60,7 @@ def test_event_bus_queue_full_and_filters() -> None:
         assert last["data"]["index"] == 999
 
         bus.log("info", "one token=abc")
+        assert bus.logs()[-1]["message"] == "one token=[REDACTED]"
         bus.log("warning", "two")
         bus.log("info", "three")
         assert [item["message"] for item in bus.logs()] == ["two", "three"]
@@ -68,7 +69,6 @@ def test_event_bus_queue_full_and_filters() -> None:
         assert len(bus.logs(limit=1)) == 1
         exported = bus.export_logs().splitlines()
         assert len(exported) == 2
-        assert "token=[REDACTED]" in bus.logs()[0]["message"] or True
 
         await bus.unsubscribe(queue)
         await bus.publish("event", {"index": 1000})  # no subscribers

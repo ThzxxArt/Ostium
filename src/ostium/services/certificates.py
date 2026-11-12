@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import ipaddress
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,30 @@ def _cert_dir(settings: Settings, domain: str) -> Path:
     return settings.paths.certs_dir / safe
 
 
+_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+
+
+def validate_domain(domain: str) -> str:
+    """Normalise and validate a certificate domain or IP address.
+
+    Domain input is used as a filesystem directory name, so rejecting path
+    separators and control characters here is a security boundary, not just
+    user-input polish.
+    """
+
+    value = domain.strip().lower().rstrip(".")
+    if not value or len(value) > 253:
+        raise CertificateError("invalid domain")
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        pass
+    labels = value.split(".")
+    if len(labels) < 2 or any(not _LABEL_RE.fullmatch(label) for label in labels):
+        raise CertificateError("invalid domain")
+    return value
+
+
 async def create_self_signed(
     session: AsyncSession,
     settings: Settings,
@@ -42,9 +67,7 @@ async def create_self_signed(
     domain: str,
     days: int = 3650,
 ) -> Certificate:
-    domain = domain.strip().lower()
-    if not domain or len(domain) > 253:
-        raise CertificateError("invalid domain")
+    domain = validate_domain(domain)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name(
         [
@@ -115,7 +138,7 @@ async def import_manual(
     key_pem: str,
     source: str = "manual",
 ) -> Certificate:
-    domain = domain.strip().lower()
+    domain = validate_domain(domain)
     try:
         certificate = x509.load_pem_x509_certificate(cert_pem.encode())
         key = serialization.load_pem_private_key(key_pem.encode(), password=None)

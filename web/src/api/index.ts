@@ -29,10 +29,10 @@ export const api = {
   auth: {
     status: () => http.get<AuthStatus>(`${v1}/auth/status`),
     csrf: () => http.get<{ csrf_token: string }>(`${v1}/auth/csrf`),
-    login: (username: string, password: string, totp?: string) =>
+    login: (username: string, password: string, totp?: string, recoveryCode?: string) =>
       http.post<{ ok: boolean; must_change_password: boolean; totp_enabled: boolean }>(
         `${v1}/auth/login`,
-        { username, password, totp },
+        { username, password, totp, recovery_code: recoveryCode },
       ),
     logout: () => http.post<{ ok: boolean }>(`${v1}/auth/logout`),
     me: () => http.get<Me>(`${v1}/auth/me`),

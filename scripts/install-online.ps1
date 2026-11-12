@@ -49,11 +49,16 @@ function Resolve-Version {
 }
 
 function Get-ExpectedHash([string]$SumsFile, [string]$AssetName) {
-    $line = Get-Content -LiteralPath $SumsFile |
-        Where-Object { $_ -match "\s+\.?/?$([regex]::Escape($AssetName))$" } |
-        Select-Object -First 1
-    if (-not $line) { throw "SHA256SUMS 中找不到 $AssetName" }
-    return ($line -split "\s+")[0]
+    $leaf = [IO.Path]::GetFileName($AssetName)
+    foreach ($line in Get-Content -LiteralPath $SumsFile) {
+        $parts = $line -split "\s+", 2
+        if ($parts.Count -ne 2) { continue }
+        $candidate = $parts[1].Trim().TrimStart("*")
+        if ([IO.Path]::GetFileName($candidate) -eq $leaf) {
+            return $parts[0]
+        }
+    }
+    throw "SHA256SUMS 中找不到 $AssetName"
 }
 
 function Install-Ostium([string]$ResolvedVersion) {
@@ -63,8 +68,12 @@ function Install-Ostium([string]$ResolvedVersion) {
     try {
         if ($LocalDir) {
             if (-not (Test-Path $LocalDir)) { throw "本地目录不存在：$LocalDir" }
-            $setup = Join-Path $LocalDir $asset
-            $sums = Join-Path $LocalDir "SHA256SUMS"
+            $setup = Get-ChildItem -LiteralPath $LocalDir -Recurse -Filter $asset |
+                Select-Object -First 1 -ExpandProperty FullName
+            $sums = Get-ChildItem -LiteralPath $LocalDir -Recurse -Filter "SHA256SUMS" |
+                Select-Object -First 1 -ExpandProperty FullName
+            if (-not $setup) { throw "找不到 Windows 安装包：$asset" }
+            if (-not $sums) { throw "找不到 SHA256SUMS" }
         }
         else {
             $base = "https://github.com/ThzxxArt/Ostium/releases/download/v$ResolvedVersion"
@@ -100,6 +109,7 @@ function Install-Ostium([string]$ResolvedVersion) {
 
         if ($RunAsSystem) {
             Write-Step "将控制面也切换为 SYSTEM（取消用户级隔离）"
+            Stop-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
             Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction SilentlyContinue
             $action = New-ScheduledTaskAction -Execute (Join-Path $installDir "ostium-ui.cmd")
             $trigger = New-ScheduledTaskTrigger -AtStartup
@@ -119,19 +129,26 @@ function Install-Ostium([string]$ResolvedVersion) {
 
 function Uninstall-Ostium {
     $installDir = Join-Path $env:ProgramFiles "Ostium"
-    $script = Join-Path $installDir "uninstall.ps1"
-    if (Test-Path $script) {
-        Write-Step "运行 Ostium 卸载脚本"
-        $uninstallArgs = @("-ExecutionPolicy", "Bypass", "-File", $script, "-InstallDir", $installDir)
-        if ($Purge) { $uninstallArgs += "-RemoveData" }
-        Start-Process powershell.exe -ArgumentList $uninstallArgs -Wait
-        Write-Step "已卸载"
-        return
-    }
     $inno = Join-Path $installDir "unins000.exe"
     if (Test-Path $inno) {
         Write-Step "运行 Inno Setup 卸载程序"
-        Start-Process -FilePath $inno -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait
+        $process = Start-Process -FilePath $inno `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait -PassThru
+        if ($process.ExitCode -ne 0) { throw "卸载程序退出码：$($process.ExitCode)" }
+        if ($Purge) {
+            Remove-Item -LiteralPath (Join-Path $env:ProgramData "Ostium") `
+                -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Step "已卸载"
+        return
+    }
+    $script = Join-Path $installDir "uninstall.ps1"
+    if (Test-Path $script) {
+        Write-Step "运行 Ostium 卸载脚本"
+        $argLine = "-ExecutionPolicy Bypass -File `"$script`" -InstallDir `"$installDir`""
+        if ($Purge) { $argLine += " -RemoveData" }
+        $process = Start-Process powershell.exe -ArgumentList $argLine -Wait -PassThru
+        if ($process.ExitCode -ne 0) { throw "卸载脚本退出码：$($process.ExitCode)" }
         Write-Step "已卸载"
         return
     }

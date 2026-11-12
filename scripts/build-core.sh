@@ -45,6 +45,8 @@ for target in "${targets[@]}"; do
   read -r os arch <<<"$target"
   name="ostium-core-${OSTIUM_VERSION}-${os}-${arch}"
   dir="$OUT_DIR/$name"
+  binary="sing-box"
+  [[ "$os" == "windows" ]] && binary="sing-box.exe"
   mkdir -p "$dir"
   tags="$TAGS"
   [[ "$os" == "windows" ]] && tags="$WINDOWS_TAGS"
@@ -54,7 +56,7 @@ for target in "${targets[@]}"; do
     CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
       -tags "$tags" \
       -ldflags "$LDFLAGS -X github.com/sagernet/sing-box/constant.Version=$OSTIUM_VERSION" \
-      -o "$dir/sing-box" ./cmd/sing-box
+      -o "$dir/$binary" ./cmd/sing-box
   )
   cp "$SRC_DIR/LICENSE" "$dir/LICENSE"
   {
@@ -66,11 +68,11 @@ for target in "${targets[@]}"; do
     echo "source: https://github.com/SagerNet/sing-box/tree/v$VERSION"
     echo "license: GPL-3.0"
     echo "--- go version -m ---"
-    go version -m "$dir/sing-box"
+    go version -m "$dir/$binary"
     echo "--- go list -m all ---"
     (cd "$SRC_DIR" && go list -m all)
   } >"$dir/SBOM.txt"
-  tar -C "$dir" -czf "$dir.tar.gz" "sing-box" "LICENSE" "SBOM.txt"
+  tar -C "$dir" -czf "$dir.tar.gz" "$binary" "LICENSE" "SBOM.txt"
   sha256sum "$dir.tar.gz" >"$dir.tar.gz.sha256"
 done
 

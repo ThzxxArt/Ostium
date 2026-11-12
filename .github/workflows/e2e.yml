@@ -12,11 +12,11 @@ jobs:
   playwright:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           version: "0.11.14"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
       - run: uv sync
@@ -48,7 +48,7 @@ jobs:
           if [ -f /tmp/ostium-e2e.pid ]; then
             kill "$(cat /tmp/ostium-e2e.pid)" 2>/dev/null || true
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report

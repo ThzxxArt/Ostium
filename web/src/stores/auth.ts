@@ -42,8 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
     me.value = status.value.authenticated ? await api.auth.me() : null
   }
 
-  async function login(username: string, password: string, totp?: string) {
-    await api.auth.login(username, password, totp)
+  async function login(username: string, password: string, totp?: string, recoveryCode?: string) {
+    await api.auth.login(username, password, totp, recoveryCode)
     await refresh()
   }
 

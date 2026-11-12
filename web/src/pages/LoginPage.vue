@@ -28,6 +28,8 @@ const { t } = useI18n()
 const username = ref('')
 const password = ref('')
 const totp = ref('')
+const recoveryCode = ref('')
+const useRecovery = ref(false)
 const needsTotp = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -37,6 +39,11 @@ onMounted(async () => {
   if (!auth.ready) await auth.bootstrap()
 })
 
+function toggleRecovery() {
+  useRecovery.value = !useRecovery.value
+  error.value = null
+}
+
 async function submit() {
   if (!username.value || !password.value) {
     error.value = t('auth.invalid')
@@ -45,13 +52,18 @@ async function submit() {
   loading.value = true
   error.value = null
   try {
-    await auth.login(username.value, password.value, needsTotp.value ? totp.value : undefined)
+    await auth.login(
+      username.value,
+      password.value,
+      needsTotp.value && !useRecovery.value ? totp.value : undefined,
+      needsTotp.value && useRecovery.value ? recoveryCode.value : undefined,
+    )
     const next = typeof route.query.next === 'string' ? route.query.next : '/'
     await router.replace(next)
   } catch (err) {
     if (err instanceof ApiError && err.code === 'totp_required') {
       needsTotp.value = true
-      error.value = t('auth.totp_hint')
+      error.value = useRecovery.value ? t('auth.recovery_invalid') : t('auth.totp_hint')
     } else if (err instanceof ApiError && err.code === 'rate_limited') {
       error.value = t('auth.invalid')
     } else {
@@ -165,15 +177,31 @@ async function submit() {
               <template #prefix><LockKeyhole :size="16" /></template>
             </NInput>
           </NFormItem>
-          <NFormItem v-if="needsTotp" :label="t('auth.totp')" :show-feedback="false">
+          <NFormItem
+            v-if="needsTotp"
+            :label="useRecovery ? t('auth.recovery_code') : t('auth.totp')"
+            :show-feedback="false"
+          >
             <NInput
+              v-if="!useRecovery"
               v-model:value="totp"
               size="large"
               maxlength="8"
               autocomplete="one-time-code"
               placeholder="123456"
             />
+            <NInput
+              v-else
+              v-model:value="recoveryCode"
+              size="large"
+              maxlength="64"
+              autocomplete="off"
+              :placeholder="t('auth.recovery_code_placeholder')"
+            />
           </NFormItem>
+          <button v-if="needsTotp" type="button" class="recovery-toggle" @click="toggleRecovery">
+            {{ useRecovery ? t('auth.use_totp') : t('auth.use_recovery') }}
+          </button>
           <p v-if="error" class="error" role="alert">{{ error }}</p>
           <NButton
             type="primary"
@@ -387,6 +415,19 @@ h1 {
   border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
   border-radius: 9px;
   padding: 8px 10px;
+}
+.recovery-toggle {
+  align-self: flex-start;
+  margin: -8px 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.recovery-toggle:hover {
+  text-decoration: underline;
 }
 .submit {
   margin-top: 4px;

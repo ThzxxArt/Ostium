@@ -17,6 +17,8 @@
     <string>/Library/Application Support/Ostium</string>
     <key>OSTIUM_CONFIG_FILE</key>
     <string>/Library/Application Support/Ostium/config.toml</string>
+    <key>OSTIUM_SHARED_DATA</key>
+    <string>1</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

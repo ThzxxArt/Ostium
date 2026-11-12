@@ -195,6 +195,9 @@ def run_core(settings: Settings) -> None:
             import grp
 
             group = grp.getgrnam("ostium")
+            for path in (settings.data_dir, settings.paths.runtime_dir):
+                os.chown(path, -1, group.gr_gid)
+                path.chmod(0o750)
             os.chown(settings.core_token_file, -1, group.gr_gid)
             settings.core_token_file.chmod(0o640)
         except (KeyError, OSError):

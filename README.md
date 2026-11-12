@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.51%25%20statements%20%C2%B7%2095.87%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.56%25%20statements%20%C2%B7%2085.64%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-386%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.34%25%20statements%20%C2%B7%2095.79%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.46%25%20statements%20%C2%B7%2085.43%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20133%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -71,7 +71,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / PyInstaller / Inno Setup 构建与安装脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 386 个后端测试、133 个前端测试、18 个 Playwright 测试；后端 98.51% 语句 / 95.87% 分支。 |
+| 🧪 **可验证** | 391 个后端测试、133 个前端测试、18 个 Playwright 测试；后端 98.34% 语句 / 95.79% 分支。 |
 
 ---
 
@@ -198,8 +198,8 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 1. 安装缺失的 `curl`/`tar`（Linux）；
 2. 下载静态 `uv`，用它安装**托管的 Python 3.13**，不碰系统 Python；
 3. 下载 wheel、sing-box 核心和 `SHA256SUMS`，校验后安装；
-4. 创建服务用户、初始化数据库、注册 systemd/launchd/Windows 服务；
-5. 打印一次性管理员密码。
+4. 服务端创建服务用户、初始化数据库并注册 systemd/launchd/Windows 服务；
+5. 服务端打印一次性管理员密码；Linux/macOS 客户端不预置密码，首次打开 UI 完成客户端向导。
 
 #### 全部用 root、不创建 ostium 用户
 
@@ -659,7 +659,7 @@ systemctl --user daemon-reload
 sudo rm -rf /opt/ostium
 sudo rm -f /usr/local/bin/ostium
 # 数据默认保留；确认后再删除：
-# sudo rm -rf /var/lib/ostium-core /etc/ostium/client.toml
+# sudo rm -rf /var/lib/ostium-core /etc/ostium/client.toml ~/.local/share/ostium
 ```
 
 ### Windows
@@ -674,7 +674,7 @@ sudo launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -f /Library/LaunchDaemons/com.ostium.core.plist
 sudo rm -f /Library/LaunchAgents/com.ostium.ui.plist
 sudo rm -rf /opt/ostium
-# 数据：/Library/Application Support/Ostium（确认后再删除）
+# 数据：/Library/Application Support/Ostium 与 Ostium UI（确认后再删除）
 ```
 
 ### Docker
@@ -690,7 +690,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 ## 安全建议
 
 - 管理 UI 默认只监听回环；不要在没有 TLS + TOTP 的情况下暴露公网。
-- 首次登录后立即修改密码、启用 TOTP、保存恢复码。
+- 首次登录后立即修改密码、启用 TOTP、保存恢复码；丢失验证器时可在登录页切换为恢复码登录。
 - 只开放必要端口：22、80、443/tcp、443/udp；不要默认开放 8388/8443。
 - 使用非 root 用户运行控制面；核心服务才需要绑定低端口/TUN 权限。
 - 定期备份并把加密备份存到异地；备份包含主密钥，视同最高敏感文件。
@@ -704,10 +704,10 @@ docker compose -f deploy/docker/docker-compose.yml down
 
 | 平台 | 控制面数据 | 核心数据 |
 |---|---|---|
-| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium` | 同左 |
-| Linux 客户端 | `~/.local/share/ostium`（用户 UI） | `/var/lib/ostium-core` |
-| Windows | `%LOCALAPPDATA%\Ostium`（UI） | `%ProgramData%\Ostium` |
-| macOS | `~/Library/Application Support/Ostium`（UI） | `/Library/Application Support/Ostium` |
+| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium/config.toml` | 同左 |
+| Linux 客户端 | `~/.local/share/ostium`（UI 数据与 `config.toml`） | `/var/lib/ostium-core`、`/etc/ostium/client.toml` |
+| Windows | `%ProgramData%\Ostium`（UI） | `%ProgramData%\Ostium` |
+| macOS | `/Library/Application Support/Ostium UI`（UI） | `/Library/Application Support/Ostium` |
 
 关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。
 
@@ -763,8 +763,8 @@ npx playwright test
 
 当前结果：
 
-- 后端：**386 passed / 0 skipped**（380 个常规测试 + 6 个真实核心集成测试），语句 **98.51%**、分支 **95.87%**；
-- 前端：**133 passed**，语句 **91.56%**、分支 **85.64%**、函数 **89.31%**、行 **92.29%**；
+- 后端：**391 passed / 0 skipped**（385 个常规测试 + 6 个真实核心集成测试），语句 **98.34%**、分支 **95.79%**；
+- 前端：**133 passed**，语句 **91.46%**、分支 **85.43%**、函数 **89.14%**、行 **92.17%**；
 - Playwright：**18 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线和 axe 登录页检查；
 - `pip-audit` / `npm audit`：0 已知漏洞；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

@@ -51,6 +51,27 @@ def test_admin_login_totp_lock_and_session(settings: Settings) -> None:
                     totp_code="000000",
                     ip="127.0.0.1",
                 )
+            recovered = await auth_service.authenticate(
+                session,
+                settings,
+                username="admin",
+                password="verysecret123",
+                totp_code=None,
+                recovery_code=codes[0],
+                ip="127.0.0.1",
+            )
+            assert recovered.id == admin.id
+            assert len(admin.recovery_codes_hash) == 9
+            with pytest.raises(auth_service.AuthError):
+                await auth_service.authenticate(
+                    session,
+                    settings,
+                    username="admin",
+                    password="verysecret123",
+                    totp_code=None,
+                    recovery_code=codes[0],
+                    ip="127.0.0.1",
+                )
             await auth_service.disable_totp(session, admin)
             await session.commit()
         await engine.dispose()

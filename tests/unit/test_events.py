@@ -21,4 +21,11 @@ def test_event_bus_pubsub_and_logs() -> None:
         assert records[-1]["context"]["user"] == "alice"
         assert "hello" in bus.export_logs()
 
+        bus.log(
+            "error",
+            "failed for 2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e",
+        )
+        assert "2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e" not in bus.export_logs()
+        assert "[REDACTED-UUID]" in bus.export_logs()
+
     asyncio.run(_run())

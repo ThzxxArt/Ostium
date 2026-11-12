@@ -135,9 +135,12 @@ class AcmeIssuer:
         return await asyncio.to_thread(self._issue_sync, domain, timeout_seconds)
 
     def _issue_sync(self, domain: str, timeout_seconds: int) -> tuple[str, str]:
-        domain = domain.strip().lower()
-        if not domain:
-            raise AcmeError("a domain is required for ACME")
+        from ostium.services.certificates import CertificateError, validate_domain
+
+        try:
+            domain = validate_domain(domain)
+        except CertificateError as exc:
+            raise AcmeError(str(exc), "invalid_domain", 400) from exc
         account_key = self._load_account_key()
         acme_key = jose.JWKRSA(key=account_key)  # type: ignore[attr-defined]
         net = client.ClientNetwork(

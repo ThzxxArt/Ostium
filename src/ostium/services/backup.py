@@ -65,8 +65,8 @@ def create_backup(
             archive.add(db_copy, arcname="ostium.db")
             if include_master_key and paths.master_key_path.is_file():
                 archive.add(paths.master_key_path, arcname="master.key")
-            if paths.config_file.is_file():
-                archive.add(paths.config_file, arcname="config.toml")
+            if settings.config_file.is_file():
+                archive.add(settings.config_file, arcname="config.toml")
             if paths.certs_dir.is_dir():
                 for item in paths.certs_dir.rglob("*"):
                     if item.is_file():
@@ -155,8 +155,8 @@ def restore_backup(
             if os.name == "posix":
                 paths.master_key_path.chmod(0o600)
         if (staging / "config.toml").is_file():
-            paths.config_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(staging / "config.toml", paths.config_file)
+            settings.config_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(staging / "config.toml", settings.config_file)
         certs = staging / "certs"
         if certs.is_dir():
             for item in certs.rglob("*"):

@@ -64,6 +64,15 @@ def test_paths_properties_and_ensure(tmp_path: Path) -> None:
         assert (paths.runtime_dir.stat().st_mode & 0o777) == 0o700
 
 
+def test_shared_client_directories_are_group_traversable(tmp_path: Path) -> None:
+    value = _settings(tmp_path, role=Role.CLIENT, shared_data=True)
+    paths = value.paths
+    paths.ensure()
+    if os.name == "posix":
+        assert (value.data_dir.stat().st_mode & 0o777) == 0o750
+        assert (paths.runtime_dir.stat().st_mode & 0o777) == 0o750
+
+
 def test_engine_binary_windows_suffix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import types
 
@@ -115,6 +124,29 @@ def test_save_to_explicit_path_and_none_fields(tmp_path: Path) -> None:
     saved = value.save(explicit)
     assert saved == explicit
     assert "acme_email" not in explicit.read_text()
+
+
+def test_loaded_client_config_saves_back_to_the_same_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "etc"
+    client_config = config_dir / "client.toml"
+    client_config.parent.mkdir(parents=True)
+    client_config.write_text('role = "client"\nport = 8787\n', encoding="utf-8")
+    monkeypatch.setenv("OSTIUM_CONFIG_FILE", str(client_config))
+    monkeypatch.setenv("OSTIUM_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("OSTIUM_CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("OSTIUM_STATE_DIR", str(tmp_path / "state"))
+
+    loaded = Settings.load(client_config)
+    assert loaded.config_file == client_config
+    loaded.mixed_port = 7891
+    saved = loaded.save()
+
+    assert saved == client_config
+    assert "mixed_port = 7891" in client_config.read_text()
+    # The generic config.toml must not be created behind the client's back.
+    assert not (config_dir / "config.toml").exists()
 
 
 def test_load_environment_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

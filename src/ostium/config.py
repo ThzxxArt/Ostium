@@ -60,6 +60,7 @@ class Paths(BaseModel):
     backups_dir: Path
     rulesets_dir: Path
     web_dist: Path | None = None
+    shared: bool = False
 
     @property
     def db_path(self) -> Path:
@@ -111,9 +112,10 @@ class Paths(BaseModel):
         ):
             path.mkdir(parents=True, exist_ok=True)
         if os.name == "posix":
+            mode = 0o750 if self.shared else 0o700
             for path in (self.data_dir, self.runtime_dir):
                 try:
-                    path.chmod(0o700)
+                    path.chmod(mode)
                 except OSError:
                     pass
 
@@ -148,11 +150,26 @@ class Settings(BaseModel):
     auto_connect: bool = False
     auto_reconnect: bool = True
     dev: bool = False
+    # Only the privileged client core sets this: its data/runtime directories
+    # must be traversable by the unprivileged UI group so it can read the core
+    # token.  The UI's own data directory stays private (0700).
+    shared_data: bool = False
+    # Path this instance was loaded from.  It is intentionally excluded from
+    # TOML serialisation and from model dumps so a client install can keep
+    # using ``/etc/ostium/client.toml`` while still saving back to that exact
+    # file instead of the generic ``<config_dir>/config.toml``.
+    config_path: Path | None = Field(default=None, exclude=True)
 
     @field_validator("log_level")
     @classmethod
     def _normalise_level(cls, value: str) -> str:
         return value.lower()
+
+    @property
+    def config_file(self) -> Path:
+        """The file this settings object was loaded from (or should save to)."""
+
+        return self.config_path or self.paths.config_file
 
     @property
     def paths(self) -> Paths:
@@ -166,6 +183,7 @@ class Settings(BaseModel):
             backups_dir=self.data_dir / "backups",
             rulesets_dir=self.data_dir / "rulesets",
             web_dist=_locate_web_dist(),
+            shared=self.shared_data,
         )
 
     def save(self, path: Path | None = None) -> Path:
@@ -173,19 +191,7 @@ class Settings(BaseModel):
 
         import tomli_w
 
-        target = (
-            path
-            or Paths(
-                data_dir=self.data_dir,
-                config_dir=self.config_dir,
-                state_dir=self.state_dir,
-                runtime_dir=self.data_dir / "runtime",
-                logs_dir=self.data_dir / "logs",
-                certs_dir=self.data_dir / "certs",
-                backups_dir=self.data_dir / "backups",
-                rulesets_dir=self.data_dir / "rulesets",
-            ).config_file
-        )
+        target = path or self.config_file
         target.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, Any] = {
             "role": self.role.value,
@@ -222,8 +228,8 @@ class Settings(BaseModel):
     def load(cls, config_file: Path | None = None) -> Settings:
         env_role = Role(os.environ.get("OSTIUM_ROLE", Role.SERVER.value))
         initial_config = _default_config_dir(env_role)
-        candidate = config_file or Path(
-            os.environ.get("OSTIUM_CONFIG_FILE", initial_config / "config.toml")
+        candidate = Path(
+            config_file or os.environ.get("OSTIUM_CONFIG_FILE") or (initial_config / "config.toml")
         )
         raw: dict[str, Any] = {}
         if candidate.is_file():
@@ -281,6 +287,7 @@ class Settings(BaseModel):
             "auto_connect": raw.get("auto_connect", False),
             "auto_reconnect": raw.get("auto_reconnect", True),
             "dev": raw.get("dev", False),
+            "shared_data": _as_bool(os.environ.get("OSTIUM_SHARED_DATA", "false")),
         }
         env_map: dict[str, tuple[str, Any]] = {
             "OSTIUM_HOST": ("host", str),
@@ -308,6 +315,7 @@ class Settings(BaseModel):
                 data_dir / "core" / ("sing-box.exe" if os.name == "nt" else "sing-box")
             )
         settings = cls.model_validate(base)
+        settings.config_path = candidate
         settings.paths.ensure()
         return settings
 

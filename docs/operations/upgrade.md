@@ -65,7 +65,7 @@ v0.1.0 的 SQLite 迁移是前向的。release notes 会标记不可回滚的迁
 ## 客户端升级
 
 - Windows：重新运行新版 `setup.exe` 覆盖安装，数据和订阅保留。
-- macOS：重新运行 `install-macos.sh`，或使用新版 DMG。
+- macOS：重新运行 `install-macos.sh` 覆盖安装，数据与订阅保留。
 - Linux：重新执行一键脚本 `upgrade` 或 `install.sh --role client`。
 
 核心升级会短暂中断隧道；UI 升级不会。升级前建议先导出配置或备份数据。

@@ -208,6 +208,12 @@ async def toggle_proxy(
             raise ApiError(500, f"could not disable system proxy: {exc}", "proxy_failed") from exc
         if services.settings.mode is Mode.SYSTEM_PROXY:
             services.settings.mode = Mode.MIXED
+    try:
+        services.settings.save()
+    except OSError as exc:
+        raise ApiError(
+            500, f"could not persist the network mode: {exc}", "settings_write_failed"
+        ) from exc
     await audit(
         session,
         actor=admin.username,

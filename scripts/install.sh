@@ -29,7 +29,9 @@ DATA="${OSTIUM_DATA_DIR:-/var/lib/ostium}"
 CONFIG="${OSTIUM_CONFIG_DIR:-/etc/ostium}"
 CLIENT_DATA="${OSTIUM_CLIENT_DATA_DIR:-/var/lib/ostium-core}"
 CLIENT_UI_DATA="${OSTIUM_CLIENT_UI_DATA:-/var/lib/ostium}"
-CLIENT_CONFIG="${OSTIUM_CLIENT_CONFIG:-/etc/ostium/client.toml}"
+UI_DATA="$CLIENT_UI_DATA"
+UI_CONFIG="$CLIENT_UI_DATA/config.toml"
+CLIENT_CONFIG="${OSTIUM_CLIENT_CONFIG:-$CONFIG/client.toml}"
 BIN_LINK="${OSTIUM_BIN_LINK:-/usr/local/bin/ostium}"
 SYSTEMD_DIR="${OSTIUM_SYSTEMD_DIR:-/etc/systemd/system}"
 PYTHON_BIN="${OSTIUM_PYTHON:-}"
@@ -118,6 +120,37 @@ fi
 if [[ "$PUBLIC_UI" == "true" ]]; then
   SECURE_COOKIES="true"
 fi
+
+validate_install_path() {
+  local path="$1" label="$2" normalized
+  if [[ -z "$path" || "$path" != /* ]]; then
+    echo "$label 必须是绝对路径：$path" >&2
+    exit 2
+  fi
+  if command -v realpath >/dev/null 2>&1; then
+    normalized="$(realpath -m "$path" 2>/dev/null || echo "$path")"
+  else
+    normalized="$(printf '%s' "$path" | sed 's#//*#/#g; s#/$##')"
+  fi
+  case "$normalized" in
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
+      echo "拒绝使用系统根目录作为 $label：$normalized" >&2
+      exit 2
+      ;;
+  esac
+  case "/$normalized/" in
+    */../*)
+      echo "$label 不能包含 ..：$path" >&2
+      exit 2
+      ;;
+  esac
+}
+
+validate_install_path "$PREFIX" "安装目录"
+validate_install_path "$DATA" "数据目录"
+validate_install_path "$CONFIG" "配置目录"
+validate_install_path "$CLIENT_DATA" "客户端核心数据目录"
+validate_install_path "$CLIENT_UI_DATA" "客户端 UI 数据目录"
 TRUSTED_HOSTS_TOML='["localhost", "127.0.0.1", "::1"'
 if [[ -n "$DOMAIN" ]]; then
   TRUSTED_HOSTS_TOML+=", \"$DOMAIN\""
@@ -130,7 +163,10 @@ systemd_available() {
 
 stop_services() {
   if systemd_available; then
-    systemctl stop ostium ostium-core 2>/dev/null || true
+    # Keep the proxy core running during a control-plane upgrade so the
+    # tunnel is not interrupted.  The old venv stays open by inode until the
+    # new unit is restarted.
+    systemctl stop ostium 2>/dev/null || true
     if [[ -n "${SUDO_USER:-}" ]]; then
       sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
         systemctl --user stop ostium 2>/dev/null || true
@@ -174,13 +210,15 @@ EOF
 
 未注册 systemd。可交给 OpenRC/runit/s6/supervisord，或直接运行：
 
-  sudo OSTIUM_ROLE=client OSTIUM_CONFIG_FILE=$CLIENT_CONFIG $PREFIX/venv/bin/ostium core-run
-  OSTIUM_ROLE=client OSTIUM_DATA_DIR=$CLIENT_UI_DATA OSTIUM_CONFIG_DIR=$CONFIG \
-    OSTIUM_CORE_TOKEN_FILE=$CLIENT_DATA/core.token OSTIUM_CORE_URL=http://127.0.0.1:8788 \
-    $PREFIX/venv/bin/ostium serve
+  sudo OSTIUM_ROLE=client OSTIUM_CONFIG_FILE=$CLIENT_CONFIG OSTIUM_SHARED_DATA=1 $PREFIX/venv/bin/ostium core-run
+
+  OSTIUM_ROLE=client OSTIUM_CONFIG_FILE=$UI_CONFIG OSTIUM_CONFIG_DIR=$UI_DATA \\
+    OSTIUM_DATA_DIR=$UI_DATA OSTIUM_CORE_TOKEN_FILE=$CLIENT_DATA/runtime/core.token \\
+    OSTIUM_CORE_URL=http://127.0.0.1:8788 $PREFIX/venv/bin/ostium serve
 
 核心数据：$CLIENT_DATA
-客户端配置：$CLIENT_CONFIG
+核心配置：$CLIENT_CONFIG
+UI 数据/配置：$UI_DATA
 EOF
   fi
 }
@@ -192,8 +230,12 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 if [[ -z "$PYTHON_BIN" ]]; then
   if command -v apt-get >/dev/null; then
-    apt-get update
-    apt-get install -y --no-install-recommends python3.13 python3.13-venv ca-certificates curl tar || true
+    if ! apt-get update; then
+      echo "警告：apt-get update 失败，继续使用现有软件源缓存" >&2
+    fi
+    if ! apt-get install -y --no-install-recommends python3.13 python3.13-venv ca-certificates curl tar; then
+      echo "警告：系统 Python 3.13 安装失败，将尝试 uv 托管 Python" >&2
+    fi
   fi
   PYTHON_BIN="$(command -v python3.13 || true)"
   if [[ -z "$PYTHON_BIN" ]]; then
@@ -231,29 +273,79 @@ else
     install -d -m 0755 "$CONFIG"
     if [[ -n "${SUDO_USER:-}" ]]; then
       usermod -aG ostium "$SUDO_USER"
+      USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+      UI_DATA="$USER_HOME/.local/share/ostium"
+      UI_CONFIG="$UI_DATA/config.toml"
+      install -d -m 0700 -o "$SUDO_USER" -g ostium "$UI_DATA"
     fi
   fi
 fi
 
-install -d -m 0755 "$PREFIX"
-if [[ "$UPGRADE" == "true" ]]; then
-  rm -rf "$PREFIX/venv"
-fi
-"$PYTHON_BIN" -m venv "$PREFIX/venv"
-"$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
-"$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
-install -d -m 0755 "$(dirname "$BIN_LINK")"
-ln -sfn "$PREFIX/venv/bin/ostium" "$BIN_LINK"
-
 CORE_TMP="$(mktemp -d)"
 trap 'rm -rf "$CORE_TMP"' EXIT
 tar -xzf "$CORE" -C "$CORE_TMP" --no-same-owner
+if [[ ! -x "$CORE_TMP/sing-box" ]]; then
+  echo "核心包内缺少可执行的 sing-box" >&2
+  exit 1
+fi
+if ! "$CORE_TMP/sing-box" version >/dev/null 2>&1; then
+  echo "核心二进制无法运行，拒绝安装" >&2
+  exit 1
+fi
+
+install -d -m 0755 "$PREFIX"
+NEW_VENV=""
+cleanup_new_venv() {
+  if [[ -n "$NEW_VENV" && -d "$NEW_VENV" ]]; then
+    rm -rf "$NEW_VENV"
+  fi
+}
+trap 'rm -rf "$CORE_TMP"; cleanup_new_venv' EXIT
+if [[ "$UPGRADE" == "true" ]]; then
+  NEW_VENV="$PREFIX/venv.new.$$"
+  if ! "$PYTHON_BIN" -m venv "$NEW_VENV"; then
+    echo "无法创建升级用的虚拟环境" >&2
+    exit 1
+  fi
+  if ! "$NEW_VENV/bin/pip" install --no-cache-dir --upgrade pip wheel \
+    || ! "$NEW_VENV/bin/pip" install --no-cache-dir "$WHEEL"; then
+    echo "升级失败，旧虚拟环境保持不变" >&2
+    exit 1
+  fi
+  if [[ -d "$PREFIX/venv" ]]; then
+    rm -rf "$PREFIX/venv.old"
+    mv "$PREFIX/venv" "$PREFIX/venv.old"
+  fi
+  if ! mv "$NEW_VENV" "$PREFIX/venv"; then
+    [[ -d "$PREFIX/venv.old" ]] && mv "$PREFIX/venv.old" "$PREFIX/venv"
+    echo "无法切换虚拟环境，已回滚" >&2
+    exit 1
+  fi
+  NEW_VENV=""
+  rm -rf "$PREFIX/venv.old"
+else
+  "$PYTHON_BIN" -m venv "$PREFIX/venv"
+  "$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
+  "$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
+fi
+install -d -m 0755 "$(dirname "$BIN_LINK")"
+ln -sfn "$PREFIX/venv/bin/ostium" "$BIN_LINK"
+
+install_core() {
+  local destination="$1" owner="$2" temporary="$1.new.$$"
+  if ! install -m 0755 "$CORE_TMP/sing-box" "$temporary"; then
+    rm -f "$temporary"
+    echo "无法写入核心二进制：$destination" >&2
+    exit 1
+  fi
+  if [[ -n "$owner" ]]; then
+    chown "$owner" "$temporary"
+  fi
+  mv -f "$temporary" "$destination"
+}
 
 if [[ "$ROLE" == "server" ]]; then
-  install -m 0755 "$CORE_TMP/sing-box" "$DATA/core/sing-box"
-  if [[ "$RUN_AS_ROOT" != "true" ]]; then
-    chown ostium:ostium "$DATA/core/sing-box"
-  fi
+  install_core "$DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium:ostium")"
   if [[ "$UPGRADE" != "true" ]]; then
     cat >"$CONFIG/config.toml" <<EOF
 role = "server"
@@ -320,10 +412,7 @@ Ostium 服务端已安装。
 $([[ "$UPGRADE" == "true" ]] && echo "升级完成，数据与管理员密码保持不变。" || echo "密码只显示一次，登录后请立即启用 TOTP。")
 EOF
 else
-  install -m 0755 "$CORE_TMP/sing-box" "$CLIENT_DATA/core/sing-box"
-  if [[ "$RUN_AS_ROOT" != "true" ]]; then
-    chown ostium-core:ostium "$CLIENT_DATA/core/sing-box"
-  fi
+  install_core "$CLIENT_DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium-core:ostium")"
   if [[ "$UPGRADE" != "true" ]]; then
     cat >"$CLIENT_CONFIG" <<EOF
 role = "client"
@@ -336,13 +425,31 @@ engine_version = "1.14.4-ostium.1"
 core_url = "http://127.0.0.1:8788"
 mode = "system_proxy"
 EOF
-    chmod 0640 "$CLIENT_CONFIG"
+    chmod 0660 "$CLIENT_CONFIG"
     if [[ "$RUN_AS_ROOT" != "true" ]]; then
       chown root:ostium "$CLIENT_CONFIG"
     fi
   elif [[ ! -f "$CLIENT_CONFIG" ]]; then
     echo "升级模式需要已有配置：$CLIENT_CONFIG" >&2
     exit 1
+  fi
+
+  if [[ ! -f "$UI_CONFIG" ]]; then
+    cat >"$UI_CONFIG" <<EOF
+role = "client"
+host = "127.0.0.1"
+port = 8787
+data_dir = "$UI_DATA"
+config_dir = "$UI_DATA"
+log_level = "info"
+engine_version = "1.14.4-ostium.1"
+core_url = "http://127.0.0.1:8788"
+mode = "system_proxy"
+EOF
+    UI_OWNER="${SUDO_USER:-root}"
+    [[ "$RUN_AS_ROOT" == "true" ]] && UI_OWNER="root"
+    chown "$UI_OWNER" "$UI_CONFIG"
+    chmod 0600 "$UI_CONFIG"
   fi
 
   if [[ "$NO_SERVICE" != "true" ]] && systemd_available; then
@@ -362,8 +469,8 @@ EOF
       if [[ "$START" == "true" ]]; then
         systemctl restart ostium-core
         sleep 1
-        chmod 0640 "$CLIENT_DATA/core.token" 2>/dev/null || true
-        chgrp ostium "$CLIENT_DATA/core.token" 2>/dev/null || true
+        chmod 0640 "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
+        chgrp ostium "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
       fi
       if [[ -n "${SUDO_USER:-}" ]]; then
         USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"

@@ -28,6 +28,7 @@ class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=200)
     totp: str | None = None
+    recovery_code: str | None = Field(default=None, max_length=64)
 
 
 class SetupRequest(BaseModel):
@@ -69,11 +70,15 @@ async def csrf(request: Request, response: Response) -> dict[str, str]:
     token = request.cookies.get(CSRF_COOKIE) or getattr(request.state, "csrf_token", "")
     if not token:
         raise ApiError(500, "CSRF token could not be initialised", "csrf_unavailable")
+    app = getattr(request, "app", None)
+    services = getattr(getattr(app, "state", None), "services", None)
+    secure = bool(getattr(getattr(services, "settings", None), "secure_cookies", False))
     response.set_cookie(
         CSRF_COOKIE,
         token,
         httponly=False,
         samesite="strict",
+        secure=secure,
         path="/",
     )
     return {"csrf_token": token}
@@ -184,6 +189,7 @@ async def login(
             username=payload.username,
             password=payload.password,
             totp_code=payload.totp,
+            recovery_code=payload.recovery_code,
             ip=ip,
         )
     except auth_service.AuthError as exc:

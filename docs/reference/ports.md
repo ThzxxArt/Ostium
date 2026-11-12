@@ -30,9 +30,9 @@
 
 | 平台 | 控制面 / UI | 核心 |
 |---|---|---|
-| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium` | 同左 |
-| Linux 客户端 | `~/.local/share/ostium`（默认）；root 模式 `/var/lib/ostium` | `/var/lib/ostium-core` |
-| Windows | `%ProgramData%\Ostium`（当前安装器布局） | `%ProgramData%\Ostium` |
-| macOS | `~/Library/Application Support/Ostium`（默认）；root 模式 `/Library/Application Support/Ostium UI` | `/Library/Application Support/Ostium` |
+| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium/config.toml` | 同左 |
+| Linux 客户端 | `~/.local/share/ostium`（默认）；root 模式 `/var/lib/ostium` | `/var/lib/ostium-core`、`/etc/ostium/client.toml` |
+| Windows | `%ProgramData%\Ostium`（UI） | `%ProgramData%\Ostium` |
+| macOS | `/Library/Application Support/Ostium UI`（UI） | `/Library/Application Support/Ostium` |
 
 关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。

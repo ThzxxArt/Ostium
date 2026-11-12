@@ -45,10 +45,8 @@ class EventBus:
         record = {
             "ts": iso(utcnow()),
             "level": level.lower(),
-            "message": redact(message, redact_ids=False),
-            "context": {
-                key: redact(str(value), redact_ids=False) for key, value in context.items()
-            },
+            "message": redact(message),
+            "context": {key: redact(str(value)) for key, value in context.items()},
         }
         self._logs.append(record)
         try:

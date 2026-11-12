@@ -34,7 +34,7 @@ const tun = computed(() => info.value?.tun)
 const allowLan = computed(() => Boolean(info.value?.allow_lan))
 const lanPort = computed(() => info.value?.lan_port || 7890)
 const lanAddresses = computed(() => info.value?.lan_addresses ?? [])
-const lanAvailable = computed(() => mode.value !== 'tun')
+const lanAvailable = computed(() => mode.value !== 'tun' && !tun.value?.enabled)
 const proxyHost = computed(() => (allowLan.value ? '0.0.0.0' : '127.0.0.1'))
 
 const modes = computed(() => [
@@ -66,7 +66,7 @@ const modes = computed(() => [
 
 const envHint = computed(
   () =>
-    `export http_proxy=http://127.0.0.1:7890\nexport https_proxy=http://127.0.0.1:7890\nexport all_proxy=socks5://127.0.0.1:7890`,
+    `export http_proxy=http://127.0.0.1:${lanPort.value}\nexport https_proxy=http://127.0.0.1:${lanPort.value}\nexport all_proxy=socks5://127.0.0.1:${lanPort.value}`,
 )
 
 async function load() {
@@ -89,6 +89,9 @@ async function toggleLan(value: boolean) {
     await load()
   } catch (err) {
     message.error(t('network.lan_failed', { message: (err as Error).message }))
+    // The backend restores the previous value when the core rejects the
+    // change; reload so the switch reflects what sing-box is actually doing.
+    await load()
   } finally {
     lanBusy.value = false
   }

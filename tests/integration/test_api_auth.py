@@ -179,6 +179,27 @@ def test_totp_lifecycle_password_and_logout(api_client: TestClient, settings: Se
     )
     assert with_totp.status_code == 200
 
+    recovery = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "admin",
+            "password": "verysecret123",
+            "recovery_code": payload["recovery_codes"][0],
+        },
+    )
+    assert recovery.status_code == 200, recovery.text
+    assert client.get("/api/v1/auth/me").json()["recovery_codes_remaining"] == 9
+    reused = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "admin",
+            "password": "verysecret123",
+            "recovery_code": payload["recovery_codes"][0],
+        },
+    )
+    assert reused.status_code == 401
+    assert reused.json()["code"] == "totp_required"
+
     headers = _headers(csrf(client))
     wrong_password = client.post(
         "/api/v1/auth/password",

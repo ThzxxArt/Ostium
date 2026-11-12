@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import secrets
 import time
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -27,6 +28,9 @@ from ostium.util.security import (
     totp_uri,
     verify_password,
     verify_totp,
+)
+from ostium.util.security import (
+    consume_recovery_code as _consume_recovery_code,
 )
 from ostium.util.time import as_utc, utcnow
 
@@ -107,6 +111,7 @@ async def authenticate(
     password: str,
     totp_code: str | None,
     ip: str,
+    recovery_code: str | None = None,
 ) -> AdminUser:
     LIMITER.check(ip, username)
     admin = await get_admin(session)
@@ -130,8 +135,9 @@ async def authenticate(
     if admin.totp_secret_enc:
         secret = _decrypt_totp(admin, settings)
     if secret and not verify_totp(secret, totp_code or ""):
-        LIMITER.fail(ip, username)
-        raise AuthError("a valid TOTP code is required", "totp_required", 401)
+        if not recovery_code or not consume_recovery_code(admin, recovery_code):
+            LIMITER.fail(ip, username)
+            raise AuthError("a valid TOTP code is required", "totp_required", 401)
     admin.failed_attempts = 0
     admin.locked_until = None
     admin.last_login_at = utcnow()
@@ -237,10 +243,12 @@ async def disable_totp(session: AsyncSession, admin: AdminUser) -> None:
 
 
 async def create_api_token(
-    session: AsyncSession, *, name: str, scopes: list[str], expires_at: datetime | None = None
+    session: AsyncSession, *, name: str, scopes: Sequence[str], expires_at: datetime | None = None
 ) -> tuple[str, ApiToken]:
     token = f"ost_{generate_session_token()}"
-    row = ApiToken(name=name, token_hash=hash_token(token), scopes=scopes, expires_at=expires_at)
+    row = ApiToken(
+        name=name, token_hash=hash_token(token), scopes=list(scopes), expires_at=expires_at
+    )
     session.add(row)
     await session.flush()
     return token, row
@@ -269,6 +277,17 @@ async def rotate_session_token(session: AsyncSession, row: Session) -> str:
 def verify_recovery(admin: AdminUser, code: str) -> bool:
     candidate = hash_token(code.replace("-", "").lower())
     return any(constant_time_equal(item, candidate) for item in admin.recovery_codes_hash)
+
+
+def consume_recovery_code(admin: AdminUser, code: str) -> bool:
+    """Validate and atomically remove a single-use recovery code."""
+
+    matched, remaining = _consume_recovery_code(admin.recovery_codes_hash, code)
+    if not matched:
+        return False
+    # Reassign so SQLAlchemy detects the JSON mutation.
+    admin.recovery_codes_hash = remaining
+    return True
 
 
 def new_id_for_tests() -> str:

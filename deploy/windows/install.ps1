@@ -12,7 +12,14 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 
 $Source = Split-Path -Parent $MyInvocation.MyCommand.Path
 New-Item -ItemType Directory -Force -Path $InstallDir, $DataDir, "$DataDir\runtime", "$DataDir\logs", "$DataDir\core" | Out-Null
-Copy-Item "$Source\*" $InstallDir -Recurse -Force
+# Inno Setup already copied the bundle into $InstallDir before running this
+# script.  Copying a directory onto itself makes PowerShell fail, so only do
+# the copy for the portable/zip workflow where source and destination differ.
+$sourceFull = [IO.Path]::GetFullPath($Source).TrimEnd([char[]]('\', '/'))
+$installFull = [IO.Path]::GetFullPath($InstallDir).TrimEnd([char[]]('\', '/'))
+if ($sourceFull -ne $installFull) {
+    Copy-Item "$Source\*" $InstallDir -Recurse -Force
+}
 
 # Core binary and Wintun live beside the service executable.
 if (Test-Path "$Source\core\sing-box.exe") {
@@ -48,7 +55,8 @@ set OSTIUM_CONFIG_FILE=$DataDir\config.toml
 "@ | Set-Content -LiteralPath $uiCmd -Encoding ascii
 
 # Allow the interactive user to read/write the shared client data.
-icacls $DataDir /grant "$($env:USERNAME):(OI)(CI)M" | Out-Null
+$userAccount = if ($env:USERDOMAIN) { "$env:USERDOMAIN\$env:USERNAME" } else { $env:USERNAME }
+icacls $DataDir /grant "${userAccount}:(OI)(CI)M" | Out-Null
 
 # Register the privileged TUN core as a Windows service (LocalSystem).
 & "$InstallDir\ostium-service.exe" --startup auto install
@@ -63,8 +71,9 @@ if ($RunAsSystem) {
 else {
     $action = New-ScheduledTaskAction -Execute $uiCmd
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+    $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 }
+Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName "Ostium" -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName "Ostium"
 

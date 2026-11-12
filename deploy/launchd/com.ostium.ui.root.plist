@@ -17,8 +17,10 @@
     <string>/Library/Application Support/Ostium UI</string>
     <key>OSTIUM_CONFIG_DIR</key>
     <string>/Library/Application Support/Ostium UI</string>
+    <key>OSTIUM_CONFIG_FILE</key>
+    <string>/Library/Application Support/Ostium UI/config.toml</string>
     <key>OSTIUM_CORE_TOKEN_FILE</key>
-    <string>/Library/Application Support/Ostium/core.token</string>
+    <string>/Library/Application Support/Ostium/runtime/core.token</string>
     <key>OSTIUM_CORE_URL</key>
     <string>http://127.0.0.1:8788</string>
   </dict>

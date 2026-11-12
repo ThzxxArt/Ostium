@@ -22,6 +22,7 @@ set -euo pipefail
 
 VERSION="${OSTIUM_VERSION:-0.1.0}"
 CORE_VERSION="${OSTIUM_CORE_VERSION:-1.14.4-ostium.1}"
+UV_VERSION="${OSTIUM_UV_VERSION:-0.11.14}"
 ROLE="server"
 DOMAIN=""
 PASSWORD=""
@@ -96,6 +97,26 @@ need_root() {
   if [[ "$(id -u)" -ne 0 ]]; then
     die "请使用 sudo 运行，例如：curl ... | sudo bash -s -- install --role server"
   fi
+}
+
+validate_install_path() {
+  local path="$1" label="$2" normalized
+  if [[ -z "$path" || "$path" != /* ]]; then
+    die "$label 必须是绝对路径：$path"
+  fi
+  if command -v realpath >/dev/null 2>&1; then
+    normalized="$(realpath -m "$path" 2>/dev/null || printf '%s' "$path")"
+  else
+    normalized="$(printf '%s' "$path" | sed 's#//*#/#g; s#/$##')"
+  fi
+  case "$normalized" in
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
+      die "拒绝使用系统根目录作为 $label：$normalized"
+      ;;
+  esac
+  case "/$normalized/" in
+    */../*) die "$label 不能包含 ..：$path" ;;
+  esac
 }
 
 cleanup() {
@@ -252,9 +273,9 @@ bootstrap_python() {
   if [[ ! -x "$UV_BIN" ]]; then
     say "安装静态 uv（无需系统 Python）"
     local archive="$WORK_DIR/uv.tar.gz"
-    fetch_file "https://github.com/astral-sh/uv/releases/latest/download/uv-${uv_target}.tar.gz" "$archive"
+    fetch_file "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_target}.tar.gz" "$archive"
     local checksum="$WORK_DIR/uv.tar.gz.sha256"
-    if fetch_file "https://github.com/astral-sh/uv/releases/latest/download/uv-${uv_target}.tar.gz.sha256" "$checksum" 2>/dev/null; then
+    if fetch_file "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_target}.tar.gz.sha256" "$checksum" 2>/dev/null; then
       local expected actual
       expected="$(awk '{print $1; exit}' "$checksum")"
       actual="$(sha256_file "$archive")"
@@ -285,8 +306,8 @@ systemd_available() {
 
 detect_existing_mode() {
   if [[ "$RUN_AS_ROOT" != "true" ]]; then
-    if [[ -f /etc/systemd/system/ostium.service.d/root.conf ]] \
-      || [[ -f /etc/systemd/system/ostium-core.service.d/root.conf ]]; then
+    if [[ -f "$SYSTEMD_DIR/ostium.service.d/root.conf" ]] \
+      || [[ -f "$SYSTEMD_DIR/ostium-core.service.d/root.conf" ]]; then
       RUN_AS_ROOT="true"
       say "检测到已有 root 模式，升级将保持该模式"
     fi
@@ -312,8 +333,8 @@ run_platform_installer() {
     warn "macOS 一键安装暂不支持 --behind-proxy；请安装后编辑 launchd 配置"
   fi
 
+  export OSTIUM_PREFIX="$PREFIX"
   if [[ "$OS" == "linux" ]]; then
-    export OSTIUM_PREFIX="$PREFIX"
     chmod +x "$SOURCE_DIR/scripts/install.sh"
     "$SOURCE_DIR/scripts/install.sh" \
       --role "$ROLE" \
@@ -356,7 +377,12 @@ uninstall_ostium() {
   elif [[ "$OS" == "darwin" ]]; then
     launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
     launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
-    launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      launchctl asuser "$(id -u "$SUDO_USER")" \
+        launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+    else
+      launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+    fi
     rm -f /Library/LaunchDaemons/com.ostium.core.plist \
       /Library/LaunchDaemons/com.ostium.ui.plist \
       /Library/LaunchAgents/com.ostium.ui.plist
@@ -428,6 +454,11 @@ if [[ "$ACTION" == "status" ]]; then
 fi
 need_root
 detect_platform
+validate_install_path "$PREFIX" "安装目录"
+validate_install_path "$DATA" "数据目录"
+validate_install_path "$CONFIG" "配置目录"
+validate_install_path "$CLIENT_DATA" "客户端核心数据目录"
+validate_install_path "$CLIENT_UI_DATA" "客户端 UI 数据目录"
 
 if [[ "$ACTION" == "uninstall" ]]; then
   uninstall_ostium
@@ -437,7 +468,7 @@ fi
 if [[ "$ACTION" == "upgrade" && -z "$LOCAL_DIR" ]]; then
   [[ -d "$PREFIX" ]] || die "未发现 $PREFIX，无法升级；请先安装"
 fi
-if [[ -z "$PASSWORD" && "$ACTION" == "install" ]]; then
+if [[ -z "$PASSWORD" && "$ACTION" == "install" && "$ROLE" == "server" ]]; then
   PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
 fi
 
@@ -448,13 +479,11 @@ bootstrap_python
 detect_existing_mode
 run_platform_installer
 
-if [[ "$ACTION" == "install" && -n "$PASSWORD" ]]; then
+if [[ "$ACTION" == "install" && -n "$PASSWORD" && "$ROLE" == "server" ]]; then
   if [[ "$BEHIND_PROXY" == "true" ]]; then
     ADMIN_URL="https://${DOMAIN:-your-domain} （Nginx/Caddy 反代到 127.0.0.1:${UI_PORT:-8443}）"
-  elif [[ "$ROLE" == "server" ]]; then
-    ADMIN_URL="http://127.0.0.1:${UI_PORT:-8443} （建议 SSH 隧道）"
   else
-    ADMIN_URL="http://127.0.0.1:8787"
+    ADMIN_URL="http://127.0.0.1:${UI_PORT:-8443} （建议 SSH 隧道）"
   fi
   cat <<EOF
 
@@ -468,6 +497,19 @@ Ostium 安装完成
   服务管理：$([[ "$NO_SERVICE" == "true" ]] && echo "未注册，交给你的进程管理器" || echo systemd/launchd)
 ============================================================
 密码只显示一次。登录后请立即修改密码并启用 TOTP。
+EOF
+elif [[ "$ACTION" == "install" && "$ROLE" == "client" ]]; then
+  cat <<EOF
+
+============================================================
+Ostium 客户端安装完成
+============================================================
+  Web UI：http://127.0.0.1:8787
+  安装目录：$PREFIX
+  运行身份：$([[ "$RUN_AS_ROOT" == "true" ]] && echo root || echo "无特权服务用户")
+  服务管理：$([[ "$NO_SERVICE" == "true" ]] && echo "未注册，交给你的进程管理器" || echo systemd/launchd)
+============================================================
+首次打开 UI 会进入客户端设置向导，请在那里创建管理员账号并导入订阅。
 EOF
 else
   say "操作完成：$ACTION"

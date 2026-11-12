@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,8 +31,16 @@ def main() -> None:
     parser.add_argument(
         "--base-url", default="https://github.com/ThzxxArt/Ostium/releases/download"
     )
+    parser.add_argument(
+        "--release-version",
+        default=os.environ.get("OSTIUM_RELEASE_VERSION", "0.1.0"),
+        help="Ostium release tag/version that hosts the core archives",
+    )
     parser.add_argument("--output", type=Path, default=Path("dist/core-manifest.json"))
     args = parser.parse_args()
+    release_version = args.release_version.strip().lstrip("v")
+    if not release_version:
+        parser.error("--release-version must not be empty")
 
     artifacts = []
     for path in sorted(args.dir.glob("ostium-core-*.tar.gz")):
@@ -49,7 +58,7 @@ def main() -> None:
                 "filename": path.name,
                 "size": path.stat().st_size,
                 "sha256": digest(path),
-                "url": f"{args.base_url}/v{version.split('-')[0]}/{path.name}",
+                "url": f"{args.base_url}/v{release_version}/{path.name}",
             }
         )
     manifest = {

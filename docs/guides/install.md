@@ -68,7 +68,8 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
    - `ostium-core-1.14.4-ostium.1-<os>-<arch>.tar.gz`
    - `SHA256SUMS`
 6. 校验通过后调用仓库内的 `scripts/install.sh` 或 `deploy/launchd/install-macos.sh`。
-7. 创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动。
+7. 服务端创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动，打印一次性管理员密码。
+8. 客户端不预置管理员密码；首次打开 UI 时完成客户端设置向导。
 
 ## 常用参数
 

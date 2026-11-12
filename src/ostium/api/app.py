@@ -157,8 +157,16 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             "/api/"
         ):
             length = request.headers.get("content-length")
-            if length is not None and int(length) > 20 * 1024 * 1024:
-                return JSONResponse(status_code=413, content={"detail": "body too large"})
+            if length is not None:
+                try:
+                    too_large = int(length) > 20 * 1024 * 1024
+                except ValueError:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"detail": "invalid Content-Length", "code": "invalid_request"},
+                    )
+                if too_large:
+                    return JSONResponse(status_code=413, content={"detail": "body too large"})
             body = await request.body()
             if len(body) > 20 * 1024 * 1024:
                 return JSONResponse(status_code=413, content={"detail": "body too large"})

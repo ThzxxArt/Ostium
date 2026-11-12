@@ -146,6 +146,7 @@ def init(
         settings.data_dir = data_dir
     if config_dir:
         settings.config_dir = config_dir
+        settings.config_path = config_dir / "config.toml"
     settings.role = role_value
     settings.dev = dev
     settings.host = host or (
@@ -242,17 +243,18 @@ def serve(
         from ostium.db.models import Certificate
 
         async def _find_cert() -> tuple[str, str] | None:
+            from ostium.services.settings import get_setting
+
             engine, factory, _store = await _database(settings)
             async with factory() as session:
-                cert = (
-                    (
-                        await session.execute(
-                            select(Certificate).where(Certificate.status == "ready")
-                        )
-                    )
-                    .scalars()
-                    .first()
-                )
+                server_info = await get_setting(session, "server", {})
+                domain = server_info.get("domain") if isinstance(server_info, dict) else None
+                query = select(Certificate).where(Certificate.status == "ready")
+                if domain:
+                    query = query.where(Certificate.domain == domain)
+                else:
+                    query = query.order_by(Certificate.expires_at.desc())
+                cert = (await session.execute(query)).scalars().first()
             await engine.dispose()
             return (cert.cert_path, cert.key_path) if cert else None
 
@@ -297,7 +299,7 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         "version": __version__,
         "role": settings.role.value,
         "data_dir": str(settings.data_dir),
-        "config_file": str(settings.paths.config_file),
+        "config_file": str(settings.config_file),
         "database": settings.paths.db_path.is_file(),
         "core_binary": settings.paths.engine_binary.is_file(),
         "ui_url": f"http://127.0.0.1:{settings.port}",
@@ -391,8 +393,8 @@ def doctor(
     )
     add(
         "config",
-        "pass" if settings.paths.config_file.is_file() else "warn",
-        str(settings.paths.config_file),
+        "pass" if settings.config_file.is_file() else "warn",
+        str(settings.config_file),
     )
     add(
         "core_binary",
@@ -503,7 +505,7 @@ def diagnostics_export(
         "platform": platform.platform(),
         "python": sys.version,
         "data_dir": str(settings.data_dir),
-        "config_file": str(settings.paths.config_file),
+        "config_file": str(settings.config_file),
         "database_exists": settings.paths.db_path.is_file(),
         "core_binary_exists": settings.paths.engine_binary.is_file(),
     }
@@ -1071,15 +1073,20 @@ def core_install(
             archive_path.write_bytes(response.content)
             with tarfile.open(archive_path, "r:gz") as archive:
                 member = next(
-                    (item for item in archive.getmembers() if item.name.endswith("sing-box")),
+                    (
+                        item
+                        for item in archive.getmembers()
+                        if Path(item.name).name in {"sing-box", "sing-box.exe"}
+                    ),
                     None,
                 )
                 if member is None:
                     _fail("manifest archive does not contain sing-box", 6)
                 assert member is not None
-                member.name = "sing-box"
+                member.name = Path(member.name).name
+                extracted = Path(temp) / member.name
                 archive.extract(member, Path(temp), filter="data")
-            shutil.copy2(Path(temp) / "sing-box", target)
+            shutil.copy2(extracted, target)
     elif binary:
         shutil.copy2(binary, target)
     elif url:

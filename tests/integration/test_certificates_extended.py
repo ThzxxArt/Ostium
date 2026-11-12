@@ -56,7 +56,7 @@ def test_self_signed_validation_and_reissue(settings: Settings) -> None:
     async def _run() -> None:
         engine, factory, _store = await _setup(settings)
         async with factory() as session:
-            for domain in ("", "a" * 254):
+            for domain in ("", "a" * 254, "../../etc/passwd", "bad domain"):
                 with pytest.raises(cert_service.CertificateError):
                     await cert_service.create_self_signed(session, settings, domain=domain)
 
