@@ -1,39 +1,31 @@
-# Subscriptions
+# 订阅
 
-Every enabled user can have one subscription token. The token is a secret:
-anyone with the URL can use the user's credentials.
+每个启用的用户都可以有一个订阅 token。token 是机密：拿到 URL 的人就能使用该用户的凭据。
 
-## Formats
+## 格式
 
-| Format | URL | Use |
+| 格式 | URL | 用途 |
 |---|---|---|
-| Ostium Profile v1 | `/sub/<token>?format=ostium` | Ostium client; full metadata |
-| Base64 URI list | `/sub/<token>?format=base64` | v2rayN and compatible clients |
+| Ostium Profile v1 | `/sub/<token>?format=ostium` | Ostium 客户端；完整元数据 |
+| Base64 URI 列表 | `/sub/<token>?format=base64` | v2rayN 等兼容客户端 |
 | Clash Meta YAML | `/sub/<token>?format=clash` | Clash Meta / Mihomo |
 | sing-box JSON | `/sub/<token>?format=singbox` | sing-box outbounds |
 
-The response uses `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and
-rate limits 60 requests/minute/IP. Disabled, expired or over-quota users receive
-403; unknown tokens receive 404.
+响应头包含 `Cache-Control: no-store`、`Referrer-Policy: no-referrer`，并限制每 IP 每分钟 60 次。禁用、到期或超配额的用户返回 403；未知 token 返回 404。
 
-## Importing
+## 导入
 
-In Ostium: **Profiles → Import**, paste the URL, a share link, JSON, or scan a
-QR image. Subscription-backed profiles refresh once per day and keep the last
-successful copy if a refresh fails.
+在 Ostium 中：**Profiles → Import**，粘贴 URL、分享链接、JSON，或扫描二维码图片。订阅型配置每天刷新一次；刷新失败时保留上一次成功副本。
 
-Third-party clients: export the Base64 or Clash format. The URLs contain the
-standard VLESS/Hysteria2/Trojan/SS2022 parameters.
+第三方客户端：导出 Base64 或 Clash 格式。URL 中包含标准 VLESS/Hysteria2/Trojan/SS2022 参数。
 
-## Rotating
+## 轮换
 
-Rotate the subscription token in **Subscriptions** or the user drawer. The old
-URL stops working immediately. Rotating credentials (UUID/passwords) is a
-separate action and disconnects active sessions.
+在 **Subscriptions** 或用户抽屉中轮换订阅 token。旧 URL 立即失效。轮换凭据（UUID/密码）是另一个操作，会断开活跃会话。
 
-## Security
+## 安全
 
-- Never post a subscription URL in a public issue or screenshot.
-- Prefer HTTPS for the subscription endpoint when using a public domain.
-- Tokens are stored as a SHA-256 hash plus an encrypted copy; they are not
-  written to logs.
+- 不要把订阅 URL 发到公开 issue 或截图。
+- 使用公网域名时，订阅端点优先走 HTTPS。
+- token 以 SHA-256 哈希 + 加密副本存储，不写入日志。
+- 怀疑泄露时立即轮换，并检查审计日志。

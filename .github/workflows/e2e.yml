@@ -32,9 +32,17 @@ jobs:
           export OSTIUM_DATA_DIR=/tmp/ostium-e2e
           export OSTIUM_PORT=18443
           export OSTIUM_DEV=1
-          uv run ostium init --role server --no-input --password 'verysecret123' --domain example.com
-          uv run ostium serve > /tmp/ostium-e2e.log 2>&1 &
+          .venv/bin/ostium init --role server --no-input --password 'verysecret123' --domain example.com
+          # Run the venv entry point directly so no uv process holds the cache lock.
+          nohup .venv/bin/ostium serve > /tmp/ostium-e2e.log 2>&1 &
+          echo $! > /tmp/ostium-e2e.pid
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18443/healthz && break; sleep 1; done
+      - name: Stop Ostium
+        if: always()
+        run: |
+          if [ -f /tmp/ostium-e2e.pid ]; then
+            kill "$(cat /tmp/ostium-e2e.pid)" 2>/dev/null || true
+          fi
       - run: npx playwright test
         working-directory: web
         env:

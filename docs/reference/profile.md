@@ -1,6 +1,6 @@
 # Ostium Profile v1
 
-The native subscription format is a deterministic JSON document:
+原生订阅格式是一份确定性的 JSON：
 
 ```json
 {
@@ -32,13 +32,11 @@ The native subscription format is a deterministic JSON document:
 }
 ```
 
-Supported protocols: `vless-reality`, `hysteria2`, `trojan`, `shadowsocks`.
-Unknown fields are rejected by the Pydantic model. URIs are also accepted for
-import:
+支持协议：`vless-reality`、`hysteria2`、`trojan`、`shadowsocks`。未知字段会被 Pydantic 模型拒绝。也支持 URI 导入：
 
 - `vless://UUID@host:443?...`
 - `hysteria2://password@host:443?...`
 - `trojan://password@host:443?...`
 - `ss://base64(method:password)@host:8388#name`
 
-Exports never include the subscription token, admin session or private keys.
+导出永远不会包含订阅 token、管理员会话或私钥。

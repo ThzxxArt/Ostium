@@ -39,6 +39,46 @@ jobs:
     permissions:
       contents: read
 
+  windows:
+    needs: [wheel, core]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.14"
+      - name: Download core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: core-windows-amd64
+          path: dist/core-artifact
+      - name: Prepare core and Wintun
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/core | Out-Null
+          tar -xzf (Get-ChildItem dist/core-artifact/ostium-core-*-windows-amd64.tar.gz).FullName -C dist/core
+          Invoke-WebRequest -UseBasicParsing -Uri https://www.wintun.net/builds/wintun-0.14.1.zip -OutFile dist/wintun.zip
+          Expand-Archive dist/wintun.zip -DestinationPath dist/wintun -Force
+          Copy-Item dist/wintun/bin/amd64/wintun.dll dist/core/wintun.dll
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          ./scripts/build-windows.ps1 -Version $version -CoreBinary dist/core/sing-box.exe -WintunDll dist/core/wintun.dll
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          & $iscc deploy/windows/ostium.iss /DAppVersion=$version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/windows/*-setup.exe
+
   docker:
     runs-on: ubuntu-24.04
     steps:
@@ -60,7 +100,7 @@ jobs:
             ghcr.io/thzxxart/ostium:latest
 
   publish:
-    needs: [wheel, core]
+    needs: [wheel, core, windows]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +113,10 @@ jobs:
           pattern: core-*
           merge-multiple: true
           path: dist/core
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/windows
       - run: python3 scripts/build-core-manifest.py --dir dist/core --output dist/core-manifest.json
       - name: Checksums
         run: |
@@ -91,5 +135,6 @@ jobs:
             dist/core/*.tar.gz
             dist/core/*.sha256
             dist/core-manifest.json
+            dist/windows/*-setup.exe
             dist/SHA256SUMS
           generate_release_notes: true

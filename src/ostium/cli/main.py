@@ -118,6 +118,8 @@ def init(
     username: str = typer.Option("admin", "--username"),
     password: str | None = typer.Option(None, "--password"),
     domain: str | None = typer.Option(None, "--domain"),
+    host: str | None = typer.Option(None, "--host", help="UI listen address"),
+    port: int | None = typer.Option(None, "--port", help="UI listen port"),
     public_ui: bool = typer.Option(False, "--public-ui/--no-public-ui"),
     no_input: bool = typer.Option(False, "--no-input"),
     force: bool = typer.Option(
@@ -146,10 +148,10 @@ def init(
         settings.config_dir = config_dir
     settings.role = role_value
     settings.dev = dev
-    settings.host = (
+    settings.host = host or (
         "127.0.0.1" if dev else ("0.0.0.0" if role_value is Role.SERVER else "127.0.0.1")
     )
-    settings.port = 8443 if role_value is Role.SERVER else 8787
+    settings.port = port or (8443 if role_value is Role.SERVER else 8787)
     settings.public_ui = public_ui and role_value is Role.SERVER
     if role_value is Role.SERVER or settings.dev:
         settings.core_token_file = settings.data_dir / "runtime" / "core.token"

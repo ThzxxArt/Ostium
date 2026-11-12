@@ -1,44 +1,71 @@
-# Server guide (Ubuntu 24.04 / Debian 13)
+# 服务端指南（Ubuntu 24.04 / Debian 13）
 
-## Baseline
+## 基础要求
 
-- 1 vCPU / 1 GB works; 2 vCPU / 2 GB recommended.
-- 20 GB SSD, IPv4/IPv6, UTC, NTP.
-- Open 22 (restricted), 80/tcp (ACME), 443/tcp, 443/udp. Open 8443 only if you
-  intentionally expose the admin UI.
-- Use a non-root sudo user; do not run the UI as root.
+- 1 vCPU / 1 GB 可运行；推荐 2 vCPU / 2 GB。
+- 20 GB SSD、IPv4/IPv6、UTC 时区、NTP 同步。
+- 放行 22（限制来源）、80/tcp（ACME）、443/tcp、443/udp。
+- 只有明确要公网管理 UI 时才放行 8443。
 
-## Install
+> 默认安装会创建无特权 `ostium` 用户。若使用 `--run-as-root`，控制面也会以 root 运行，隔离降级；详见[服务管理](service-manager.md)。
 
-1. Download the release wheel, the matching core tarball and `SHA256SUMS` from
-   GitHub Releases.
-2. Verify:
+## 一键安装（推荐）
 
-   ```bash
-   sha256sum -c SHA256SUMS --ignore-missing
-   ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+  | sudo bash -s -- install --role server --domain vpn.example.com
+```
 
-3. Run:
+脚本会自动下载 uv、托管 Python 3.13、wheel、sing-box 核心和校验文件，然后注册 systemd。无需预装 Python。
 
-   ```bash
-   sudo ./install.sh --role server \
-     --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
-     --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
-     --domain vpn.example.com
-   ```
+安装完成后用 SSH 隧道访问：
 
-4. The installer creates the `ostium` user, installs both systemd services,
-   initialises the database and prints a one-time admin password.
-5. Open an SSH tunnel and finish setup in the UI:
+```bash
+ssh -L 8443:127.0.0.1:8443 root@your-server
+```
 
-   ```bash
-   ssh -L 8443:127.0.0.1:8443 root@your-server
-   ```
+打开 <http://127.0.0.1:8443>。Reality 默认启用；创建用户后把订阅导入客户端。
 
-   Visit <http://127.0.0.1:8443>. Reality is enabled by default; create a user
-   and import the generated subscription on a client.
+## 离线安装
 
-## Firewall
+从 GitHub Release 下载：
+
+- `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
+- `SHA256SUMS`
+- 源码包或包含 `scripts/`、`deploy/` 的目录
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+sudo ./install.sh --role server \
+  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+  --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
+  --domain vpn.example.com
+```
+
+也可以使用一键脚本的离线模式：
+
+```bash
+sudo bash install-online.sh install --local-dir /path/to/release --role server --domain vpn.example.com
+```
+
+## root 模式
+
+```bash
+curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --run-as-root
+```
+
+不创建 `ostium` 用户，两个 systemd 服务都以 root 运行。方便，但**不推荐生产环境**：Web/API 漏洞将直接影响整机。安装器会写 drop-in，升级时自动保持该模式。
+
+## 不用 systemd
+
+```bash
+curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-service
+```
+
+然后按[服务管理](service-manager.md)配置 OpenRC、runit、s6 或 supervisord。
+
+## 防火墙
 
 ```bash
 ufw default deny incoming
@@ -49,8 +76,7 @@ ufw allow 443/udp
 ufw enable
 ```
 
-Configure the cloud security group too. Do not expose 8388 unless you
-explicitly enable Shadowsocks 2022.
+同时配置云安全组。除非明确启用 Shadowsocks 2022，不要暴露 8388。
 
 ## sysctl
 
@@ -64,42 +90,60 @@ net.ipv4.tcp_wmem = 4096 65536 16777216
 fs.file-max = 1000000
 ```
 
-Run `sysctl --system`. The core unit sets `LimitNOFILE=65535`.
+```bash
+sudo sysctl --system
+```
 
-## Services
+核心 unit 已设置 `LimitNOFILE=65535`。
+
+## 服务管理
 
 ```bash
 systemctl status ostium-core ostium
 journalctl -u ostium -u ostium-core -f
 ```
 
-The UI can restart/reload the core, but it cannot restart itself. Use
-`sudo systemctl restart ostium` after changing listener/TLS settings.
+UI 可以重启/重载核心，但不能重启自己。修改监听地址或 TLS 后：
 
-## TLS and public UI
+```bash
+sudo systemctl restart ostium
+```
 
-Issue a certificate in **Certificates** (ACME HTTP-01 or upload), assign it to
-Hysteria2/Trojan, enable TOTP, then enable **Public admin UI** in Settings. The
-UI will refuse to serve publicly over plain HTTP; restart `ostium.service` after
-the change.
+## TLS 与公网 UI
 
-## Backups
+1. 在 **Certificates** 申请 ACME HTTP-01 证书，或上传证书。
+2. 把证书分配给 Hysteria2 / Trojan。
+3. 启用 TOTP。
+4. 在 Settings 打开 **Public admin UI**。
+5. 重启 `ostium.service`。
 
-Create an encrypted backup from Settings or:
+UI 会拒绝在纯 HTTP 下公网服务。v0.1.0 只支持 HTTP-01。
+
+## 备份
+
+在 Settings 创建加密备份，或：
 
 ```bash
 sudo -u ostium ostium backup create --password 'a long passphrase'
 ```
 
-The file lands in `/var/lib/ostium/backups`. Store it off-host. Restore requires
-stopping both services or staging the restore from the UI and restarting.
+文件在 `/var/lib/ostium/backups`。请存到异地。恢复需要停止两个服务，或从 UI staging 后重启。
 
-## Operations
+root 模式下把 `sudo -u ostium` 换成 `sudo`。
 
-- `ostium doctor`
-- `ostium logs --source core -f`
-- `ostium diagnostics export`
-- `ostium core version`
-- `ostium update --check`
+## 日常运维
 
-Never expose the control plane without TLS+TOTP. Never run the UI as root.
+```bash
+ostium doctor
+ostium logs --source core -f
+ostium diagnostics export
+ostium core version
+ostium update --check
+```
+
+## 安全底线
+
+- 默认不要用 root 跑控制面；如使用 `--run-as-root`，明确接受风险。
+- 没有 TLS + TOTP 不要把管理 UI 暴露公网。
+- 只开放必要端口。
+- 定期备份，并把备份视为最高敏感文件。

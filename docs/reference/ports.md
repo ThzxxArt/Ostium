@@ -1,33 +1,37 @@
-# Ports and paths
+# 端口与路径
 
-## Server
+## 服务端
 
-| Purpose | Value |
+| 用途 | 值 |
 |---|---|
 | Reality / Trojan | `0.0.0.0:443/tcp` |
 | Hysteria2 | `0.0.0.0:443/udp` |
-| SS2022 (off) | `0.0.0.0:8388/tcp+udp` |
-| Admin UI | `127.0.0.1:8443` (HTTPS when public) |
-| ACME | `0.0.0.0:80/tcp` during issuance |
-| Core API | `127.0.0.1:8788` |
+| SS2022（默认关闭） | `0.0.0.0:8388/tcp+udp` |
+| 管理 UI | `127.0.0.1:8443`（公网时 HTTPS） |
+| ACME | 签发期间 `0.0.0.0:80/tcp` |
+| 核心 API | `127.0.0.1:8788` |
 | Clash API | `127.0.0.1:19090` |
-| V2Ray stats | `127.0.0.1:19091` |
+| V2Ray 统计 | `127.0.0.1:19091` |
 
-Data: `/var/lib/ostium`. Config: `/etc/ostium/config.toml`. Certificates:
-`/var/lib/ostium/certs/<domain>/`. Backups: `/var/lib/ostium/backups/`.
+数据：`/var/lib/ostium`。配置：`/etc/ostium/config.toml`。证书：`/var/lib/ostium/certs/<domain>/`。备份：`/var/lib/ostium/backups/`。
 
-## Client
+## 客户端
 
-| Purpose | Value |
+| 用途 | 值 |
 |---|---|
-| Mixed proxy | `127.0.0.1:7890` |
+| 混合代理 | `127.0.0.1:7890` |
 | Web UI | `127.0.0.1:8787` |
-| Core API | `127.0.0.1:8788` |
+| 核心 API | `127.0.0.1:8788` |
 | Clash API | `127.0.0.1:19090` |
 | TUN | `ostium0` / `Ostium` |
 
-Linux core data: `/var/lib/ostium-core`. Linux UI data:
-`~/.local/share/ostium`. macOS core:
-`/Library/Application Support/Ostium`; UI:
-`~/Library/Application Support/Ostium`. Windows core:
-`%ProgramData%\Ostium`; UI: `%LOCALAPPDATA%\Ostium`.
+## 数据目录
+
+| 平台 | 控制面 / UI | 核心 |
+|---|---|---|
+| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium` | 同左 |
+| Linux 客户端 | `~/.local/share/ostium`（默认）；root 模式 `/var/lib/ostium` | `/var/lib/ostium-core` |
+| Windows | `%ProgramData%\Ostium`（当前安装器布局） | `%ProgramData%\Ostium` |
+| macOS | `~/Library/Application Support/Ostium`（默认）；root 模式 `/Library/Application Support/Ostium UI` | `/Library/Application Support/Ostium` |
+
+关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。

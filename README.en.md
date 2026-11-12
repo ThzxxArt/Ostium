@@ -37,17 +37,25 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.54%25%20statements%20%C2%B7%2095.84%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.84%25%20statements%20%C2%B7%2085.97%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-384%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-385%20backend%20%C2%B7%20132%20frontend%20%C2%B7%2018%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
-> **Current stable release: v0.1.0.** Install from PyPI, GitHub Releases, GHCR Docker,
-> native Linux/Windows/macOS packages, or source. To try it in seconds:
+> **Current stable release: v0.1.0.** The easiest install does not require Python:
 >
 > ```bash
-> uv tool install ostium-ctl
-> ostium version
+> curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+>   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
+>
+> Windows client (admin PowerShell):
+>
+> ```powershell
+> irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+> ```
+>
+> Parameters, offline install, root mode and no-service mode:
+> [one-click install guide](docs/guides/install.md).
 
 ---
 
@@ -63,9 +71,9 @@ and auditable private-network console.
 | 📊 **Real traffic accounting** | A custom `sing-box` build with `with_v2ray_api` tracks per-user up/down, daily/monthly totals, quotas and expiry. |
 | 🌐 **A real desktop client** | Windows 11, macOS 14+ and Linux with mixed proxy, system proxy, TUN, URLTest and multiple subscriptions. |
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
-| 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller, Inno Setup, DEB and AppImage assets. |
+| 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 384 backend tests, 132 frontend tests and 18 Playwright tests; 98.54% backend statements / 95.84% branches. |
+| 🧪 **Verified** | 385 backend tests, 132 frontend tests and 18 Playwright tests; 98.54% backend statements / 95.84% branches. |
 
 ---
 
@@ -146,6 +154,7 @@ flowchart LR
 | Windows client | Windows 10 22H2+ / 11 x64; administrator rights for the TUN service |
 | macOS client | macOS 14+, arm64/x64; `sudo` for the LaunchDaemon |
 | Linux client | x64/arm64; TUN requires root or `CAP_NET_ADMIN` |
+| Install environment | One-click installer downloads uv + managed Python 3.13; **no Python required** |
 | Development | Python 3.13, uv 0.11+, Node 24.19+, Go 1.25.5 (only for the custom core) |
 
 > The server UI listens on `127.0.0.1:8443` by default. For public access, configure a certificate
@@ -157,16 +166,78 @@ flowchart LR
 
 | Method | Best for |
 |---|---|
-| **PyPI / uv / pipx** | Servers, CLI, automation and existing Python environments; easiest upgrades |
-| **GitHub Release packages** | systemd/launchd/Windows services, TUN and desktop clients |
+| **One-click online install** | Recommended; no Python needed; downloads uv, managed Python and core, registers services |
+| **GitHub Release packages** | Offline, intranet, pinned versions, or manual auditing |
+| **PyPI / uv / pipx** | CLI, automation and existing Python environments; easiest upgrades |
 | **Docker / GHCR** | Containerised servers and immutable infrastructure |
 | **Source** | Development, audit, and custom builds |
 
-> The PyPI distribution is **`ostium-ctl`**; the installed command is still **`ostium`**. Native
-> packages bundle the matching custom sing-box core and platform service files, which is the
-> simplest choice if you do not want to manage Python yourself.
+> The PyPI distribution is **`ostium-ctl`**; the installed command is still **`ostium`**. The
+> one-click installer uses the same wheel and custom sing-box core, but also handles managed
+> Python, service users, systemd/launchd and privileges.
 
-### Option 1 — Linux server (native package, recommended)
+### Option 1 — One-click online install (recommended, no Python)
+
+Linux server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+  | sudo bash -s -- install --role server --domain vpn.example.com
+```
+
+Linux / macOS client:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+  | sudo bash -s -- install --role client
+```
+
+Windows client (admin PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+```
+
+The installer:
+
+1. installs missing `curl`/`tar` on Linux;
+2. downloads static `uv` and installs a **managed Python 3.13** (system Python is untouched);
+3. downloads and verifies the wheel, sing-box core and `SHA256SUMS`;
+4. creates service users, initialises the database and registers systemd/launchd/Windows services;
+5. prints a one-time administrator password.
+
+#### Run everything as root (no `ostium` user)
+
+```bash
+curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --run-as-root
+```
+
+No `ostium`/`ostium-core` users are created; both the control plane and core run as root, and the
+client UI is installed as a system service. **This removes the default privilege isolation**: a
+Web/API vulnerability may affect the whole machine. Use it only on single-user test machines,
+temporary environments, or when another isolation layer exists.
+
+#### No systemd
+
+```bash
+curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-service
+```
+
+Files, core and configuration are installed without registering systemd/launchd. Use OpenRC,
+runit, s6, supervisord or run both commands manually. Full examples:
+[service management](docs/guides/service-manager.md).
+
+#### Offline / intranet
+
+```bash
+sudo bash install-online.sh install \
+  --local-dir /path/to/release \
+  --role server --domain vpn.example.com
+```
+
+`--local-dir` may be a release directory or a source checkout.
+
+### Option 2 — Linux server (offline native package)
 
 Download the release artifacts:
 
@@ -219,7 +290,7 @@ systemctl status ostium-core ostium
 journalctl -u ostium -u ostium-core -f
 ```
 
-### Option 2 — Linux client
+### Option 3 — Linux client (offline)
 
 ```bash
 sudo ./install.sh --role client \
@@ -235,13 +306,15 @@ systemctl --user enable --now ostium
 
 Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 
-### Option 3 — Windows client
+### Option 4 — Windows client (offline)
 
 1. Run `Ostium-0.1.0-windows-x64-setup.exe`.
 2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
    and starts the UI at logon.
 3. Data lives in `%ProgramData%\Ostium`.
-4. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
+4. The initial admin password is printed by the online installer; the offline setup stores it in
+   `%ProgramData%\Ostium\initial-password.txt`. Delete the file after the first login.
+5. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
    trust the source.
 
 You can also run the PowerShell installer from the installation directory:
@@ -250,10 +323,10 @@ You can also run the PowerShell installer from the installation directory:
 .\install.ps1
 ```
 
-### Option 4 — macOS client
+### Option 5 — macOS client (one-click online / offline source)
 
-1. Open the DMG and keep `install-macos.sh` beside the installation files.
-2. Run:
+Use the one-click online installer from Option 1. For offline installs, keep `install-macos.sh`,
+the wheel and `ostium-core-*-darwin-*.tar.gz` in one directory, then run:
 
 ```bash
 sudo ./install-macos.sh client
@@ -263,7 +336,7 @@ The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` L
 and links the `ostium` command. Unsigned/unnotarised builds trigger Gatekeeper; verify checksums
 first.
 
-### Option 5 — Docker server
+### Option 6 — Docker server
 
 Use the GHCR image directly:
 
@@ -289,7 +362,7 @@ docker run -d --name ostium --network host \
 > Docker uses host networking so it can bind 443/80. Configure the firewall, TLS and off-host
 > backups yourself.
 
-### Option 6 — PyPI / uv / pipx (servers, CLI and development)
+### Option 7 — PyPI / uv / pipx (servers, CLI and development)
 
 The PyPI distribution is **`ostium-ctl`**; the import name and CLI remain `ostium`:
 
@@ -323,7 +396,7 @@ sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.0"
 > they create an unprivileged `ostium` user, register `ostium-core.service`/`ostium.service`
 > and handle TUN, low ports and platform service privileges correctly.
 
-### Option 7 — From source
+### Option 8 — From source
 
 ```bash
 git clone https://github.com/ThzxxArt/Ostium.git
@@ -348,6 +421,35 @@ Build the custom core:
 ```bash
 ./scripts/build-core.sh --os linux amd64
 ```
+
+---
+
+## Service Management
+
+Ostium is not tied to one init system:
+
+| Environment | Default | Notes |
+|---|---|---|
+| Linux | systemd | `ostium.service` + `ostium-core.service` |
+| macOS | launchd | core LaunchDaemon + UI LaunchAgent (root mode: two LaunchDaemons) |
+| Windows | SCM | `OstiumCore` service + logon/SYSTEM task |
+| Docker | entrypoint | runs both processes in the foreground |
+| OpenRC / runit / s6 / supervisord | `--no-service` | install files, start under your supervisor |
+
+```bash
+systemctl status ostium-core ostium
+journalctl -u ostium -u ostium-core -f
+sudo systemctl restart ostium-core ostium
+```
+
+The default install creates unprivileged users. `--run-as-root` skips user creation and runs both
+services as root. **Root mode removes the control-plane/root isolation**; use it only on
+single-user test machines or with another isolation layer. Full examples (OpenRC, runit, s6,
+supervisord and root drop-ins): [service management](docs/guides/service-manager.md).
+
+If Nginx already owns 80/443, use `--behind-proxy`: the UI listens on `127.0.0.1:8443`, Nginx
+terminates TLS and proxies it, Reality/Trojan move to 9443/tcp and Hysteria2 keeps 443/udp.
+Complete config: [Nginx coexistence](docs/guides/nginx.md).
 
 ---
 
@@ -488,6 +590,17 @@ v0.1.0 supports HTTP-01 only; DNS-01 and TLS-ALPN-01 are intentionally out of sc
 
 ## Upgrade and Rollback
 
+### One-click upgrade
+
+```bash
+sudo bash install-online.sh upgrade
+# pin a version
+sudo bash install-online.sh upgrade --version 0.1.1
+```
+
+The upgrade keeps the database, `master.key`, configuration, certificates, users and
+subscriptions; only the venv and core binary are replaced. Existing root mode is preserved.
+
 ### Application upgrade (server)
 
 ```bash
@@ -536,6 +649,14 @@ not.
 ---
 
 ## Uninstall
+
+One-click uninstall (data preserved by default):
+
+```bash
+sudo bash install-online.sh uninstall
+# also remove data, configuration and users
+sudo bash install-online.sh uninstall --purge
+```
 
 ### Linux server
 
@@ -674,7 +795,7 @@ npx playwright test
 
 Current results:
 
-- Backend: **384 passed / 0 skipped** (378 regular tests + 6 live-engine integration tests),
+- Backend: **385 passed / 0 skipped** (379 regular tests + 6 live-engine integration tests),
   **98.54%** statements / **95.84%** branches.
 - Frontend: **132 passed**, **91.84%** statements / **85.97%** branches /
   **89.39%** functions / **92.59%** lines.
@@ -687,6 +808,9 @@ Current results:
 
 ## Documentation
 
+- [One-click install](docs/guides/install.md)
+- [Service management (systemd / OpenRC / runit / s6 / supervisord)](docs/guides/service-manager.md)
+- [Nginx coexistence and reverse proxy](docs/guides/nginx.md)
 - [Architecture](docs/architecture.md)
 - [Server guide](docs/guides/server.md)
 - [Client guide](docs/guides/client.md)

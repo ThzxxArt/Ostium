@@ -4,7 +4,7 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).parent.parent
-datas = [(str(ROOT / "src" / "ostium" / "web" / "dist"), "ostium/web/dist")]
+datas = [(str(ROOT / "web" / "dist"), "ostium/web/dist")]
 hiddenimports = (
     collect_submodules("uvicorn")
     + collect_submodules("grpc")

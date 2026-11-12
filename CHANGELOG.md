@@ -29,9 +29,16 @@ SemVer.
 - Backups with scrypt + AES-256-GCM, staged restore, upgrade/rollback tooling.
 - systemd/launchd/Windows service assets, Linux installer, Docker image,
   GitHub Actions CI, core build, security scans and release automation.
+- One-click online installer for Linux/macOS and PowerShell installer for
+  Windows: downloads static uv, managed Python 3.13, wheel, core and checksums;
+  supports install/upgrade/uninstall/status and needs no system Python.
+- Installer modes `--run-as-root` (no service users, both services as root) and
+  `--no-service` (OpenRC/runit/s6/supervisord/manual).
+- Chinese documentation for every guide and reference, including one-click
+  install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 384 backend tests, 132 frontend tests
+- Comprehensive audit and coverage suite: 385 backend tests, 132 frontend tests
   and 18 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 

@@ -20,7 +20,7 @@
 | 前端 branches | 1.62% | **85.97%** | ≥85% PASS |
 | 前端 functions | 0.56% | **89.39%** | ≥85% PASS |
 | 前端 lines | 0.83% | **92.59%** | ≥85% PASS |
-| 后端测试 | 69 | **384 passed / 0 skipped** | — |
+| 后端测试 | 69 | **385 passed / 0 skipped** | — |
 | 前端测试 | 5 | **132 passed** | — |
 | Playwright | 12 passed / 3 skipped | **18 passed / 0 skipped** | — |
 
@@ -51,7 +51,7 @@
 | Python lint | `uv run ruff check src tests scripts` | PASS |
 | Python format | `uv run ruff format --check src tests scripts` | PASS（132 files） |
 | Python types | `uv run mypy src/ostium` | PASS（69 files） |
-| Backend tests | `uv run pytest -q` | 384 passed, 0 skipped |
+| Backend tests | `uv run pytest -q` | 385 passed, 0 skipped |
 | Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
@@ -281,8 +281,8 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 uv run ruff check src tests scripts                  -> All checks passed
 uv run ruff format --check src tests scripts         -> 132 files already formatted
 uv run mypy src/ostium                               -> Success: no issues in 69 files
-uv run pytest -q                                     -> 384 passed, 35 warnings
-uv run pytest -m "not integration" --cov=ostium ...  -> 378 passed, coverage 98.54/95.84
+uv run pytest -q                                     -> 385 passed, 35 warnings
+uv run pytest -m "not integration" --cov=ostium ...  -> 379 passed, coverage 98.54/95.84
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass

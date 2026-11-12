@@ -1,37 +1,37 @@
-# UI guide
+# Web UI 指南
 
-Open the console at `http://127.0.0.1:8443` (server, via SSH tunnel) or
-`http://127.0.0.1:8787` (client).
+服务端打开 `http://127.0.0.1:8443`（建议 SSH 隧道），客户端打开 `http://127.0.0.1:8787`。
 
-## Server pages
+## 服务端页面
 
-- **Overview** — Server Pulse, live rate, today's traffic, online users, alerts,
-  certificate health and quick actions.
-- **Inbounds** — enable/disable Reality, Hysteria2, Trojan and SS2022; rotate
-  Reality keys; see certificate requirements.
-- **Users** — create/edit users, quotas, expiry, notes, bulk actions, usage
-  charts and subscription access.
-- **Subscriptions** — four formats, copy, QR and token rotation.
-- **Connections** — live connection table with search and close.
-- **Routing** — rule priority, actions, test panel and remote rule sets.
-- **Certificates** — ACME/self-signed/upload, expiry ring, renew and assign.
-- **Logs / Jobs / Audit** — observe the control plane and long tasks.
-- **System** — host metrics, services, doctor and redacted diagnostics.
-- **Settings** — theme/language, security, TOTP, API tokens, notifications,
-  backups and public UI policy.
+- **Overview** — 服务脉搏、实时速率、今日流量、在线用户、告警、证书健康和快捷操作。
+- **Inbounds** — 启用/禁用 Reality、Hysteria2、Trojan、SS2022；轮换 Reality 密钥；查看证书要求。
+- **Users** — 新建/编辑用户、配额、到期、备注、批量操作、流量图和订阅入口。
+- **Subscriptions** — 四种格式、复制、二维码、token 轮换。
+- **Connections** — 实时连接表，支持搜索和关闭。
+- **Routing** — 规则优先级、动作、测试面板和远程规则集。
+- **Certificates** — ACME/自签/上传、到期环、续期和分配。
+- **Logs / Jobs / Audit** — 观察控制面和长任务。
+- **System** — 主机指标、服务、doctor 和脱敏诊断。
+- **Settings** — 主题/语言、安全、TOTP、API token、通知、备份和公网 UI 策略。
 
-## Client pages
+## 客户端页面
 
-- **Home** — large connect orb, profile/endpoint picker, live rates, mode chips.
-- **Profiles** — import URL/share link/QR image, refresh, select endpoint.
-- **Routing** — smart/global/direct/custom presets and rules.
-- **Network** — mixed/system proxy/TUN, ports, MTU/stack and env hints.
-- **Statistics** — traffic trend and top destinations.
-- **Diagnostics** — port/DNS/route/TUN/proxy/core checks with fix hints.
-- **Logs / Settings** — shared with the server.
+- **Home** — 大号连接球、配置/线路选择、实时速率、模式标签。
+- **Profiles** — 导入 URL/分享链接/二维码，刷新，选择线路。
+- **Routing** — 智能/全局/直连/自定义预设和规则。
+- **Network** — 混合/系统代理/TUN、端口、MTU/栈和环境提示。
+- **Statistics** — 流量趋势和热门目标。
+- **Diagnostics** — 端口/DNS/路由/TUN/代理/核心检查及修复提示。
+- **Logs / Settings** — 与服务端共用。
 
-## Command palette
+## 命令面板
 
-Press `Cmd/Ctrl+K` and type a page, action or user name. `↑/↓` selects, `Enter`
-opens, `Esc` closes. Recent items are remembered locally. Press `?` for the
-full shortcut sheet.
+按 `Cmd/Ctrl+K`，输入页面、操作或用户名。`↑/↓` 选择，`Enter` 打开，`Esc` 关闭。最近使用会记在本地。按 `?` 查看完整快捷键。
+
+## 主题与语言
+
+- 深色/浅色主题即时切换，不需要刷新。
+- 中文/英文界面即时切换。
+- 手机端侧边栏变为抽屉，底部保留四个主要入口。
+- PWA 支持离线壳和更新提示。

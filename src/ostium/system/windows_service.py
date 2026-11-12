@@ -14,7 +14,9 @@ if sys.platform != "win32":  # pragma: no cover - import guard
         raise SystemExit("Windows services are only available on Windows")
 
 else:  # pragma: no cover - exercised on Windows
+    import os
     import threading
+    from pathlib import Path
 
     import servicemanager
     import uvicorn
@@ -44,6 +46,12 @@ else:  # pragma: no cover - exercised on Windows
 
         def SvcDoRun(self) -> None:
             servicemanager.LogInfoMsg("Ostium core service starting")
+            # Windows services run as LocalSystem and do not inherit the
+            # installer's environment. Use the machine-wide client layout.
+            program_data = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Ostium"
+            os.environ.setdefault("OSTIUM_ROLE", "client")
+            os.environ.setdefault("OSTIUM_DATA_DIR", str(program_data))
+            os.environ.setdefault("OSTIUM_CONFIG_FILE", str(program_data / "config.toml"))
             settings = Settings.load()
             app = create_core_app(settings)
             config = uvicorn.Config(

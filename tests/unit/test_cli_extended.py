@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from ostium.cli import main as cli
 from ostium.cli.main import app
+from ostium.config import Settings
 
 VLESS = (
     "vless://2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e@vpn.example.com:443"
@@ -84,6 +85,34 @@ def test_init_generated_password_force_and_invalid_role(tmp_path: Path, monkeypa
 
     invalid = runner.invoke(app, ["init", "--role", "nonsense", "--no-input"])
     assert invalid.exit_code == 2
+
+
+def test_init_custom_ui_host_and_port(tmp_path: Path, monkeypatch) -> None:
+    data = tmp_path / "proxy-data"
+    config = tmp_path / "proxy-config"
+    monkeypatch.setenv("OSTIUM_DATA_DIR", str(data))
+    monkeypatch.setenv("OSTIUM_CONFIG_DIR", str(config))
+    monkeypatch.setenv("OSTIUM_ROLE", "server")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "server",
+            "--no-input",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9443",
+            "--password",
+            "verysecret123",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    settings = Settings.load()
+    assert settings.host == "127.0.0.1"
+    assert settings.port == 9443
 
 
 def test_status_open_and_connect_commands(tmp_path: Path, monkeypatch) -> None:

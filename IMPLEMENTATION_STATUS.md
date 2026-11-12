@@ -93,7 +93,7 @@ platform/external validation, `[ ]` not done yet.
 
 - `ruff check` / `ruff format --check`: pass (132 files).
 - `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 384 passed, 0 skipped, 0 failed, including real sing-box config
+- `pytest`: 385 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.

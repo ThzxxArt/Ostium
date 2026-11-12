@@ -1,51 +1,44 @@
-# UX notes and usability script
+# UX 说明与可用性脚本
 
-## Goals
+## 目标
 
-- Server: deploy + first subscription in under 15 minutes for a new user.
-- Client: import + connect in under 5 minutes.
-- Common actions within three clicks; keyboard users can do the same with
-  shortcuts.
-- No dead ends: every error has at least one recovery action.
+- 服务端：新用户 15 分钟内完成部署并拿到第一个订阅。
+- 客户端：5 分钟内完成导入并连接。
+- 常用操作不超过三次点击；键盘用户可以用快捷键完成同样操作。
+- 没有死路：每个错误至少有一个恢复动作。
 
-## First-run flows
+## 首次使用流程
 
-**Server:** account → deployment/domain → default inbound (Reality recommended)
-→ review. The last step creates the admin and opens the console with Reality
-already listening.
+**服务端：** 账号 → 部署/域名 → 默认入口（推荐 Reality）→ 复核。最后一步创建管理员，并让 Reality 直接开始监听。
 
-**Client:** account → import (URL/share link/QR) → test → mode. System proxy is
-the recommended first mode; TUN is presented as “global mode” with its
-permission and kill-switch caveats.
+**客户端：** 账号 → 导入（URL/分享链接/二维码）→ 测试 → 模式。推荐先用系统代理；TUN 以“全局模式”呈现，并明确权限和 kill switch 限制。
 
-## Interaction rules
+## 交互规则
 
-- Feedback is immediate: buttons enter pending, success uses a 4s toast, errors
-  persist and can be copied.
-- Forms validate on blur; errors appear next to the field; leaving with unsaved
-  changes prompts.
-- Tables have sticky headers, hover, selection, column/density controls and
-  card layouts on phones. Filters live in the URL.
-- Detail views use a right drawer; confirmations use a dialog; never nest
-  dialogs.
-- Long jobs never block the page. The job drawer is reachable from the topbar.
-- Theme and language changes apply without a reload.
-- Status changes are announced through `aria-live`.
+- 反馈立即出现：按钮进入 pending，成功用 4 秒 toast，错误持续显示并可复制。
+- 表单失焦校验；错误显示在字段旁；有未保存修改时离开会提示。
+- 表格有粘性表头、悬停、选择、列/密度控制，手机上变卡片布局。筛选条件写入 URL。
+- 详情用右侧抽屉；确认用对话框；不要嵌套对话框。
+- 长任务不阻塞页面；任务抽屉可从顶栏打开。
+- 主题和语言切换不需要刷新。
+- 状态变化通过 `aria-live` 播报。
 
-## Keyboard
+## 键盘
 
-`Cmd/Ctrl+K` command palette, `/` focus search, `?` shortcuts, `C` connect on
-client, `G` then `D/U/C/R/L/S` navigate, `Esc` close. All interactive elements
-are reachable by Tab with a 3px focus ring.
+`Cmd/Ctrl+K` 命令面板，`/` 聚焦搜索，`?` 快捷键，客户端 `C` 连接，`G` 后接 `D/U/C/R/L/S` 导航，`Esc` 关闭。所有交互元素可通过 Tab 到达，焦点环 3px。
 
-## Usability test (5 participants)
+## 可用性测试（5 人）
 
-1. Give a fresh Ubuntu VPS and the release assets. Task: install, create one
-   user, open the subscription on a phone. Target ≤15 minutes, no hints.
-2. Give a clean Windows laptop with the installer. Task: import the URL, connect,
-   verify traffic, switch to TUN, disconnect. Target ≤5 minutes.
-3. Observe where participants hesitate; record task success, time, and any
-   accessibility issue. Fix blockers before release.
+1. 给一台全新 Ubuntu VPS 和发布资产。任务：安装、创建一个用户、在手机上打开订阅。目标 ≤15 分钟，不给提示。
+2. 给一台干净 Windows 笔记本和安装包。任务：导入 URL、连接、验证流量、切到 TUN、断开。目标 ≤5 分钟。
+3. 观察参与者卡在哪里；记录任务成功、耗时和可访问性问题。发布前修复阻塞项。
 
-Success threshold: ≥90% task completion; no participant blocked by a bug; all
-serious/critical axe findings fixed.
+成功标准：≥90% 任务完成；没有参与者被 bug 阻塞；所有 serious/critical axe 问题修复。
+
+## 一键安装专项
+
+新增可用性任务：给一台**没有 Python** 的全新 VPS，只提供一行安装命令。目标 ≤8 分钟完成安装并登录。记录：
+
+- 是否理解“默认用户模式”和 `--run-as-root` 的差异；
+- 是否知道如何查看初始密码；
+- 是否能在没有 systemd 的环境选择 `--no-service`。
