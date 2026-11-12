@@ -29,6 +29,8 @@ uv run ostium init --role server --dev --no-input --password 'change-me-now'
 uv run ostium serve
 ```
 
+PyPI distribution name: `ostium-ctl` (the import/CLI remains `ostium`).
+
 Open <http://127.0.0.1:8443>. In a second terminal start the core service:
 
 ```bash
