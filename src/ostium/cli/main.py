@@ -167,44 +167,48 @@ def init(
         from ostium.util.ids import new_password
 
         generated = False
-        async with factory() as session:
-            if await is_initialized(session) and not force:
+        try:
+            async with factory() as session:
+                if await is_initialized(session) and not force:
+                    admin = await get_admin(session)
+                    return (admin.username if admin else "admin"), False
                 admin = await get_admin(session)
-                return (admin.username if admin else "admin"), False
-            admin = await get_admin(session)
-            actual_password = password
-            if admin is None:
-                if not actual_password:
-                    actual_password = new_password(18)
-                    generated = True
-                admin = await create_admin(
-                    session, username=username, password=actual_password, must_change_password=False
-                )
-            elif actual_password:
-                from ostium.services.auth import set_password
+                actual_password = password
+                if admin is None:
+                    if not actual_password:
+                        actual_password = new_password(18)
+                        generated = True
+                    admin = await create_admin(
+                        session,
+                        username=username,
+                        password=actual_password,
+                        must_change_password=False,
+                    )
+                elif actual_password:
+                    from ostium.services.auth import set_password
 
-                await set_password(session, admin, actual_password)
-            if role_value is Role.SERVER:
-                await ensure_inbounds(session, store)
-            await set_setting(session, "initialized", True)
-            await set_setting(
-                session,
-                "server",
-                {
-                    "domain": domain,
-                    "public_host": domain,
-                    "public_ui": settings.public_ui,
-                },
-            )
-            await session.commit()
-            if generated:
-                console.print(
-                    "[bold yellow]Generated administrator password (save it now):[/bold yellow]"
+                    await set_password(session, admin, actual_password)
+                if role_value is Role.SERVER:
+                    await ensure_inbounds(session, store)
+                await set_setting(session, "initialized", True)
+                await set_setting(
+                    session,
+                    "server",
+                    {
+                        "domain": domain,
+                        "public_host": domain,
+                        "public_ui": settings.public_ui,
+                    },
                 )
-                console.print(f"  {actual_password}")
-            return admin.username, generated
-
-        await engine.dispose()
+                await session.commit()
+                if generated:
+                    console.print(
+                        "[bold yellow]Generated administrator password (save it now):[/bold yellow]"
+                    )
+                    console.print(f"  {actual_password}")
+                return admin.username, generated
+        finally:
+            await engine.dispose()
 
     username_value, generated = _run(_init())
     console.print(f"[green]Ostium {role_value.value} initialised[/green] at {settings.data_dir}")
