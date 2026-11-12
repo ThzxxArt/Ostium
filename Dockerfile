@@ -26,7 +26,7 @@ ENV PYTHONUNBUFFERED=1 \
     OSTIUM_PORT=8443 \
     OSTIUM_ENGINE_PATH=/opt/ostium/core/sing-box
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates tini \
+    && apt-get install -y --no-install-recommends ca-certificates curl libcap2-bin tini \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system ostium \
     && useradd --system --gid ostium --home-dir /var/lib/ostium --shell /usr/sbin/nologin ostium

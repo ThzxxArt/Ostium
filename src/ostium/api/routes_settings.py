@@ -26,6 +26,8 @@ class SettingsPatch(BaseModel):
     mixed_port: int | None = Field(default=None, ge=1024, le=65535)
     routing_mode: str | None = None
     trusted_hosts: list[str] | None = None
+    auto_connect: bool | None = None
+    auto_reconnect: bool | None = None
     webhook_url: str | None = None
     webhook_secret: str | None = None
     update_channel: str | None = None
@@ -64,6 +66,8 @@ async def read_settings(
             "mode": services.settings.mode.value,
             "routing_mode": routing_mode,
             "tun_enabled": services.settings.tun_enabled,
+            "auto_connect": services.settings.auto_connect,
+            "auto_reconnect": services.settings.auto_reconnect,
             "public_ui": services.settings.public_ui,
             "domain": server_info.get("domain"),
             "acme_email": services.settings.acme_email,
@@ -106,6 +110,10 @@ async def update_settings(
         services.settings.trusted_hosts = changes["trusted_hosts"]
     if changes.get("routing_mode"):
         await set_setting(session, "routing_mode", changes["routing_mode"])
+    if changes.get("auto_connect") is not None:
+        services.settings.auto_connect = bool(changes["auto_connect"])
+    if changes.get("auto_reconnect") is not None:
+        services.settings.auto_reconnect = bool(changes["auto_reconnect"])
     for key in (
         "webhook_url",
         "update_channel",

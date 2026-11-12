@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -35,7 +36,7 @@ async def overview(
     snapshot = services.stats.snapshot() if services.stats is not None else {}
     engine_status: dict[str, Any] = {}
     try:
-        engine_status = await services.engine.client.status()
+        engine_status = await asyncio.wait_for(services.engine.client.status(), timeout=2.5)
     except Exception:
         engine_status = {"running": False, "last_error": "core service is unreachable"}
     connections = await services.clash.connections()

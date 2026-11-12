@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ostium.config import Settings
 from ostium.db.models import Alert, AuditLog
 from ostium.services.events import EventBus
 from ostium.util.redact import redact, redact_mapping
@@ -70,6 +70,8 @@ async def create_alert(
     code: str,
     message: str,
 ) -> Alert:
+    from ostium.services.settings import get_setting
+
     alert = Alert(level=level, code=code, message=redact(message)[:500])
     session.add(alert)
     await session.flush()
@@ -77,6 +79,16 @@ async def create_alert(
         "alert.created",
         {"id": alert.id, "level": level, "code": code, "message": alert.message},
     )
+    webhook_url = await get_setting(session, "webhook_url")
+    if webhook_url:
+        secret = await get_setting(session, "webhook_secret", "")
+        asyncio.create_task(
+            send_webhook(
+                str(webhook_url),
+                {"type": "alert", "level": level, "code": code, "message": alert.message},
+                str(secret or ""),
+            )
+        )
     return alert
 
 
@@ -107,9 +119,7 @@ def serialize_alert(alert: Alert) -> dict[str, Any]:
     }
 
 
-async def send_webhook(
-    settings: Settings, url: str, payload: dict[str, Any], secret: str = ""
-) -> bool:
+async def send_webhook(url: str, payload: dict[str, Any], secret: str = "") -> bool:
     import hashlib
     import hmac
     import json

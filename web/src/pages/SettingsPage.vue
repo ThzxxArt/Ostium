@@ -56,7 +56,12 @@ const loading = ref(true)
 const saving = ref(false)
 const activeTab = ref('general')
 
-const general = ref({ log_level: 'info', mixed_port: 7890 })
+const general = ref({
+  log_level: 'info',
+  mixed_port: 7890,
+  auto_connect: false,
+  auto_reconnect: true,
+})
 const notifications = ref({ webhook_url: '', webhook_secret: '', enabled: true })
 const maintenance = ref({
   update_channel: 'stable',
@@ -109,7 +114,12 @@ async function load() {
     settings.value = data
     certificates.value = certData.certificates
     backups.value = backupData.backups
-    general.value = { log_level: data.general.log_level, mixed_port: data.general.mixed_port }
+    general.value = {
+      log_level: data.general.log_level,
+      mixed_port: data.general.mixed_port,
+      auto_connect: data.general.auto_connect,
+      auto_reconnect: data.general.auto_reconnect,
+    }
     notifications.value = {
       webhook_url: data.notifications.webhook_url || '',
       webhook_secret: '',
@@ -136,6 +146,8 @@ async function saveGeneral() {
     const result = await api.settings.update({
       log_level: general.value.log_level,
       mixed_port: general.value.mixed_port,
+      auto_connect: general.value.auto_connect,
+      auto_reconnect: general.value.auto_reconnect,
     })
     message.success(t('settings.saved'))
     if (result.restart_required) message.warning(t('settings.restart_hint'))
@@ -435,6 +447,14 @@ onMounted(load)
               <label v-if="!server" class="field">
                 <span>{{ t('settings.mixed_port') }}</span>
                 <NInputNumber v-model:value="general.mixed_port" :min="1024" :max="65535" />
+              </label>
+              <label v-if="!server" class="field row">
+                <NCheckbox v-model:checked="general.auto_connect">{{
+                  t('settings.auto_connect')
+                }}</NCheckbox>
+                <NCheckbox v-model:checked="general.auto_reconnect">{{
+                  t('settings.auto_reconnect')
+                }}</NCheckbox>
               </label>
             </div>
             <template #footer>

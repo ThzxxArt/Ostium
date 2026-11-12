@@ -3,7 +3,7 @@ requires = ["hatchling==1.27.0", "hatch-vcs==0.5.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ostium-art"
+name = "ostium-ctl"
 dynamic = ["version"]
 description = "Ostium — a dual-role personal VPN and universal proxy console"
 readme = "README.md"

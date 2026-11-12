@@ -7,6 +7,7 @@ SemVer.
 
 ### Added
 
+- PyPI distribution `ostium-ctl` (import/CLI remains `ostium`).
 - Dual-role Ostium app (server/client) with one Python package, SPA, CLI and
   installer.
 - `ostium.service` control plane and `ostium-core.service` privileged core

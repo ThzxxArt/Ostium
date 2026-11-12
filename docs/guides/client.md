@@ -26,7 +26,7 @@ Gatekeeper; verify checksums and allow manually.
 
 ```bash
 sudo ./install.sh --role client \
-  --wheel ./ostium_art-0.1.0-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 

@@ -110,3 +110,72 @@ def test_local_one_time_login(
     assert response.status_code == 200
     assert client.get("/api/v1/auth/me").status_code == 200
     assert client.get("/api/v1/auth/local-login?token=bogus").status_code == 401
+
+
+def test_rules_certificates_settings_and_system(api_client: TestClient, session_token: str) -> None:
+    client = api_client
+    headers = _auth(session_token)
+
+    rule = client.post(
+        "/api/v1/rules",
+        json={"action": "direct", "match": {"domain_suffix": [".example.cn"]}, "note": "cn"},
+        headers=headers,
+    )
+    assert rule.status_code == 201, rule.text
+    rule_id = rule.json()["rule"]["id"]
+    assert (
+        client.post(
+            "/api/v1/rules/test", json={"domain": "www.example.cn"}, headers=headers
+        ).json()["rule"]["action"]
+        == "direct"
+    )
+    assert (
+        client.patch(
+            f"/api/v1/rules/{rule_id}", json={"enabled": False}, headers=headers
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/rules/{rule_id}", headers=headers).status_code == 200
+    assert client.get("/api/v1/rule-sets").status_code == 200
+
+    issued = client.post(
+        "/api/v1/certificates/issue",
+        json={"domain": "local.example.com", "method": "self-signed"},
+        headers=headers,
+    )
+    assert issued.status_code == 202, issued.text
+    certificate_id = issued.json()["certificate"]["id"]
+    assert client.get("/api/v1/certificates").status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/certificates/{certificate_id}/use",
+            json={"kinds": ["hysteria2"]},
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.delete(f"/api/v1/certificates/{certificate_id}", headers=headers).status_code == 200
+    )
+
+    settings = client.get("/api/v1/settings").json()
+    assert settings["general"]["role"] == "server"
+    updated = client.patch("/api/v1/settings", json={"log_level": "warning"}, headers=headers)
+    assert updated.status_code == 200
+    token = client.post(
+        "/api/v1/api-tokens", json={"name": "ci", "scopes": ["read"]}, headers=headers
+    )
+    assert token.status_code == 201
+    assert (
+        client.delete(f"/api/v1/api-tokens/{token.json()['id']}", headers=headers).status_code
+        == 200
+    )
+
+    assert client.get("/api/v1/system/info").status_code == 200
+    assert client.get("/api/v1/system/services").status_code == 200
+    assert client.get("/api/v1/system/doctor").status_code == 200
+    assert client.get("/api/v1/system/diagnostics").status_code == 200
+    assert client.get("/api/v1/logs").status_code == 200
+    assert client.get("/api/v1/jobs").status_code == 200
+    assert client.get("/api/v1/alerts").status_code == 200
+    assert client.get("/api/v1/audit").status_code == 200

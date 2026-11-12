@@ -482,6 +482,8 @@ export default {
     traffic_retention: 'Traffic retention (days)',
     auto_backup: 'Daily automatic backup',
     backups: 'Backups',
+    auto_connect: 'Auto-connect on start',
+    auto_reconnect: 'Reconnect automatically',
     api_tokens: 'API tokens',
     new_token: 'Create token',
     token_name: 'Token name',

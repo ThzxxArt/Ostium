@@ -285,6 +285,8 @@ export interface AppSettings {
     routing_mode: string
     mode: ConnectionMode
     tun_enabled: boolean
+    auto_connect: boolean
+    auto_reconnect: boolean
     public_ui: boolean
     domain: string | null
     acme_email: string | null

@@ -9,7 +9,7 @@ platform/external validation, `[ ]` not done yet.
 
 ### Backend and data plane
 
-- [x] Python 3.13 package `ostium-art`, import/CLI `ostium`, GPL-3.0-or-later.
+- [x] Python 3.13 package `ostium-ctl`, import/CLI `ostium`, GPL-3.0-or-later.
 - [x] FastAPI control plane with lifespan-managed SQLAlchemy/aiosqlite engine.
 - [x] SQLite schema, WAL/foreign keys, Alembic initial migration, create/stamp
       bootstrap.
@@ -27,9 +27,12 @@ platform/external validation, `[ ]` not done yet.
 - [x] Real sing-box 1.14.4 config checks and a local Reality loopback traffic
       test (curl → client mixed → server Reality → example.com).
 - [x] Users, credentials, quotas, expiry, subscription tokens, token rotation.
-- [~] V2Ray per-user stats client/collector, epoch reset, daily flush, quota
-      enforcement (logic tested with a fake gRPC source; custom core build not
-      compiled in this environment).
+- [x] Custom `with_v2ray_api` core built with Go 1.25.5 (version
+      `1.14.4-ostium.1`); gRPC per-user counters verified live
+      (`alice: (5679, 19387)` after test traffic) and Clash API verified.
+- [~] V2Ray stats collector epoch/quota logic (green against the custom core
+      manually and with a fake gRPC source in tests; a live collector integration
+      test is still to add).
 - [x] Four subscription formats + QR + share URIs + public rate limiting.
 - [x] ACME HTTP-01 client (account key, order, challenge server, CSR, finalize)
       and self-signed/manual certificate storage; live ACME not run here.
@@ -63,8 +66,9 @@ platform/external validation, `[ ]` not done yet.
 - [x] Lazy-loaded ECharts chart wrapper to keep echarts out of the initial
       render path.
 - [x] Responsive breakpoints and reduced-motion handling.
-- [~] Browser notifications and service-worker update prompt are not wired into
-      the UI yet (API/PWA foundation exists).
+- [~] Browser notifications and PWA update prompt are wired; notification
+      permission is opt-in from Settings. Browser/platform fallbacks need a
+      real-device pass.
 - [~] Visual regression baselines are configured but not generated; axe smoke
       is present in Playwright spec.
 
@@ -87,11 +91,15 @@ platform/external validation, `[ ]` not done yet.
 - `ruff check` / `ruff format --check`: pass.
 - `mypy src/ostium` strict: pass (generated protobuf and platform-only proxy
   modules excluded/ignored).
-- `pytest`: 37 passed locally, including real sing-box config checks and core
-  apply/stop. Integration tests skip if no core binary.
+- `pytest`: 69 passed locally, including real sing-box config checks, core
+  apply/stop, custom-core V2Ray gRPC smoke, certificates, jobs, auth, backups,
+  stats, client profiles, rules, ACME challenge server and API flows.
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass locally.
-- Coverage: approximately 45% overall; below the PLAN gate (core/services 85%,
-  overall 70%). Additional tests are required before release.
+- Playwright smoke tests pass on desktop 1440, tablet 1024 and mobile Pixel 7;
+  login, dashboard, command palette, axe smoke and horizontal-overflow checks
+  pass. Visual baselines are not committed yet.
+- Coverage: 62% overall; below the PLAN gate (core/services 85%, overall 70%).
+  Additional tests are required before release.
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS
   system proxy, 72h soak, usability tests and installer-on-fresh-VM are not
   run in this environment.
@@ -102,8 +110,8 @@ platform/external validation, `[ ]` not done yet.
   `typescript/lib/tsc` path). v0.1.0 uses TypeScript 6.0.3 and vue-tsc 3.3.14.
   See `docs/adr/0001-typescript-6.md`.
 - The official sing-box 1.14.4 release lacks `with_v2ray_api`; per-user stats
-  require `scripts/build-core.sh`. All other protocols/TUN are tested with the
-  official binary.
+  require `scripts/build-core.sh`. The custom build was compiled and its gRPC
+  stats were verified locally with two test users and live traffic.
 - Default smart routing uses an offline curated domain-suffix list, not remote
   GeoIP/GeoSite downloads, so first start does not depend on GitHub reachability.
   Users can add remote rule sets explicitly.
@@ -112,10 +120,9 @@ platform/external validation, `[ ]` not done yet.
 
 ## Release blockers still open
 
-- [ ] Raise coverage to the PLAN gate and add ACME/certificate/profile/auth/jobs
-      tests.
-- [ ] Compile the custom `with_v2ray_api` core and verify per-user stats against
-      a real gRPC endpoint.
+- [ ] Raise coverage to the PLAN gate and add ACME/certificate/profile/auth/jobs/
+      CLI/system-proxy branch tests.
+- [ ] Add a live collector integration test (custom core + collector quota tick).
 - [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14.
 - [ ] Run ACME staging and one production issuance on the Hong Kong server.
 - [ ] Run a fresh Ubuntu 24.04 installer test and a backup/restore/upgrade drill.

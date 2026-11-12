@@ -2,7 +2,7 @@
 # Ostium release installer for Linux server and client.
 #
 # Usage:
-#   sudo ./install.sh --role server --wheel ./ostium_art-0.1.0-py3-none-any.whl \
+#   sudo ./install.sh --role server --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
 #        --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz --domain vpn.example.com
 #   sudo ./install.sh --role client --wheel ... --core ...
 set -euo pipefail
@@ -24,7 +24,7 @@ usage() {
   cat <<'EOF'
 Ostium installer options:
   --role server|client       Role for this machine (default: server)
-  --wheel PATH               Path to ostium_art-*.whl
+  --wheel PATH               Path to ostium_ctl-*.whl
   --core PATH                Path to ostium-core-*.tar.gz
   --domain DOMAIN            Server domain (optional for Reality)
   --public-ui                Expose the server admin UI publicly (TLS + TOTP required later)
@@ -56,7 +56,7 @@ if [[ "$ROLE" != "server" && "$ROLE" != "client" ]]; then
   exit 2
 fi
 if [[ -z "$WHEEL" || ! -f "$WHEEL" ]]; then
-  echo "provide --wheel /path/to/ostium_art-*.whl" >&2
+  echo "provide --wheel /path/to/ostium_ctl-*.whl" >&2
   exit 2
 fi
 if [[ -z "$CORE" || ! -f "$CORE" ]]; then
@@ -70,7 +70,22 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 if command -v apt-get >/dev/null; then
   apt-get update
-  apt-get install -y --no-install-recommends python3.13 python3.13-venv ca-certificates curl tar
+  apt-get install -y --no-install-recommends python3.13 python3.13-venv ca-certificates curl tar || true
+fi
+
+PYTHON_BIN="$(command -v python3.13 || true)"
+if [[ -z "$PYTHON_BIN" ]]; then
+  if ! command -v uv >/dev/null; then
+    install -d -m 0755 "$PREFIX/uv"
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$PREFIX/uv" sh
+  fi
+  UV_BIN="$(command -v uv || echo "$PREFIX/uv/uv")"
+  "$UV_BIN" python install 3.13
+  PYTHON_BIN="$("$UV_BIN" python find 3.13)"
+fi
+if [[ -z "$PYTHON_BIN" || ! -x "$PYTHON_BIN" ]]; then
+  echo "Python 3.13 is required; install python3.13 or uv first" >&2
+  exit 1
 fi
 
 if [[ "$ROLE" == "server" ]]; then
@@ -87,7 +102,7 @@ else
 fi
 
 install -d -m 0755 "$PREFIX"
-python3.13 -m venv "$PREFIX/venv"
+"$PYTHON_BIN" -m venv "$PREFIX/venv"
 "$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
 "$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
 

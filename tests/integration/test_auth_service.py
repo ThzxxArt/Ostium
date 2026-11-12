@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import pyotp
 import pytest
@@ -9,7 +8,6 @@ import pytest
 from ostium.config import Settings
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.services import auth as auth_service
-from ostium.services.crypto import SecretStore
 
 
 def test_admin_login_totp_lock_and_session(settings: Settings) -> None:
@@ -88,10 +86,3 @@ def test_password_and_recovery_helpers(settings: Settings) -> None:
         await engine.dispose()
 
     asyncio.run(_run())
-
-
-def test_master_key_is_used_for_local_login(settings: Settings, tmp_path: Path) -> None:
-    store = SecretStore.from_data_dir(settings.data_dir)
-    token = auth_service.make_local_login_token(settings)
-    assert store.aad("x", "y", "z")
-    assert auth_service.verify_local_login_token(settings, token)

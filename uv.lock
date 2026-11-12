@@ -1486,7 +1486,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ostium-art"
+name = "ostium-ctl"
 source = { editable = "." }
 dependencies = [
     { name = "acme" },

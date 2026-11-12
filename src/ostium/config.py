@@ -144,6 +144,8 @@ class Settings(BaseModel):
     tun_enabled: bool = False
     tun_interface: str = "ostium0"
     proxy_ports: list[int] = Field(default_factory=lambda: [443, 8388])
+    auto_connect: bool = False
+    auto_reconnect: bool = True
     dev: bool = False
 
     @field_validator("log_level")
@@ -204,6 +206,8 @@ class Settings(BaseModel):
             "tun_enabled": self.tun_enabled,
             "tun_interface": self.tun_interface,
             "proxy_ports": self.proxy_ports,
+            "auto_connect": self.auto_connect,
+            "auto_reconnect": self.auto_reconnect,
             "dev": self.dev,
         }
         payload = {key: value for key, value in payload.items() if value is not None}
@@ -271,6 +275,8 @@ class Settings(BaseModel):
             "tun_enabled": raw.get("tun_enabled", False),
             "tun_interface": raw.get("tun_interface", "ostium0"),
             "proxy_ports": raw.get("proxy_ports", [443, 8388]),
+            "auto_connect": raw.get("auto_connect", False),
+            "auto_reconnect": raw.get("auto_reconnect", True),
             "dev": raw.get("dev", False),
         }
         env_map: dict[str, tuple[str, Any]] = {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
@@ -55,9 +56,9 @@ async def info(
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage(str(services.settings.data_dir))
     try:
-        core = await services.engine.client.status()
+        core = await asyncio.wait_for(services.engine.client.status(), timeout=2.5)
     except Exception as exc:
-        core = {"running": False, "last_error": str(exc)}
+        core = {"running": False, "last_error": str(exc) or "core service is unreachable"}
     return {
         "app": {"name": "Ostium", "version": __version__, "role": services.settings.role.value},
         "host": {
@@ -288,7 +289,12 @@ async def connect(
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "connect is a client action", "role_mismatch")
-    result = await services.engine.apply_client(session)
+    try:
+        result = await services.engine.apply_client(session)
+    except Exception as exc:
+        code = getattr(exc, "code", "engine_error")
+        status = getattr(exc, "status_code", 502)
+        raise ApiError(status, str(exc), code) from exc
     await audit(session, actor=admin.username, action="client.connect", ip=client_ip(request))
     return {"connected": True, "status": result.get("status")}
 

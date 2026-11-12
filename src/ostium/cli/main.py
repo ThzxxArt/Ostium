@@ -484,10 +484,13 @@ def update(check: bool = typer.Option(False, "--check")) -> None:
 
 @app.command("diagnostics")
 def diagnostics_export(
+    action: str = typer.Argument("export", help="export"),
     output: Path = typer.Option(Path("ostium-diagnostics.tar.gz"), "--output"),
 ) -> None:
     """Export a redacted diagnostics bundle."""
 
+    if action != "export":
+        _fail("only the 'export' action is supported", 2)
     settings = _load_settings()
     from ostium.util.time import iso, utcnow
 
@@ -1007,15 +1010,66 @@ def core_install(
     binary: Path | None = typer.Option(None, "--binary", help="Path to a sing-box binary"),
     url: str | None = typer.Option(None, "--url"),
     sha256: str | None = typer.Option(None, "--sha256"),
+    manifest: str | None = typer.Option(
+        None, "--manifest", help="Manifest file or URL from an Ostium release"
+    ),
+    version: str | None = typer.Option(None, "--version", help="Pin a manifest version"),
 ) -> None:
-    """Install the core binary (copy or verified download)."""
+    """Install the core binary (copy, verified download, or release manifest)."""
 
     import hashlib
+    import tempfile
 
     settings = _load_settings()
     target = settings.paths.engine_binary
     target.parent.mkdir(parents=True, exist_ok=True)
-    if binary:
+    if manifest:
+        try:
+            if manifest.startswith(("http://", "https://")):
+                response = httpx.get(manifest, timeout=30, follow_redirects=True, trust_env=False)
+                response.raise_for_status()
+                data = response.json()
+            else:
+                data = json.loads(Path(manifest).read_text(encoding="utf-8"))
+        except Exception as exc:
+            _fail(f"could not read core manifest: {exc}", 6)
+        os_name = {"Linux": "linux", "Darwin": "darwin", "Windows": "windows"}.get(
+            platform.system(), platform.system().lower()
+        )
+        machine = platform.machine().lower()
+        arch = "arm64" if machine in {"aarch64", "arm64"} else "amd64"
+        candidates = [
+            item
+            for item in data.get("artifacts", [])
+            if item.get("os") == os_name and item.get("arch") == arch
+        ]
+        if version:
+            candidates = [item for item in candidates if item.get("version") == version]
+        if not candidates:
+            _fail(f"no core artifact for {os_name}/{arch} in the manifest", 6)
+        artifact = sorted(candidates, key=lambda item: str(item.get("version")))[-1]
+        response = httpx.get(
+            str(artifact["url"]), timeout=180, follow_redirects=True, trust_env=False
+        )
+        response.raise_for_status()
+        digest = hashlib.sha256(response.content).hexdigest()
+        if digest != artifact["sha256"]:
+            _fail("SHA256 mismatch; refusing to install", 6)
+        with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
+            archive_path = Path(temp) / "core.tar.gz"
+            archive_path.write_bytes(response.content)
+            with tarfile.open(archive_path, "r:gz") as archive:
+                member = next(
+                    (item for item in archive.getmembers() if item.name.endswith("sing-box")),
+                    None,
+                )
+                if member is None:
+                    _fail("manifest archive does not contain sing-box", 6)
+                assert member is not None
+                member.name = "sing-box"
+                archive.extract(member, Path(temp), filter="data")
+            shutil.copy2(Path(temp) / "sing-box", target)
+    elif binary:
         shutil.copy2(binary, target)
     elif url:
         response = httpx.get(url, timeout=120, follow_redirects=True, trust_env=False)
@@ -1024,10 +1078,23 @@ def core_install(
             _fail("SHA256 mismatch; refusing to install", 6)
         target.write_bytes(response.content)
     else:
-        _fail("provide --binary or --url", 2)
+        _fail("provide --binary, --url or --manifest", 2)
     if os.name == "posix":
         target.chmod(0o755)
     console.print(f"installed core at {target}")
+
+
+@core_app.command("update")
+def core_update(
+    manifest: str = typer.Option(
+        "https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json",
+        "--manifest",
+    ),
+    version: str | None = typer.Option(None, "--version"),
+) -> None:
+    """Install the latest pinned core from the release manifest."""
+
+    core_install(None, None, None, manifest, version)
 
 
 # --------------------------------------------------------------------------- backup

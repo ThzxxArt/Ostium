@@ -52,6 +52,33 @@ def api_client(settings: Settings) -> TestClient:
         yield client
 
 
+@pytest.fixture
+def client_settings(tmp_path: Path) -> Settings:
+    data = tmp_path / "client-data"
+    value = Settings(
+        role=Role.CLIENT,
+        host="127.0.0.1",
+        port=18444,
+        data_dir=data,
+        config_dir=tmp_path / "client-config",
+        state_dir=tmp_path / "client-state",
+        core_token_file=data / "runtime" / "core.token",
+        engine_path="/tmp/opencode/sing-box",
+        dev=True,
+        log_level="warning",
+    )
+    value.paths.ensure()
+    value.save()
+    return value
+
+
+@pytest.fixture
+def client_api(client_settings: Settings) -> TestClient:
+    app = build_app(client_settings)
+    with TestClient(app) as client:
+        yield client
+
+
 def csrf(client: TestClient) -> str:
     response = client.get("/api/v1/auth/csrf")
     assert response.status_code == 200
@@ -63,12 +90,13 @@ def setup_admin(
     username: str = "admin",
     password: str = "verysecret123",
     domain: str = "example.com",
+    role: str = "server",
 ) -> str:
     token = csrf(client)
     response = client.post(
         "/api/v1/setup",
         json={
-            "role": "server",
+            "role": role,
             "username": username,
             "password": password,
             "domain": domain,

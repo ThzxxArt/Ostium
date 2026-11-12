@@ -20,7 +20,7 @@ class CoreApiError(Exception):
 
 
 class CoreClient:
-    def __init__(self, settings: Settings, *, timeout: float = 30.0) -> None:
+    def __init__(self, settings: Settings, *, timeout: float = 5.0) -> None:
         self.settings = settings
         self.base_url = settings.core_url.rstrip("/")
         self.token_file: Path = settings.core_token_file
@@ -33,7 +33,9 @@ class CoreClient:
         return {"Authorization": f"Bearer {self._token()}", "Accept": "application/json"}
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout, connect=1.5), trust_env=False
+        ) as client:
             try:
                 response = await client.request(
                     method,
@@ -59,7 +61,9 @@ class CoreClient:
         return response.text
 
     async def health(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(2.0, connect=0.8), trust_env=False
+        ) as client:
             try:
                 response = await client.get(f"{self.base_url}/v1/health")
                 response.raise_for_status()

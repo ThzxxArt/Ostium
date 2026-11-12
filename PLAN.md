@@ -5,7 +5,7 @@
 > 作者：苏浅玥（Cynthia）  
 > 状态：已锁定，进入实施  
 > 仓库：<https://github.com/ThzxxArt/Ostium>  
-> PyPI 分发名：`ostium-art`  
+> PyPI 分发名：`ostium-ctl`  
 > Python 导入名 / CLI：`ostium`  
 > 数据面：sing-box v1.14.4 + Ostium 定制构建（`with_v2ray_api`）
 
@@ -38,7 +38,7 @@ Ostium 是一个 **Python 3.13 + FastAPI + Vue 3** 编写的双端一体私人�
 | 项目 | 锁定值 |
 |---|---|
 | GitHub 仓库 | `ThzxxArt/Ostium` |
-| PyPI 分发名 | `ostium-art`（已确认可用） |
+| PyPI 分发名 | `ostium-ctl`（已确认可用） |
 | Python 导入名 | `ostium` |
 | CLI 命令 | `ostium` |
 | 服务名 | `ostium.service`、`ostium-core.service` |
@@ -1408,7 +1408,7 @@ Ostium/
 
 **发布物：**
 
-- `ostium_art-0.1.0-py3-none-any.whl`
+- `ostium_ctl-0.1.0-py3-none-any.whl`
 - `Ostium-0.1.0-windows-x64-setup.exe`
 - `Ostium-0.1.0-macos-arm64.dmg`、`Ostium-0.1.0-macos-x64.dmg`
 - `Ostium-0.1.0-linux-x64.deb`、`Ostium-0.1.0-linux-arm64.deb`
@@ -1416,7 +1416,7 @@ Ostium/
 - `ostium-core-1.14.4-ostium.1-<os>-<arch>.tar.gz`（五个平台）
 - `ghcr.io/thzxxart/ostium:0.1.0`（amd64/arm64）
 - `SHA256SUMS`、SBOM、Sigstore/attestation
-- PyPI `ostium-art==0.1.0`
+- PyPI `ostium-ctl==0.1.0`
 
 **发布门禁：**
 

@@ -84,6 +84,15 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 with contextlib.suppress(Exception):
                     await ensure_inbounds(session, store)
                     await session.commit()
+        elif settings.auto_connect:
+            try:
+                async with factory() as session:
+                    await engine_manager.apply_client(
+                        session, mode=settings.mode.value, tun_enabled=settings.tun_enabled
+                    )
+                bus.log("info", "auto-connect applied the active client profile")
+            except Exception as exc:
+                bus.log("warning", "auto-connect skipped", error=str(exc))
         with contextlib.suppress(Exception):
             services.proxy.recover_if_stale()
         if stats is not None:

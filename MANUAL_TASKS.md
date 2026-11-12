@@ -68,7 +68,7 @@ hardware or accounts.
 
 - [ ] Create the GitHub repository `ThzxxArt/Ostium` and push the implementation
       (requires explicit approval).
-- [ ] Configure PyPI Trusted Publishing for `ostium-art`, GHCR permissions and
+- [ ] Configure PyPI Trusted Publishing for `ostium-ctl`, GHCR permissions and
       GitHub release signing/attestation.
 - [ ] Decide whether to buy a Windows code-signing certificate and Apple
       Developer ID/notarization (optional per PLAN).

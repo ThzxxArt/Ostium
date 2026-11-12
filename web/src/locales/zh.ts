@@ -478,6 +478,8 @@ export default {
     traffic_retention: '流量保留天数',
     auto_backup: '每日自动备份',
     backups: '备份',
+    auto_connect: '启动时自动连接',
+    auto_reconnect: '断线后自动重连',
     api_tokens: 'API Token',
     new_token: '创建 Token',
     token_name: 'Token 名称',

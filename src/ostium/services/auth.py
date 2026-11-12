@@ -275,13 +275,13 @@ def new_id_for_tests() -> str:
     return new_id()
 
 
-LOCAL_LOGIN_TTL = 60
+LOCAL_LOGIN_TTL = 300
 
 
 def make_local_login_token(settings: Settings) -> str:
     """Create a short-lived signed token for ``ostium open``.
 
-    The token is bound to the master key, valid for 60 seconds and only used
+    The token is bound to the master key, valid for five minutes and only used
     from the local CLI.  It is a GET-only convenience; no admin password is
     embedded.
     """
