@@ -365,6 +365,7 @@ clean venv install + ostium init + ostium serve      -> Ostium 0.1.0; /healthz 2
 - **真实 TUN/系统代理/ACME/72h soak/5 用户可用性**：仍属外部环境。
 - **数据库升级**：当前 `create_schema` 是 `create_all + stamp`，v0.1.0 只有初始迁移；后续版本若新增 Alembic 迁移，需要补“已有库执行 upgrade”路径，本轮未虚构已验证。
 - **macOS DMG**：`build-macos.sh` 存在，但 Release workflow 未构建/上传 DMG；已把升级文档中“使用新版 DMG”改为重新运行安装器，避免误导。
+- **npm dev toolchain advisories**：`npm audit --omit=dev` 为 0；完整 `npm audit` 有 16 个 low/moderate（`deepmerge`、`glob`、`js-beautify` 等开发依赖），无 high/critical。`npm audit --audit-level=high` 门禁通过；`npm audit fix --force` 会引入 `vite-plugin-pwa`/`@vue/test-utils` 破坏性升级，本轮未强行升级。
 - **Windows 卸载脚本**：Inno 卸载与脚本删除目录的交互未实机验证；已避免安装阶段自复制错误。
 
 ### 12.4 本轮验证证据

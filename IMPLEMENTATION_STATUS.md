@@ -109,7 +109,9 @@ platform/external validation, `[ ]` not done yet.
 - Playwright: 18 passed on desktop 1440, tablet 1024 and mobile 390; login,
   dashboard, command palette, axe smoke, no-horizontal-scroll and six dark/light
   visual baselines pass.
-- `pip-audit` and `npm audit`: no known vulnerabilities.
+- `pip-audit` and production `npm audit`: 0 known vulnerabilities. The dev
+  toolchain reports 16 low/moderate advisories (no high/critical); CI keeps the
+  `--audit-level=high` gate.
 - `mkdocs build --strict`, `shellcheck`, clean-wheel install and serve smoke:
   pass.
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS

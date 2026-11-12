@@ -766,7 +766,7 @@ npx playwright test
 - 后端：**391 passed / 0 skipped**（385 个常规测试 + 6 个真实核心集成测试），语句 **98.34%**、分支 **95.79%**；
 - 前端：**133 passed**，语句 **91.46%**、分支 **85.43%**、函数 **89.14%**、行 **92.17%**；
 - Playwright：**18 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线和 axe 登录页检查；
-- `pip-audit` / `npm audit`：0 已知漏洞；
+- `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链有 16 个 low/moderate 告警，无 high/critical，`--audit-level=high` 门禁通过；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。
 
 ---

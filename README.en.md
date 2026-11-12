@@ -802,7 +802,7 @@ Current results:
   **89.14%** functions / **92.17%** lines.
 - Playwright: **18 passed**, covering 1440/1024/390, dark/light visual baselines and an axe login
   check.
-- `pip-audit` / `npm audit`: 0 known vulnerabilities.
+- `pip-audit` / production `npm audit`: 0 known vulnerabilities. The dev toolchain has 16 low/moderate advisories and no high/critical; the `--audit-level=high` gate passes.
 - Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).
 
 ---
