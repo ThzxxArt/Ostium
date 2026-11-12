@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NModal, NRadio, NRadioGroup, useDialog, useMessage } from 'naive-ui'
-import { Check, Link2, Plus, RefreshCw, ScanLine, Trash2, Waypoints } from 'lucide-vue-next'
+import { Check, Link2, Plus, RefreshCw, ScanLine, Trash2, Waypoints } from '@lucide/vue'
 import jsQR from 'jsqr'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OStatusPill from '@/components/OStatusPill.vue'

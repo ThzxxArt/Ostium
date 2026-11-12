@@ -15,7 +15,7 @@ import {
   Sun,
   Users,
   Keyboard,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api'

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NModal, NProgress, useMessage } from 'naive-ui'
-import { Ban, CheckCircle2, CircleX, LoaderCircle, RefreshCw, XCircle } from 'lucide-vue-next'
+import { Ban, CheckCircle2, CircleX, LoaderCircle, RefreshCw, XCircle } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'

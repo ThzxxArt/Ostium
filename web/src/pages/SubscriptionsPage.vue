@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, useDialog, useMessage } from 'naive-ui'
-import { Link2, QrCode, RefreshCw, RotateCcw, Search, ShieldAlert } from 'lucide-vue-next'
+import { Link2, QrCode, RefreshCw, RotateCcw, Search, ShieldAlert } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import OCopyButton from '@/components/OCopyButton.vue'

@@ -12,7 +12,7 @@ import {
   ShieldQuestion,
   Waypoints,
   Zap,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OCopyButton from '@/components/OCopyButton.vue'
 import OStatusPill from '@/components/OStatusPill.vue'

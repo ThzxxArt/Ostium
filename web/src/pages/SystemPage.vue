@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Stethoscope,
   Terminal,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OStatCard from '@/components/OStatCard.vue'

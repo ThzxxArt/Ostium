@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   Waypoints,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OBrandMark from '@/components/OBrandMark.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'

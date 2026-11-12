@@ -79,7 +79,7 @@ self.addEventListener('message', (event) => {
  * Small replacement for vite-plugin-pwa/workbox.  It emits a deterministic
  * precache service worker after Vite has written the bundle; no third-party
  * runtime or build dependency is involved.
- */export function ostiumPwa(): Plugin {
+ */ export function ostiumPwa(): Plugin {
   let outDir = 'dist'
   return {
     name: 'ostium-pwa',

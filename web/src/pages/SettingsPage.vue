@@ -28,7 +28,7 @@ import {
   Sun,
   Trash2,
   Wrench,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OStatusPill from '@/components/OStatusPill.vue'

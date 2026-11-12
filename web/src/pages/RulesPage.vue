@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
-import { Ban, Compass, Database, Plus, RefreshCw, Route, Trash2, Zap } from 'lucide-vue-next'
+import { Ban, Compass, Database, Plus, RefreshCw, Route, Trash2, Zap } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OEmptyState from '@/components/OEmptyState.vue'

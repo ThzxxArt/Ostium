@@ -14,7 +14,7 @@ import {
   Sparkles,
   Trash2,
   Zap,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OEmptyState from '@/components/OEmptyState.vue'

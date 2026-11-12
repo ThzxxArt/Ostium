@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { NDrawer, NDrawerContent, NProgress, NSpin, NButton } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { Ban, CheckCircle2, CircleX, ListChecks, LoaderCircle } from 'lucide-vue-next'
+import { Ban, CheckCircle2, CircleX, ListChecks, LoaderCircle } from '@lucide/vue'
 import { api } from '@/api'
 import type { Job } from '@/api/types'
 import OStatusPill from './OStatusPill.vue'

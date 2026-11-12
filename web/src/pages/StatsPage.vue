@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NSelect } from 'naive-ui'
-import { Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, RefreshCw } from 'lucide-vue-next'
+import { Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, RefreshCw } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OStatCard from '@/components/OStatCard.vue'
 import OSectionCard from '@/components/OSectionCard.vue'

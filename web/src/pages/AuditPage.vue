@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput } from 'naive-ui'
-import { FileClock, RefreshCw, Search } from 'lucide-vue-next'
+import { FileClock, RefreshCw, Search } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import OErrorState from '@/components/OErrorState.vue'

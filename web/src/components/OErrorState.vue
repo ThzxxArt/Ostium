@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, RotateCw } from 'lucide-vue-next'
+import { AlertTriangle, RotateCw } from '@lucide/vue'
 import { NButton } from 'naive-ui'
 
 defineProps<{

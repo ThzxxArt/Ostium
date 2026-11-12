@@ -23,7 +23,7 @@ import {
   PanelLeftOpen,
   Search,
   Sun,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OBrandMark from '@/components/OBrandMark.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import { clientNav, clientQuickNav, serverNav } from '@/router/nav'

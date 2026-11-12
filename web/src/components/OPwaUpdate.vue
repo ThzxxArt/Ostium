@@ -2,7 +2,7 @@
 import { useRegisterSW } from '@/composables/usePwa'
 import { NButton } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { RefreshCw, X } from 'lucide-vue-next'
+import { RefreshCw, X } from '@lucide/vue'
 import { ref } from 'vue'
 
 const { needRefresh, updateServiceWorker } = useRegisterSW()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CircleCheck, CircleAlert, CircleX, CircleDot, LoaderCircle } from 'lucide-vue-next'
+import { CircleCheck, CircleAlert, CircleX, CircleDot, LoaderCircle } from '@lucide/vue'
 import { statusTone } from '@/utils/format'
 
 const props = withDefaults(

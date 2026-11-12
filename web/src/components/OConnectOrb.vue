@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Power } from 'lucide-vue-next'
+import { Power } from '@lucide/vue'
 
 const props = withDefaults(
   defineProps<{

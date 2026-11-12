@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NSelect, NSwitch } from 'naive-ui'
-import { Download, Pause, Play, RefreshCw, Search, Terminal, Trash2 } from 'lucide-vue-next'
+import { Download, Pause, Play, RefreshCw, Search, Terminal, Trash2 } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import { api } from '@/api'

@@ -13,7 +13,7 @@ import {
   Stethoscope,
   Waypoints,
   Wifi,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OConnectOrb from '@/components/OConnectOrb.vue'
 import OStatusPill from '@/components/OStatusPill.vue'

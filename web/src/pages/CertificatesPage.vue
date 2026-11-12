@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   Trash2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'

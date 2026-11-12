@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NSwitch, useMessage } from 'naive-ui'
-import { Ban, Cable, Pause, Play, RefreshCw, Search, XCircle } from 'lucide-vue-next'
+import { Ban, Cable, Pause, Play, RefreshCw, Search, XCircle } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import { api } from '@/api'

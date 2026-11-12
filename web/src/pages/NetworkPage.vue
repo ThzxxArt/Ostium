@@ -2,16 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NSwitch, useMessage } from 'naive-ui'
-import {
-  Check,
-  Globe2,
-  Info,
-  Router,
-  ShieldCheck,
-  Terminal,
-  Waypoints,
-  Wifi,
-} from 'lucide-vue-next'
+import { Check, Globe2, Info, Router, ShieldCheck, Terminal, Waypoints, Wifi } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OStatusPill from '@/components/OStatusPill.vue'

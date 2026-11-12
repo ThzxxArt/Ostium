@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Component } from 'vue'
-import { Inbox } from 'lucide-vue-next'
+import { Inbox } from '@lucide/vue'
 
 const props = withDefaults(
   defineProps<{
