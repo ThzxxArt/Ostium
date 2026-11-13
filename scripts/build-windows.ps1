@@ -26,6 +26,7 @@ Pop-Location
 # a shallow checkout that has no tags.
 $env:SETUPTOOLS_SCM_PRETEND_VERSION = $Version
 uv sync
+New-Item -ItemType Directory -Force -Path "dist\core" | Out-Null
 if ($CoreBinary) {
     Copy-IfDifferent $CoreBinary "dist\core\sing-box.exe"
 }
