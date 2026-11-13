@@ -245,7 +245,7 @@ sums_asset() {
       }
     }
     END { if (fallback != "") print fallback }
-  ' "$2")"
+  ' "$3")"
   printf '%s' "$value"
 }
 
