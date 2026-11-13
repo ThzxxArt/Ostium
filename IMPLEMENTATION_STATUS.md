@@ -78,6 +78,10 @@ platform/external validation, `[ ]` not done yet.
       recovery-code login, Allow LAN rollback, installer upgrade rollback,
       Windows/macOS installer paths, Docker SPA assets, core manifest URLs and
       CI action versions (see `AUDIT_REPORT.md` §12).
+- [x] Third audit fixed Allow LAN through the core validator, the broken Linux
+      upgrade shebangs, Windows service packaging/SYSTEM config boundaries,
+      PyPI staging, Unicode subscription filenames, PWA content hashing,
+      TUN/Allow LAN exclusion and Windows PAC restoration (see §13).
 
 ### Packaging, CI and docs
 
@@ -95,7 +99,7 @@ platform/external validation, `[ ]` not done yet.
 
 ## Test status
 
-- `ruff check` / `ruff format --check`: pass (134 files).
+- `ruff check` / `ruff format --check`: pass (136 files).
 - `mypy src/ostium` strict: pass (69 source files).
 - `pytest`: 400 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
