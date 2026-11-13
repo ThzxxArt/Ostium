@@ -443,10 +443,12 @@ shellcheck + bash -n                                  -> PASS
 | 客户端隔离 | 核心/UI 配置分离；`core-run` 在 `runtime/core.token` 生成令牌，`/v1/status` 鉴权 200 |
 | 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、权限按 job 收窄 |
 | 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、394 非集成后端测试、wheel 含 SPA 全部通过（基线 `9886352`） |
+| GitHub Actions | `cbf9b70`：CI 43342090358、E2E 43342090301、Security 43342090359、Docs 43342090287 全部 success |
 
 ### 13.4 仍未验证 / 外部阻塞
 
-- **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。未经用户批准，本轮没有 push、tag 或发布。
+- **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。本轮已按爸爸批准 **push 代码到 `main`**；没有 tag 或发布。
+- 推送后的 GitHub Actions 在 `cbf9b70` 全部通过：CI `43342090358`、E2E `43342090301`、Security `43342090359`、Docs `43342090287`。
 - **Windows**：未在 Windows runner/实机执行 PyInstaller one-dir、Inno 安装/卸载、服务启动、TUN/Wintun、PAC 恢复；PowerShell 只做了解析和静态检查。R3-03/R3-05 的运行时行为必须实机确认。
 - **macOS**：launchd、`ostium` 组、token 权限、UI 以用户启动、Gatekeeper/签名未实机验证。
 - **Linux TUN/系统代理**：需要真实 `/dev/net/tun`、NetworkManager/GNOME/KDE 会话；本轮只验证代码和配置。
