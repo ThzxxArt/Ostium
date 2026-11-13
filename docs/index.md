@@ -20,16 +20,18 @@ Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包
 - [API 参考](reference/api.md)
 - [设计系统](design-system.md)
 - [安全模型](security/threat-model.md)
+- [安全公告：默认管理面绑定](security/advisory-2026-11-default-bind.md)
 
-## v0.1.0 范围
+## v0.1.1 范围
 
 锁定范围见 [`PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/PLAN.md)：
 
 - 服务端：Reality、Hysteria2、Trojan、Shadowsocks 2022
 - 每用户配额、到期禁用、流量统计
-- ACME HTTP-01、手动证书、自签证书
-- 四种订阅格式、分享链接、二维码
+- ACME HTTP-01、手动证书、自签证书、按 inbound 分配证书
+- 四种订阅格式、分享链接、二维码、public base URL
 - 客户端：混合代理、系统代理、TUN、URLTest、多订阅
-- 完整 Web UI、CLI、Docker、安装器、测试与发布门禁
+- 完整 Web UI、CLI、Docker、Windows setup、macOS DMG、DEB/AppImage、测试与发布门禁
+- 默认管理面只监听回环；出口 ACL、SS2022 多用户、TOTP pending、IP allowlist、自动备份与保留策略
 
-v0.1.0 **不包含**：NaiveProxy、独立 kill switch、原生手机 App、多节点编排、RBAC、DNS-01/TLS-ALPN-01、静默自动更新。
+当前版本 **不包含**：NaiveProxy、独立 kill switch、原生手机 App、多节点编排、RBAC、DNS-01/TLS-ALPN-01、静默自动更新。

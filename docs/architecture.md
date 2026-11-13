@@ -29,7 +29,7 @@ systemd / launchd / SCM / 你的进程管理器
 - 按角色策略校验端口、路径和入口；
 - 写入 `last-good.json`；
 - 执行 `sing-box check`；
-- 原子替换运行时配置，并通过 SIGHUP 重载（Windows 为重启）；
+- 原子替换运行时配置，然后重启子进程并验证存活；失败回滚上一版（SIGHUP 无法证明新配置已生效，因此不再使用）；
 - 不执行 shell，不连接数据库。
 
 ## 数据流
@@ -42,7 +42,10 @@ systemd / launchd / SCM / 你的进程管理器
 
 控制面把生成的 JSON 推给核心 API。核心事务式应用：校验或启动失败时保留上一版配置。统计每 5 秒从 sing-box 的 V2Ray gRPC API 读取，每分钟写入 SQLite。
 
-配额和到期由控制面执行。**控制面停止时，核心继续服务现有配置，但配额执行会暂停**——这是 v0.1.0 的明确限制。
+服务端路由默认拒绝 RFC1918、CGNAT、link-local、云 metadata 和 SMTP 25 出口；
+`block_private_egress = false` 时仍拒绝 25。
+
+配额和到期由控制面执行。**控制面停止时，核心继续服务现有配置，但配额执行会暂停**——这是当前版本的明确限制。
 
 ## 端口
 

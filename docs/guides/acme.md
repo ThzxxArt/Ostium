@@ -20,6 +20,9 @@ Ostium 内置 Let's Encrypt ACME HTTP-01 客户端，用于 Hysteria2、Trojan �
 
 Ostium 每天检查一次，剩余不足 30 天时自动续期。续期失败会产生告警，并保留旧证书。
 
+签发任务支持 per-issue `staging` 与 `email` 覆盖；全局 ACME 邮箱/staging 在 Settings 中配置。
+证书必须在线路页绑定到具体 inbound，不存在“任意 ready 证书兜底”。
+
 UI 和核心是两个服务，所以 UI TLS 变更后需要重启 `ostium.service`；隧道不会中断。
 
 ## 手动上传与自签
@@ -29,11 +32,23 @@ UI 和核心是两个服务，所以 UI TLS 变更后需要重启 `ostium.servic
 
 ## 边界
 
-v0.1.0 只支持 HTTP-01。DNS-01 和 TLS-ALPN-01 明确不在范围内（不接 DNS 服务商 API，也避免与 443 的 Reality 监听冲突）。
+当前版本只支持 HTTP-01。DNS-01 和 TLS-ALPN-01 明确不在范围内（不接 DNS 服务商 API，也避免与 443 的 Reality 监听冲突）。
+
+## 账户密钥轮换
+
+ACME 账户私钥加密保存在数据目录 `acme/account.key.enc`。轮换步骤：
+
+1. 备份数据目录；
+2. 停止 `ostium.service`；
+3. 删除 `acme/account.key.enc`（下次签发会生成新账户密钥并重新注册）；
+4. 启动服务并签发一次 staging 证书验证账户可用；
+5. 再执行生产签发。
+
+轮换账户密钥不会使已签发证书失效，但旧账户将无法再用于续期。
 
 ## 常见错误
 
-- 80 端口被 nginx/caddy 占用：临时停掉，或让 ACME 使用其他方式（v0.1.0 不支持）。
+- 80 端口被 nginx/caddy 占用：临时停掉，或让 ACME 使用其他方式（当前版本不支持）。
 - 域名解析未生效：用 `dig`/`nslookup` 确认 A/AAAA。
 - 云安全组未放行 80：同时检查本机防火墙和云防火墙。
 - 证书域名不匹配：确认申请域名和实际访问域名一致。

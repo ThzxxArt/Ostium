@@ -22,9 +22,14 @@ after a fix is available.
 ## Supported versions
 
 Only the latest v0.1.x release receives security fixes during the v0.1 series.
+v0.1.1 fixes the default admin bind issue documented in
+[`docs/security/advisory-2026-11-default-bind.md`](docs/security/advisory-2026-11-default-bind.md).
 
 ## Scope notes
 
+- Server admin UI defaults to `127.0.0.1`; non-loopback plaintext requires an
+  explicit `allow_insecure_bind` opt-in. Reports that rely on a deliberately
+  public plaintext bind are accepted but may be lower priority.
 - The core API is loopback-only; reports requiring local root or physical access
   are lower priority unless they cross a privilege boundary.
 - TUN strict-route is not a kill switch; this is documented behavior.

@@ -12,7 +12,9 @@ sudo bash install-online.sh upgrade
 2. 停止控制面；核心尽量保持运行。
 3. 替换 `/opt/ostium/venv` 和核心二进制。
 4. 保留数据库、`master.key`、配置、证书、用户和订阅。
-5. 重启服务。
+5. 启动并做健康检查；控制面健康检查失败会自动回滚旧 venv，核心启动失败会回滚旧核心。
+6. 0.1.0 的 `host = "0.0.0.0"` 明文配置会收敛到 `127.0.0.1`；需要保留公网明文绑定时使用
+   `--allow-insecure-bind` 并配置防火墙。
 
 指定版本：
 
@@ -33,7 +35,7 @@ sudo bash install-online.sh upgrade --version 0.1.1
 ```bash
 sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.0-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.1-py3-none-any.whl
 sudo systemctl start ostium
 curl -fsS http://127.0.0.1:8443/readyz
 ```
@@ -55,7 +57,8 @@ sudo ostium core update
 
 ## 数据库
 
-v0.1.0 的 SQLite 迁移是前向的。release notes 会标记不可回滚的迁移；升级前必须备份。Alembic 用 `alembic_version` 记录版本。
+数据库迁移在启动时由 Alembic `upgrade head` 执行；`alembic_version` 高于当前代码版本时
+Ostium 会拒绝启动。release notes 会标记不可回滚的迁移；升级前必须备份。
 
 回滚步骤：
 

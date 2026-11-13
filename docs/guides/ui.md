@@ -5,15 +5,16 @@
 ## 服务端页面
 
 - **Overview** — 服务脉搏、实时速率、今日流量、在线用户、告警、证书健康和快捷操作。
-- **Inbounds** — 启用/禁用 Reality、Hysteria2、Trojan、SS2022；轮换 Reality 密钥；查看证书要求。
-- **Users** — 新建/编辑用户、配额、到期、备注、批量操作、流量图和订阅入口。
+- **Inbounds** — 启用/禁用 Reality、Hysteria2、Trojan、SS2022；轮换 Reality 密钥；为每个 TLS 线路选择证书；显示端口冲突和 skipped 原因。
+- **Users** — 新建/编辑用户、配额、到期、备注、批量操作、流量图、分页/筛选 URL 持久化和订阅入口。
+- **Subscriptions** — 只有在显式“显示令牌”后才展示完整 URL/二维码，显示操作写审计；支持标准分享链接。
 - **Subscriptions** — 四种格式、复制、二维码、token 轮换。
 - **Connections** — 实时连接表，支持搜索和关闭。
 - **Routing** — 规则优先级、动作、测试面板和远程规则集。
 - **Certificates** — ACME/自签/上传、到期环、续期和分配。
 - **Logs / Jobs / Audit** — 观察控制面和长任务。
 - **System** — 主机指标、服务、doctor 和脱敏诊断。
-- **Settings** — 主题/语言、安全、TOTP、API token、通知、备份和公网 UI 策略。
+- **Settings** — 主题/语言、安全、TOTP、API token、IP allowlist、通知、备份（明文需确认）和公网 UI 策略。
 
 ## 客户端页面
 

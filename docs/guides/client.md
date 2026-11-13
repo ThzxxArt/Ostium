@@ -9,10 +9,10 @@
 管理员 PowerShell：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
 ```
 
-脚本会下载并静默运行 Windows 安装包，校验 SHA256，然后打印初始管理员密码。
+脚本会下载并静默运行 Windows 安装包并校验 SHA256；不会创建或打印管理员密码，首次打开 UI 时完成设置向导。
 
 默认安装：
 
@@ -21,12 +21,13 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.p
 - 核心二进制在 `%ProgramFiles%\Ostium\core`，服务配置在 `%ProgramFiles%\Ostium\service\core.toml`（普通用户不可写）；
 - Web UI 在当前用户登录时启动；
 - UI 数据在 `%ProgramData%\Ostium`；
-- 初始密码由在线安装器打印；离线 setup 保存在 `%ProgramData%\Ostium\initial-password.txt`，首次登录后请删除。
+- 核心数据、token 与 last-good 配置在 `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写）；
+- 安装器不再生成或保存明文密码。
 
 需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1))) -RunAsSystem
+& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1))) -RunAsSystem
 ```
 
 **风险**：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。
@@ -36,7 +37,7 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.p
 ### macOS 14+
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -70,7 +71,7 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role client --run-a
 
 ## 离线安装
 
-Windows：运行 `Ostium-0.1.0-windows-x64-setup.exe`。
+Windows：运行 `Ostium-0.1.1-windows-x64-setup.exe`。
 
 macOS：
 
@@ -82,7 +83,7 @@ Linux：
 
 ```bash
 sudo ./install.sh --role client \
-  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -107,7 +108,7 @@ sudo ./install.sh --role client \
 注意：
 
 - 混合代理**没有认证**，开启后同一网络内任何人都可能使用；只建议在可信家庭/实验室网络开启。
-- 该功能适用于混合代理/系统代理模式；v0.1.0 不包含“TUN 局域网网关”。
+- 该功能适用于混合代理/系统代理模式；当前版本不包含“TUN 局域网网关”。
 - 如果开启了系统代理，系统代理本身仍指向 `127.0.0.1:7890`；局域网设备需要手动填写本机 IP。
 - 关闭开关后，sing-box 会重新监听 `127.0.0.1`，局域网设备立即断开。
 
@@ -117,7 +118,7 @@ sudo ./install.sh --role client \
 |---|---|---|
 | 混合代理 | 手动设置 `127.0.0.1:7890` 的应用 | 不接管 DNS |
 | 系统代理 | 遵循系统代理的应用 | 部分应用会绕过；不接管 DNS |
-| TUN | 全机 TCP/UDP/DNS | 需要管理员/root；v0.1.0 无独立 kill switch |
+| TUN | 全机 TCP/UDP/DNS | 需要管理员/root；当前版本无独立 kill switch |
 
 系统代理和 TUN 互斥；切换时会清理旧代理、路由和虚拟网卡。
 

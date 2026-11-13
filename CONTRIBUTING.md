@@ -35,7 +35,7 @@ V2Ray stats require the Ostium custom build from `scripts/build-core.sh`.
 
 ## Pull requests
 
-- Keep the locked v0.1.0 scope. Do not silently move features or broaden the
+- Keep the locked v0.1.1 scope. Do not silently move features or broaden the
   protocol set.
 - Add tests for behavior changes; golden config tests must still pass
   `sing-box check`.
@@ -43,6 +43,18 @@ V2Ray stats require the Ostium custom build from `scripts/build-core.sh`.
 - Security-sensitive changes (core API, auth, encryption, proxy config) need a
   reviewer and a note in `SECURITY.md`/ADR if the threat model changes.
 - Run the frontend and backend gates locally; CI is mandatory.
+
+## Release policy
+
+- A release tag is created once, on the final reviewed commit. All assets are
+  built from that tag; `SHA256SUMS` and attestations cover every published file.
+- Published release assets are immutable. Do not replace, hotfix or re-upload a
+  file after publication. Any fix ships in the next patch release.
+- The GitHub release workflow uses `overwrite_files: false`; a failed publication
+  is retried as a new version, never by editing the old release.
+- Unsigned Windows/macOS artifacts must be labelled unsigned in the release
+  notes. Never claim Authenticode/notarization without `signtool`/`spctl`
+  evidence.
 
 ## License
 

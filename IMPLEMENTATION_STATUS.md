@@ -1,9 +1,37 @@
-# Ostium v0.1.0 implementation status
+# Ostium v0.1.1 implementation status
 
 Updated: 2026-11-13
 
 Legend: `[x]` implemented and exercised locally, `[~]` implemented but needs
 platform/external validation, `[ ]` not done yet.
+
+## v0.1.1 delta
+
+- [x] Default admin bind is loopback; legacy `0.0.0.0` plaintext configs migrate;
+      `serve` fails closed without `allow_insecure_bind`.
+- [x] Server egress blocks RFC1918/CGNAT/link-local/metadata/SMTP 25; verified
+      with a real `sing-box check`.
+- [x] SS2022 multi-user `server_key:user_key` validated by a real loopback
+      traffic test.
+- [x] Apply restarts and verifies the child; failures roll back and return
+      422/502.
+- [x] TOTP pending/confirm/cancel; docs authentication; UI IP allowlist;
+      WebSocket revalidation; single-use local login; password-change session
+      revocation.
+- [x] Rule/path/reference validation, profile activation/reorder, duplicate tag
+      namespacing, per-inbound certificates, certificate renewal retention.
+- [x] Alembic `upgrade head` at startup, fresh/legacy/newer-version handling,
+      restore + migration rollback.
+- [x] Auto backup/retention, quota retry/commit/alerts, job recovery, update
+      check, subscription public base URL and audited reveal.
+- [x] Windows/macOS package scripts, Linux DEB/AppImage builder, Docker hardening,
+      release provenance/SBOM scaffolding.
+- [~] Windows/macOS/Docker/Nginx/ACME/TUN/72h/performance/5-user and code signing
+      remain external validation; see `MANUAL_TASKS.md`.
+- [x] Local final gates: 474 backend tests + 9 real sing-box integration tests,
+      95.7%/91.5% coverage; 158 frontend tests, 90.7%/85.2% coverage;
+      69 Playwright cases (axe/visual/performance/PWA); ruff/mypy/shellcheck/
+      mkdocs/pip-audit/npm audit green.
 
 ## Delivered in this workspace
 
@@ -18,8 +46,8 @@ platform/external validation, `[ ]` not done yet.
 - [x] AES-256-GCM field encryption with AAD, master key 0600, scrypt encrypted
       backups.
 - [x] Two-service core: `core-run` minimal API, bearer token, 2 MiB limit,
-      role/port/path whitelist, `sing-box check`, atomic last-good, SIGHUP reload
-      (restart on Windows), log capture.
+      role/port/path whitelist, `sing-box check`, atomic last-good, restart +
+      liveness verification with rollback, log capture.
 - [x] Server config generation: Reality, Hysteria2, Trojan, SS2022, V2Ray stats,
       Clash API, egress blocks.
 - [x] Client config generation: mixed, TUN, smart/global/direct/custom routing,

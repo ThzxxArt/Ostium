@@ -1,6 +1,9 @@
 # 订阅
 
 每个启用的用户都可以有一个订阅 token。token 是机密：拿到 URL 的人就能使用该用户的凭据。
+订阅 URL 的基地址按以下顺序解析：Settings 的 `public_base_url` → `--domain`/server domain
+派生的 `https://<domain>` → `http://127.0.0.1:<port>`。不会使用请求的 `Host` 头，因此
+SSH 隧道访问也能生成客户端可用的公网 URL。
 
 ## 格式
 
@@ -11,7 +14,13 @@
 | Clash Meta YAML | `/sub/<token>?format=clash` | Clash Meta / Mihomo |
 | sing-box JSON | `/sub/<token>?format=singbox` | sing-box outbounds |
 
-响应头包含 `Cache-Control: no-store`、`Referrer-Policy: no-referrer`，并限制每 IP 每分钟 60 次。禁用、到期或超配额的用户返回 403；未知 token 返回 404。
+响应头包含 `Cache-Control: no-store`、`Referrer-Policy: no-referrer`，并限制每 IP 每分钟 60 次。禁用、到期或超配额的用户返回 403；未知 token 返回 404；未知 `format` 返回 400。
+
+## 管理端 API
+
+`GET /api/v1/users/{id}/subscription` 默认只返回 `token_hint` 和 `reveal_required=true`。
+需要完整 token/URL/二维码时使用 `?reveal=true`，该操作会写入审计日志。创建用户和轮换
+token 时仍一次性返回完整 token。
 
 ## 导入
 

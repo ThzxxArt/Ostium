@@ -600,3 +600,42 @@ shellcheck + bash -n                                  -> PASS
   与签名仍未实机验收。
 
 **结论：v0.1.0 已发布且主安装路径可用；生产可用性仍取决于上述外部实机验收。**
+
+---
+
+## 16. v0.1.1 审计与修复（2026-11-13）
+
+本轮针对 v0.1.0 的 P0/P1/P2 发现做全量修复，并补充可复现测试。详细工作项状态见
+`V0.1.1_PLAN.md` 与最终交付报告；自主决策见 `V0.1.1_DECISIONS.md`。
+
+### 16.1 P0 关闭证据
+
+| ID | 发现 | 修复 | 证据 |
+|---|---|---|---|
+| SEC-01/02/03 | 服务端默认 `0.0.0.0:8443` 明文 | 默认回环、serve fail-closed、旧配置迁移、显式 `allow_insecure_bind` | 单元测试覆盖旧配置迁移与 opt-in；安装器静态检查 |
+| SEC-04 | 服务端出口可访问内网/metadata | 完整 RFC1918/CGNAT/link-local/metadata/SMTP 25 ACL | 真实 `sing-box check` + 生成配置断言 |
+| DATA-01 | SS2022 订阅缺少 server key | `server_key:user_key` 三种格式统一 | 真实 sing-box 回环流量测试通过 |
+| DATA-02 | SIGHUP 假成功 | 重启子进程 + 存活验证 + 回滚 | 真实 sing-box apply/失败回滚测试 |
+| REL-01/02/03 | 版本/资产不可变 | 版本统一 0.1.1、`overwrite_files: false`、发布后只读校验脚本 | workflow 静态测试 + `scripts/verify-release.sh` |
+
+### 16.2 已在本环境验证
+
+- 后端：474 passed / 0 skipped；语句 95.7%、分支 91.5%；覆盖率门禁通过。
+- 真实 sing-box 1.14.4：`sing-box check`、SS2022 多用户回环流量、apply 失败保留旧配置。
+- 前端：158 passed；语句 90.7%、分支 85.2%；首屏 JS 191.8 KiB gzip（预算 300 KiB）。
+- Playwright：69 passed，含全核心页面 axe、dashboard/users/settings 视觉基线、LCP/CLS 预算。
+- Alembic fresh/旧库/更高版本拒绝、备份恢复迁移、SQLite integrity_check。
+- Linux 安装脚本静态检查（shellcheck/bash -n）、PowerShell 解析（CI 步骤）。
+
+### 16.3 未在本环境验证（仍是发布阻断项）
+
+- Windows 11 实机：setup、OstiumCore、Wintun、TUN、PAC、SmartScreen、卸载。
+- macOS 14 实机：launchd、utun、系统代理、DMG、Gatekeeper、卸载。
+- Ubuntu 24.04 默认非 root systemd 实装、重启、升级失败回滚、卸载。
+- Nginx `nginx -t` + 真实 TLS/WebSocket/IP allowlist 反代。
+- Docker amd64/arm64 实际运行与 compose 加固参数。
+- ACME staging/production 真实签发/续期、UI HTTPS 重启。
+- 真实 TUN/Allow LAN/DNS 泄漏、72h soak、性能、5 用户可用性。
+- Windows Authenticode、macOS Developer ID/notarization（无证书）。
+
+这些项目没有被写成“已验证”；发布前必须补证据，否则按 blocker 处理。

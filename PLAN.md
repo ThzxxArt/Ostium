@@ -3,11 +3,20 @@
 > 版本：v0.1.0 基线（确定性方案）  
 > 日期：2026-11-12  
 > 作者：苏浅玥（Cynthia）  
-> 状态：已锁定，进入实施  
-> 仓库：<https://github.com/ThzxxArt/Ostium>  
-> PyPI 分发名：`ostium-ctl`  
-> Python 导入名 / CLI：`ostium`  
+> 状态：v0.1.0 已发布；v0.1.1 安全/正确性补丁已按 `V0.1.1_PLAN.md` 实施
+> 仓库：<https://github.com/ThzxxArt/Ostium>
+> PyPI 分发名：`ostium-ctl`
+> Python 导入名 / CLI：`ostium`
 > 数据面：sing-box v1.14.4 + Ostium 定制构建（`with_v2ray_api`）
+
+> **v0.1.1 修订（2026-11-13）**
+>
+> - 服务端管理 UI 默认 `127.0.0.1`；非回环明文需显式 `allow_insecure_bind`。
+> - 配置应用改为重启子进程并验证；失败回滚，不再依赖 SIGHUP 假成功。
+> - 交付范围新增 Windows setup、macOS DMG、Linux DEB/AppImage、SBOM 与不可变发布。
+> - IP allowlist、自动备份/保留策略、stats epoch、Alembic 启动迁移均已有真实实现。
+> - 详细任务、证据与外部 blocker 见 `V0.1.1_PLAN.md`、`V0.1.1_DECISIONS.md`、
+>   `AUDIT_REPORT.md` 与 `MANUAL_TASKS.md`。本文件保留 v0.1.0 设计基线。
 
 ---
 
@@ -195,7 +204,7 @@ flowchart TB
 
 - 读取/校验配置；调用 `sing-box check`。
 - 写运行时配置（0600），启动/重启/停止 sing-box。
-- 发送 `SIGHUP` 重载；失败回滚。
+- 原子替换运行时配置，然后重启子进程并验证存活；失败回滚。
 - 暴露 127.0.0.1:8788 的最小 API。
 - 采集核心 stdout/stderr，写入日志文件；保留最近日志。
 - 不连接数据库，不提供 Web UI，不执行 shell。
@@ -488,7 +497,7 @@ Node 24.19.0、npm 12.0.2；`package-lock.json` 锁定。
 - 定制内核启用 `experimental.v2ray_api`。
 - `stats.users` 包含所有启用用户。
 - UI 每 5 秒调用 gRPC `GetStats`（每用户上行/下行）。
-- 计数器因 `SIGHUP` 重置时，检测到数值下降，开启新 epoch，累计值继续累加；两次采样之间的少量流量可能丢失，误差 < 5 秒。
+- 计数器因核心子进程重启重置时，检测到数值下降，开启新 epoch，累计值继续累加；两次采样之间的少量流量可能丢失，误差 < 5 秒。
 - 每 60 秒批量写 `traffic_user_daily`；避免高频写库。
 - 在线状态：最近 60 秒该用户计数有增长。
 - 配额检查每 30 秒；超限/到期将用户置为禁用，应用配置；活动连接因重载关闭。
@@ -700,7 +709,7 @@ SQLite + WAL + 外键；Alembic 迁移。
 - 类型：内核安装/升级、配置应用、ACME 申请/续期、规则集更新、备份/恢复、诊断、订阅刷新。
 - `jobs` 表持久化；进程重启后 `running` → `interrupted`。
 - 进度事件；协作式取消；幂等键；错误摘要；不写密钥。
-- 配置应用是事务：校验 → 写临时 → `sing-box check` → 原子替换 → SIGHUP → 健康检查 → 失败回滚。
+- 配置应用是事务：校验 → 写临时 → `sing-box check` → 原子替换 → 重启子进程并验证 → 失败回滚。
 
 ### 6.7 升级与回滚
 
@@ -1244,7 +1253,7 @@ docker run -d --name ostium \
 - TCP/UDP/DNS/IPv6/大文件哈希。
 - TUN（Linux CI 特权 runner；Windows/macOS 手工矩阵）。
 - 两服务 IPC：正常/超时/大配置/非法配置/角色错配/核心崩溃。
-- 配置应用/回滚/SIGHUP 断线范围。
+- 配置应用/回滚/重启断线范围。
 - ACME Pebble（HTTP-01 staging）；证书续期/重启 UI。
 - 订阅 URL 四种格式与第三方解析器兼容（至少 v2rayN 格式、Clash YAML 解析）。
 - 系统代理设置/恢复/崩溃遗留。

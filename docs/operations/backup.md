@@ -16,7 +16,7 @@
 sudo -u ostium ostium backup create --password 'a long passphrase'
 ```
 
-或在 **Settings → Maintenance → Backups** 创建。加密文件扩展名为 `.ostb`；明文归档为 `.tar.gz`。请把备份存到异地。
+或在 **Settings → Maintenance → Backups** 创建。加密文件扩展名为 `.ostb`；明文归档为 `.tar.gz`。API/UI 创建明文备份需要显式确认，因为归档包含 `master.key`。请把备份存到异地。
 
 root 模式下：
 
@@ -36,7 +36,8 @@ sudo -u ostium ostium backup restore ./ostium-backup-....ostb --password '...'
 sudo systemctl start ostium-core ostium
 ```
 
-恢复会校验 manifest 和归档路径，替换数据库与主密钥，下次启动执行迁移。**请定期演练恢复**，不要只在出事时才第一次测试。
+恢复会校验归档/角色、SQLite `integrity_check`，替换数据库与主密钥，然后执行 Alembic 迁移；
+迁移失败会恢复旧数据库并保留 pending 文件。**请定期演练恢复**，不要只在出事时才第一次测试。
 
 ## 保留策略
 

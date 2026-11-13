@@ -3,6 +3,65 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [0.1.1] - 2026-11-13
+
+### Security
+
+- Server admin UI now defaults to `127.0.0.1`; legacy `0.0.0.0` plaintext
+  configurations are migrated unless `allow_insecure_bind = true` is set.
+  `ostium serve` fails closed for non-loopback plaintext binds.
+- Server egress now blocks RFC1918, CGNAT, the complete link-local range, cloud
+  metadata (IPv4/IPv6) and SMTP port 25; `block_private_egress = false` keeps
+  the SMTP block.
+- Shadowsocks 2022 client passwords now use `server_key:user_key` in URI,
+  Clash and sing-box formats.
+- `/api/docs` and `/api/openapi.json` require an authenticated admin.
+- Admin UI CIDR allowlist, WebSocket session revalidation, single-use local
+  login tokens, password-change session revocation and expired login-limiter
+  cleanup.
+- TOTP enrollment uses a pending secret; cancel/close no longer locks out the
+  administrator. TOTP failures count toward persistent lockout.
+- Webhook SSRF protection with retries/HMAC; profile refresh blocks
+  loopback/link-local/metadata targets while allowing LAN subscriptions.
+- Rule-set path traversal fixed; rule match/regex/CIDR/reference validation;
+  ruleset deletion checks references.
+- Backup plaintext creation requires explicit acknowledgement; restore checks
+  role, SQLite integrity and migrations. Certificate deletion removes key files;
+  manual chains are verified; renewals keep the previous ready certificate.
+- Windows core data/token/last-good moved to an admin/SYSTEM-only ACL directory;
+  uninstall restores proxy/TUN state.
+
+### Fixed
+
+- Configuration apply restarts the child and verifies liveness; failures roll
+  back and return 422/502 instead of pretending SIGHUP succeeded.
+- Monthly quota reset commits; disabled users are retried if a core apply fails;
+  final statistics flush on shutdown; quota thresholds 80/90% alert once.
+- Retention policies execute for audit/traffic/jobs; automatic daily backups
+  (default off, 7 kept, 0600) and `ostium update --check` are real.
+- Subscription URLs use `public_base_url`/domain instead of request `Host`;
+  tokens are not re-shown without an audited reveal; unknown formats return 400.
+- Active profile persistence, profile reorder/activation, duplicate endpoint tag
+  namespacing, real Clash API latency probes and per-inbound certificate
+  selection.
+- Startup runs Alembic `upgrade head`; newer schemas are rejected; restores run
+  migrations with rollback.
+- Inbound port conflicts return 409; skipped inbounds show their reason.
+- Setup no longer offers unreachable Hysteria2/both without a certificate.
+
+### Delivery
+
+- Release builds Windows setup, macOS DMG, Linux DEB/AppImage (amd64/arm64),
+  Docker, SBOM and checksums from one tag; release publication refuses to
+  overwrite existing assets.
+- CI enforces frontend coverage, Playwright/axe/visual checks, shellcheck,
+  PowerShell parsing, mkdocs `--strict`, dependency audits and first-load JS
+  budget.
+- Windows/macOS installers are labelled unsigned when no signing certificate is
+  configured; macOS notarization is optional and explicit.
+- Documentation, migration guide and security advisory updated for the new
+  defaults and residual external validation.
+
 ## [0.1.0] - 2026-11-13
 
 ### Release

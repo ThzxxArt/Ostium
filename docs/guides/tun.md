@@ -32,7 +32,7 @@ TUN 模式会让 Ostium 创建虚拟网卡，接管整机 TCP、UDP 和 DNS。�
 
 ## Kill switch 边界
 
-`strict_route` 能减少 TUN 运行时的常见泄漏，但 Ostium v0.1.0 **不提供独立防火墙 kill switch**。核心退出后，直连可能恢复。UI 会明确提示，这是 v0.1.0 的边界，不是“以后再做”的功能。
+`strict_route` 能减少 TUN 运行时的常见泄漏，但 Ostium 当前版本 **不提供独立防火墙 kill switch**。核心退出后，直连可能恢复。UI 会明确提示，这是当前版本的边界，不是“以后再做”的功能。
 
 ## DNS
 

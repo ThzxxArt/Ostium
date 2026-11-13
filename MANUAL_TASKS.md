@@ -1,8 +1,26 @@
 # Manual tasks / external validation
 
 These items cannot be completed inside this Linux workspace. They are required
-for the v0.1.0 release gates and must be performed by a human with the relevant
+for the v0.1.1 release gates and must be performed by a human with the relevant
 hardware or accounts.
+
+## v0.1.1 external matrix
+
+- [ ] Windows 11: run `Ostium-0.1.1-windows-x64-setup.exe`, verify OstiumCore
+      service, Wintun/TUN, PAC, token/last-good ACL, SmartScreen and uninstall
+      proxy/TUN restoration.
+- [ ] macOS 14: mount `Ostium-0.1.1-macos-arm64.dmg`, run `install-macos.sh
+      client`, verify launchd/utun/system proxy/Gatekeeper/uninstall.
+- [ ] Ubuntu 24.04 + Debian 13: DEB install, systemd boot, upgrade failure
+      rollback, uninstall, `--behind-proxy`, `--run-as-root`, `--no-service`.
+- [ ] Docker amd64/arm64: build/run/health/volume/upgrade under the hardened
+      compose settings.
+- [ ] Nginx: `nginx -t`, TLS, WebSocket, IP allowlist and real reverse proxy.
+- [ ] ACME staging + production issuance/renewal and UI HTTPS restart.
+- [ ] Real TUN/Allow LAN/DNS leak tests; 72h soak; iperf3 performance; 5-user
+      usability (server <=15 min, client <=5 min).
+- [ ] Windows Authenticode and macOS Developer ID/notarization (blocked until
+      certificates are purchased); unsigned assets must stay labelled unsigned.
 
 ## Server / network
 

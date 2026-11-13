@@ -21,7 +21,7 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
   <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
-  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-5EEAD4?style=flat-square"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.1"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.1-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -35,24 +35,28 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-97.67%25%20statements%20%C2%B7%2094.93%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.34%25%20statements%20%C2%B7%2085.26%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-419%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-95.7%25%20statements%20%C2%B7%2091.5%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.2%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-474%20backend%20%C2%B7%20158%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
-> **Current stable release: v0.1.0.** The easiest install does not require Python:
+> **Current release: v0.1.1.** The easiest install does not require Python:
 >
 > ```bash
-> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
 >   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
 >
 > Windows client (admin PowerShell):
 >
 > ```powershell
-> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
+> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
 > ```
+>
+> The admin UI binds `127.0.0.1:8443` by default. Use an SSH tunnel or enable Public UI
+> with a valid TLS certificate. Plaintext public binds require an explicit
+> `--allow-insecure-bind` and a host firewall.
 >
 > Parameters, offline install, root mode and no-service mode:
 > [one-click install guide](docs/guides/install.md).
@@ -73,7 +77,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 419 backend tests, 137 frontend tests and 21 Playwright tests; 97.67% backend statements / 94.93% branches. |
+| 🧪 **Verified** | 474 backend tests (9 live sing-box integration tests), 158 frontend tests and 69 Playwright cases; 95.7% backend statements / 91.5% branches. |
 
 ---
 
@@ -182,21 +186,21 @@ flowchart LR
 Linux server:
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS client:
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows client (admin PowerShell):
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
 ```
 
 The installer:
@@ -233,8 +237,8 @@ runit, s6, supervisord or run both commands manually. Full examples:
 Download the same release's assets into one directory, keeping their filenames:
 
 - `install-online.sh`
-- `ostium_ctl-0.1.0-py3-none-any.whl`
-- `ostium_ctl-0.1.0.tar.gz` (installer, systemd/launchd files)
+- `ostium_ctl-0.1.1-py3-none-any.whl`
+- `ostium_ctl-0.1.1.tar.gz` (installer, systemd/launchd files)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (choose the right architecture)
   and its `.sha256`
 - `SHA256SUMS`
@@ -260,22 +264,32 @@ The installer verifies the sdist first, then extracts `scripts/install.sh` and
 Download the wheel, sdist, core archive and `SHA256SUMS`, then run the platform
 installer from the extracted sdist:
 
-- `ostium_ctl-0.1.0-py3-none-any.whl`
-- `ostium_ctl-0.1.0.tar.gz` (contains `scripts/install.sh` and `deploy/`)
+- `ostium_ctl-0.1.1-py3-none-any.whl`
+- `ostium_ctl-0.1.1.tar.gz` (contains `scripts/install.sh` and `deploy/`)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
-Download: <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>
+Download: <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.1>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.0.tar.gz
+tar -xzf ostium_ctl-0.1.1.tar.gz
 
-sudo ./ostium_ctl-0.1.0/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.1/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
+
+The same release also ships native packages:
+
+- `ostium_0.1.1_amd64.deb` / `ostium_0.1.1_arm64.deb` (PyInstaller control plane + core, systemd units);
+- `Ostium-0.1.1-linux-amd64.AppImage` / `arm64` (single-file client/temporary runtime);
+- `Ostium-0.1.1-macos-arm64.dmg` (wheel, darwin core and launchd installer);
+- `Ostium-0.1.1-windows-x64-setup.exe`.
+
+If no code-signing certificate is configured, Windows/DMG assets are explicitly labelled
+unsigned in the release notes; do not treat them as signed builds.
 
 The installer will:
 
@@ -316,8 +330,8 @@ journalctl -u ostium -u ostium-core -f
 Extract the sdist first, then run:
 
 ```bash
-sudo ./ostium_ctl-0.1.0/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.1/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -331,13 +345,13 @@ Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 
 ### Option 4 — Windows client (offline)
 
-1. Run `Ostium-0.1.0-windows-x64-setup.exe`.
+1. Run `Ostium-0.1.1-windows-x64-setup.exe`.
 2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
    and starts the UI at logon.
-3. UI data lives in `%ProgramData%\Ostium`; the core binary and the LocalSystem service
-   configuration live under `%ProgramFiles%\Ostium`.
-4. The initial admin password is printed by the online installer; the offline setup stores it in
-   `%ProgramData%\Ostium\initial-password.txt`. Delete the file after the first login.
+3. UI data lives in `%ProgramData%\Ostium`; core data, the token and last-good configuration
+   live in `%ProgramData%\OstiumCore` (SYSTEM/Administrators write only).
+4. Complete the first-run wizard at <http://127.0.0.1:8787> to create the admin; the installer
+   no longer generates or stores a plaintext password.
 5. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
    trust the source.
 
@@ -353,10 +367,10 @@ Use the one-click online installer from Option 1. For offline installs, extract 
 and point it at the wheel and core archive:
 
 ```bash
-tar -xzf ostium_ctl-0.1.0.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.0-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.1.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.1-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.0/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.1/deploy/launchd/install-macos.sh client
 ```
 
 The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` LaunchAgent,
@@ -376,14 +390,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 Local build:
 
 ```bash
-docker build -t ostium:0.1.0 .
+docker build -t ostium:0.1.1 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.0
+  ostium:0.1.1
 ```
 
 > Docker uses host networking so it can bind 443/80. Configure the firewall, TLS and off-host
@@ -399,14 +413,14 @@ uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
 # or pin the release
-uv tool install "ostium-ctl==0.1.0"
+uv tool install "ostium-ctl==0.1.1"
 ```
 
 Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.1"
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -419,7 +433,7 @@ Upgrade:
 ```bash
 uv tool upgrade ostium-ctl
 # or
-sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.1"
 ```
 
 > The PyPI wheel contains the complete SPA assets. For production, prefer the native packages:
@@ -545,7 +559,7 @@ sudo -u ostium ostium cert issue local.example.com --self-signed
 |---|---|---|
 | Mixed | Apps explicitly configured for `127.0.0.1:7890` | No DNS takeover |
 | System proxy | Apps that honour the OS proxy | Some apps bypass it; no DNS takeover |
-| TUN | Whole-machine TCP/UDP/DNS | Requires admin/root; no standalone kill switch in v0.1.0 |
+| TUN | Whole-machine TCP/UDP/DNS | Requires admin/root; no standalone kill switch in the current release |
 
 System proxy and TUN are mutually exclusive. Switching cleans up the old proxy, routes and
 virtual interface.
@@ -610,11 +624,12 @@ sudo systemctl start ostium-core ostium
 2. Open 80/tcp.
 3. Set the ACME email in Settings.
 4. Certificates → Issue → ACME.
-5. Assign the certificate to Hysteria2/Trojan.
+5. Assign the certificate to a specific Hysteria2/Trojan inbound.
 6. Enable TOTP, then enable the public admin UI.
 7. Restart `ostium.service`.
 
-v0.1.0 supports HTTP-01 only; DNS-01 and TLS-ALPN-01 are intentionally out of scope.
+The current release supports HTTP-01 only; DNS-01 and TLS-ALPN-01 are intentionally out of scope.
+A failed renewal keeps the previous ready certificate and does not downgrade the live TLS endpoint.
 
 ---
 
@@ -641,7 +656,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. Install the new wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.0-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.1-py3-none-any.whl
 
 # 4. Start; migrations run at startup
 sudo systemctl start ostium
@@ -826,12 +841,13 @@ npx playwright test
 
 Current results:
 
-- Backend: **419 passed / 0 skipped** (413 regular tests + 6 live-engine integration tests),
-  **97.67%** statements / **94.93%** branches.
-- Frontend: **137 passed**, **91.34%** statements / **85.26%** branches /
-  **89.06%** functions / **92.14%** lines.
-- Playwright: **21 passed**, covering 1440/1024/390, dark/light visual baselines,
-  PWA service-worker registration and an axe login check.
+- Backend: **474 passed / 0 skipped** (465 regular tests + 9 live-engine integration tests),
+  **95.7%** statements / **91.5%** branches.
+- Frontend: **158 passed**, **90.7%** statements / **85.2%** branches /
+  **88.5%** functions / **91.8%** lines.
+- Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
+  baselines, axe on every core page (serious/critical=0), LCP/CLS performance budgets, PWA
+  service-worker registration, navigation and the command palette.
 - `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev
   toolchain audit is also clean after breaking upgrades/overrides.
 - Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).

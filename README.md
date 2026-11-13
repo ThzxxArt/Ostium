@@ -21,7 +21,7 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
   <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
-  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-5EEAD4?style=flat-square"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.1"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.1-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -35,24 +35,27 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-97.67%25%20statements%20%C2%B7%2094.93%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.34%25%20statements%20%C2%B7%2085.26%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-419%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-95.7%25%20statements%20%C2%B7%2091.5%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.2%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-474%20backend%20%C2%B7%20158%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
-> **当前稳定版本：v0.1.0。** 最省事的安装方式不需要预装 Python：
+> **当前版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
 >
 > ```bash
-> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
 >   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
 >
 > Windows 客户端（管理员 PowerShell）：
 >
 > ```powershell
-> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
+> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
 > ```
+>
+> 管理 UI 默认只监听 `127.0.0.1:8443`。远程管理请使用 SSH 隧道，或启用带证书的 Public UI；
+> 确需明文公网监听时必须显式 `--allow-insecure-bind` 并配置防火墙。
 >
 > 详细参数、离线安装、root 模式和 no-service 模式见[一键安装指南](docs/guides/install.md)。
 
@@ -69,9 +72,9 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 📊 **真实流量账本** | 定制 `sing-box` 开启 `with_v2ray_api`，每用户上行/下行、日/月汇总、配额与到期自动禁用。 |
 | 🌐 **全平台客户端** | Windows 11、macOS 14+、Linux；混合代理、系统代理、TUN、URLTest、多订阅。 |
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
-| 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / PyInstaller / Inno Setup 构建与安装脚本齐全。 |
+| 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 419 个后端测试、137 个前端测试、21 个 Playwright 测试；后端 97.67% 语句 / 94.93% 分支。 |
+| 🧪 **可验证** | 474 个后端测试（9 个真实 sing-box 集成测试）、158 个前端测试、69 个 Playwright 用例；后端 95.7% 语句 / 91.5% 分支。 |
 
 ---
 
@@ -176,21 +179,21 @@ flowchart LR
 Linux 服务端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS 客户端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows 客户端（管理员 PowerShell）：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
 ```
 
 安装器会：
@@ -222,8 +225,8 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-se
 把同一版本的 Release 资产下载到同一目录（保持文件名不变）：
 
 - `install-online.sh`
-- `ostium_ctl-0.1.0-py3-none-any.whl`
-- `ostium_ctl-0.1.0.tar.gz`（安装脚本、systemd/launchd 文件）
+- `ostium_ctl-0.1.1-py3-none-any.whl`
+- `ostium_ctl-0.1.1.tar.gz`（安装脚本、systemd/launchd 文件）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（按架构选择）及其 `.sha256`
 - `SHA256SUMS`
 
@@ -247,22 +250,31 @@ sudo bash install-online.sh install \
 从 GitHub Release 下载 wheel、sdist、核心包和 `SHA256SUMS`，解压 sdist 后直接运行
 其中的平台安装器：
 
-- `ostium_ctl-0.1.0-py3-none-any.whl`
-- `ostium_ctl-0.1.0.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
+- `ostium_ctl-0.1.1-py3-none-any.whl`
+- `ostium_ctl-0.1.1.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
-下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>
+下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.1>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.0.tar.gz
+tar -xzf ostium_ctl-0.1.1.tar.gz
 
-sudo ./ostium_ctl-0.1.0/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.1/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
+
+同一 Release 还提供：
+
+- `ostium_0.1.1_amd64.deb` / `ostium_0.1.1_arm64.deb`：原生 DEB，包含 PyInstaller 控制面与核心，安装后启用 systemd；
+- `Ostium-0.1.1-linux-amd64.AppImage` / `arm64`：单文件 AppImage，适合无 root 的客户端或临时运行；
+- `Ostium-0.1.1-macos-arm64.dmg`：macOS 客户端 DMG，内含 wheel、darwin 核心与 launchd 安装脚本；
+- `Ostium-0.1.1-windows-x64-setup.exe`：Windows 客户端安装包。
+
+未配置代码签名证书时，Windows/DMG 资产会在 Release 说明中明确标注“未签名”；不要把它当作已签名构建。
 
 安装器会：
 
@@ -303,8 +315,8 @@ journalctl -u ostium -u ostium-core -f
 同样先解压 sdist，再运行：
 
 ```bash
-sudo ./ostium_ctl-0.1.0/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.1/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -318,10 +330,10 @@ systemctl --user enable --now ostium
 
 ### 方式四：Windows 客户端（离线）
 
-1. 运行 `Ostium-0.1.0-windows-x64-setup.exe`。
+1. 运行 `Ostium-0.1.1-windows-x64-setup.exe`。
 2. 安装器会复制程序到 `%ProgramFiles%\Ostium`，注册 `OstiumCore` 服务，并设置登录时启动 UI。
-3. UI 数据保存在 `%ProgramData%\Ostium`；核心二进制和 LocalSystem 服务配置位于 `%ProgramFiles%\Ostium`。
-4. 初始管理员密码：在线安装器会直接打印；离线 setup 会保存到 `%ProgramData%\Ostium\initial-password.txt`，首次登录后请删除该文件。
+3. UI 数据保存在 `%ProgramData%\Ostium`；核心数据、token、last-good 配置位于 `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写）。
+4. 首次打开 <http://127.0.0.1:8787> 时完成设置向导并创建管理员；安装器不再生成或保存明文密码。
 5. 未签名构建会触发 SmartScreen；请先校验 `SHA256SUMS`，确认来源可信后再选择“仍要运行”。
 
 也可以从安装目录运行 PowerShell：
@@ -335,10 +347,10 @@ systemctl --user enable --now ostium
 推荐直接用方式一的一键在线安装。离线时解压 sdist，并用环境变量指向 wheel 与核心包：
 
 ```bash
-tar -xzf ostium_ctl-0.1.0.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.0-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.1.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.1-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.0/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.1/deploy/launchd/install-macos.sh client
 ```
 
 安装器会注册 `com.ostium.core` LaunchDaemon 和 `com.ostium.ui` LaunchAgent，并链接 `ostium` 命令。未签名/未公证构建会触发 Gatekeeper，请先校验校验和。
@@ -356,14 +368,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 本地构建：
 
 ```bash
-docker build -t ostium:0.1.0 .
+docker build -t ostium:0.1.1 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.0
+  ostium:0.1.1
 ```
 
 > Docker 使用 host 网络，以便绑定 443/80；请自行配置防火墙、TLS 和持久化备份。
@@ -378,14 +390,14 @@ uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
 # 或指定版本
-uv tool install "ostium-ctl==0.1.0"
+uv tool install "ostium-ctl==0.1.1"
 ```
 
 服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.1"
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -398,7 +410,7 @@ sudo /opt/ostium/venv/bin/ostium core-run   # 终端 2：核心服务
 ```bash
 uv tool upgrade ostium-ctl
 # 或
-sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.0"
+sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.1"
 ```
 
 > PyPI 版本包含完整 SPA 静态资源。生产环境仍建议使用原生安装包：它会创建非 root 的
@@ -520,7 +532,7 @@ sudo -u ostium ostium cert issue local.example.com --self-signed
 |---|---|---|
 | Mixed | 手动设置 `127.0.0.1:7890` 的应用 | 不接管 DNS |
 | System proxy | 遵循系统代理的应用 | 部分应用会绕过；不接管 DNS |
-| TUN | 全机 TCP/UDP/DNS | 需要管理员/root；v0.1.0 无独立 kill switch |
+| TUN | 全机 TCP/UDP/DNS | 需要管理员/root；当前版本无独立 kill switch |
 
 系统代理与 TUN 互斥。切换时 Ostium 会清理旧代理、路由和虚拟网卡。
 
@@ -581,11 +593,12 @@ sudo systemctl start ostium-core ostium
 2. 开放 80/tcp；
 3. Settings 中填写 ACME 邮箱；
 4. Certificates → Issue → ACME；
-5. 分配证书到 Hysteria2/Trojan；
+5. 在“线路”页把证书分配给具体 Hysteria2/Trojan 线路；
 6. 启用 TOTP 后再开启 Public admin UI；
 7. 重启 `ostium.service`。
 
-v0.1.0 只支持 HTTP-01，不支持 DNS-01/TLS-ALPN-01。
+当前版本只支持 HTTP-01，不支持 DNS-01/TLS-ALPN-01。续期失败会保留上一张 ready 证书，
+不会把现有 TLS 入口提前切到 pending。
 
 ---
 
@@ -611,7 +624,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. 安装新 wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.0-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.1-py3-none-any.whl
 
 # 4. 启动；迁移在启动时执行
 sudo systemctl start ostium
@@ -790,9 +803,9 @@ npx playwright test
 
 当前结果：
 
-- 后端：**419 passed / 0 skipped**（413 个常规测试 + 6 个真实核心集成测试），语句 **97.67%**、分支 **94.93%**；
-- 前端：**137 passed**，语句 **91.34%**、分支 **85.26%**、函数 **89.06%**、行 **92.14%**；
-- Playwright：**21 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线、PWA service worker 和 axe 登录页检查；
+- 后端：**474 passed / 0 skipped**（465 个常规测试 + 9 个真实核心集成测试），语句 **95.7%**、分支 **91.5%**；
+- 前端：**158 passed**，语句 **90.7%**、分支 **85.2%**、函数 **88.5%**、行 **91.8%**；
+- Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe（serious/critical=0）、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。
 

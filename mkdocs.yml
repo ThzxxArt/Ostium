@@ -52,9 +52,13 @@ nav:
   - 运维:
       - 备份: operations/backup.md
       - 升级: operations/upgrade.md
+      - 0.1.0 → 0.1.1 迁移: operations/upgrade-0.1.0-to-0.1.1.md
+      - 发布清单: operations/release-checklist.md
       - 故障排查: operations/troubleshooting.md
   - 设计:
       - 设计系统: design-system.md
       - UX: ux.md
       - ADR 0001 - TypeScript 6: adr/0001-typescript-6.md
-  - 安全: security/threat-model.md
+  - 安全:
+      - 威胁模型: security/threat-model.md
+      - 公告：默认管理面绑定: security/advisory-2026-11-default-bind.md

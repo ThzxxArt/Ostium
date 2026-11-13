@@ -34,7 +34,7 @@
 - TUN 需要核心以 root/SYSTEM 运行，或具备 `CAP_NET_ADMIN`。
 - 另一个 VPN 可能占用了网卡或路由表。
 - 关闭再开启 TUN；核心崩溃后重启核心清理路由。
-- v0.1.0 没有独立 kill switch。
+- 当前版本没有独立 kill switch。
 
 ## ACME 失败
 
@@ -45,7 +45,7 @@
 
 ## 重载后统计不对
 
-sing-box 计数器在 SIGHUP 后重置。Ostium 会检测下降并开启新 epoch 继续累计；最多丢失一个 5 秒采样。配额不是计费级精度。
+sing-box 计数器在核心子进程重启后重置。Ostium 会检测下降并开启新 epoch 继续累计；最多丢失一个 5 秒采样。配额不是计费级精度。
 
 ## 恢复
 
