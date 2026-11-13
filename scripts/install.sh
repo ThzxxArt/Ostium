@@ -601,8 +601,9 @@ EOF
         fi
         HEALTH_SCHEME="http"
         [[ "$PUBLIC_UI" == "true" ]] && HEALTH_SCHEME="https"
-        if ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz"; then
-          rollback_control_plane "control plane health check"
+        if ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz" \
+          || ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/readyz"; then
+          rollback_control_plane "control plane health/readiness check"
         fi
         rm -rf "$PREFIX/venv.old"
         rm -f "$DATA/core/sing-box.old"
