@@ -135,11 +135,18 @@ platform/external validation, `[ ]` not done yet.
 - The UI uses `create_all` + an Alembic stamp for the initial schema and ships
   the initial migration; future schema changes use Alembic.
 
-## Release blockers still open
+## Release status
 
-- [ ] Create the `v0.1.0` tag and run the Release workflow; verify Windows
-      setup, five core archives, Docker image, PyPI wheel, `SHA256SUMS` and
-      attestations. No publication has been performed without approval.
+- [x] Created `v0.1.0` tag and ran Release workflow `43381306485` (success):
+      GitHub Release, PyPI `ostium-ctl==0.1.0`, GHCR `0.1.0`/`v0.1.0`/`latest`,
+      five core archives, Windows setup and flat `SHA256SUMS` all published.
+- [x] Downloaded all Release assets and verified `sha256sum -c SHA256SUMS`;
+      real online installer and PyPI install both produced `ostium 0.1.0`.
+- [ ] Publish `v0.1.1` if immutable provenance is required for the post-release
+      `install-online.sh`/`SHA256SUMS` hotfix (PyPI 0.1.0 sdist and tag source
+      still contain the pre-hotfix installer copy).
+
+## External validation still open
 - [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14, and
       Linux TUN on a privileged host.
 - [ ] Run ACME staging and one production issuance on the Hong Kong server.

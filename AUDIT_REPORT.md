@@ -3,7 +3,7 @@
 日期：2026-11-13
 
 审计对象：`/mnt/d/CodeWorkspace/Ostium`（第四轮，基线 `e0d4c4a`）
-结论：**第四轮发现的 P0/P1 代码缺陷已修复；自动化测试、覆盖率、静态检查、前端构建、E2E、隔离安装与升级回滚均通过。真实 Release、Windows/macOS 实机、Nginx `nginx -t`、TUN/系统代理实机、ACME 与 72h soak 仍未验证，发布状态列为 blocker。§12/§13 是前几轮历史记录；第四轮最新结果以本节、§14 和文末证据为准。**
+结论：**v0.1.0 已于 2026-11-13 发布（GitHub Release、PyPI、GHCR）；第四轮发现的 P0/P1 代码缺陷已修复，自动化测试、覆盖率、静态检查、前端构建、E2E、隔离安装与真实 Release 在线安装均通过。Windows/macOS 运行时、Nginx `nginx -t`、真实 TUN/系统代理、ACME 与 72h soak 仍未实机验证。§12/§13 是前几轮历史记录；第四轮最新结果以本节、§14、§15 和文末证据为准。**
 
 ---
 
@@ -551,7 +551,7 @@ shellcheck + bash -n                                  -> PASS
 
 **代码层面：达到 release candidate；第四轮发现的 P0/P1 已修复，自动化、构建、隔离安装/升级和前端 E2E 证据通过。**
 
-**发布层面：NO-GO。** 最小阻塞：
+**发布前判断为 NO-GO（保留为审计记录）。** 用户随后明确授权发布，实际发布结果见 §15；以下外部验证项仍是发布后的残余风险：
 
 1. 未创建 `v0.1.0` tag，Release/PyPI/GHCR 链接仍 404；需明确授权发布。
 2. Windows 实机/runner 未验证安装、服务、TUN/Wintun、PAC 恢复。
@@ -561,3 +561,42 @@ shellcheck + bash -n                                  -> PASS
 6. 默认非 root systemd 安装尚未在真实 systemd 主机跑通。
 
 因此不能把 README 的“当前稳定版本”与发布链接视为已验证事实；需要完成上述验收并发布后才能给出 GO。
+
+---
+
+## 15. v0.1.0 发布记录（2026-11-13）
+
+### 15.1 发布结果
+
+| 项目 | 结果 |
+|---|---|
+| Git tag | `v0.1.0` → `b244f08` |
+| Release workflow | run `43381306485`，success |
+| GitHub Release | <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>，17 个资产 |
+| PyPI | `ostium-ctl==0.1.0`，wheel + sdist |
+| GHCR | `0.1.0`、`v0.1.0`、`latest` |
+| Core archives | 5 个目标（linux/darwin amd64+arm64、windows amd64），含 `.sha256` 与 manifest |
+| Windows installer | `Ostium-0.1.0-windows-x64-setup.exe`（约 99 MB） |
+
+### 15.2 真实发布制品验证
+
+- 下载全部 17 个 Release 资产后 `sha256sum -c SHA256SUMS`：全部 OK。
+- 从 GitHub Release 资产运行 `install-online.sh install --version 0.1.0`：
+  uv + 托管 Python 3.13.13 + wheel/sdist/core 下载与 SHA256 校验通过，
+  安装后 `ostium version` 为 `0.1.0`，`/healthz` 正常。
+- 从 PyPI 安装 `ostium-ctl==0.1.0`：`ostium version` 为 `0.1.0`，wheel 内 SPA 存在。
+- GitHub Release / PyPI 页面 HTTP 200；GHCR tags list 包含三个标签。
+
+### 15.3 发布后热修与残余风险
+
+- 首次发布的 `install-online.sh` 在 `sums_asset` 中误用函数 `$2` 而非 `$3`，导致在线安装找不到 wheel。
+  已在 main `8e3bb41` 修复，并重新上传 Release 的 `install-online.sh` 与 `SHA256SUMS`
+  （`sha256sum -c` 已复核）。
+- **注意**：PyPI 的 0.1.0 sdist 与 `v0.1.0` tag 源码中的 `scripts/install-online.sh`
+  仍是热修前副本；PyPI 安装、GitHub Release 资产安装和 `--local-dir` 均可用。
+  Release 中热修的两个资产没有重新生成构建证明；若需要完整不可变制品证明，应发布 `v0.1.1`。
+- Windows 安装器已构建，但未在真实 Windows 11 运行安装/服务/TUN/PAC；macOS launchd、
+  Linux 默认非 root systemd、Nginx、Docker 运行、ACME、真实 TUN/Allow LAN、72h soak
+  与签名仍未实机验收。
+
+**结论：v0.1.0 已发布且主安装路径可用；生产可用性仍取决于上述外部实机验收。**

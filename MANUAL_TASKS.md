@@ -78,15 +78,17 @@ hardware or accounts.
 - [x] Create the GitHub repository `ThzxxArt/Ostium` and push the implementation.
 - [x] Isolated Linux install/upgrade/uninstall tests with local release assets,
       including failed-wheel rollback and `--run-as-root --no-service`.
-- [x] Online installer local-dir path with uv-managed Python 3.13 and SHA256
-      verification (real GitHub Release assets still unverified).
-- [ ] Configure PyPI Trusted Publishing for `ostium-ctl`, GHCR permissions and
-      GitHub release signing/attestation.
+- [x] Real GitHub Release online install (`install-online.sh --version 0.1.0`)
+      with uv-managed Python 3.13, SHA256 verification and `ostium 0.1.0`.
+- [x] PyPI Trusted Publishing for `ostium-ctl`, GHCR permissions and release
+      attestations; Release workflow `43381306485` published `v0.1.0`.
+- [x] Downloaded all 17 Release assets and verified `sha256sum -c SHA256SUMS`;
+      PyPI wheel install and GHCR tags (`0.1.0`, `v0.1.0`, `latest`) verified.
 - [ ] Decide whether to buy a Windows code-signing certificate and Apple
       Developer ID/notarization (optional per PLAN).
-- [ ] Create tag `v0.1.0` and run the release workflow; verify `SHA256SUMS`, SBOM,
-      wheel, core artifacts, Windows setup, Docker image and GitHub release.
-      Nothing has been published without explicit approval.
+- [ ] If immutable provenance is required for the post-release
+      `install-online.sh`/`SHA256SUMS` hotfix, publish `v0.1.1` (PyPI 0.1.0
+      sdist and tag source still contain the pre-hotfix copy).
 - [ ] Complete the legal/AUP review for the chosen hosting provider and
       jurisdiction; this project provides no legal advice.
 - [ ] Confirm the final 72h soak, ACME, backup/restore and upgrade/rollback

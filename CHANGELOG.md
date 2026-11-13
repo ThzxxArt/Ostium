@@ -3,7 +3,15 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-11-13
+
+### Release
+
+- Published GitHub Release `v0.1.0`, PyPI `ostium-ctl==0.1.0` and GHCR tags
+  `0.1.0`/`v0.1.0`/`latest`.
+- Post-release live-download testing fixed the online installer's checksum
+  lookup; the Release `install-online.sh` and `SHA256SUMS` assets were repaired
+  on `main` commit `8e3bb41`.
 
 ### Added
 
