@@ -49,6 +49,17 @@ def test_release_publishes_every_checksummed_asset() -> None:
         assert asset in files
 
 
+def test_release_windows_wintun_is_checked_and_located() -> None:
+    windows = _release()["jobs"]["windows"]
+    prepare = next(
+        step for step in windows["steps"] if step.get("name") == "Prepare core and Wintun"
+    )
+    script = prepare["run"]
+    assert "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51" in script
+    assert "Get-ChildItem dist/wintun -Recurse -Filter wintun.dll" in script
+    assert "dist/wintun/bin/amd64/wintun.dll" not in script
+
+
 def test_release_publishes_both_docker_version_tags() -> None:
     docker = _release()["jobs"]["docker"]
     metadata = next(
