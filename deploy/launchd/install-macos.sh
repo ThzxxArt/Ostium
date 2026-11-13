@@ -52,9 +52,26 @@ if [[ ! -x "$CORE_DIR/sing-box" ]] || ! "$CORE_DIR/sing-box" version >/dev/null 
 fi
 
 mkdir -p "$PREFIX" "$DATA" "$DATA/logs" "$DATA/core" "$UI_DATA" "$UI_DATA/logs"
-"$PYTHON_BIN" -m venv "$PREFIX/venv"
-"$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
-"$PREFIX/venv/bin/pip" install --no-cache-dir "$WHEEL"
+VENV="$PREFIX/venv"
+OLD_VENV=""
+if [[ -d "$VENV" ]]; then
+  OLD_VENV="$PREFIX/venv.old"
+  rm -rf "$OLD_VENV"
+  mv "$VENV" "$OLD_VENV"
+fi
+if ! "$PYTHON_BIN" -m venv "$VENV" \
+  || ! "$VENV/bin/pip" install --no-cache-dir --upgrade pip wheel \
+  || ! "$VENV/bin/pip" install --no-cache-dir "$WHEEL"; then
+  rm -rf "$VENV"
+  if [[ -n "$OLD_VENV" ]]; then
+    mv "$OLD_VENV" "$VENV"
+  fi
+  echo "Ostium 安装失败，旧虚拟环境已恢复" >&2
+  exit 1
+fi
+if [[ -n "$OLD_VENV" ]]; then
+  rm -rf "$OLD_VENV"
+fi
 ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
 install -m 0755 "$CORE_DIR/sing-box" "$PREFIX/sing-box"

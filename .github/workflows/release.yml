@@ -167,6 +167,8 @@ jobs:
           python3 scripts/build-core-manifest.py --dir dist/core
           --release-version "${{ github.ref_name }}"
           --output dist/core-manifest.json
+      - name: Drop downloaded core manifest
+        run: rm -f dist/core/core-manifest.json
       - name: Stage Python distributions
         run: |
           mkdir -p dist/pypi

@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Run this script as Administrator."
 }
@@ -29,7 +30,7 @@ if ($sourceFull -ne $installFull) {
 $dataToml = $DataDir.Replace('\', '/')
 $engineToml = (Join-Path $CoreDir "sing-box.exe").Replace('\', '/')
 $coreConfig = Join-Path $ServiceDir "core.toml"
-@"
+$coreToml = @"
 role = "client"
 data_dir = "$dataToml"
 config_dir = "$dataToml"
@@ -37,13 +38,16 @@ log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$engineToml"
 core_url = "http://127.0.0.1:8788"
-"@ | Set-Content -LiteralPath $coreConfig -Encoding utf8
+"@
+# File.WriteAllText emits UTF-8 without a BOM.  Windows PowerShell 5.1's
+# `Set-Content -Encoding utf8` adds a BOM, which tomllib rejects.
+[IO.File]::WriteAllText($coreConfig, $coreToml)
 
 # The UI keeps its own user-writable configuration.  Keep the service's
 # configuration separate so a local user cannot change engine_path.
 $uiConfig = "$DataDir\config.toml"
 if (-not (Test-Path $uiConfig)) {
-    @"
+    $uiToml = @"
 role = "client"
 host = "127.0.0.1"
 port = 8787
@@ -54,7 +58,8 @@ engine_version = "1.14.4-ostium.1"
 engine_path = "$engineToml"
 core_url = "http://127.0.0.1:8788"
 mode = "system_proxy"
-"@ | Set-Content -LiteralPath $uiConfig -Encoding utf8
+"@
+    [IO.File]::WriteAllText($uiConfig, $uiToml)
 }
 
 $env:OSTIUM_ROLE = "client"
@@ -91,6 +96,13 @@ icacls $DataDir /grant "${userAccount}:(OI)(CI)M" | Out-Null
 $serviceExe = Join-Path $ServiceDir "ostium-service.exe"
 if (-not (Test-Path $serviceExe)) {
     throw "Ostium service executable is missing: $serviceExe"
+}
+# Re-running the installer must be idempotent.  Remove the old service
+# registration before installing the new one; user data lives outside the
+# service definition and is preserved.
+if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
+    Stop-Service OstiumCore -ErrorAction SilentlyContinue
+    & $serviceExe remove
 }
 & $serviceExe --startup auto install
 Start-Service OstiumCore -ErrorAction Stop

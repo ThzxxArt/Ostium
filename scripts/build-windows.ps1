@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-if (-not $IsWindows) { throw "Run this script on Windows." }
+if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 
 function Copy-IfDifferent([string]$Source, [string]$Destination) {
     $sourceFull = [IO.Path]::GetFullPath($Source)

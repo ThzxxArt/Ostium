@@ -123,6 +123,7 @@ function Install-Ostium([string]$ResolvedVersion) {
         }
         if ($NoStart) {
             Stop-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
+            Stop-Service OstiumCore -ErrorAction SilentlyContinue
         }
         Write-Step "安装完成。打开 http://127.0.0.1:8787"
     }

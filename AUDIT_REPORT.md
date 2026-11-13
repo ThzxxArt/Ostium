@@ -406,6 +406,8 @@ shellcheck + bash -n                                  -> PASS
 | R3-03 | Windows 服务包缺少 PyInstaller `_internal`：只复制 `ostium-service.exe`，LocalSystem 服务无法启动 | PyInstaller 6 one-dir 产物依赖 `_internal`；构建脚本只复制单文件 | 整个 `dist\OstiumService\*` 复制到 `service\` 子目录，安装/卸载脚本改用该路径 | `test_windows_release_layout...`；Windows runner 仍待实机 |
 | R3-04 | PyPI 发布目录混入 core/windows/SHA256SUMS：`pypa/gh-action-pypi-publish` 对 `dist/*` 执行 `twine check`/`upload`，会因目录或非分发包失败 | release workflow 直接把 `packages-dir` 指向包含所有 Release 资产的 `dist` | 新增 `dist/pypi` 暂存目录，只复制 wheel/sdist；checksums 排除该目录 | 本地布局模拟只得到 wheel+sdist；`release.yml` 静态核对 |
 | R3-05 | Windows LocalSystem 核心从用户可写的 `%ProgramData%\Ostium\config.toml` 读取 `engine_path`，本地用户可把核心指向任意 exe，形成 SYSTEM 提权 | UI 与核心共用 ProgramData 配置，`icacls` 又给交互用户 Modify | 核心配置/二进制移到管理员可写的 `%ProgramFiles%\Ostium`；`core.toml` 放 `service\`；UI 配置独立；服务强制机器级路径 | `test_windows_service_paths...`；`install.ps1` 静态核对；Windows 实机待验 |
+| R3-20 | Windows 默认 `powershell.exe`（5.1）没有 `$IsWindows`，`install.ps1` 会直接抛出“Run on Windows” | 使用 PowerShell Core 才存在的自动变量 | 改用 `$env:OS -eq "Windows_NT"` 判断；`build-windows.ps1` 同步 | `test_windows_release_layout...`；PowerShell 7 解析 |
+| R3-21 | PowerShell 5.1 的 `Set-Content -Encoding utf8` 写 BOM，Python `tomllib` 拒绝解析 `core.toml`，Windows 核心无法启动 | BOM 在 `tomllib` 中是 `Invalid statement` | 用 `[IO.File]::WriteAllText` 写 UTF-8 without BOM | `test_windows_release_layout...` 断言无 `Set-Content ... utf8`；本地 `tomllib` BOM 复现 |
 
 ### 13.2 P1（安全/功能/发布质量）
 
@@ -425,6 +427,9 @@ shellcheck + bash -n                                  -> PASS
 | R3-17 | Linux 客户端核心配置对 UI 组可写，UI 用户可改 `engine_path` 后由带网络权限的核心执行 | `CLIENT_CONFIG` 使用 `0660 root:ostium` | 改为 `0640 root:ostium`，升级路径也收紧权限 | `test_installers` 静态断言；安装脚本路径复核 |
 | R3-18 | Release 工作流没有验证门禁：tag 推送可绕过测试直接发布 | `publish` 只依赖构建 job，不依赖测试/审计 | 新增 `verify` job（ruff/mypy/pytest/前后端审计/前端测试），`docker`/`publish` 均依赖它；同时补齐 sdist 上传与 provenance 范围 | workflow 静态核对；真实 tag 待授权 |
 | R3-19 | macOS 非 root UI LaunchAgent 把日志写到 `/tmp`，本机其他用户可读 | plist 使用固定 `/tmp/ostium-ui.log` | 改为用户可写的 `Ostium UI/logs/ui.log` | `com.ostium.ui.plist` 静态核对 |
+| R3-22 | Windows 重装/升级时 `ostium-service.exe install` 可能因服务已存在失败 | 未先移除旧服务注册 | 检测 `OstiumCore`，停止并 remove 后重新 install | `install.ps1` 静态核对；Windows 实机待验 |
+| R3-23 | Release `SHA256SUMS` 包含下载 artifact 里的 `core/core-manifest.json`，但该嵌套文件未上传，校验会失败 | `download-artifact core-*` 把 manifest 解到 `dist/core` | 发布前删除 `dist/core/core-manifest.json`，只保留根 manifest | release workflow 静态核对 |
+| R3-24 | macOS 升级先重建 venv，pip 失败会留下损坏安装 | 没有事务/回滚 | 先移到 `venv.old`，失败恢复旧 venv | `install-macos.sh` shellcheck + 静态路径核对；macOS 实机待验 |
 
 ### 13.3 第三轮回归矩阵
 
@@ -446,13 +451,13 @@ shellcheck + bash -n                                  -> PASS
 | 卸载 | `install-online.sh uninstall` 删除程序/链接，保留数据和配置 |
 | 客户端隔离 | 核心/UI 配置分离；`core-run` 在 `runtime/core.token` 生成令牌，`/v1/status` 鉴权 200 |
 | 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、sdist 已上传、权限按 job 收窄、`verify` 门禁依赖正确 |
-| 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、397 非集成后端测试、wheel 含 SPA 全部通过（基线 `9886352`；最终修复后需再跑一次） |
-| GitHub Actions | `cbf9b70`：CI 43342090358、E2E 43342090301、Security 43342090359、Docs 43342090287 全部 success |
+| 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、397 非集成后端测试、wheel 含 SPA 全部通过（基线 `a2db617`） |
+| GitHub Actions | `a2db617`：CI 43350901759、E2E 43350901748、Security 43350901777 全部 success；Docs 在包含 docs 变更的 `cbf9b70` 为 43342090287 success |
 
 ### 13.4 仍未验证 / 外部阻塞
 
 - **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。本轮已按爸爸批准 **push 代码到 `main`**；没有 tag 或发布。
-- 推送后的 GitHub Actions 在 `cbf9b70` 全部通过：CI `43342090358`、E2E `43342090301`、Security `43342090359`、Docs `43342090287`。
+- 推送后的 GitHub Actions 在 `a2db617` 全部通过：CI `43350901759`、E2E `43350901748`、Security `43350901777`；Docs 在包含 docs 变更的 `cbf9b70` 为 `43342090287`。
 - **Windows**：未在 Windows runner/实机执行 PyInstaller one-dir、Inno 安装/卸载、服务启动、TUN/Wintun、PAC 恢复；PowerShell 只做了解析和静态检查。R3-03/R3-05 的运行时行为必须实机确认。
 - **macOS**：launchd、`ostium` 组、token 权限、UI 以用户启动、Gatekeeper/签名未实机验证。
 - **Linux TUN/系统代理**：需要真实 `/dev/net/tun`、NetworkManager/GNOME/KDE 会话；本轮只验证代码和配置。
