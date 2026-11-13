@@ -283,7 +283,7 @@ async def use_for_inbounds(
         raise CertificateError(
             f"certificate assignment is not supported for: {sorted(unknown)}", "bad_request"
         )
-    if certificate.status != "ready" or certificate.expires_at is None:
+    if not certificate_is_ready(certificate):
         raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
     inbounds = (
         (await session.execute(select(Inbound).where(Inbound.kind.in_(targets)))).scalars().all()
@@ -300,7 +300,12 @@ async def use_for_unbound(
 
     allowed = {"hysteria2", "trojan"}
     targets = kinds or sorted(allowed)
-    if certificate.status != "ready" or certificate.expires_at is None:
+    unknown = set(targets) - allowed
+    if unknown:
+        raise CertificateError(
+            f"certificate assignment is not supported for: {sorted(unknown)}", "bad_request"
+        )
+    if not certificate_is_ready(certificate):
         raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
     inbounds = (
         (

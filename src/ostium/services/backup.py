@@ -181,7 +181,10 @@ def restore_backup(
         shm = paths.data_dir / "ostium.db-shm"
         previous_db = staging / "previous.db"
         if db_target.is_file():
-            shutil.copy2(db_target, previous_db)
+            # Snapshot through SQLite instead of copying only the main file:
+            # commits still living in ostium.db-wal would otherwise be lost if
+            # the post-restore migration failed and we rolled back.
+            _sqlite_backup(db_target, previous_db)
         for leftover in (wal, shm):
             leftover.unlink(missing_ok=True)
         shutil.copy2(staging / "ostium.db", db_target)
@@ -192,6 +195,8 @@ def restore_backup(
         except Exception as exc:
             if previous_db.is_file():
                 shutil.copy2(previous_db, db_target)
+                for leftover in (wal, shm):
+                    leftover.unlink(missing_ok=True)
             else:
                 db_target.unlink(missing_ok=True)
             raise BackupError(
@@ -230,7 +235,16 @@ def restore_backup(
 
 def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     for member in archive.getmembers():
-        name = member.name.lstrip("./")
+        raw_name = member.name
+        # Validate before stripping ``./``: lstrip("./") would turn
+        # ``../../manifest.json`` into an apparently safe ``manifest.json``.
+        if raw_name.startswith(("/", "\\")) or (len(raw_name) > 1 and raw_name[1] == ":"):
+            raise BackupError("backup contains an unsafe path", "invalid_archive")
+        # Normalise Windows-created archive separators so a backup remains
+        # restorable after a move between POSIX and Windows.
+        name = raw_name.replace("\\", "/")
+        while name.startswith("./"):
+            name = name[2:]
         if member.isdir():
             continue
         if not member.isfile():
@@ -240,6 +254,7 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
             raise BackupError(f"backup contains an unexpected entry: {name}", "invalid_archive")
         if ".." in Path(name).parts or Path(name).is_absolute():
             raise BackupError("backup contains an unsafe path", "invalid_archive")
+        member.name = name
     archive.extractall(destination, filter="data")
 
 

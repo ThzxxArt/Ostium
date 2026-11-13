@@ -123,22 +123,29 @@ async def add_profile(
         except UnsafeUrlError as exc:
             raise ApiError(400, str(exc), "unsafe_url") from exc
     if subscription_url and not text:
-        async with httpx.AsyncClient(
-            timeout=20.0,
-            follow_redirects=True,
-            trust_env=False,
-            headers={"User-Agent": "Ostium/0.1"},
-        ) as client:
-            response = await client.get(subscription_url)
-            if response.status_code >= 400:
-                raise ApiError(
-                    502,
-                    f"subscription download failed: HTTP {response.status_code}",
-                    "refresh_failed",
-                )
-            if len(response.content) > MAX_SUBSCRIPTION_BYTES:
-                raise ApiError(400, "the subscription exceeds the 2 MiB size limit", "too_large")
-            text = response.text
+        from ostium.services.netguard import UnsafeUrlError, fetch_limited
+
+        try:
+            fetched = await fetch_limited(
+                subscription_url,
+                allow_private=True,
+                max_bytes=MAX_SUBSCRIPTION_BYTES,
+                timeout=20.0,
+                headers={"User-Agent": "Ostium/0.1"},
+            )
+        except UnsafeUrlError as exc:
+            raise ApiError(400, str(exc), "unsafe_url") from exc
+        except ValueError as exc:
+            raise ApiError(400, str(exc), "too_large") from exc
+        except httpx.HTTPError as exc:
+            raise ApiError(502, f"subscription download failed: {exc}", "refresh_failed") from exc
+        if fetched.status_code >= 400:
+            raise ApiError(
+                502,
+                f"subscription download failed: HTTP {fetched.status_code}",
+                "refresh_failed",
+            )
+        text = fetched.text
     if not text:
         raise ApiError(400, "either text or url is required", "bad_request")
     try:
@@ -306,6 +313,10 @@ async def refresh(
     try:
         count = await refresh_profile(session, services.store, profile)
     except ProfileError as exc:
+        # ``refresh_profile`` records last_refresh_error before raising.  The
+        # request-level session would roll that flush back when the API error
+        # propagates, so persist the diagnostic explicitly.
+        await session.commit()
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_client(services, session)
     await audit(
@@ -322,12 +333,21 @@ async def refresh(
 @router.get("/profiles/{profile_id}/export")
 async def export_profile(
     profile_id: str,
-    _: AdminUser = Depends(get_current_admin),
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     profile = await _get_profile(session, profile_id)
     endpoints = endpoints_from_profile(profile, services.store)
+    await audit(
+        session,
+        actor=admin.username,
+        action="profile.exported",
+        target=profile.name,
+        ip=client_ip(request),
+        detail={"endpoints": len(endpoints)},
+    )
     return {
         "name": profile.name,
         "subscription_url": subscription_url_of(profile, services.store),

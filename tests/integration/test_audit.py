@@ -42,6 +42,30 @@ def test_alert_webhook_and_ack(settings: Settings) -> None:
     asyncio.run(_run())
 
 
+def test_notifications_switch_disables_webhook(settings: Settings) -> None:
+    async def _run() -> None:
+        engine = create_engine(settings.paths.db_path)
+        await create_schema(engine)
+        factory = create_session_factory(engine)
+        bus = EventBus()
+        async with factory() as session:
+            await set_setting(session, "webhook_url", "https://example.com/hook")
+            await set_setting(session, "notifications_enabled", False)
+            with respx.mock:
+                route = respx.post("https://example.com/hook").mock(
+                    return_value=httpx.Response(200)
+                )
+                await create_alert(
+                    session, bus, level="warning", code="quiet", message="do not send"
+                )
+                await session.commit()
+                await asyncio.sleep(0.05)
+                assert not route.called
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
 def test_webhook_requires_200() -> None:
     async def _run() -> None:
         with respx.mock:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -139,6 +140,8 @@ class EngineManager:
             if cert.status == "ready"
             and cert.expires_at is not None
             and as_utc(cert.expires_at) > utcnow()
+            and Path(cert.cert_path).is_file()
+            and Path(cert.key_path).is_file()
         }
         inbound_rows = (await session.execute(select(Inbound))).scalars().all()
         inbounds: list[ServerInbound] = []
@@ -209,8 +212,10 @@ class EngineManager:
             profiles = [profile for profile in profiles if profile.id == active_profile_id]
         if not profiles:
             raise EngineError("no client profile is configured", "no_profile", 400)
+        # Key by database id, not display name: profile names are not unique.
         groups = [
-            (profile.name, endpoints_from_profile(profile, self.store)) for profile in profiles
+            (profile.id, profile.name, endpoints_from_profile(profile, self.store))
+            for profile in profiles
         ]
         endpoints, tag_mapping = namespace_endpoint_tags(groups)
         if not endpoints:
@@ -219,7 +224,7 @@ class EngineManager:
         if chosen is None:
             source = next((profile for profile in profiles if profile.selected_endpoint), None)
             if source is not None and source.selected_endpoint:
-                chosen = tag_mapping.get((source.name, source.selected_endpoint))
+                chosen = tag_mapping.get((source.id, source.selected_endpoint))
         tags = {endpoint.tag for endpoint in endpoints}
         if chosen is not None and chosen not in tags:
             chosen = None

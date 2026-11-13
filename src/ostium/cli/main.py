@@ -235,6 +235,8 @@ def init(
         settings.allow_insecure_bind = False
     if role_value is Role.SERVER or settings.dev:
         settings.core_token_file = settings.data_dir / "runtime" / "core.token"
+    if role_value is Role.SERVER and domain:
+        settings.trusted_hosts = sorted({*settings.trusted_hosts, domain.strip().lower()})
     settings.paths.ensure()
     settings.save()
 
@@ -342,10 +344,14 @@ def serve(
             "[yellow]warning: admin UI is listening on a non-loopback plaintext address "
             "because allow_insecure_bind is enabled; restrict the port with a firewall.[/yellow]"
         )
-    with contextlib.suppress(Exception):
+    try:
         result = apply_pending_restore(settings)
         if result:
             console.print("[green]Staged backup restored before startup.[/green]")
+    except Exception as exc:
+        err_console.print(
+            f"[yellow]warning: staged backup restore failed and was kept for retry: {exc}[/yellow]"
+        )
     ssl_certfile = ssl_keyfile = None
     if settings.public_ui:
         from sqlalchemy import select
@@ -675,6 +681,27 @@ def tun(action: str = typer.Argument("status", help="on, off or status")) -> Non
         _fail("action must be on, off or status", 2)
 
 
+def _update_channel(settings: Settings) -> str:
+    """Read the operational update channel without making the check brittle."""
+
+    async def _read() -> str:
+        from ostium.services.settings import get_setting
+
+        engine, factory, _store = await _database(settings)
+        try:
+            async with factory() as session:
+                value = await get_setting(session, "update_channel", "stable")
+                return value if value in {"stable", "beta"} else "stable"
+        finally:
+            await engine.dispose()
+
+    try:
+        result = _run(_read())
+        return result if isinstance(result, str) else "stable"
+    except Exception:
+        return "stable"
+
+
 @app.command()
 def update(check: bool = typer.Option(False, "--check")) -> None:
     """Check for updates (installation is explicit)."""
@@ -688,7 +715,12 @@ def update(check: bool = typer.Option(False, "--check")) -> None:
         return
     from packaging.version import InvalidVersion, Version
 
-    url = "https://api.github.com/repos/ThzxxArt/Ostium/releases/latest"
+    settings = _load_settings()
+    channel = _update_channel(settings)
+    if channel == "beta":
+        url = "https://api.github.com/repos/ThzxxArt/Ostium/releases?per_page=30"
+    else:
+        url = "https://api.github.com/repos/ThzxxArt/Ostium/releases/latest"
     try:
         response = httpx.get(
             url,
@@ -699,13 +731,31 @@ def update(check: bool = typer.Option(False, "--check")) -> None:
         )
         response.raise_for_status()
         payload = response.json()
-        latest = str(payload.get("tag_name", "")).lstrip("v")
-        if not latest:
-            _fail("the update check returned no release tag", 4)
+        if channel == "beta":
+            releases = payload if isinstance(payload, list) else []
+            versions = []
+            for release in releases:
+                if not isinstance(release, dict) or release.get("draft"):
+                    continue
+                try:
+                    versions.append(
+                        (Version(str(release.get("tag_name", "")).lstrip("v")), release)
+                    )
+                except InvalidVersion:
+                    continue
+            if not versions:
+                _fail("the update check returned no usable release tag", 4)
+            version, selected = max(versions, key=lambda item: item[0])
+            latest = str(version)
+        else:
+            latest = str(payload.get("tag_name", "")).lstrip("v")
+            selected = payload
+            if not latest:
+                _fail("the update check returned no release tag", 4)
         if Version(latest) > Version(__version__):
             console.print(f"[yellow]update available: {latest}[/yellow]")
             console.print(
-                str(payload.get("html_url", "https://github.com/ThzxxArt/Ostium/releases"))
+                str(selected.get("html_url", "https://github.com/ThzxxArt/Ostium/releases"))
             )
         else:
             console.print("[green]Ostium is up to date.[/green]")
@@ -1231,10 +1281,27 @@ def profile_import(
     text: str
     subscription_url: str | None = None
     if source.startswith(("http://", "https://")):
+        from ostium.services.netguard import UnsafeUrlError, fetch_limited
+        from ostium.services.profiles import MAX_SUBSCRIPTION_BYTES
+
         subscription_url = source
-        response = httpx.get(source, timeout=20, follow_redirects=True, trust_env=False)
-        response.raise_for_status()
-        text = response.text
+        try:
+            fetched = _run(
+                fetch_limited(
+                    source,
+                    allow_private=True,
+                    max_bytes=MAX_SUBSCRIPTION_BYTES,
+                    timeout=20.0,
+                    headers={"User-Agent": "Ostium/0.1"},
+                )
+            )
+        except UnsafeUrlError as exc:
+            _fail(str(exc), 2)
+        except (httpx.HTTPError, ValueError) as exc:
+            _fail(f"subscription download failed: {exc}", 1)
+        if fetched.status_code >= 400:
+            _fail(f"subscription download failed: HTTP {fetched.status_code}", 1)
+        text = fetched.text
     else:
         path = Path(source)
         text = path.read_text(encoding="utf-8") if path.is_file() else source

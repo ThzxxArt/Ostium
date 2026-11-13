@@ -254,6 +254,7 @@ class CoreSupervisor:
         if not self.engine.is_file():
             raise EngineUnavailable(f"sing-box was not found at {self.engine}")
         await self._terminate()
+        self._cleanup_orphan()
         if not self.last_good.is_file():
             raise EngineUnavailable("no last-good configuration is available")
         self._rotate_logs()
@@ -343,6 +344,39 @@ class CoreSupervisor:
         finally:
             self._process = None
             self._append_log("supervisor", "stopped sing-box")
+
+    def _cleanup_orphan(self) -> None:
+        """Terminate a sing-box child left behind by a killed core process.
+
+        The child is started in a new session so an operator-run core that is
+        SIGKILLed does not take its proxy down with it.  On the next start the
+        old PID is still recorded in ``core-state.json`` and would otherwise
+        keep the inbound ports, making every new spawn fail.
+        """
+
+        try:
+            state = json.loads(self.state_path.read_text(encoding="utf-8"))
+            pid = int(state.get("pid") or 0)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return
+        if pid <= 1 or pid == os.getpid():
+            return
+        try:
+            import psutil
+
+            process = psutil.Process(pid)
+            command = " ".join(process.cmdline())
+            if str(self.engine) not in command:
+                return
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except psutil.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+            self._append_log("supervisor", f"terminated orphan sing-box pid={pid}")
+        except Exception:
+            return
 
     def _rotate_logs(self) -> None:
         try:

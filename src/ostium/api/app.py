@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ipaddress
+import logging
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from urllib.parse import urlparse
@@ -30,6 +31,7 @@ from ostium.services.stats import StatsCollector
 from ostium.services.users import ensure_inbounds
 
 CSRF_COOKIE = "ostium_csrf"
+logger = logging.getLogger(__name__)
 
 
 def build_app(settings: Settings | None = None) -> FastAPI:
@@ -44,8 +46,10 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             settings.validate_bind()
         except InsecureBindError as exc:
             raise RuntimeError(str(exc)) from exc
-        with contextlib.suppress(Exception):
+        try:
             apply_pending_restore(settings)
+        except Exception as exc:
+            logger.warning("staged backup restore failed and was kept for retry: %s", exc)
         engine = create_engine(settings.paths.db_path, echo=False)
         await create_schema(engine)
         factory = create_session_factory(engine)
@@ -99,7 +103,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             except Exception as exc:
                 bus.log("warning", "auto-connect skipped", error=str(exc))
         with contextlib.suppress(Exception):
-            services.proxy.recover_if_stale()
+            await asyncio.to_thread(services.proxy.recover_if_stale)
         if stats is not None:
             await stats.start()
         services.tasks = [
@@ -112,6 +116,11 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         else:
             services.tasks.append(
                 asyncio.create_task(_profile_refresh(services), name="ostium-profile-refresh")
+            )
+            # Always run the watchdog; the switch is read every tick so toggling
+            # auto-reconnect in Settings takes effect without a restart.
+            services.tasks.append(
+                asyncio.create_task(_core_watchdog(services), name="ostium-core-watchdog")
             )
         bus.log(
             "info", "Ostium control plane started", version=__version__, role=settings.role.value
@@ -128,7 +137,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 await stats.stop()
             await jobs.shutdown()
             with contextlib.suppress(Exception):
-                services.proxy.disable()
+                await asyncio.to_thread(services.proxy.disable)
             await engine.dispose()
 
     app = FastAPI(
@@ -254,6 +263,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception(
+            "unhandled API error",
+            extra={
+                "request_id": getattr(request.state, "request_id", None),
+                "path": request.url.path,
+            },
+        )
         return problem_response(request, ApiError(500, "internal server error", "internal_error"))
 
     from ostium.api import routes_auth
@@ -417,9 +433,16 @@ async def _housekeeping(
 async def _run_housekeeping(services: Services) -> None:
     from datetime import timedelta
 
-    from sqlalchemy import select
+    from sqlalchemy import delete, select
 
-    from ostium.db.models import AuditLog, Certificate, Job, Session, TrafficDaily
+    from ostium.db.models import (
+        AuditLog,
+        Backup,
+        Certificate,
+        Job,
+        Session,
+        TrafficDaily,
+    )
     from ostium.services.audit import create_alert
     from ostium.services.backup import create_backup, prune_automatic_backups
     from ostium.services.settings import get_setting
@@ -513,7 +536,23 @@ async def _run_housekeeping(services: Services) -> None:
                     create_backup, services.settings, automatic=True, include_master_key=True
                 )
                 services.bus.log("info", "automatic backup created", filename=result["filename"])
-                prune_automatic_backups(services.settings, keep=7)
+                async with services.session_factory() as backup_session:
+                    backup_session.add(
+                        Backup(
+                            filename=result["filename"],
+                            size=result["size"],
+                            sha256=result["sha256"],
+                            encrypted=result["encrypted"],
+                        )
+                    )
+                    await backup_session.commit()
+                removed = prune_automatic_backups(services.settings, keep=7)
+                if removed:
+                    async with services.session_factory() as prune_session:
+                        await prune_session.execute(
+                            delete(Backup).where(Backup.filename.in_(removed))
+                        )
+                        await prune_session.commit()
         except Exception as exc:
             services.bus.log("error", "automatic backup failed", error=str(exc))
 
@@ -601,6 +640,39 @@ async def _profile_refresh(
             return
         except Exception as exc:
             services.bus.log("error", "profile refresh loop failed", error=str(exc))
+
+
+async def _watchdog_tick(services: Services) -> None:
+    """Restart a client core that disappeared after it had a good config."""
+
+    if not services.settings.auto_reconnect or services.watchdog_suspended:
+        return
+    if not services.settings.paths.last_good_path.is_file():
+        return
+    try:
+        status = await services.engine.client.status()
+        if status.get("running"):
+            return
+    except Exception:
+        pass
+    try:
+        await services.engine.client.reload()
+        services.bus.log("info", "client core auto-reconnected")
+    except Exception as exc:
+        services.bus.log("warning", "client core auto-reconnect failed", error=str(exc))
+
+
+async def _core_watchdog(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    while True:
+        try:
+            await sleep(15)
+            await _watchdog_tick(services)
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            services.bus.log("error", "core watchdog failed", error=str(exc))
 
 
 def _register_extra_routers(app: FastAPI) -> None:

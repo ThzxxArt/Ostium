@@ -110,7 +110,8 @@ async def create_alert(
         {"id": alert.id, "level": level, "code": code, "message": alert.message},
     )
     webhook_url = await get_setting(session, "webhook_url")
-    if webhook_url:
+    notifications_enabled = bool(await get_setting(session, "notifications_enabled", True))
+    if webhook_url and notifications_enabled:
         secret = await get_setting(session, "webhook_secret", "")
         payload = {"type": "alert", "level": level, "code": code, "message": alert.message}
 

@@ -61,6 +61,7 @@ class StatsCollector:
         self._bootstrapped = False
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
+        self._flush_lock = asyncio.Lock()
         self._tick = 0
         self._last_error: str | None = None
         self._last_flush = time.monotonic()
@@ -161,105 +162,127 @@ class StatsCollector:
             await self.enforce_quotas()
 
     async def flush(self) -> None:
-        pending = {key: value for key, value in self._pending.items() if value.up or value.down}
-        if not pending:
-            self._last_flush = time.monotonic()
-            return
-        today = utcnow().date()
-        async with self.session_factory() as session:
-            users = (
-                (await session.execute(select(ProxyUser).where(ProxyUser.id.in_(pending.keys()))))
-                .scalars()
-                .all()
-            )
-            for user in users:
-                delta = pending[user.id]
-                total = delta.up + delta.down
-                if total <= 0:
-                    continue
-                user.used_bytes += total
-                user.last_seen_at = utcnow()
-                row = (
-                    await session.execute(
-                        select(TrafficDaily).where(
-                            TrafficDaily.user_id == user.id, TrafficDaily.day == today
+        # ``stop()`` flushes explicitly while the periodic tick may already be
+        # inside flush().  Without serialisation both callers can snapshot the
+        # same pending counters and bill them twice (or clear them while the
+        # first commit is still in flight).
+        async with self._flush_lock:
+            pending = {key: value for key, value in self._pending.items() if value.up or value.down}
+            if not pending:
+                self._last_flush = time.monotonic()
+                return
+            today = utcnow().date()
+            async with self.session_factory() as session:
+                users = (
+                    (
+                        await session.execute(
+                            select(ProxyUser).where(ProxyUser.id.in_(pending.keys()))
                         )
                     )
-                ).scalar_one_or_none()
-                if row is None:
-                    session.add(
-                        TrafficDaily(
-                            user_id=user.id,
-                            day=today,
-                            uplink=delta.up,
-                            downlink=delta.down,
-                        )
-                    )
-                else:
-                    row.uplink += delta.up
-                    row.downlink += delta.down
-            for user_id, epoch in self._epoch_pending.items():
-                await session.execute(
-                    update(StatsEpoch)
-                    .where(StatsEpoch.user_id == user_id, StatsEpoch.active.is_(True))
-                    .values(active=False)
+                    .scalars()
+                    .all()
                 )
-                session.add(StatsEpoch(user_id=user_id, epoch=epoch, active=True))
-            self._epoch_pending.clear()
-            await session.commit()
-        self._pending.clear()
-        self._last_flush = time.monotonic()
-        if self.usage:
-            await self.bus.publish(
-                "stats.tick",
-                {
-                    "users": [
-                        {
-                            "id": usage.user_id,
-                            "name": usage.name,
-                            "up": usage.up,
-                            "down": usage.down,
-                            "online": usage.online,
-                        }
-                        for usage in self.usage.values()
-                    ]
-                },
-            )
+                for user in users:
+                    delta = pending[user.id]
+                    total = delta.up + delta.down
+                    if total <= 0:
+                        continue
+                    user.used_bytes += total
+                    user.last_seen_at = utcnow()
+                    row = (
+                        await session.execute(
+                            select(TrafficDaily).where(
+                                TrafficDaily.user_id == user.id, TrafficDaily.day == today
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if row is None:
+                        session.add(
+                            TrafficDaily(
+                                user_id=user.id,
+                                day=today,
+                                uplink=delta.up,
+                                downlink=delta.down,
+                            )
+                        )
+                    else:
+                        row.uplink += delta.up
+                        row.downlink += delta.down
+                for user_id, epoch in self._epoch_pending.items():
+                    await session.execute(
+                        update(StatsEpoch)
+                        .where(StatsEpoch.user_id == user_id, StatsEpoch.active.is_(True))
+                        .values(active=False)
+                    )
+                    session.add(StatsEpoch(user_id=user_id, epoch=epoch, active=True))
+                self._epoch_pending.clear()
+                await session.commit()
+            self._pending.clear()
+            self._last_flush = time.monotonic()
+            if self.usage:
+                await self.bus.publish(
+                    "stats.tick",
+                    {
+                        "users": [
+                            {
+                                "id": usage.user_id,
+                                "name": usage.name,
+                                "up": usage.up,
+                                "down": usage.down,
+                                "online": usage.online,
+                            }
+                            for usage in self.usage.values()
+                        ]
+                    },
+                )
 
     async def enforce_quotas(self) -> None:
         from ostium.services.audit import create_alert
 
         to_disable: list[str] = []
+        reactivated: list[str] = []
         changed = False
+        first_enforce = self._first_enforce
+        self._first_enforce = False
         now = utcnow()
         async with self.session_factory() as session:
             users = (await session.execute(select(ProxyUser))).scalars().all()
-            if self._first_enforce:
-                self._first_enforce = False
-                for user in users:
-                    if not user.enabled and user.disabled_reason in {"quota_exceeded", "expired"}:
-                        # The previous process may have crashed after writing
-                        # the database but before the core accepted the change.
-                        self._pending_disable.add(user.name)
             for user in users:
+                if user.quota_cycle != "monthly" or user.cycle_started_at is None:
+                    continue
+                started = user.cycle_started_at
+                if started.year == now.year and started.month == now.month:
+                    continue
+                # The cycle boundary applies to disabled users too.  A user who
+                # hit last month's quota must become usable again instead of
+                # staying disabled forever.
+                quota_disabled = not user.enabled and user.disabled_reason == "quota_exceeded"
+                user.used_bytes = 0
+                user.cycle_started_at = now
+                changed = True
+                self._alerted.pop(user.id, None)
+                self._epochs[user.id] += 1
+                await session.execute(
+                    update(StatsEpoch)
+                    .where(StatsEpoch.user_id == user.id, StatsEpoch.active.is_(True))
+                    .values(active=False)
+                )
+                session.add(StatsEpoch(user_id=user.id, epoch=self._epochs[user.id], active=True))
+                if quota_disabled:
+                    user.enabled = True
+                    user.disabled_reason = None
+                    reactivated.append(user.name)
+            for user in users:
+                if (
+                    first_enforce
+                    and not user.enabled
+                    and user.disabled_reason in {"quota_exceeded", "expired"}
+                ):
+                    # The previous process may have crashed after writing the
+                    # database but before the core accepted the change.
+                    self._pending_disable.add(user.name)
                 if not user.enabled:
                     continue
-                if user.quota_cycle == "monthly" and user.cycle_started_at is not None:
-                    started = user.cycle_started_at
-                    if started.year != now.year or started.month != now.month:
-                        user.used_bytes = 0
-                        user.cycle_started_at = now
-                        changed = True
-                        self._alerted.pop(user.id, None)
-                        self._epochs[user.id] += 1
-                        await session.execute(
-                            update(StatsEpoch)
-                            .where(StatsEpoch.user_id == user.id, StatsEpoch.active.is_(True))
-                            .values(active=False)
-                        )
-                        session.add(
-                            StatsEpoch(user_id=user.id, epoch=self._epochs[user.id], active=True)
-                        )
                 pending = self._pending[user.id]
                 effective = user.used_bytes + pending.up + pending.down
                 if user.expires_at is not None and as_utc(user.expires_at) <= now:
@@ -298,6 +321,10 @@ class StatsCollector:
             self._pending_disable.update(to_disable)
             self.bus.log("warning", "users disabled by policy", users=", ".join(to_disable))
             await self.bus.publish("quota.exceeded", {"users": to_disable})
+        if reactivated:
+            self._pending_disable.update(reactivated)
+            self.bus.log("info", "users re-enabled after quota reset", users=", ".join(reactivated))
+            await self.bus.publish("quota.reset", {"users": reactivated})
         if self._pending_disable:
             names = sorted(self._pending_disable)
             if await self._disable(names):

@@ -237,6 +237,58 @@ async def _create_over(factory, store) -> bool:
     return True
 
 
+def test_monthly_rollover_reactivates_quota_disabled_user(tmp_path: Path) -> None:
+    async def _run() -> None:
+        settings, engine, factory, store = await _setup(tmp_path)
+        async with factory() as session:
+            user, _password, _token = await create_user(
+                session, store, name="recover", quota_bytes=10, quota_cycle="monthly"
+            )
+            user.used_bytes = 10
+            user.enabled = False
+            user.disabled_reason = "quota_exceeded"
+            user.cycle_started_at = utcnow() - timedelta(days=40)
+            await session.commit()
+
+        calls: list[list[str]] = []
+
+        async def on_quota(names: list[str]) -> None:
+            calls.append(names)
+
+        collector = StatsCollector(
+            settings=settings, session_factory=factory, bus=EventBus(), on_quota=on_quota
+        )
+        await collector.enforce_quotas()
+        async with factory() as session:
+            refreshed = await session.get(ProxyUser, user.id)
+            assert refreshed is not None
+            assert refreshed.enabled is True
+            assert refreshed.disabled_reason is None
+            assert refreshed.used_bytes == 0
+        assert calls and "recover" in calls[0]
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_concurrent_flush_does_not_double_count(tmp_path: Path) -> None:
+    async def _run() -> None:
+        settings, engine, factory, store = await _setup(tmp_path)
+        async with factory() as session:
+            user, _password, _token = await create_user(session, store, name="alice")
+            await session.commit()
+        collector = StatsCollector(settings=settings, session_factory=factory, bus=EventBus())
+        collector._pending[user.id].up = 10
+        await asyncio.gather(collector.flush(), collector.flush())
+        async with factory() as session:
+            refreshed = await session.get(ProxyUser, user.id)
+            assert refreshed is not None
+            assert refreshed.used_bytes == 10
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
 def test_snapshot_empty_and_disable_without_callback(tmp_path: Path) -> None:
     async def _run() -> None:
         settings, engine, factory, _store = await _setup(tmp_path)

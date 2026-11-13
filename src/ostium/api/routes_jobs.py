@@ -4,12 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ostium.api.deps import Services, get_current_admin, get_services, get_session
+from ostium.api.deps import (
+    Services,
+    client_ip,
+    get_current_admin,
+    get_services,
+    get_session,
+)
 from ostium.api.errors import ApiError
 from ostium.db.models import AdminUser, Job
+from ostium.services.audit import audit
 from ostium.services.jobs import list_jobs, serialize_job
 
 router = APIRouter(tags=["jobs"])
@@ -40,7 +47,8 @@ async def job_detail(
 @router.post("/jobs/{job_id}/cancel")
 async def cancel_job(
     job_id: str,
-    _: AdminUser = Depends(get_current_admin),
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -48,4 +56,12 @@ async def cancel_job(
     if row is None:
         raise ApiError(404, "job not found", "not_found")
     ok = await services.jobs.cancel(job_id)
+    if ok:
+        await audit(
+            session,
+            actor=admin.username,
+            action="job.cancelled",
+            target=job_id,
+            ip=client_ip(request),
+        )
     return {"cancelled": ok}

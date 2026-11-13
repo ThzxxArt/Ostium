@@ -269,17 +269,26 @@ async def add_rule_set(
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    existing = (
-        await session.execute(select(RuleSet).where(RuleSet.name == payload.name))
-    ).scalar_one_or_none()
-    if existing is not None:
-        raise ApiError(409, "a rule set with this name already exists", "name_taken")
     try:
         name = rule_service.validate_rule_set_name(payload.name)
     except rule_service.RuleValidationError as exc:
         raise ApiError(422, str(exc), "invalid_rule_set") from exc
-    if not payload.url.startswith(("http://", "https://")):
-        raise ApiError(422, "rule set URL must use http(s)", "invalid_rule_set")
+    existing = (
+        await session.execute(select(RuleSet).where(RuleSet.name == name))
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise ApiError(409, "a rule set with this name already exists", "name_taken")
+    from urllib.parse import urlparse
+
+    from ostium.services.netguard import UnsafeUrlError, validate_target_host
+
+    parsed_url = urlparse(payload.url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+        raise ApiError(422, "rule set URL must be an absolute http(s) URL", "invalid_rule_set")
+    try:
+        validate_target_host(parsed_url.hostname, allow_private=False)
+    except UnsafeUrlError as exc:
+        raise ApiError(422, str(exc), "invalid_rule_set") from exc
     rule_set = RuleSet(name=name, url=payload.url, format=payload.format, enabled=payload.enabled)
     session.add(rule_set)
     await session.flush()

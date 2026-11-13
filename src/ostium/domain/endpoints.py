@@ -147,13 +147,16 @@ class Endpoint(BaseModel):
                 proxy["fingerprint"] = self.tls.certificate_pin_sha256
             return proxy
         if self.protocol is Protocol.TROJAN:
-            return {
+            proxy = {
                 **common,
                 "type": "trojan",
                 "password": self.password,
                 "sni": self.tls.server_name,
                 "skip-cert-verify": self.tls.insecure,
             }
+            if self.tls.certificate_pin_sha256:
+                proxy["fingerprint"] = self.tls.certificate_pin_sha256
+            return proxy
         return {
             **common,
             "type": "ss",

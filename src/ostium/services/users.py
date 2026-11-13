@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
@@ -133,7 +134,14 @@ async def rotate_subscription(session: AsyncSession, store: SecretStore, user: P
 async def reset_usage(session: AsyncSession, user: ProxyUser) -> None:
     user.used_bytes = 0
     user.cycle_started_at = utcnow()
-    if user.disabled_reason in {"quota_exceeded", "expired"} and user.expires_at is None:
+    if user.disabled_reason == "quota_exceeded":
+        # Resetting usage is also the operator's recovery path for a user that
+        # was automatically disabled at 100%: clear the reason and re-enable
+        # unless the account has independently expired.
+        user.disabled_reason = None
+        if user.expires_at is None or as_utc(user.expires_at) > utcnow():
+            user.enabled = True
+    elif user.disabled_reason == "expired" and user.expires_at is None:
         user.disabled_reason = None
     await session.flush()
 
@@ -272,6 +280,8 @@ async def endpoints_for_user(
         if row.status == "ready"
         and row.expires_at is not None
         and as_utc(row.expires_at) > utcnow()
+        and Path(row.cert_path).is_file()
+        and Path(row.key_path).is_file()
     }
     password = decrypt_password(user, store)
     ss_user_key = decrypt_ss_password(user, store)

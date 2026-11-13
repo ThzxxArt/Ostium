@@ -68,6 +68,12 @@ def test_tls_pin_and_empty_flow() -> None:
     assert endpoint.to_clash_proxy()["fingerprint"] == "pin"
     assert endpoint.to_uri().endswith("#HK%20%E8%8A%82%E7%82%B9")
 
+    trojan = _endpoint(
+        Protocol.TROJAN,
+        tls=TLSConfig(server_name="x", certificate_pin_sha256="pin"),
+    )
+    assert trojan.to_clash_proxy()["fingerprint"] == "pin"
+
     vless = _endpoint(flow="")
     assert "flow" not in vless.to_singbox_outbound()
 

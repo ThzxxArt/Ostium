@@ -142,10 +142,12 @@ def test_reset_usage_rules(settings: Settings) -> None:
         async with factory() as session:
             user, _password, _token = await create_user(session, store, name="alice")
             user.used_bytes = 100
+            user.enabled = False
             user.disabled_reason = "quota_exceeded"
             await reset_usage(session, user)
             assert user.used_bytes == 0
             assert user.disabled_reason is None
+            assert user.enabled is True
 
             user.used_bytes = 100
             user.disabled_reason = "expired"

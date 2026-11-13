@@ -167,6 +167,17 @@ async def setup(
         "acme_email": payload.acme_email,
         "lines": payload.lines,
     }
+    if server_info["domain"]:
+        # Subscription URLs are derived from this domain, and clients behind a
+        # TLS reverse proxy send it as the Host header.  Trust it from setup so
+        # the documented Nginx flow does not fail with `invalid Host header`.
+        services.settings.trusted_hosts = sorted(
+            {*services.settings.trusted_hosts, str(server_info["domain"])}
+        )
+        try:
+            services.settings.save()
+        except OSError:
+            pass
     await set_setting(session, "server", server_info)
     await set_setting(session, "initialized", True)
     await set_setting(session, "initialized_at", datetime.now(UTC).isoformat())

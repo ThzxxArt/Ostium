@@ -57,18 +57,22 @@ async def events(websocket: WebSocket) -> None:
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=PING_INTERVAL_SECONDS)
-                await websocket.send_json(event)
             except TimeoutError:
-                # Revalidate long-lived sessions so a logout, password change
-                # or revocation closes the stream instead of leaking events.
-                if asyncio.get_running_loop().time() - last_auth_check >= AUTH_REVALIDATE_SECONDS:
-                    async with services.session_factory() as session:
-                        resolved = await resolve_session(session, token)
-                        await session.commit()
-                    if resolved is None:
-                        await websocket.close(code=4401, reason="session revoked")
-                        return
-                    last_auth_check = asyncio.get_running_loop().time()
+                event = None
+            # Revalidate on a time basis, not only after an idle timeout: a
+            # busy event stream keeps resetting wait_for(), which previously
+            # let revoked sessions receive events indefinitely.
+            if asyncio.get_running_loop().time() - last_auth_check >= AUTH_REVALIDATE_SECONDS:
+                async with services.session_factory() as session:
+                    resolved = await resolve_session(session, token)
+                    await session.commit()
+                if resolved is None:
+                    await websocket.close(code=4401, reason="session revoked")
+                    return
+                last_auth_check = asyncio.get_running_loop().time()
+            if event is not None:
+                await websocket.send_json(event)
+            else:
                 await websocket.send_json({"type": "ping", "ts": iso(utcnow()), "data": {}})
     except WebSocketDisconnect:
         pass

@@ -335,6 +335,9 @@ class Settings(BaseModel):
         allow_insecure_bind = _as_bool(
             os.environ.get("OSTIUM_ALLOW_INSECURE_BIND", str(raw.get("allow_insecure_bind", False)))
         )
+        effective_public_ui = _as_bool(
+            os.environ.get("OSTIUM_PUBLIC_UI", str(raw.get("public_ui", False)))
+        )
         host_migrated = False
         # 0.1.0 shipped with host = "0.0.0.0" for servers.  Converge legacy
         # plaintext configurations to loopback unless the operator explicitly
@@ -343,7 +346,7 @@ class Settings(BaseModel):
         if (
             role is Role.SERVER
             and "OSTIUM_HOST" not in os.environ
-            and not _as_bool(str(raw.get("public_ui", False)))
+            and not effective_public_ui
             and not allow_insecure_bind
             and not is_loopback_host(str(selected_host))
         ):

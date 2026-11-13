@@ -181,6 +181,8 @@ def evaluate(rules: list[dict[str, Any]], target: dict[str, Any]) -> dict[str, A
 async def update_rule_set(
     session: AsyncSession, settings: Settings, rule_set: RuleSet
 ) -> dict[str, Any]:
+    from ostium.services.netguard import UnsafeUrlError, fetch_limited
+
     target_dir = (settings.paths.rulesets_dir / f"{rule_set.id}.srs").resolve()
     root = settings.paths.rulesets_dir.resolve()
     try:
@@ -189,39 +191,40 @@ async def update_rule_set(
         raise RuleValidationError("rule set path escapes the rules directory") from exc
     root.mkdir(parents=True, exist_ok=True)
     target = target_dir
+    headers = {"User-Agent": "Ostium/0.1"}
+    if rule_set.etag:
+        headers["If-None-Match"] = rule_set.etag
     try:
-        async with httpx.AsyncClient(
+        fetched = await fetch_limited(
+            rule_set.url,
+            allow_private=False,
+            max_bytes=MAX_RULE_SET_BYTES,
             timeout=30.0,
-            follow_redirects=True,
-            trust_env=False,
-            headers={"User-Agent": "Ostium/0.1"},
-        ) as client:
-            headers = {}
-            if rule_set.etag:
-                headers["If-None-Match"] = rule_set.etag
-            response = await client.get(rule_set.url, headers=headers)
-            if response.status_code == 304:
-                rule_set.updated_at = utcnow()
-                await session.flush()
-                return {"updated": False, "reason": "not_modified"}
-            response.raise_for_status()
-        payload = response.content
-        if len(payload) > MAX_RULE_SET_BYTES:
-            rule_set.last_error = "rule set exceeds the 32 MiB size limit"
+            headers=headers,
+        )
+        if fetched.status_code == 304:
+            rule_set.updated_at = utcnow()
             await session.flush()
-            return {"updated": False, "error": rule_set.last_error}
+            return {"updated": False, "reason": "not_modified"}
+        if fetched.status_code >= 400:
+            raise RuleValidationError(f"rule set download failed: HTTP {fetched.status_code}")
+        payload = fetched.content
         digest = hashlib.sha256(payload).hexdigest()
         temp = target.with_suffix(".srs.tmp")
         temp.write_bytes(payload)
         temp.replace(target)
         rule_set.path = str(target)
         rule_set.sha256 = digest
-        rule_set.etag = response.headers.get("etag")
+        rule_set.etag = fetched.headers.get("etag")
         rule_set.updated_at = utcnow()
         rule_set.last_error = None
         await session.flush()
         return {"updated": True, "sha256": digest, "size": len(payload)}
-    except httpx.HTTPError as exc:
+    except UnsafeUrlError as exc:
+        rule_set.last_error = str(exc)[:500]
+        await session.flush()
+        return {"updated": False, "error": str(exc)}
+    except (httpx.HTTPError, ValueError) as exc:
         rule_set.last_error = str(exc)[:500]
         await session.flush()
         return {"updated": False, "error": str(exc)}

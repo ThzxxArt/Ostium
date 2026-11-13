@@ -268,6 +268,28 @@ def test_ready_certificate_selection_and_unbound_assignment(settings: Settings) 
     asyncio.run(_run())
 
 
+def test_expired_ready_certificate_cannot_be_assigned(settings: Settings) -> None:
+    async def _run() -> None:
+        engine, factory, store = await _setup(settings)
+        async with factory() as session:
+            await ensure_inbounds(session, store)
+            certificate = await cert_service.create_self_signed(
+                session, settings, domain="vpn.example.com"
+            )
+            certificate.expires_at = utcnow() - dt.timedelta(days=1)
+            await session.flush()
+            with pytest.raises(cert_service.CertificateError, match="ready certificate"):
+                await cert_service.use_for_inbounds(session, certificate)
+            with pytest.raises(cert_service.CertificateError, match="ready certificate"):
+                await cert_service.use_for_unbound(session, certificate)
+            rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
+            assert rows["hysteria2"].certificate_id is None
+            assert rows["trojan"].certificate_id is None
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
 def test_serialize_expired_certificate(settings: Settings) -> None:
     async def _run() -> None:
         engine, factory, _store = await _setup(settings)

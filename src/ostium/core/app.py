@@ -8,6 +8,7 @@ and supervises exactly one child process.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -29,6 +30,7 @@ from ostium.engine.singbox.validate import ConfigRejected
 from ostium.util.redact import redact
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 class ApplyRequest(BaseModel):
@@ -107,7 +109,8 @@ def create_core_app(settings: Settings) -> FastAPI:
         return _problem(422, redact(str(exc)), exc.code)
 
     @app.exception_handler(Exception)
-    async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("unhandled core error", extra={"path": request.url.path})
         return _problem(500, "internal core error", "internal_error")
 
     @app.get("/v1/health")

@@ -529,25 +529,26 @@ def config_digest(config: dict[str, Any]) -> str:
 
 
 def namespace_endpoint_tags(
-    groups: list[tuple[str, list[Endpoint]]],
+    groups: list[tuple[str, str, list[Endpoint]]],
 ) -> tuple[list[Endpoint], dict[tuple[str, str], str]]:
     """Make endpoint tags unique across profiles without renaming unique ones.
 
-    Returns the flattened endpoints plus a ``(profile_name, original_tag) ->
-    effective_tag`` mapping so persisted selections keep working.
+    ``groups`` carries ``(profile_id, display_name, endpoints)``.  The returned
+    mapping is keyed by ``(profile_id, original_tag)`` so duplicate profile
+    names cannot collide, while generated tags still use the readable name.
     """
 
     counts: dict[str, int] = {}
-    for _profile, endpoints in groups:
+    for _group_key, _label, endpoints in groups:
         for endpoint in endpoints:
             counts[endpoint.tag] = counts.get(endpoint.tag, 0) + 1
     flattened: list[Endpoint] = []
     mapping: dict[tuple[str, str], str] = {}
-    for profile_name, endpoints in groups:
+    for group_key, label, endpoints in groups:
         for endpoint in endpoints:
             effective = endpoint.tag
             if counts.get(endpoint.tag, 0) > 1:
-                prefix = _tag_slug(profile_name)
+                prefix = _tag_slug(label)
                 effective = f"{prefix}-{endpoint.tag}"[:64]
                 candidate = effective
                 suffix = 2
@@ -555,7 +556,7 @@ def namespace_endpoint_tags(
                     candidate = f"{effective[:58]}-{suffix}"
                     suffix += 1
                 effective = candidate
-            mapping[(profile_name, endpoint.tag)] = effective
+            mapping[(group_key, endpoint.tag)] = effective
             flattened.append(
                 endpoint
                 if effective == endpoint.tag

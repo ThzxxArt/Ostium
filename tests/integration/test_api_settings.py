@@ -28,7 +28,12 @@ def test_settings_read_and_patch(api_client: TestClient, settings: Settings) -> 
     initial = api_client.get("/api/v1/settings").json()
     assert initial["general"]["role"] == "server"
     assert initial["general"]["routing_mode"] == "smart"
-    assert initial["security"]["trusted_hosts"] == ["localhost", "127.0.0.1", "::1"]
+    assert set(initial["security"]["trusted_hosts"]) == {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "example.com",
+    }
     assert initial["notifications"]["enabled"] is True
     assert initial["maintenance"]["update_channel"] == "stable"
 
@@ -184,6 +189,7 @@ def test_public_ui_enable_and_disable(api_client: TestClient, settings: Settings
     assert enabled.json()["public_ui"] is True
     assert settings.public_ui is True
     assert settings.secure_cookies is True
+    assert settings.host == "0.0.0.0"
     assert "ui.example.com" in settings.trusted_hosts
     server = api_client.get("/api/v1/settings").json()
     assert server["general"]["public_ui"] is True
@@ -195,6 +201,7 @@ def test_public_ui_enable_and_disable(api_client: TestClient, settings: Settings
     assert disabled.status_code == 200
     assert settings.public_ui is False
     assert settings.secure_cookies is False
+    assert settings.host == "127.0.0.1"
 
 
 def test_public_ui_disable_handles_non_dict_setting(api_client: TestClient, monkeypatch) -> None:

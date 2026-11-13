@@ -38,6 +38,9 @@ class Services:
     clash: ClashApi
     started_at: datetime = field(default_factory=utcnow)
     tasks: list[Any] = field(default_factory=list)
+    # Set by an explicit Disconnect so the auto-reconnect watchdog does not
+    # immediately undo the operator's action.
+    watchdog_suspended: bool = False
 
     @property
     def proxy(self) -> Any:

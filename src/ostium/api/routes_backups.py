@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,16 @@ from ostium.services.jobs import JobContext
 from ostium.util.time import iso
 
 router = APIRouter(tags=["backups"])
+
+
+def _backup_path(services: Services, filename: str) -> Path:
+    root = services.settings.paths.backups_dir.resolve()
+    candidate = (root / filename).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ApiError(400, "invalid backup filename", "invalid_backup") from exc
+    return candidate
 
 
 class BackupRequest(BaseModel):
@@ -81,8 +92,11 @@ async def create_backup(
 
     async def job(context: JobContext) -> dict[str, Any]:
         await context.progress(20, "snapshotting database")
-        result = backup_service.create_backup(
-            services.settings, password=payload.password, include_master_key=True
+        result = await asyncio.to_thread(
+            backup_service.create_backup,
+            services.settings,
+            password=payload.password,
+            include_master_key=True,
         )
         await context.progress(85, "recording backup")
         async with services.session_factory() as job_session:
@@ -122,11 +136,16 @@ async def restore_backup(
     row = await session.get(Backup, backup_id)
     if row is None:
         raise ApiError(404, "backup not found", "not_found")
-    source = services.settings.paths.backups_dir / row.filename
+    source = _backup_path(services, row.filename)
     if not source.is_file():
         raise ApiError(404, "backup file is missing", "not_found")
     try:
-        staged = backup_service.stage_restore(services.settings, source, password=payload.password)
+        staged = await asyncio.to_thread(
+            backup_service.stage_restore,
+            services.settings,
+            source,
+            password=payload.password,
+        )
     except backup_service.BackupError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     await audit(
@@ -157,7 +176,7 @@ async def delete_backup(
     row = await session.get(Backup, backup_id)
     if row is None:
         raise ApiError(404, "backup not found", "not_found")
-    path = services.settings.paths.backups_dir / row.filename
+    path = _backup_path(services, row.filename)
     path.unlink(missing_ok=True)
     await session.delete(row)
     await audit(

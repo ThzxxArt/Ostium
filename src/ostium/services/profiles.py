@@ -322,27 +322,28 @@ async def refresh_profile(session: AsyncSession, store: SecretStore, profile: Pr
     url = subscription_url_of(profile, store)
     if not url:
         raise ProfileError("this profile has no subscription URL")
-    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+    from ostium.services.netguard import UnsafeUrlError, fetch_limited
 
     try:
-        url = validate_remote_url(url, allow_private=True)
+        fetched = await fetch_limited(
+            url,
+            allow_private=True,
+            max_bytes=MAX_SUBSCRIPTION_BYTES,
+            timeout=20.0,
+            headers={"User-Agent": "Ostium/0.1"},
+        )
+        if fetched.status_code >= 400:
+            raise ProfileError(
+                f"subscription download failed: HTTP {fetched.status_code}",
+                "refresh_failed",
+                502,
+            )
+        endpoints = parse_subscription_text(fetched.text)
     except UnsafeUrlError as exc:
         profile.last_refresh_error = str(exc)[:500]
         await session.flush()
         raise ProfileError(str(exc), "unsafe_url", 400) from exc
-    try:
-        async with httpx.AsyncClient(
-            timeout=20.0,
-            follow_redirects=True,
-            trust_env=False,
-            headers={"User-Agent": "Ostium/0.1"},
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            if len(response.content) > MAX_SUBSCRIPTION_BYTES:
-                raise ProfileError("the subscription exceeds the 2 MiB size limit")
-        endpoints = parse_subscription_text(response.text)
-    except (httpx.HTTPError, ProfileError) as exc:
+    except (httpx.HTTPError, ValueError, ProfileError) as exc:
         profile.last_refresh_error = str(exc)[:500]
         await session.flush()
         raise ProfileError(f"subscription refresh failed: {exc}", "refresh_failed", 502) from exc

@@ -364,7 +364,8 @@ async def rotate_user_subscription(
 @router.get("/users/{user_id}/export")
 async def export_user(
     user_id: str,
-    _: AdminUser = Depends(get_current_admin),
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -373,6 +374,14 @@ async def export_user(
         session, services.store, user, server_host=await server_hostname(session)
     )
     document = ProfileDocument(name=user.name, generated_at=iso(utcnow()), endpoints=endpoints)
+    await audit(
+        session,
+        actor=admin.username,
+        action="user.exported",
+        target=user.name,
+        ip=client_ip(request),
+        detail={"endpoints": len(endpoints)},
+    )
     return cast(dict[str, Any], json.loads(document.to_json()))
 
 

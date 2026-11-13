@@ -153,7 +153,15 @@ def test_restore_archive_structure_errors(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "member",
-    ["../evil", "/absolute", "unexpected.txt", "certs/ok/../../evil", "certs/../../evil"],
+    [
+        "../evil",
+        "./../evil",
+        "/absolute",
+        "unexpected.txt",
+        "certs/ok/../../evil",
+        "certs/../../evil",
+        "..\\evil",
+    ],
 )
 def test_safe_extract_rejects_unsafe_members(member: str, tmp_path: Path) -> None:
     payload = tmp_path / "unsafe.tar.gz"
@@ -165,6 +173,26 @@ def test_safe_extract_rejects_unsafe_members(member: str, tmp_path: Path) -> Non
         _safe_extract(archive, tmp_path / "out")
 
 
+def test_safe_extract_normalises_windows_separators(tmp_path: Path) -> None:
+    payload = tmp_path / "windows.tar.gz"
+    _tar(
+        payload,
+        {
+            "manifest.json": b"{}",
+            "certs\\vpn.example.com\\fullchain.pem": b"cert",
+        },
+    )
+    destination = tmp_path / "out"
+    with tarfile.open(payload) as archive:
+        _safe_extract(archive, destination)
+    assert (destination / "certs" / "vpn.example.com" / "fullchain.pem").read_bytes() == b"cert"
+
+    drive = tmp_path / "drive.tar.gz"
+    _tar(drive, {"C:evil": b"x"})
+    with tarfile.open(drive) as archive, pytest.raises(BackupError, match="unsafe path"):
+        _safe_extract(archive, tmp_path / "out2")
+
+
 def test_safe_extract_rejects_non_regular(tmp_path: Path) -> None:
     payload = tmp_path / "link.tar.gz"
     with tarfile.open(payload, "w:gz") as archive:
@@ -174,6 +202,52 @@ def test_safe_extract_rejects_non_regular(tmp_path: Path) -> None:
         archive.addfile(info)
     with tarfile.open(payload) as archive, pytest.raises(BackupError, match="non-regular"):
         _safe_extract(archive, tmp_path / "out")
+
+
+def _backup_with_newer_schema(source: Settings, tmp_path: Path) -> Path:
+    created = create_backup(source)
+    with tarfile.open(created["path"]) as archive:
+        members = {
+            member.name: archive.extractfile(member).read()
+            for member in archive.getmembers()
+            if member.isfile()
+        }
+    database = tmp_path / "newer.db"
+    database.write_bytes(members["ostium.db"])
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE alembic_version SET version_num='999999999999'")
+        connection.commit()
+        connection.execute("PRAGMA wal_checkpoint(FULL)")
+    members["ostium.db"] = database.read_bytes()
+    output = tmp_path / "newer.tar.gz"
+    with tarfile.open(output, "w:gz") as archive:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    return output
+
+
+def test_restore_migration_failure_keeps_previous_database(tmp_path: Path) -> None:
+    source = _settings(tmp_path, "source-newer")
+    _seed(source)
+    payload = _backup_with_newer_schema(source, tmp_path)
+
+    target = _settings(tmp_path, "target-newer")
+    _seed(target)
+    with sqlite3.connect(target.paths.db_path) as connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO settings(key,value_json,updated_at) VALUES (?,?,?)",
+            ("marker", '"kept"', "2026-01-01T00:00:00+00:00"),
+        )
+        connection.commit()
+
+    with pytest.raises(BackupError) as excinfo:
+        restore_backup(target, payload)
+    assert excinfo.value.code == "migration_failed"
+    with sqlite3.connect(target.paths.db_path) as connection:
+        row = connection.execute("SELECT value_json FROM settings WHERE key='marker'").fetchone()
+    assert row == ('"kept"',)
 
 
 def test_restore_plain_copies_files(tmp_path: Path) -> None:

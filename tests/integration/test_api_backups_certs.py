@@ -237,12 +237,18 @@ def test_acme_issue_job_and_existing_row(
 
     first = api_client.post(
         "/api/v1/certificates/issue",
-        json={"domain": "acme.example.com", "method": "acme"},
+        json={
+            "domain": "acme.example.com",
+            "method": "acme",
+            "staging": True,
+            "email": "ops@example.com",
+        },
         headers=headers,
     )
     assert first.status_code == 202
     job = _wait_job(api_client, first.json()["job_id"])
     assert job["status"] == "succeeded", job
+    assert FakeIssuer.options[0] == {"staging": True, "email": "ops@example.com"}
     certificates = api_client.get("/api/v1/certificates", headers=headers).json()["certificates"]
     assert certificates[0]["domain"] == "acme.example.com"
     assert certificates[0]["source"] == "acme"

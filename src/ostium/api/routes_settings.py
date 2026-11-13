@@ -131,19 +131,22 @@ async def update_settings(
         )
     if changes.get("mixed_port"):
         services.settings.mixed_port = changes["mixed_port"]
-    if "public_base_url" in changes and changes["public_base_url"] is not None:
+    if "public_base_url" in changes:
         from ostium.services.public_url import normalize_base_url
 
-        value = changes["public_base_url"].strip()
+        raw_value = changes["public_base_url"]
+        value = str(raw_value).strip() if raw_value is not None else ""
         if value:
             try:
                 await set_setting(session, "public_base_url", normalize_base_url(value))
             except ValueError as exc:
                 raise ApiError(400, str(exc), "invalid_public_base_url") from exc
         else:
+            # An explicit null from the UI clears a previously configured URL.
             await set_setting(session, "public_base_url", None)
-    if "acme_email" in changes and changes["acme_email"] is not None:
-        services.settings.acme_email = changes["acme_email"] or None
+    if "acme_email" in changes:
+        raw_email = changes["acme_email"]
+        services.settings.acme_email = str(raw_email).strip() if raw_email else None
     if changes.get("acme_staging") is not None:
         services.settings.acme_staging = bool(changes["acme_staging"])
     if changes.get("block_private_egress") is not None:
@@ -151,9 +154,19 @@ async def update_settings(
     if changes.get("allow_lan") is not None:
         services.settings.allow_lan = bool(changes["allow_lan"])
     if changes.get("log_level"):
-        services.settings.log_level = changes["log_level"]
+        level = str(changes["log_level"]).lower()
+        if level not in {"debug", "info", "warning", "error"}:
+            raise ApiError(400, "log_level must be debug, info, warning or error", "bad_log_level")
+        services.settings.log_level = level
     if "trusted_hosts" in changes and changes["trusted_hosts"] is not None:
-        services.settings.trusted_hosts = changes["trusted_hosts"]
+        hosts = [str(item).strip() for item in changes["trusted_hosts"]]
+        if any(not item or item == "*" for item in hosts):
+            raise ApiError(
+                400,
+                "trusted_hosts cannot contain empty entries or a wildcard",
+                "invalid_trusted_hosts",
+            )
+        services.settings.trusted_hosts = hosts
     if "ui_allowlist" in changes and changes["ui_allowlist"] is not None:
         import ipaddress
 
@@ -167,14 +180,49 @@ async def update_settings(
                 ) from exc
         services.settings.ui_allowlist = validated
     if changes.get("routing_mode"):
-        await set_setting(session, "routing_mode", changes["routing_mode"])
+        routing_mode = str(changes["routing_mode"])
+        if routing_mode not in {"smart", "direct", "global", "custom"}:
+            raise ApiError(
+                400,
+                "routing_mode must be smart, direct, global or custom",
+                "bad_routing_mode",
+            )
+        await set_setting(session, "routing_mode", routing_mode)
     if changes.get("auto_connect") is not None:
         services.settings.auto_connect = bool(changes["auto_connect"])
     if changes.get("auto_reconnect") is not None:
         services.settings.auto_reconnect = bool(changes["auto_reconnect"])
+    if "webhook_url" in changes:
+        raw_url = changes["webhook_url"]
+        value = str(raw_url).strip() if raw_url else ""
+        if value:
+            from urllib.parse import urlparse
+
+            from ostium.services.netguard import UnsafeUrlError, validate_target_host
+
+            parsed = urlparse(value)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+            ):
+                raise ApiError(
+                    400,
+                    "webhook_url must be an absolute http(s) URL without credentials",
+                    "bad_webhook",
+                )
+            try:
+                validate_target_host(parsed.hostname, allow_private=False)
+            except UnsafeUrlError as exc:
+                raise ApiError(400, str(exc), "bad_webhook") from exc
+        await set_setting(session, "webhook_url", value or None)
+    if "update_channel" in changes and changes["update_channel"] is not None:
+        channel = str(changes["update_channel"])
+        if channel not in {"stable", "beta"}:
+            raise ApiError(400, "update_channel must be stable or beta", "bad_update_channel")
+        await set_setting(session, "update_channel", channel)
     for key in (
-        "webhook_url",
-        "update_channel",
         "audit_retention_days",
         "traffic_retention_days",
         "job_retention_days",
@@ -183,8 +231,9 @@ async def update_settings(
     ):
         if key in changes and changes[key] is not None:
             await set_setting(session, key, changes[key])
-    if "webhook_secret" in changes and changes["webhook_secret"] is not None:
-        await set_setting(session, "webhook_secret", changes["webhook_secret"])
+    if "webhook_secret" in changes:
+        raw_secret = changes["webhook_secret"]
+        await set_setting(session, "webhook_secret", str(raw_secret) if raw_secret else None)
     try:
         services.settings.save()
     except OSError as exc:
@@ -232,6 +281,9 @@ async def public_ui(
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    server_info = await get_setting(session, "server", {})
+    if not isinstance(server_info, dict):
+        server_info = {}
     if payload.enabled:
         if not admin.totp_secret_enc:
             raise ApiError(
@@ -242,11 +294,15 @@ async def public_ui(
         certificate = (
             await session.execute(select(Certificate).where(Certificate.domain == payload.domain))
         ).scalar_one_or_none()
+        from pathlib import Path
+
         if (
             certificate is None
             or certificate.status != "ready"
             or certificate.expires_at is None
             or as_utc(certificate.expires_at) <= utcnow()
+            or not Path(certificate.cert_path).is_file()
+            or not Path(certificate.key_path).is_file()
         ):
             raise ApiError(
                 409,
@@ -256,9 +312,15 @@ async def public_ui(
         services.settings.public_ui = True
         services.settings.secure_cookies = True
         services.settings.trusted_hosts = list({*services.settings.trusted_hosts, payload.domain})
-        server_info = await get_setting(session, "server", {})
-        if not isinstance(server_info, dict):
-            server_info = {}
+        from ostium.config import is_loopback_host
+
+        if is_loopback_host(services.settings.host):
+            # The toggle promises a reachable public listener.  A loopback
+            # listener with TLS would still be unreachable from the internet,
+            # so widen only in this explicit, certificate+TOTP-gated flow and
+            # remember that the change was automatic.
+            services.settings.host = "0.0.0.0"
+            server_info["public_ui_auto_host"] = True
         server_info.update({"domain": payload.domain, "public_ui": True})
         await set_setting(session, "server", server_info)
         if not await get_setting(session, "public_base_url"):
@@ -266,6 +328,11 @@ async def public_ui(
     else:
         services.settings.public_ui = False
         services.settings.secure_cookies = False
+        auto_host = bool(server_info.pop("public_ui_auto_host", False))
+        if auto_host and services.settings.host == "0.0.0.0":
+            services.settings.host = "127.0.0.1"
+        server_info["public_ui"] = False
+        await set_setting(session, "server", server_info)
     try:
         services.settings.save()
     except OSError as exc:

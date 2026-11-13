@@ -104,7 +104,7 @@ def test_rule_sets_lifecycle(api_client: TestClient, session_token: str, setting
 
     created = api_client.post(
         "/api/v1/rule-sets",
-        json={"name": "ads", "url": "https://rules.example.com/ads.srs"},
+        json={"name": "ads", "url": "https://example.com/ads.srs"},
         headers=headers,
     )
     assert created.status_code == 201
@@ -113,13 +113,13 @@ def test_rule_sets_lifecycle(api_client: TestClient, session_token: str, setting
 
     duplicate = api_client.post(
         "/api/v1/rule-sets",
-        json={"name": "ads", "url": "https://rules.example.com/other.srs"},
+        json={"name": "ads", "url": "https://example.com/other.srs"},
         headers=headers,
     )
     assert duplicate.status_code == 409
 
     with respx.mock:
-        respx.get("https://rules.example.com/ads.srs").mock(
+        respx.get("https://example.com/ads.srs").mock(
             return_value=httpx.Response(200, content=b"rules", headers={"etag": '"v1"'})
         )
         updated = api_client.post(f"/api/v1/rule-sets/{rule_set['id']}/update", headers=headers)
@@ -128,16 +128,14 @@ def test_rule_sets_lifecycle(api_client: TestClient, session_token: str, setting
     assert updated.json()["rule_set"]["sha256"]
 
     with respx.mock:
-        respx.get("https://rules.example.com/ads.srs").mock(return_value=httpx.Response(304))
+        respx.get("https://example.com/ads.srs").mock(return_value=httpx.Response(304))
         not_modified = api_client.post(
             f"/api/v1/rule-sets/{rule_set['id']}/update", headers=headers
         )
     assert not_modified.json()["result"]["reason"] == "not_modified"
 
     with respx.mock:
-        respx.get("https://rules.example.com/ads.srs").mock(
-            return_value=httpx.Response(500, text="down")
-        )
+        respx.get("https://example.com/ads.srs").mock(return_value=httpx.Response(500, text="down"))
         failure = api_client.post(f"/api/v1/rule-sets/{rule_set['id']}/update", headers=headers)
     assert failure.status_code == 200
     assert failure.json()["result"]["updated"] is False

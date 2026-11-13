@@ -29,6 +29,28 @@ def test_websocket_revalidates_and_closes_after_logout(
         assert excinfo.value.code == 4401
 
 
+def test_websocket_revalidates_while_events_keep_flowing(
+    api_client: TestClient, session_token: str, monkeypatch
+) -> None:
+    monkeypatch.setattr(routes_events, "AUTH_REVALIDATE_SECONDS", 0.0)
+    with api_client.websocket_connect("/api/v1/events") as websocket:
+        assert websocket.receive_json()["type"] == "hello"
+        api_client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": session_token})
+        # A continuous event stream used to keep resetting wait_for(), so the
+        # revocation check in the timeout branch never ran.
+        for _ in range(20):
+            api_client.portal.call(
+                api_client.app.state.services.bus.publish, "test.event", {"value": 1}
+            )
+            try:
+                websocket.receive_json()
+            except WebSocketDisconnect as exc:
+                assert exc.code == 4401
+                break
+        else:
+            pytest.fail("revoked session kept receiving events")
+
+
 def test_websocket_rejects_invalid_session(api_client: TestClient) -> None:
     api_client.cookies.set("ostium_session", "not-a-session")
     with pytest.raises(WebSocketDisconnect) as excinfo:  # noqa: SIM117

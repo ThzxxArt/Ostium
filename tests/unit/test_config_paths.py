@@ -377,6 +377,32 @@ def test_legacy_public_plaintext_bind_is_migrated(
     assert loaded.allow_insecure_bind is False
 
 
+def test_legacy_bind_is_not_migrated_when_public_ui_env_is_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        "\n".join(
+            [
+                'role = "server"',
+                'host = "0.0.0.0"',
+                "port = 8443",
+                "public_ui = false",
+                f'data_dir = "{tmp_path / "data"}"',
+                f'config_dir = "{tmp_path / "config"}"',
+                f'state_dir = "{tmp_path / "state"}"',
+            ]
+        )
+    )
+    monkeypatch.setenv("OSTIUM_CONFIG_FILE", str(config_file))
+    monkeypatch.setenv("OSTIUM_PUBLIC_UI", "true")
+    monkeypatch.delenv("OSTIUM_HOST", raising=False)
+    loaded = Settings.load()
+    assert loaded.host == "0.0.0.0"
+    assert loaded.public_ui is True
+    assert loaded.host_migrated is False
+
+
 def test_legacy_public_bind_can_be_preserved_explicitly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -197,13 +197,15 @@ async def toggle_proxy(
         raise ApiError(409, "TUN and system proxy are mutually exclusive", "mode_conflict")
     if payload.enabled:
         try:
-            result = services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+            result = await asyncio.to_thread(
+                services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+            )
         except Exception as exc:
             raise ApiError(500, f"could not enable system proxy: {exc}", "proxy_failed") from exc
         services.settings.mode = Mode.SYSTEM_PROXY
     else:
         try:
-            result = services.proxy.disable()
+            result = await asyncio.to_thread(services.proxy.disable)
         except Exception as exc:
             raise ApiError(500, f"could not disable system proxy: {exc}", "proxy_failed") from exc
         if services.settings.mode is Mode.SYSTEM_PROXY:
@@ -213,7 +215,7 @@ async def toggle_proxy(
     except OSError as exc:
         if payload.enabled:
             try:
-                services.proxy.disable()
+                await asyncio.to_thread(services.proxy.disable)
             except Exception:
                 pass
         raise ApiError(
@@ -242,7 +244,8 @@ async def toggle_tun(
         raise ApiError(400, "TUN is a client feature", "role_mismatch")
     previous_tun = services.settings.tun_enabled
     previous_mode = services.settings.mode
-    proxy_was_enabled = bool(services.proxy.status().get("enabled"))
+    proxy_status = await asyncio.to_thread(services.proxy.status)
+    proxy_was_enabled = bool(proxy_status.get("enabled"))
     if payload.enabled:
         if services.settings.allow_lan:
             raise ApiError(
@@ -252,7 +255,7 @@ async def toggle_tun(
             )
         if proxy_was_enabled:
             try:
-                services.proxy.disable()
+                await asyncio.to_thread(services.proxy.disable)
             except Exception as exc:
                 raise ApiError(
                     500, f"could not disable the system proxy: {exc}", "proxy_failed"
@@ -266,7 +269,9 @@ async def toggle_tun(
             services.settings.mode = previous_mode
             if proxy_was_enabled:
                 try:
-                    services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+                    await asyncio.to_thread(
+                        services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+                    )
                 except Exception:
                     pass
             try:
@@ -322,21 +327,20 @@ async def set_mode(
         return {"mode": "tun", **result}
     if services.settings.tun_enabled:
         await toggle_tun(TunToggle(enabled=False), request, admin, services, session)
+    proxy_enabled = bool((await asyncio.to_thread(services.proxy.status)).get("enabled"))
     if mode is Mode.SYSTEM_PROXY:
-        if not services.proxy.status().get("enabled"):
+        if not proxy_enabled:
             await toggle_proxy(ProxyToggle(enabled=True), request, admin, services, session)
-    elif services.proxy.status().get("enabled"):
+    elif proxy_enabled:
         await toggle_proxy(ProxyToggle(enabled=False), request, admin, services, session)
     services.settings.mode = mode
     try:
         services.settings.save()
     except OSError:
         pass
-    if mode is Mode.MIXED and services.settings.role is Role.CLIENT:
-        try:
-            await services.engine.apply_client(session, mode="mixed", tun_enabled=False)
-        except Exception:
-            pass
+    # toggle_tun()/toggle_proxy() already apply the client configuration when
+    # they change it.  A separate best-effort apply here used to swallow core
+    # failures and report success; there is no state left to apply.
     return {"mode": mode.value}
 
 
@@ -349,6 +353,7 @@ async def connect(
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "connect is a client action", "role_mismatch")
+    services.watchdog_suspended = False
     try:
         result = await services.engine.apply_client(session)
     except Exception as exc:
@@ -368,9 +373,10 @@ async def disconnect(
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "disconnect is a client action", "role_mismatch")
-    if services.proxy.status().get("enabled"):
+    services.watchdog_suspended = True
+    if (await asyncio.to_thread(services.proxy.status)).get("enabled"):
         try:
-            services.proxy.disable()
+            await asyncio.to_thread(services.proxy.disable)
         except Exception:
             pass
     try:
@@ -496,7 +502,14 @@ async def preflight_reality(
     port: int = 443,
     _: AdminUser = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    from ostium.services.netguard import UnsafeUrlError, validate_target_host
+
     try:
+        validate_target_host(host, allow_private=False)
+    except UnsafeUrlError as exc:
+        return {"ok": False, "host": host, "message": str(exc)}
+
+    def probe() -> dict[str, Any]:
         context = ssl.create_default_context()
         with (
             socket.create_connection((host, port), timeout=8) as sock,
@@ -512,5 +525,10 @@ async def preflight_reality(
             "cipher": cipher[0] if cipher else None,
             "message": "TLS 1.3 handshake succeeded" if ok else "TLS 1.3 is required for Reality",
         }
+
+    try:
+        # Socket handshakes can block for up to eight seconds; never stall the
+        # whole control-plane event loop while an operator probes a host.
+        return await asyncio.to_thread(probe)
     except Exception as exc:
         return {"ok": False, "host": host, "message": str(exc)}

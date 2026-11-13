@@ -28,6 +28,58 @@ from ostium.engine.singbox.supervisor import (
 from ostium.engine.singbox.validate import ConfigRejected
 
 
+def test_cleanup_orphan_state_branches(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    supervisor = CoreSupervisor(settings)
+    supervisor._cleanup_orphan()  # no state file
+
+    supervisor.state_path.write_text("not-json", encoding="utf-8")
+    supervisor._cleanup_orphan()
+
+    supervisor.state_path.write_text(json.dumps({"pid": 0}), encoding="utf-8")
+    supervisor._cleanup_orphan()
+
+    supervisor.state_path.write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
+    supervisor._cleanup_orphan()
+
+    supervisor.state_path.write_text(json.dumps({"pid": 4242}), encoding="utf-8")
+
+    def missing(pid):  # type: ignore[no-untyped-def]
+        raise RuntimeError("no such process")
+
+    monkeypatch.setattr("psutil.Process", missing)
+    supervisor._cleanup_orphan()
+
+    class Other:
+        def cmdline(self):  # type: ignore[no-untyped-def]
+            return ["/usr/bin/other"]
+
+    monkeypatch.setattr("psutil.Process", lambda pid: Other())
+    supervisor._cleanup_orphan()
+
+    class FakeProcess:
+        terminated = False
+        waited = False
+
+        def __init__(self, pid):  # type: ignore[no-untyped-def]
+            self.pid = pid
+
+        def cmdline(self):  # type: ignore[no-untyped-def]
+            return [str(settings.engine_path), "run"]
+
+        def terminate(self) -> None:
+            self.__class__.terminated = True
+
+        def wait(self, timeout=None) -> int:  # type: ignore[no-untyped-def]
+            self.__class__.waited = True
+            return 0
+
+    monkeypatch.setattr("psutil.Process", FakeProcess)
+    supervisor._cleanup_orphan()
+    assert FakeProcess.terminated is True
+    assert FakeProcess.waited is True
+
+
 def _settings(tmp_path: Path) -> Settings:
     value = Settings(
         role=Role.SERVER,

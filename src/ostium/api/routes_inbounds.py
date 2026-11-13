@@ -96,10 +96,14 @@ def _skipped_reason(
             return "no certificate is assigned to this inbound"
         if certificate.status != "ready" or certificate.expires_at is None:
             return "the assigned certificate is not ready"
+        from pathlib import Path
+
         from ostium.util.time import as_utc, utcnow
 
         if as_utc(certificate.expires_at) <= utcnow():
             return "the assigned certificate has expired"
+        if not (Path(certificate.cert_path).is_file() and Path(certificate.key_path).is_file()):
+            return "the assigned certificate files are missing"
     return None
 
 
@@ -201,6 +205,41 @@ async def update_inbound(
                 ) from exc
     if "enabled" in changes and changes["enabled"] is not None:
         enabled = bool(changes["enabled"])
+        if enabled:
+            if kind == "trojan":
+                vless = await _get_inbound(session, "vless")
+                vless.enabled = False
+            if kind == "vless":
+                trojan = await _get_inbound(session, "trojan")
+                trojan.enabled = False
+            if inbound.port in RESERVED_PORTS or inbound.port == int(services.settings.port):
+                raise ApiError(
+                    409,
+                    f"port {inbound.port} is reserved by the core API or the admin UI",
+                    "port_reserved",
+                )
+            if kind in TCP_KINDS:
+                others = (
+                    (
+                        await session.execute(
+                            select(Inbound).where(
+                                Inbound.id != inbound.id,
+                                Inbound.enabled.is_(True),
+                                Inbound.port == inbound.port,
+                                Inbound.kind.in_(TCP_KINDS),
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                if others:
+                    raise ApiError(
+                        409,
+                        f"TCP port {inbound.port} is already used by "
+                        f"{', '.join(row.kind for row in others)}",
+                        "port_conflict",
+                    )
         if enabled and kind in {"hysteria2", "trojan"}:
             certificate = await _resolve_certificate(
                 session, inbound, changes.get("certificate_id")
@@ -212,12 +251,6 @@ async def update_inbound(
                     "certificate_required",
                 )
             inbound.certificate_id = certificate.id
-        if enabled and kind == "trojan":
-            vless = await _get_inbound(session, "vless")
-            vless.enabled = False
-        if enabled and kind == "vless":
-            trojan = await _get_inbound(session, "trojan")
-            trojan.enabled = False
         inbound.enabled = enabled
     if changes.get("certificate_id"):
         if kind not in {"hysteria2", "trojan"}:

@@ -84,7 +84,9 @@ async def issue_certificate(
         certificate.auto_renew = False
         await session.flush()
         try:
-            await cert_service.use_for_inbounds(session, certificate)
+            # Only fill TLS inbounds that have no certificate yet.  Explicit
+            # per-inbound assignments must never be overwritten by a new cert.
+            await cert_service.use_for_unbound(session, certificate)
         except cert_service.CertificateError as exc:
             raise ApiError(exc.status_code, str(exc), exc.code) from exc
         applied = await _apply_server(services, session)
@@ -204,7 +206,7 @@ async def upload_certificate(
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     certificate.auto_renew = payload.auto_renew
     try:
-        await cert_service.use_for_inbounds(session, certificate)
+        await cert_service.use_for_unbound(session, certificate)
     except cert_service.CertificateError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_server(services, session)

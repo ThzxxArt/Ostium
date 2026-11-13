@@ -249,6 +249,37 @@ def test_v011_cli_safety_and_update_checks(tmp_path: Path, monkeypatch) -> None:
     assert checked.exit_code == 0
     assert "update available: 9.9.9" in checked.output
 
+    async def _set_beta() -> None:
+        from ostium.services.settings import set_setting
+
+        settings = Settings.load()
+        engine, factory, _store = await cli._database(settings)
+        try:
+            async with factory() as session:
+                await set_setting(session, "update_channel", "beta")
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    cli._run(_set_beta())
+
+    class BetaResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict]:
+            return [
+                {"tag_name": "v9.9.8", "html_url": "https://example.com/old"},
+                {"tag_name": "v9.9.10-beta.1", "html_url": "https://example.com/beta"},
+                {"tag_name": "v9.9.9", "draft": True},
+            ]
+
+    monkeypatch.setattr(cli.httpx, "get", lambda *a, **k: BetaResponse())
+    beta = runner.invoke(app, ["update", "--check"])
+    assert beta.exit_code == 0
+    assert "9.9.10" in beta.output
+    assert "https://example.com/beta" in beta.output
+
     monkeypatch.setattr(
         cli.httpx,
         "get",
