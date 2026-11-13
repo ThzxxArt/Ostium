@@ -147,7 +147,7 @@ async def doctor(
             )
     except Exception as exc:
         add("core", "fail", f"core API unreachable: {exc}", "start ostium-core.service")
-    engine = services.settings.paths.engine_binary
+    engine = Path(services.settings.engine_path or services.settings.paths.engine_binary)
     if engine.is_file():
         add("engine", "pass", f"core binary found at {engine}")
     else:
@@ -236,6 +236,12 @@ async def toggle_tun(
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "TUN is a client feature", "role_mismatch")
     if payload.enabled:
+        if services.settings.allow_lan:
+            raise ApiError(
+                409,
+                "disable Allow LAN before enabling TUN; the TUN LAN gateway is not supported",
+                "mode_conflict",
+            )
         if services.proxy.status().get("enabled"):
             try:
                 services.proxy.disable()

@@ -17,6 +17,7 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -o /out/sing-box ./cmd/sing-box
 
 FROM python:3.13.5-slim-bookworm AS runtime
+ARG OSTIUM_VERSION=0.1.0
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     OSTIUM_ROLE=server \
@@ -40,7 +41,7 @@ COPY alembic ./alembic
 # (the same layout used by CI and release builds).  Copying it into the
 # package directory instead silently ships a UI-less wheel.
 COPY --from=web /build/web/dist ./web/dist
-RUN SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0 pip install .
+RUN SETUPTOOLS_SCM_PRETEND_VERSION="${OSTIUM_VERSION#v}" pip install .
 
 COPY --from=core /out/sing-box /opt/ostium/core/sing-box
 RUN chmod 0755 /opt/ostium/core/sing-box \

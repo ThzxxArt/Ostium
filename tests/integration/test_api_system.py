@@ -5,6 +5,7 @@ import json
 import sqlite3
 import tarfile
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -85,6 +86,7 @@ def test_server_system_info_doctor_and_diagnostics(
     assert isinstance(payload["lan_addresses"], list)
     assert payload["lan_port"] == settings.mixed_port
 
+    settings.engine_path = settings.data_dir / "missing-sing-box"
     doctor = api_client.get("/api/v1/system/doctor").json()
     statuses = {(check["id"], check["status"]) for check in doctor["checks"]}
     assert ("database", "pass") in statuses
@@ -94,6 +96,7 @@ def test_server_system_info_doctor_and_diagnostics(
 
     settings.paths.engine_binary.parent.mkdir(parents=True, exist_ok=True)
     settings.paths.engine_binary.write_text("binary")
+    settings.engine_path = settings.paths.engine_binary
     assert "pass" in {
         check["status"]
         for check in api_client.get("/api/v1/system/doctor").json()["checks"]
@@ -337,6 +340,13 @@ def test_client_proxy_and_tun_toggles(client_api: TestClient, fake_proxy: FakePr
     assert untun.status_code == 200
     assert services.settings.tun_enabled is False
 
+    services.settings.allow_lan = True
+    lan_tun = client_api.post("/api/v1/system/tun", json={"enabled": True}, headers=headers)
+    assert lan_tun.status_code == 409
+    assert lan_tun.json()["code"] == "mode_conflict"
+    assert services.settings.tun_enabled is False
+    services.settings.allow_lan = False
+
     async def fail(session, **kwargs) -> dict:  # type: ignore[no-untyped-def]
         raise EngineError("tun failed", "engine_start_failed", 500)
 
@@ -454,9 +464,13 @@ def test_client_doctor_tun_checks(client_api: TestClient, monkeypatch) -> None:
     assert any(check["id"] == "tun" and check["status"] == "pass" for check in checks)
 
     monkeypatch.setattr("ostium.api.routes_system.os.geteuid", lambda: 1000)
-    monkeypatch.setattr(
-        "ostium.api.routes_system.Path", lambda _value: SimpleNamespace(exists=lambda: False)
-    )
+
+    def fake_path(value):  # type: ignore[no-untyped-def]
+        if str(value) == "/dev/net/tun":
+            return SimpleNamespace(exists=lambda: False)
+        return Path(value)
+
+    monkeypatch.setattr("ostium.api.routes_system.Path", fake_path)
     checks = client_api.get("/api/v1/system/doctor").json()["checks"]
     assert any(check["id"] == "tun" and check["status"] == "warn" for check in checks)
 

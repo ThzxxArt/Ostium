@@ -16,7 +16,7 @@ from ostium.api.errors import ApiError
 from ostium.db.models import AdminUser, ApiToken, Certificate
 from ostium.services.audit import audit
 from ostium.services.settings import all_settings, get_setting, set_setting
-from ostium.util.time import iso
+from ostium.util.time import as_utc, iso, utcnow
 
 router = APIRouter(tags=["settings"])
 
@@ -202,9 +202,16 @@ async def public_ui(
         certificate = (
             await session.execute(select(Certificate).where(Certificate.domain == payload.domain))
         ).scalar_one_or_none()
-        if certificate is None:
+        if (
+            certificate is None
+            or certificate.status != "ready"
+            or certificate.expires_at is None
+            or as_utc(certificate.expires_at) <= utcnow()
+        ):
             raise ApiError(
-                409, "issue or upload a certificate for this domain first", "certificate_required"
+                409,
+                "issue or upload a ready certificate for this domain first",
+                "certificate_required",
             )
         services.settings.public_ui = True
         services.settings.secure_cookies = True

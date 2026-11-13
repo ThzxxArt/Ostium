@@ -54,13 +54,14 @@ def _client(**overrides: Any) -> dict[str, Any]:
     return config
 
 
-def _validate(config: Any, role: Role, tmp_path: Path) -> None:
+def _validate(config: Any, role: Role, tmp_path: Path, *, allow_lan: bool = False) -> None:
     validate_config(
         config,
         role=role,
         allowed_ports={443, 8388},
         allowed_paths=[tmp_path, tmp_path / "certs"],
         tun_interface="ostium0",
+        allow_lan=allow_lan,
     )
 
 
@@ -193,6 +194,29 @@ def test_client_inbound_rejections(inbound: dict[str, Any], tmp_path: Path) -> N
 def test_client_inbound_acceptance(inbound: dict[str, Any], accepted: bool, tmp_path: Path) -> None:
     _validate(_client(inbounds=[inbound]), Role.CLIENT, tmp_path)
     assert accepted
+
+
+def test_client_allow_lan_accepts_only_wildcard_bind(tmp_path: Path) -> None:
+    for listen in ("0.0.0.0", "::"):
+        _validate(
+            _client(inbounds=[{"type": "mixed", "listen": listen, "listen_port": 7890}]),
+            Role.CLIENT,
+            tmp_path,
+            allow_lan=True,
+        )
+    with pytest.raises(ConfigRejected):
+        _validate(
+            _client(inbounds=[{"type": "mixed", "listen": "192.168.1.10", "listen_port": 7890}]),
+            Role.CLIENT,
+            tmp_path,
+            allow_lan=True,
+        )
+    with pytest.raises(ConfigRejected):
+        _validate(
+            _client(inbounds=[{"type": "mixed", "listen": "0.0.0.0", "listen_port": 7890}]),
+            Role.CLIENT,
+            tmp_path,
+        )
 
 
 def test_server_listen_variants(tmp_path: Path) -> None:

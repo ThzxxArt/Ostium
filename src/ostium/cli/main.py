@@ -76,6 +76,12 @@ def _base_url(settings: Settings) -> str:
     return f"http://127.0.0.1:{settings.port}"
 
 
+def _engine_binary(settings: Settings) -> Path:
+    """Return the configured core binary, not only the data-dir default."""
+
+    return Path(settings.engine_path or settings.paths.engine_binary)
+
+
 def _api(settings: Settings, method: str, path: str, **kwargs: Any) -> Any:
     token_path = settings.paths.runtime_dir / "cli.token"
     if not token_path.is_file():
@@ -250,17 +256,19 @@ def serve(
             from ostium.services.settings import get_setting
 
             engine, factory, _store = await _database(settings)
-            async with factory() as session:
-                server_info = await get_setting(session, "server", {})
-                domain = server_info.get("domain") if isinstance(server_info, dict) else None
-                query = select(Certificate).where(Certificate.status == "ready")
-                if domain:
-                    query = query.where(Certificate.domain == domain)
-                else:
-                    query = query.order_by(Certificate.expires_at.desc())
-                cert = (await session.execute(query)).scalars().first()
-            await engine.dispose()
-            return (cert.cert_path, cert.key_path) if cert else None
+            try:
+                async with factory() as session:
+                    server_info = await get_setting(session, "server", {})
+                    domain = server_info.get("domain") if isinstance(server_info, dict) else None
+                    query = select(Certificate).where(Certificate.status == "ready")
+                    if domain:
+                        query = query.where(Certificate.domain == domain)
+                    else:
+                        query = query.order_by(Certificate.expires_at.desc())
+                    cert = (await session.execute(query)).scalars().first()
+                return (cert.cert_path, cert.key_path) if cert else None
+            finally:
+                await engine.dispose()
 
         found = _run(_find_cert())
         if found:
@@ -305,7 +313,7 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         "data_dir": str(settings.data_dir),
         "config_file": str(settings.config_file),
         "database": settings.paths.db_path.is_file(),
-        "core_binary": settings.paths.engine_binary.is_file(),
+        "core_binary": _engine_binary(settings).is_file(),
         "ui_url": f"http://127.0.0.1:{settings.port}",
         "core": None,
     }
@@ -402,8 +410,8 @@ def doctor(
     )
     add(
         "core_binary",
-        "pass" if settings.paths.engine_binary.is_file() else "fail",
-        str(settings.paths.engine_binary),
+        "pass" if _engine_binary(settings).is_file() else "fail",
+        str(_engine_binary(settings)),
     )
     try:
         health = httpx.get(f"{settings.core_url}/v1/health", timeout=3, trust_env=False).json()
@@ -511,7 +519,7 @@ def diagnostics_export(
         "data_dir": str(settings.data_dir),
         "config_file": str(settings.config_file),
         "database_exists": settings.paths.db_path.is_file(),
-        "core_binary_exists": settings.paths.engine_binary.is_file(),
+        "core_binary_exists": _engine_binary(settings).is_file(),
     }
     with tarfile.open(output, "w:gz") as archive:
         import io
@@ -529,15 +537,42 @@ def _server_apply(settings: Settings) -> None:
 
     async def _apply() -> None:
         engine, factory, store = await _database(settings)
-        manager = EngineManager(settings, factory, store, EventBus())
-        async with factory() as session:
-            try:
-                await manager.apply_server(session)
-                await session.commit()
-                console.print("[green]configuration applied[/green]")
-            except EngineError as exc:
-                err_console.print(f"[yellow]configuration saved but not applied: {exc}[/yellow]")
-        await engine.dispose()
+        try:
+            manager = EngineManager(settings, factory, store, EventBus())
+            async with factory() as session:
+                try:
+                    await manager.apply_server(session)
+                    await session.commit()
+                    console.print("[green]configuration applied[/green]")
+                except EngineError as exc:
+                    err_console.print(
+                        f"[yellow]configuration saved but not applied: {exc}[/yellow]"
+                    )
+        finally:
+            await engine.dispose()
+
+    _run(_apply())
+
+
+def _client_apply(settings: Settings) -> None:
+    from ostium.engine.manager import EngineError, EngineManager
+    from ostium.services.events import EventBus
+
+    async def _apply() -> None:
+        engine, factory, store = await _database(settings)
+        try:
+            manager = EngineManager(settings, factory, store, EventBus())
+            async with factory() as session:
+                try:
+                    await manager.apply_client(session)
+                    await session.commit()
+                    console.print("[green]client configuration applied[/green]")
+                except EngineError as exc:
+                    err_console.print(
+                        f"[yellow]configuration saved but not applied: {exc}[/yellow]"
+                    )
+        finally:
+            await engine.dispose()
 
     _run(_apply())
 
@@ -606,21 +641,24 @@ def user_add(
 
     async def _add() -> dict[str, Any]:
         engine, factory, store = await _database(settings)
-        from ostium.services.users import create_user
+        result: dict[str, Any] = {}
+        try:
+            from ostium.services.users import create_user
 
-        async with factory() as session:
-            user, _password, token = await create_user(
-                session,
-                store,
-                name=name,
-                quota_bytes=_parse_bytes(quota) if quota else 0,
-                quota_cycle=cycle,
-                expires_at=datetime.fromisoformat(expires) if expires else None,
-                note=note,
-            )
-            await session.commit()
-            result = {"user": user.name, "token": token, "id": user.id}
-        await engine.dispose()
+            async with factory() as session:
+                user, _password, token = await create_user(
+                    session,
+                    store,
+                    name=name,
+                    quota_bytes=_parse_bytes(quota) if quota else 0,
+                    quota_cycle=cycle,
+                    expires_at=datetime.fromisoformat(expires) if expires else None,
+                    note=note,
+                )
+                await session.commit()
+                result = {"user": user.name, "token": token, "id": user.id}
+        finally:
+            await engine.dispose()
         return result
 
     result = _run(_add())
@@ -666,19 +704,22 @@ def _set_user_enabled(name: str, enabled: bool) -> None:
 
     async def _set() -> None:
         engine, factory, _store = await _database(settings)
-        async with factory() as session:
-            user = (
-                await session.execute(select(ProxyUser).where(ProxyUser.name == name))
-            ).scalar_one_or_none()
-            if user is None:
-                _fail("user not found", 1)
-            user.enabled = enabled
-            if enabled:
-                user.disabled_reason = None
-            await session.commit()
-        await engine.dispose()
+        try:
+            async with factory() as session:
+                user = (
+                    await session.execute(select(ProxyUser).where(ProxyUser.name == name))
+                ).scalar_one_or_none()
+                if user is None:
+                    _fail("user not found", 1)
+                user.enabled = enabled
+                if enabled:
+                    user.disabled_reason = None
+                await session.commit()
+        finally:
+            await engine.dispose()
 
     _run(_set())
+    _server_apply(settings)
     console.print(f"{'enabled' if enabled else 'disabled'} {name}")
 
 
@@ -695,19 +736,22 @@ def user_rotate(name: str, subscription: bool = typer.Option(False, "--subscript
 
     async def _rotate() -> str | None:
         engine, factory, store = await _database(settings)
-        async with factory() as session:
-            user = (
-                await session.execute(select(ProxyUser).where(ProxyUser.name == name))
-            ).scalar_one_or_none()
-            if user is None:
-                _fail("user not found", 1)
-            await rotate_credentials(session, store, user)
-            token = await rotate_subscription(session, store, user) if subscription else None
-            await session.commit()
-        await engine.dispose()
+        try:
+            async with factory() as session:
+                user = (
+                    await session.execute(select(ProxyUser).where(ProxyUser.name == name))
+                ).scalar_one_or_none()
+                if user is None:
+                    _fail("user not found", 1)
+                await rotate_credentials(session, store, user)
+                token = await rotate_subscription(session, store, user) if subscription else None
+                await session.commit()
+        finally:
+            await engine.dispose()
         return token
 
     token = _run(_rotate())
+    _server_apply(settings)
     console.print(f"credentials rotated for {name}")
     if token:
         console.print(f"new subscription token: {token}")
@@ -727,17 +771,20 @@ def user_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
 
     async def _remove() -> None:
         engine, factory, _store = await _database(settings)
-        async with factory() as session:
-            user = (
-                await session.execute(select(ProxyUser).where(ProxyUser.name == name))
-            ).scalar_one_or_none()
-            if user is None:
-                _fail("user not found", 1)
-            await session.delete(user)
-            await session.commit()
-        await engine.dispose()
+        try:
+            async with factory() as session:
+                user = (
+                    await session.execute(select(ProxyUser).where(ProxyUser.name == name))
+                ).scalar_one_or_none()
+                if user is None:
+                    _fail("user not found", 1)
+                await session.delete(user)
+                await session.commit()
+        finally:
+            await engine.dispose()
 
     _run(_remove())
+    _server_apply(settings)
     console.print(f"deleted {name}")
 
 
@@ -757,18 +804,21 @@ def user_quota(
 
     async def _quota() -> None:
         engine, factory, _store = await _database(settings)
-        async with factory() as session:
-            user = (
-                await session.execute(select(ProxyUser).where(ProxyUser.name == name))
-            ).scalar_one_or_none()
-            if user is None:
-                _fail("user not found", 1)
-            user.quota_bytes = _parse_bytes(quota)
-            user.quota_cycle = cycle
-            await session.commit()
-        await engine.dispose()
+        try:
+            async with factory() as session:
+                user = (
+                    await session.execute(select(ProxyUser).where(ProxyUser.name == name))
+                ).scalar_one_or_none()
+                if user is None:
+                    _fail("user not found", 1)
+                user.quota_bytes = _parse_bytes(quota)
+                user.quota_cycle = cycle
+                await session.commit()
+        finally:
+            await engine.dispose()
 
     _run(_quota())
+    _server_apply(settings)
     console.print(f"quota updated for {name}")
 
 
@@ -789,30 +839,33 @@ def user_subscription(name: str, rotate: bool = typer.Option(False, "--rotate"))
 
     async def _sub() -> dict[str, Any]:
         engine, factory, store = await _database(settings)
-        async with factory() as session:
-            user = (
-                await session.execute(select(ProxyUser).where(ProxyUser.name == name))
-            ).scalar_one_or_none()
-            if user is None:
-                _fail("user not found", 1)
-            token = (
-                await rotate_subscription(session, store, user)
-                if rotate
-                else decrypt_subscription_token(user, store)
-            )
-            if token is None:
-                token = await rotate_subscription(session, store, user)
-            host = await server_hostname(session)
-            await session.commit()
-            data = {
-                "token": token,
-                "host": host,
-                "formats": {
-                    fmt: f"http://127.0.0.1:{settings.port}/sub/{token}?format={fmt}"
-                    for fmt in ("ostium", "base64", "clash", "singbox")
-                },
-            }
-        await engine.dispose()
+        data: dict[str, Any] = {}
+        try:
+            async with factory() as session:
+                user = (
+                    await session.execute(select(ProxyUser).where(ProxyUser.name == name))
+                ).scalar_one_or_none()
+                if user is None:
+                    _fail("user not found", 1)
+                token = (
+                    await rotate_subscription(session, store, user)
+                    if rotate
+                    else decrypt_subscription_token(user, store)
+                )
+                if token is None:
+                    token = await rotate_subscription(session, store, user)
+                host = await server_hostname(session)
+                await session.commit()
+                data = {
+                    "token": token,
+                    "host": host,
+                    "formats": {
+                        fmt: f"http://127.0.0.1:{settings.port}/sub/{token}?format={fmt}"
+                        for fmt in ("ostium", "base64", "clash", "singbox")
+                    },
+                }
+        finally:
+            await engine.dispose()
         return data
 
     _json(_run(_sub()))
@@ -921,21 +974,25 @@ def profile_import(
 
     async def _import() -> int:
         engine, factory, store = await _database(settings)
-        async with factory() as session:
-            endpoints = parse_subscription_text(text)
-            await create_profile(
-                session,
-                store,
-                name=name,
-                endpoints=endpoints,
-                kind="subscription" if subscription_url else "manual",
-                subscription_url=subscription_url,
-            )
-            await session.commit()
-        await engine.dispose()
+        endpoints: list[Any] = []
+        try:
+            async with factory() as session:
+                endpoints = parse_subscription_text(text)
+                await create_profile(
+                    session,
+                    store,
+                    name=name,
+                    endpoints=endpoints,
+                    kind="subscription" if subscription_url else "manual",
+                    subscription_url=subscription_url,
+                )
+                await session.commit()
+        finally:
+            await engine.dispose()
         return len(endpoints)
 
     count = _run(_import())
+    _client_apply(settings)
     console.print(f"imported {count} endpoint(s) into {name}")
 
 
@@ -953,17 +1010,20 @@ def profile_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
 
     async def _remove() -> None:
         engine, factory, _store = await _database(settings)
-        async with factory() as session:
-            profile = (
-                await session.execute(select(Profile).where(Profile.name == name))
-            ).scalar_one_or_none()
-            if profile is None:
-                _fail("profile not found", 1)
-            await session.delete(profile)
-            await session.commit()
-        await engine.dispose()
+        try:
+            async with factory() as session:
+                profile = (
+                    await session.execute(select(Profile).where(Profile.name == name))
+                ).scalar_one_or_none()
+                if profile is None:
+                    _fail("profile not found", 1)
+                await session.delete(profile)
+                await session.commit()
+        finally:
+            await engine.dispose()
 
     _run(_remove())
+    _client_apply(settings)
     console.print(f"deleted {name}")
 
 
@@ -980,18 +1040,23 @@ def profile_refresh(name: str) -> None:
 
     async def _refresh() -> int:
         engine, factory, store = await _database(settings)
-        async with factory() as session:
-            profile = (
-                await session.execute(select(Profile).where(Profile.name == name))
-            ).scalar_one_or_none()
-            if profile is None:
-                _fail("profile not found", 1)
-            count = await refresh_profile(session, store, profile)
-            await session.commit()
-        await engine.dispose()
+        count = 0
+        try:
+            async with factory() as session:
+                profile = (
+                    await session.execute(select(Profile).where(Profile.name == name))
+                ).scalar_one_or_none()
+                if profile is None:
+                    _fail("profile not found", 1)
+                count = await refresh_profile(session, store, profile)
+                await session.commit()
+        finally:
+            await engine.dispose()
         return count
 
-    console.print(f"refreshed {_run(_refresh())} endpoint(s)")
+    count = _run(_refresh())
+    _client_apply(settings)
+    console.print(f"refreshed {count} endpoint(s)")
 
 
 # ----------------------------------------------------------------------------- core
@@ -1013,7 +1078,7 @@ def core_version() -> None:
     """Print the installed sing-box version."""
 
     settings = _load_settings()
-    binary = settings.paths.engine_binary
+    binary = _engine_binary(settings)
     if not binary.is_file():
         _fail(f"core binary not found at {binary}", 6)
     import subprocess
@@ -1038,7 +1103,7 @@ def core_install(
     import tempfile
 
     settings = _load_settings()
-    target = settings.paths.engine_binary
+    target = _engine_binary(settings)
     target.parent.mkdir(parents=True, exist_ok=True)
     if manifest:
         try:
@@ -1132,7 +1197,7 @@ def backup_create(
     from ostium.services.backup import create_backup
 
     settings = _load_settings()
-    result = create_backup(settings, password=password)
+    result = create_backup(settings, password=password, target=output)
     console.print_json(json.dumps(result))
 
 

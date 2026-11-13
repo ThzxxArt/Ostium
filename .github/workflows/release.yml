@@ -5,10 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
-  attestations: write
+  contents: read
 
 jobs:
   wheel:
@@ -45,6 +42,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
@@ -82,6 +81,9 @@ jobs:
 
   docker:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -96,13 +98,19 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            OSTIUM_VERSION=${{ github.ref_name }}
           tags: |
             ghcr.io/thzxxart/ostium:${{ github.ref_name }}
             ghcr.io/thzxxart/ostium:latest
 
   publish:
-    needs: [wheel, core, windows]
+    needs: [wheel, core, windows, docker]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -122,16 +130,22 @@ jobs:
           python3 scripts/build-core-manifest.py --dir dist/core
           --release-version "${{ github.ref_name }}"
           --output dist/core-manifest.json
+      - name: Stage Python distributions
+        run: |
+          mkdir -p dist/pypi
+          find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
+            -exec cp {} dist/pypi/ \;
+          test -n "$(find dist/pypi -maxdepth 1 -type f -print -quit)"
       - name: Checksums
         run: |
           cd dist
-          sha256sum $(find . -type f ! -name SHA256SUMS ! -name '*.sig' | sort) > SHA256SUMS
+          sha256sum $(find . -type f ! -name SHA256SUMS ! -name '*.sig' ! -path './pypi/*' | sort) > SHA256SUMS
       - uses: actions/attest-build-provenance@v4
         with:
           subject-path: "dist/**"
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist
+          packages-dir: dist/pypi
       - uses: softprops/action-gh-release@v3
         with:
           files: |

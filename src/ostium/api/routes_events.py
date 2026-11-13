@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -15,9 +16,24 @@ from ostium.util.time import iso, utcnow
 router = APIRouter()
 
 
+def _origin_matches(origin: str, host: str) -> bool:
+    try:
+        parsed = urlparse(origin)
+    except ValueError:
+        return False
+    return bool(parsed.netloc) and parsed.netloc.lower() == host.lower()
+
+
 @router.websocket("/events")
 async def events(websocket: WebSocket) -> None:
     services: Services = websocket.app.state.services
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host", "")
+    # Browsers send Origin on WebSocket handshakes.  Reject cross-origin
+    # consoles instead of relying on SameSite cookies alone.
+    if origin and not _origin_matches(origin, host):
+        await websocket.close(code=4403, reason="origin rejected")
+        return
     token = websocket.cookies.get("ostium_session")
     if not token:
         await websocket.close(code=4401, reason="authentication required")

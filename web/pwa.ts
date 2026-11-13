@@ -46,8 +46,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put('/index.html', copy));
+          if (response.ok) {
+            const copy = response.clone();
+            void caches.open(CACHE).then((cache) => cache.put('/index.html', copy));
+          }
           return response;
         })
         .catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
@@ -61,7 +63,7 @@ self.addEventListener('fetch', (event) => {
       return fetch(request).then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          void caches.open(CACHE).then((cache) => cache.put(request, copy));
         }
         return response;
       });
@@ -75,11 +77,47 @@ self.addEventListener('message', (event) => {
 `
 }
 
+export interface GeneratedServiceWorker {
+  source: string
+  files: string[]
+  digest: string
+}
+
+/**
+ * Build a deterministic precache service worker for ``outDir``.
+ *
+ * The cache key hashes both the asset names and their contents.  Hashing only
+ * names would leave stable-name assets (``index.html``, the manifest and
+ * ``theme-init.js``) permanently stale whenever their contents changed.
+ */
+export async function buildServiceWorker(outDir: string): Promise<GeneratedServiceWorker> {
+  const files = (await walk(outDir))
+    .filter((file) => file !== 'sw.js' && PRECACHE_RE.test(file))
+    .map((file) => file.split(sep).join('/'))
+    .sort()
+  const hashes = await Promise.all(
+    files.map(async (file) => {
+      const content = await readFile(join(outDir, ...file.split('/')))
+      return `${file}:${createHash('sha256').update(content).digest('hex')}`
+    }),
+  )
+  const digest = createHash('sha256').update(hashes.join('\n')).digest('hex').slice(0, 12)
+  return {
+    source: workerSource(
+      files.map((file) => `/${file}`),
+      digest,
+    ),
+    files,
+    digest,
+  }
+}
+
 /**
  * Small replacement for vite-plugin-pwa/workbox.  It emits a deterministic
  * precache service worker after Vite has written the bundle; no third-party
  * runtime or build dependency is involved.
- */ export function ostiumPwa(): Plugin {
+ */
+export function ostiumPwa(): Plugin {
   let outDir = 'dist'
   return {
     name: 'ostium-pwa',
@@ -88,15 +126,12 @@ self.addEventListener('message', (event) => {
       outDir = config.build.outDir
     },
     async closeBundle() {
-      const files = (await walk(outDir))
-        .filter((file) => file !== 'sw.js' && PRECACHE_RE.test(file))
-        .map((file) => `/${file.split(sep).join('/')}`)
-        .sort()
-      const digest = createHash('sha256').update(files.join('\n')).digest('hex').slice(0, 12)
-      await writeFile(join(outDir, 'sw.js'), workerSource(files, digest))
+      const generated = await buildServiceWorker(outDir)
+      await writeFile(join(outDir, 'sw.js'), generated.source)
       // Keep the emitted file in the build log without depending on a plugin.
-      const sw = await readFile(join(outDir, 'sw.js'), 'utf8')
-      this.info(`generated sw.js (${sw.length} bytes, ${files.length} precached files)`)
+      this.info(
+        `generated sw.js (${generated.source.length} bytes, ${generated.files.length} precached files)`,
+      )
     },
   }
 }

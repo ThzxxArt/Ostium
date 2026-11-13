@@ -279,14 +279,24 @@ def _fake_winreg(store: dict[str, Any], fail_names: set[str] | None = None) -> t
     def set_value(key: _FakeKey, name: str, _reserved: int, _kind: int, value: Any) -> None:
         key.store[name] = value
 
+    def delete_value(key: _FakeKey, name: str) -> None:
+        if name not in key.store:
+            raise FileNotFoundError(name)
+        del key.store[name]
+
     module.OpenKey = open_key  # type: ignore[attr-defined]
     module.QueryValueEx = query_value  # type: ignore[attr-defined]
     module.SetValueEx = set_value  # type: ignore[attr-defined]
+    module.DeleteValue = delete_value  # type: ignore[attr-defined]
     return module
 
 
 def test_windows_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
-    store: dict[str, Any] = {"ProxyEnable": 0, "ProxyServer": "old:1"}
+    store: dict[str, Any] = {
+        "ProxyEnable": 0,
+        "ProxyServer": "old:1",
+        "AutoConfigURL": "http://pac.example/proxy.pac",
+    }
     monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
     monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
     monkeypatch.setattr(proxy_module.sys, "platform", "win32")
@@ -296,11 +306,13 @@ def test_windows_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
     assert status["enabled"] is True
     assert store["ProxyEnable"] == 1
     assert store["ProxyServer"] == "127.0.0.1:7893"
+    assert "AutoConfigURL" not in store
 
     status = proxy.disable()
     assert status["enabled"] is False
     assert store["ProxyEnable"] == 0
     assert store["ProxyServer"] == "old:1"
+    assert store["AutoConfigURL"] == "http://pac.example/proxy.pac"
 
     # Missing originals are created as disabled/empty values.
     proxy.state_path.unlink()
@@ -309,6 +321,7 @@ def test_windows_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
     proxy.disable()
     assert store["ProxyEnable"] == 0
     assert "ProxyServer" not in store
+    assert "AutoConfigURL" not in store
 
     monkeypatch.setattr(proxy_module.sys, "platform", "linux")
     assert WindowsProxy(settings).supported is False

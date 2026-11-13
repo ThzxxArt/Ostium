@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.34%25%20statements%20%C2%B7%2095.79%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.29%25%20statements%20%C2%B7%2095.70%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20136%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-400%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -71,7 +71,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / PyInstaller / Inno Setup 构建与安装脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 391 个后端测试、136 个前端测试、21 个 Playwright 测试；后端 98.34% 语句 / 95.79% 分支。 |
+| 🧪 **可验证** | 400 个后端测试、137 个前端测试、21 个 Playwright 测试；后端 98.29% 语句 / 95.70% 分支。 |
 
 ---
 
@@ -152,7 +152,7 @@ flowchart LR
 | macOS 客户端 | macOS 14+，arm64 / x64；`sudo` 安装 LaunchDaemon |
 | Linux 客户端 | x64 / arm64；TUN 需要 root 或 `CAP_NET_ADMIN` |
 | 安装环境 | 一键脚本自动下载 uv + 托管 Python 3.13；**无需预装 Python** |
-| 开发 | Python 3.13、uv 0.11+、Node 24.19+、Go 1.25.5（仅构建定制核心） |
+| 开发 | Python 3.13、uv 0.11+、Node 24.19+（最低 22.12）、Go 1.25.5（仅构建定制核心） |
 
 > 服务端管理 UI 默认只监听 `127.0.0.1:8443`。公网访问请先配置证书与 TOTP，再在设置中显式开启，并重启 `ostium.service`。
 
@@ -225,7 +225,7 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 可以是 Release 目录，也可以是源码 checkout。
+`--local-dir` 必须是包含 `scripts/install.sh` 的源码 checkout（或解压后的同版本源码包）。只包含 Release 下载资产的目录不包含安装脚本，不能用于 `--local-dir`。
 
 ### 方式二：Linux 服务器（离线原生安装包）
 
@@ -300,7 +300,7 @@ systemctl --user enable --now ostium
 
 1. 运行 `Ostium-0.1.0-windows-x64-setup.exe`。
 2. 安装器会复制程序到 `%ProgramFiles%\Ostium`，注册 `OstiumCore` 服务，并设置登录时启动 UI。
-3. 数据保存在 `%ProgramData%\Ostium`。
+3. UI 数据保存在 `%ProgramData%\Ostium`；核心二进制和 LocalSystem 服务配置位于 `%ProgramFiles%\Ostium`。
 4. 初始管理员密码：在线安装器会直接打印；离线 setup 会保存到 `%ProgramData%\Ostium\initial-password.txt`，首次登录后请删除该文件。
 5. 未签名构建会触发 SmartScreen；请先校验 `SHA256SUMS`，确认来源可信后再选择“仍要运行”。
 
@@ -612,7 +612,7 @@ sudo ostium core update
 
 ### 客户端升级
 
-Windows/macOS 安装器原位覆盖，数据与订阅保留；Linux 重新执行 `install.sh --role client`。升级核心会短暂中断隧道，UI 升级不会。
+Windows/macOS 安装器原位覆盖，数据与订阅保留；Linux 重新执行 `install.sh --role client`。安装器升级会替换核心并重启核心服务，隧道会短暂中断；数据与订阅不受影响。
 
 > Ostium 不做静默自动更新。所有升级都需要你下载、校验并显式安装。
 
@@ -706,7 +706,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 |---|---|---|
 | Linux 服务端 | `/var/lib/ostium`、`/etc/ostium/config.toml` | 同左 |
 | Linux 客户端 | `~/.local/share/ostium`（UI 数据与 `config.toml`） | `/var/lib/ostium-core`、`/etc/ostium/client.toml` |
-| Windows | `%ProgramData%\Ostium`（UI） | `%ProgramData%\Ostium` |
+| Windows | `%ProgramData%\Ostium`（UI 数据与用户可写配置） | `%ProgramFiles%\Ostium\core`、`%ProgramFiles%\Ostium\service\core.toml`（管理员/SYSTEM 可写） |
 | macOS | `/Library/Application Support/Ostium UI`（UI） | `/Library/Application Support/Ostium` |
 
 关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。
@@ -763,8 +763,8 @@ npx playwright test
 
 当前结果：
 
-- 后端：**391 passed / 0 skipped**（385 个常规测试 + 6 个真实核心集成测试），语句 **98.34%**、分支 **95.79%**；
-- 前端：**136 passed**，语句 **91.38%**、分支 **85.27%**、函数 **89.04%**、行 **92.13%**；
+- 后端：**400 passed / 0 skipped**（394 个常规测试 + 6 个真实核心集成测试），语句 **98.29%**、分支 **95.70%**；
+- 前端：**137 passed**，语句 **91.38%**、分支 **85.27%**、函数 **89.04%**、行 **92.13%**；
 - Playwright：**21 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线、PWA service worker 和 axe 登录页检查；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

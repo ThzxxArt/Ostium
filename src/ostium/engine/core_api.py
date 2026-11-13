@@ -81,7 +81,15 @@ class CoreClient:
             await self._request(
                 "POST",
                 "/v1/apply",
-                json={"config": config, "sha256": sha256, "role": role},
+                json={
+                    "config": config,
+                    "sha256": sha256,
+                    "role": role,
+                    # The core runs with a separate settings file on clients;
+                    # send the UI's explicit LAN policy with each apply so the
+                    # privileged validator does not have to guess it.
+                    "allow_lan": self.settings.allow_lan,
+                },
             )
         )
 

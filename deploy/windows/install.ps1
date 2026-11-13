@@ -11,7 +11,9 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 $Source = Split-Path -Parent $MyInvocation.MyCommand.Path
-New-Item -ItemType Directory -Force -Path $InstallDir, $DataDir, "$DataDir\runtime", "$DataDir\logs", "$DataDir\core" | Out-Null
+$ServiceDir = Join-Path $InstallDir "service"
+$CoreDir = Join-Path $InstallDir "core"
+New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $DataDir, "$DataDir\runtime", "$DataDir\logs" | Out-Null
 # Inno Setup already copied the bundle into $InstallDir before running this
 # script.  Copying a directory onto itself makes PowerShell fail, so only do
 # the copy for the portable/zip workflow where source and destination differ.
@@ -21,12 +23,38 @@ if ($sourceFull -ne $installFull) {
     Copy-Item "$Source\*" $InstallDir -Recurse -Force
 }
 
-# Core binary and Wintun live beside the service executable.
-if (Test-Path "$Source\core\sing-box.exe") {
-    Copy-Item "$Source\core\sing-box.exe" "$DataDir\core\sing-box.exe" -Force
-}
-if (Test-Path "$Source\core\wintun.dll") {
-    Copy-Item "$Source\core\wintun.dll" "$DataDir\core\wintun.dll" -Force
+# Core binaries live under the admin-only Program Files tree.  The privileged
+# service must never execute a binary from a directory the interactive user can
+# modify.
+$dataToml = $DataDir.Replace('\', '/')
+$engineToml = (Join-Path $CoreDir "sing-box.exe").Replace('\', '/')
+$coreConfig = Join-Path $ServiceDir "core.toml"
+@"
+role = "client"
+data_dir = "$dataToml"
+config_dir = "$dataToml"
+log_level = "info"
+engine_version = "1.14.4-ostium.1"
+engine_path = "$engineToml"
+core_url = "http://127.0.0.1:8788"
+"@ | Set-Content -LiteralPath $coreConfig -Encoding utf8
+
+# The UI keeps its own user-writable configuration.  Keep the service's
+# configuration separate so a local user cannot change engine_path.
+$uiConfig = "$DataDir\config.toml"
+if (-not (Test-Path $uiConfig)) {
+    @"
+role = "client"
+host = "127.0.0.1"
+port = 8787
+data_dir = "$dataToml"
+config_dir = "$dataToml"
+log_level = "info"
+engine_version = "1.14.4-ostium.1"
+engine_path = "$engineToml"
+core_url = "http://127.0.0.1:8788"
+mode = "system_proxy"
+"@ | Set-Content -LiteralPath $uiConfig -Encoding utf8
 }
 
 $env:OSTIUM_ROLE = "client"
@@ -48,9 +76,10 @@ if (-not (Test-Path "$DataDir\ostium.db")) {
 $uiCmd = "$InstallDir\ostium-ui.cmd"
 @"
 @echo off
-set OSTIUM_ROLE=client
-set OSTIUM_DATA_DIR=$DataDir
-set OSTIUM_CONFIG_FILE=$DataDir\config.toml
+set "OSTIUM_ROLE=client"
+set "OSTIUM_DATA_DIR=$DataDir"
+set "OSTIUM_CONFIG_FILE=$DataDir\config.toml"
+set "OSTIUM_ENGINE_PATH=$CoreDir\sing-box.exe"
 "$InstallDir\ostium.exe" serve
 "@ | Set-Content -LiteralPath $uiCmd -Encoding ascii
 
@@ -59,8 +88,12 @@ $userAccount = if ($env:USERDOMAIN) { "$env:USERDOMAIN\$env:USERNAME" } else { $
 icacls $DataDir /grant "${userAccount}:(OI)(CI)M" | Out-Null
 
 # Register the privileged TUN core as a Windows service (LocalSystem).
-& "$InstallDir\ostium-service.exe" --startup auto install
-Start-Service OstiumCore -ErrorAction SilentlyContinue
+$serviceExe = Join-Path $ServiceDir "ostium-service.exe"
+if (-not (Test-Path $serviceExe)) {
+    throw "Ostium service executable is missing: $serviceExe"
+}
+& $serviceExe --startup auto install
+Start-Service OstiumCore -ErrorAction Stop
 
 # Start the console at logon (default) or at boot as SYSTEM.
 if ($RunAsSystem) {

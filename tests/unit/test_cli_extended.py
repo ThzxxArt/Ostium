@@ -402,6 +402,9 @@ def test_profile_url_import_refresh_and_errors(tmp_path: Path, monkeypatch) -> N
     runner = _init(tmp_path, monkeypatch, role="client")
     with respx.mock:
         respx.get("https://sub.example.com/list").mock(return_value=httpx.Response(200, text=VLESS))
+        respx.post("http://127.0.0.1:8788/v1/apply").mock(
+            return_value=httpx.Response(200, json={"running": True})
+        )
         imported = runner.invoke(
             app, ["profile", "import", "https://sub.example.com/list", "--name", "HK"]
         )
@@ -410,6 +413,9 @@ def test_profile_url_import_refresh_and_errors(tmp_path: Path, monkeypatch) -> N
 
     with respx.mock:
         respx.get("https://sub.example.com/list").mock(return_value=httpx.Response(200, text=VLESS))
+        respx.post("http://127.0.0.1:8788/v1/apply").mock(
+            return_value=httpx.Response(200, json={"running": True})
+        )
         assert runner.invoke(app, ["profile", "refresh", "HK"]).exit_code == 0
 
     assert runner.invoke(app, ["profile", "refresh", "missing"]).exit_code == 1

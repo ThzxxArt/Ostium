@@ -35,6 +35,7 @@ class ApplyRequest(BaseModel):
     config: dict[str, Any]
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     role: Role
+    allow_lan: bool = False
 
 
 def create_core_app(settings: Settings) -> FastAPI:
@@ -64,8 +65,13 @@ def create_core_app(settings: Settings) -> FastAPI:
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         if request.method in {"POST", "PUT", "PATCH"}:
             length = request.headers.get("content-length")
-            if length is not None and int(length) > MAX_BODY_BYTES:
-                return _problem(413, "request body too large", "body_too_large")
+            if length is not None:
+                try:
+                    declared = int(length)
+                except ValueError:
+                    return _problem(400, "invalid Content-Length", "invalid_request")
+                if declared > MAX_BODY_BYTES:
+                    return _problem(413, "request body too large", "body_too_large")
             body = await request.body()
             if len(body) > MAX_BODY_BYTES:
                 return _problem(413, "request body too large", "body_too_large")
@@ -119,7 +125,7 @@ def create_core_app(settings: Settings) -> FastAPI:
             raise ConfigRejected(
                 "configuration role does not match this core service", "role_mismatch"
             )
-        result = await supervisor.apply(request.config, request.sha256)
+        result = await supervisor.apply(request.config, request.sha256, allow_lan=request.allow_lan)
         return _status_payload(result, settings)
 
     @app.post("/v1/reload", dependencies=[Depends(require_token)])

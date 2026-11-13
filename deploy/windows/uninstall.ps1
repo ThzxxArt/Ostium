@@ -6,8 +6,11 @@ param(
 )
 
 $ErrorActionPreference = "SilentlyContinue"
+$serviceExe = Join-Path $InstallDir "service\ostium-service.exe"
 Stop-Service OstiumCore
-& "$InstallDir\ostium-service.exe" remove
+if (Test-Path $serviceExe) {
+    & $serviceExe remove
+}
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
 Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force
 if ($RemoveData) {

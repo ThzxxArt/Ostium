@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.34%25%20statements%20%C2%B7%2095.79%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.29%25%20statements%20%C2%B7%2095.70%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-391%20backend%20%C2%B7%20136%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-400%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 391 backend tests, 136 frontend tests and 21 Playwright tests; 98.34% backend statements / 95.79% branches. |
+| 🧪 **Verified** | 400 backend tests, 137 frontend tests and 21 Playwright tests; 98.29% backend statements / 95.70% branches. |
 
 ---
 
@@ -156,7 +156,7 @@ flowchart LR
 | macOS client | macOS 14+, arm64/x64; `sudo` for the LaunchDaemon |
 | Linux client | x64/arm64; TUN requires root or `CAP_NET_ADMIN` |
 | Install environment | One-click installer downloads uv + managed Python 3.13; **no Python required** |
-| Development | Python 3.13, uv 0.11+, Node 24.19+, Go 1.25.5 (only for the custom core) |
+| Development | Python 3.13, uv 0.11+, Node 24.19+ (minimum 22.12), Go 1.25.5 (only for the custom core) |
 
 > The server UI listens on `127.0.0.1:8443` by default. For public access, configure a certificate
 > and TOTP first, enable it explicitly in Settings, then restart `ostium.service`.
@@ -236,7 +236,9 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` may be a release directory or a source checkout.
+`--local-dir` must point to a source checkout (or an extracted source archive of the
+same version) that contains `scripts/install.sh`. A directory containing only
+Release download assets does not include the installer and cannot be used here.
 
 ### Option 2 — Linux server (offline native package)
 
@@ -312,7 +314,8 @@ Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 1. Run `Ostium-0.1.0-windows-x64-setup.exe`.
 2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
    and starts the UI at logon.
-3. Data lives in `%ProgramData%\Ostium`.
+3. UI data lives in `%ProgramData%\Ostium`; the core binary and the LocalSystem service
+   configuration live under `%ProgramFiles%\Ostium`.
 4. The initial admin password is printed by the online installer; the offline setup stores it in
    `%ProgramData%\Ostium\initial-password.txt`. Delete the file after the first login.
 5. Unsigned builds trigger SmartScreen. Verify `SHA256SUMS` and only choose “Run anyway” if you
@@ -641,8 +644,8 @@ configuration remain active.
 ### Client upgrade
 
 Windows/macOS installers replace the app in place and preserve data and profiles. On Linux,
-re-run `install.sh --role client`. A core upgrade briefly interrupts the tunnel; a UI upgrade does
-not.
+re-run `install.sh --role client`. The installer replaces and restarts the core, so the tunnel is
+briefly interrupted; data and profiles are preserved.
 
 > Ostium never silently auto-updates. Every upgrade is downloaded, verified and installed
 > explicitly.
@@ -738,7 +741,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 |---|---|---|
 | Linux server | `/var/lib/ostium`, `/etc/ostium/config.toml` | same |
 | Linux client | `~/.local/share/ostium` (UI data and `config.toml`) | `/var/lib/ostium-core`, `/etc/ostium/client.toml` |
-| Windows | `%ProgramData%\Ostium` (UI) | `%ProgramData%\Ostium` |
+| Windows | `%ProgramData%\Ostium` (UI data and user-writable config) | `%ProgramFiles%\Ostium\core`, `%ProgramFiles%\Ostium\service\core.toml` (admin/SYSTEM only) |
 | macOS | `/Library/Application Support/Ostium UI` (UI) | `/Library/Application Support/Ostium` |
 
 Key files: `ostium.db`, `master.key`, `config.toml`, `certs/`, `runtime/last-good.json`,
@@ -796,9 +799,9 @@ npx playwright test
 
 Current results:
 
-- Backend: **391 passed / 0 skipped** (385 regular tests + 6 live-engine integration tests),
-  **98.34%** statements / **95.79%** branches.
-- Frontend: **136 passed**, **91.38%** statements / **85.27%** branches /
+- Backend: **400 passed / 0 skipped** (394 regular tests + 6 live-engine integration tests),
+  **98.29%** statements / **95.70%** branches.
+- Frontend: **137 passed**, **91.38%** statements / **85.27%** branches /
   **89.04%** functions / **92.13%** lines.
 - Playwright: **21 passed**, covering 1440/1024/390, dark/light visual baselines,
   PWA service-worker registration and an axe login check.

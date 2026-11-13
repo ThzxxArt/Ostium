@@ -17,6 +17,16 @@ def test_websocket_rejects_invalid_session(api_client: TestClient) -> None:
     assert "expired" in excinfo.value.reason
 
 
+def test_websocket_rejects_cross_origin(api_client: TestClient) -> None:
+    setup_admin(api_client)
+    with (
+        pytest.raises(WebSocketDisconnect) as excinfo,
+        api_client.websocket_connect("/api/v1/events", headers={"origin": "https://evil.example"}),
+    ):
+        pass
+    assert excinfo.value.code == 4403
+
+
 def test_websocket_delivers_events(api_client: TestClient) -> None:
     setup_admin(api_client)
     with api_client.websocket_connect("/api/v1/events") as websocket:

@@ -2,8 +2,8 @@
 
 日期：2026-11-13
 
-审计对象：`/mnt/d/CodeWorkspace/Ostium`（第二轮，基线 `b96324e`）
-结论：**自动化测试、覆盖率、静态检查、前端构建与 E2E 均通过；第二轮发现的 P0/P1 代码缺陷已修复。真实 Release、Windows/macOS 实机、Nginx `nginx -t`、TUN、ACME 与 72h soak 仍未验证，发布状态列为 blocker。**
+审计对象：`/mnt/d/CodeWorkspace/Ostium`（第三轮，基线 `e1d9bc2`）
+结论：**第三轮发现的 P0/P1 代码缺陷已修复；自动化测试、覆盖率、静态检查、前端构建、E2E、隔离安装与升级回滚均通过。真实 Release、Windows/macOS 实机、Nginx `nginx -t`、TUN/系统代理实机、ACME 与 72h soak 仍未验证，发布状态列为 blocker。§12 的数字与证据是第二轮历史记录；第三轮最新结果以本节、§13 和文末证据为准。**
 
 ---
 
@@ -11,18 +11,18 @@
 
 | 项目 | 基线 | 最终 | 门禁 |
 |---|---|---|---|
-| 后端语句覆盖率 | 66.81% | **98.34%** | ≥85% PASS |
-| 后端分支覆盖率 | 39.46% | **95.79%** | ≥85% PASS |
-| `api/` 覆盖 | — | 语句 97.54% / 分支 96.59% | ≥90% PASS |
-| `core/` 覆盖 | — | 语句 99.21% / 分支 95.45% | ≥90% PASS |
-| `services/` 覆盖 | — | 语句 98.09% / 分支 94.26% | ≥90% PASS |
+| 后端语句覆盖率 | 66.81% | **98.29%** | ≥85% PASS |
+| 后端分支覆盖率 | 39.46% | **95.70%** | ≥85% PASS |
+| `api/` 覆盖 | — | 语句 97.47% / 分支 96.62% | ≥90% PASS |
+| `core/` 覆盖 | — | 语句 98.48% / 分支 91.67% | ≥90% PASS |
+| `services/` 覆盖 | — | 语句 98.03% / 分支 94.08% | ≥90% PASS |
 | `engine/` 覆盖 | — | 语句 99.23% / 分支 97.29% | ≥90% PASS |
 | 前端 statements | 0.92% | **91.38%** | ≥85% PASS |
 | 前端 branches | 1.62% | **85.27%** | ≥85% PASS |
 | 前端 functions | 0.56% | **89.04%** | ≥85% PASS |
 | 前端 lines | 0.83% | **92.13%** | ≥85% PASS |
-| 后端测试 | 69 | **391 passed / 0 skipped** | — |
-| 前端测试 | 5 | **136 passed** | — |
+| 后端测试 | 69 | **400 passed / 0 skipped** | — |
+| 前端测试 | 5 | **137 passed** | — |
 | Playwright | 12 passed / 3 skipped | **21 passed / 0 skipped** | — |
 
 覆盖率排除项仅为 `src/ostium/_version.py` 和生成的
@@ -50,13 +50,13 @@
 | 门禁 | 命令 | 结果 |
 |---|---|---|
 | Python lint | `uv run ruff check src tests scripts` | PASS |
-| Python format | `uv run ruff format --check src tests scripts` | PASS（134 files） |
+| Python format | `uv run ruff format --check src tests scripts` | PASS（136 files） |
 | Python types | `uv run mypy src/ostium` | PASS（69 files） |
-| Backend tests | `uv run pytest -q` | 391 passed, 0 skipped |
+| Backend tests | `uv run pytest -q` | 400 passed, 0 skipped |
 | Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
-| Frontend unit tests | `npm run test` | 136 passed |
+| Frontend unit tests | `npm run test` | 137 passed |
 | Frontend coverage | `npm run test:coverage` | 91.38 / 85.27 / 89.04 / 92.13 |
 | Frontend build | `npm run build` | PASS |
 | Frontend format | `npm run format:check` | PASS |
@@ -135,7 +135,7 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 | 配额/到期自动禁用/重置 | PASS | `test_stats_extended.py`、API/用户测试 |
 | 四种订阅 + QR | PASS | `test_subscriptions_service.py`、API 四格式测试 |
 | 标准分享链接/二维码 | PASS | `test_endpoints_extended.py`、`qr_svg` 测试 |
-| 管理 Web UI 全部页面 | PASS | 136 个 Vitest + 21 个 Playwright |
+| 管理 Web UI 全部页面 | PASS | 137 个 Vitest + 21 个 Playwright |
 | ACME/手动/自签/续期/提醒 | PASS（真实 ACME 外部） | ACME 单元 100%、自签/上传/续期 API 测试；staging 见 MANUAL |
 | 实时流量/连接/日志/WS/Prometheus | PASS | API/WS/事件/指标测试 |
 | 备份/恢复：DB/config/certs/master key，口令加密 | PASS | `test_backup_extended.py`、错误密码/路径逃逸测试 |
@@ -280,14 +280,14 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 
 ```text
 uv run ruff check src tests scripts                  -> All checks passed
-uv run ruff format --check src tests scripts         -> 134 files already formatted
+uv run ruff format --check src tests scripts         -> 136 files already formatted
 uv run mypy src/ostium                               -> Success: no issues in 69 files
-uv run pytest -q                                     -> 391 passed, 34 warnings
-uv run pytest -m "not integration" --cov=ostium ...  -> 385 passed, coverage 98.34/95.79
+uv run pytest -q                                     -> 400 passed, 0 skipped
+uv run pytest -m "not integration" --cov=ostium ...  -> 394 passed, coverage 98.29/95.70
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass
-npm run test:coverage                                -> 136 passed; 91.38/85.27/89.04/92.13
+npm run test:coverage                                -> 137 passed; 91.38/85.27/89.04/92.13
 npm run build                                        -> built
 npm run format:check                                 -> pass
 npx playwright test                                  -> 21 passed
@@ -365,7 +365,7 @@ clean venv install + ostium init + ostium serve      -> Ostium 0.1.0; /healthz 2
 - **真实 TUN/系统代理/ACME/72h soak/5 用户可用性**：仍属外部环境。
 - **数据库升级**：当前 `create_schema` 是 `create_all + stamp`，v0.1.0 只有初始迁移；后续版本若新增 Alembic 迁移，需要补“已有库执行 upgrade”路径，本轮未虚构已验证。
 - **macOS DMG**：`build-macos.sh` 存在，但 Release workflow 未构建/上传 DMG；已把升级文档中“使用新版 DMG”改为重新运行安装器，避免误导。
-- **npm audit**：破坏性升级 + `overrides`（`editorconfig@4.0.0`、`glob@14.0.2`、`minimatch@11.0.8`）后，完整 `npm audit` 为 **0 vulnerabilities**；同时用仓库内 `web/build/pwa.ts` 替换了会引入 `deepmerge` 漏洞的 `vite-plugin-pwa/workbox-build`，PWA 由 136 个单测和真实注册 E2E 覆盖。
+- **npm audit**：破坏性升级 + `overrides`（`editorconfig@4.0.0`、`glob@14.0.2`、`minimatch@11.0.8`）后，完整 `npm audit` 为 **0 vulnerabilities**；同时用仓库内 `web/pwa.ts` 替换了会引入 `deepmerge` 漏洞的 `vite-plugin-pwa/workbox-build`，PWA 由 137 个单测和真实注册 E2E 覆盖。
 - **Windows 卸载脚本**：Inno 卸载与脚本删除目录的交互未实机验证；已避免安装阶段自复制错误。
 
 ### 12.4 本轮验证证据
@@ -390,3 +390,76 @@ shellcheck + bash -n                                  -> PASS
 ```
 
 **最终判定：代码层面的第二轮 P0/P1 已修复，自动化门禁通过；但“可发布”仍需先获得授权并真实执行 Release，再完成 Windows/macOS/Nginx/TUN/ACME 实机验收。当前不能把 README 中的 Release/PyPI 链接当作已验证事实。**
+
+---
+
+## 13. 第三轮全量审计（2026-11-13，基线 e1d9bc2）
+
+第三轮的重点不是重复第二轮，而是验证第二轮修复是否回归，并对发布构建、升级路径、跨平台安装器和新增 PWA 工具链做破坏性检查。以下问题均先复现或通过构建链静态验证，再修复并补回归。
+
+### 13.1 P0（会直接导致发布/安装/升级不可用）
+
+| ID | 问题 | 复现/根因 | 修复 | 证据 |
+|---|---|---|---|---|
+| R3-01 | Allow LAN 实际不可用：UI 生成 `0.0.0.0:7890`，但特权核心 `validate_config` 无条件要求客户端代理只绑回环，Apply 必然 422 | `allow_lan` 只存在于 UI 进程设置，核心校验没有策略输入；第二轮测试 mock 了 `apply_client`，没有走真实校验 | `ApplyRequest`/`CoreClient` 携带 `allow_lan`；`validate_config(..., allow_lan=)` 只额外允许 `0.0.0.0`/`::`；核心重启时 last-good 使用已接受策略 | `test_client_allow_lan_accepts_only_wildcard_bind`、`test_core_apply_forwards_allow_lan`、`test_core_client_methods`；LAN 配置通过真实 `sing-box check` |
+| R3-02 | Windows Release 构建必然失败：`build-windows.ps1` 把 `dist\core\sing-box.exe` 复制到自身 | PowerShell 复现：`COPY_FAILED: Cannot overwrite the item ... with itself` | 新增 `Copy-IfDifferent`，同路径跳过；Wintun 同样处理 | PowerShell 复现及修复后 `SELF_COPY_GUARD_OK`；`test_windows_release_layout...` |
+| R3-03 | Windows 服务包缺少 PyInstaller `_internal`：只复制 `ostium-service.exe`，LocalSystem 服务无法启动 | PyInstaller 6 one-dir 产物依赖 `_internal`；构建脚本只复制单文件 | 整个 `dist\OstiumService\*` 复制到 `service\` 子目录，安装/卸载脚本改用该路径 | `test_windows_release_layout...`；Windows runner 仍待实机 |
+| R3-04 | PyPI 发布目录混入 core/windows/SHA256SUMS：`pypa/gh-action-pypi-publish` 对 `dist/*` 执行 `twine check`/`upload`，会因目录或非分发包失败 | release workflow 直接把 `packages-dir` 指向包含所有 Release 资产的 `dist` | 新增 `dist/pypi` 暂存目录，只复制 wheel/sdist；checksums 排除该目录 | 本地布局模拟只得到 wheel+sdist；`release.yml` 静态核对 |
+| R3-05 | Windows LocalSystem 核心从用户可写的 `%ProgramData%\Ostium\config.toml` 读取 `engine_path`，本地用户可把核心指向任意 exe，形成 SYSTEM 提权 | UI 与核心共用 ProgramData 配置，`icacls` 又给交互用户 Modify | 核心配置/二进制移到管理员可写的 `%ProgramFiles%\Ostium`；`core.toml` 放 `service\`；UI 配置独立；服务强制机器级路径 | `test_windows_service_paths...`；`install.ps1` 静态核对；Windows 实机待验 |
+
+### 13.2 P1（安全/功能/发布质量）
+
+| ID | 问题 | 根因 | 修复 | 证据 |
+|---|---|---|---|---|
+| R3-06 | `install.sh --upgrade` 后 `ostium` 无法执行：pip console-script shebang 仍指向 `venv.new.<pid>`，目录已改名 | 先建临时 venv、pip 安装、再原子改名；没有重写 shebang | 改名后扫描 `venv/bin/*`，把临时 venv 前缀改写为最终 `$PREFIX/venv` | 隔离升级复现 `required file not found`；修复后 `ostium version`、`pip --version` 正常；坏 wheel 回滚仍保留旧 venv |
+| R3-07 | 中文用户名订阅下载 500：`Content-Disposition` 不能编码 latin-1 | 直接拼接 `ostium-{user.name}.yaml` | ASCII fallback + RFC 5987 `filename*=UTF-8''...` | `test_subscription_header_supports_unicode_user_names`（香港用户） |
+| R3-08 | PWA 缓存不失效：cache key 只哈希文件名；`index.html`、manifest、`theme-init.js` 内容变化不会生成新 SW；导航响应即使 404/500 也被缓存 | 自定义 SW 生成器只对文件名做 digest；导航缓存未检查 `response.ok` | digest 同时哈希文件内容；仅缓存 `response.ok` 响应 | `pwaGenerator.test.ts` 修改 `index.html` 后 digest/source 必须变化；真实构建生成 122 个 precache 文件 |
+| R3-09 | Allow LAN 开启时仍可切到 TUN，关闭 TUN 后混合代理会意外重新暴露到局域网 | `toggle_tun` 只检查系统代理，不检查 `allow_lan` | TUN 启用前返回 409 `mode_conflict`，要求先关闭 Allow LAN | `test_tun_rejects_allow_lan` |
+| R3-10 | Windows 系统代理的 PAC `AutoConfigURL` 启用时未移除、关闭时未恢复 | WinINET 恢复只覆盖 ProxyEnable/ProxyServer/ProxyOverride | 启用时删除 PAC，关闭时按原值恢复或删除 | `test_windows_proxy` 覆盖 PAC 保存/恢复 |
+| R3-11 | CLI 在 Windows/自定义 `engine_path` 下诊断错误；`backup create --output` 被忽略；多处 `_fail` 提前退出不释放数据库引擎；用户/配置变更后不重新 apply | 多处使用 `paths.engine_binary` 默认值、缺少 `finally`、只写数据库 | 统一 `_engine_binary()`；backup 支持 target；关键 CLI 路径加 `try/finally`；用户/配置变更后 best-effort apply | CLI 全量测试、`test_cli_workflows`、`test_config_paths`；升级后的真实 venv 已实测 |
+| R3-12 | sdist 缺少 `web/index.html`、`web/pwa.ts`、`web/tests` 等前端构建源，源码包无法重建前端 | `pyproject.toml` sdist include 列表遗漏 | 补入前端源、测试和构建配置 | 构建 sdist 后检查 `web/index.html`、`web/pwa.ts`、`web/tsconfig.node.json`、`web/tests/...` 均存在 |
+| R3-13 | Release 顶层权限过大；Docker 镜像硬编码 `0.1.0`；Windows checkout 无 tag 导致版本为 dev；独立 core manifest 未按 tag 生成 | workflow/Dockerfile 未按 job 收窄权限、未传版本 | job 级最小权限；Docker `ARG OSTIUM_VERSION` + `build-args`；Windows `fetch-depth: 0` + `SETUPTOOLS_SCM_PRETEND_VERSION`；core manifest 按 tag | YAML 解析、构建脚本静态核对；真实 tag 运行待授权 |
+| R3-14 | WebSocket 事件流只校验会话 Cookie，不校验 Origin，存在跨站 WebSocket 读取风险 | `routes_events` 未比较 `Origin` 与 `Host` | Origin 存在且不匹配时 4403 拒绝 | `test_websocket_rejects_cross_origin` |
+| R3-15 | 公网 UI 可在证书仍为 pending/已过期时被启用，重启后 `serve` 才发现无可用证书 | 只检查证书行存在 | 要求 `status=ready` 且未过期 | 现有 public-ui 测试；新增条件逻辑 |
+
+### 13.3 第三轮回归矩阵
+
+| 检查 | 结果 |
+|---|---|
+| 后端非集成测试 | **394 passed / 0 skipped**；覆盖率 **98.29% statements / 95.70% branches**；`coverage_gate.py` PASS |
+| 后端真实核心集成测试 | **6 passed**（sing-box 1.14.4 + 定制 v2ray core） |
+| 前端单元测试 | **137 passed**；覆盖率 91.38 / 85.27 / 89.04 / 92.13 |
+| Playwright | **21 passed**（1440/1024/390、深浅色基线、PWA、axe） |
+| Python lint/format/types | `ruff` PASS；`ruff format --check` 136 files；`mypy` PASS |
+| npm audit / npm ls | **0 vulnerabilities**；`npm ls` exit 0（仅可选依赖 UNMET，无 invalid/extraneous） |
+| Python 依赖审计 | 导出运行依赖后 `pip-audit --strict` 0 漏洞；本地 editable 项目不作为 PyPI 依赖审计 |
+| 文档 | `mkdocs build --strict` PASS；内部链接检查 PASS |
+| Shell / PowerShell | `bash -n`、`shellcheck` PASS；PowerShell 7.7 解析 `scripts/*.ps1` 与 `deploy/windows/*.ps1` 全部通过（4 个） |
+| wheel / sdist | 含 `ostium/web/dist/index.html`、`manifest.webmanifest`、`sw.js`；sdist 含前端构建源 |
+| 一键安装（隔离） | `install-online.sh --local-dir`、静态 uv 0.11.14、托管 Python 3.13.13、SHA256 校验、`/healthz` 200 |
+| 安装模式 | `--run-as-root --no-service`、`--behind-proxy`、`--public-ui` 冲突拒绝、危险 `--prefix /`/`//etc` 拒绝 |
+| 升级 | 坏 wheel 退出 1 且旧 venv 可执行；好 wheel 保留数据/管理员，修复后 `ostium`/`pip` 可执行 |
+| 卸载 | `install-online.sh uninstall` 删除程序/链接，保留数据和配置 |
+| 客户端隔离 | 核心/UI 配置分离；`core-run` 在 `runtime/core.token` 生成令牌，`/v1/status` 鉴权 200 |
+| 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、权限按 job 收窄 |
+| 干净克隆 | 待本轮最终提交后执行；结果见下方最终回复 |
+
+### 13.4 仍未验证 / 外部阻塞
+
+- **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。未经用户批准，本轮没有 push、tag 或发布。
+- **Windows**：未在 Windows runner/实机执行 PyInstaller one-dir、Inno 安装/卸载、服务启动、TUN/Wintun、PAC 恢复；PowerShell 只做了解析和静态检查。R3-03/R3-05 的运行时行为必须实机确认。
+- **macOS**：launchd、`ostium` 组、token 权限、UI 以用户启动、Gatekeeper/签名未实机验证。
+- **Linux TUN/系统代理**：需要真实 `/dev/net/tun`、NetworkManager/GNOME/KDE 会话；本轮只验证代码和配置。
+- **Nginx**：本机无 nginx，`nginx -t` 未执行；示例仍是静态核对。
+- **Docker**：本机无 Docker，镜像/多架构构建未执行。
+- **ACME**：没有公网域名和 80 端口，staging/production 未执行。
+- **性能/可用性**：72h soak、Lighthouse 性能预算、5 用户可用性未执行。
+- **浏览器覆盖**：PWA 只在 Chromium E2E 验证，Safari/Firefox 未覆盖。
+- **数据库迁移**：仍是 `create_all + stamp`；未来新增 Alembic 版本时需要补“已有库 upgrade”路径。
+- **PyPI Trusted Publishing**：需要在 PyPI 配置对应的 GitHub 环境/发布者；workflow 没有假设 `pypi` environment。
+- **代码签名**：Windows/macOS 证书、SmartScreen/Gatekeeper 未处理。
+
+### 13.5 结论
+
+**代码层面达到 release candidate：第三轮 P0/P1 已修复，自动化与隔离安装/升级证据通过。**
+**但不能宣布“已发布”或把 README 的 Release/PyPI/GHCR 链接当成有效：没有真实 tag/Release/发布，且 Windows/macOS/Nginx/Docker/ACME/TUN/性能仍属外部验证。**

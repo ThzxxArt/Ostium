@@ -45,7 +45,14 @@ jobs:
           pattern: core-*
           merge-multiple: true
           path: dist/core
-      - run: python3 scripts/build-core-manifest.py --dir dist/core --output dist/core-manifest.json
+      - name: Build core manifest
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            python3 scripts/build-core-manifest.py --dir dist/core \
+              --release-version "${GITHUB_REF_NAME}" --output dist/core-manifest.json
+          else
+            python3 scripts/build-core-manifest.py --dir dist/core --output dist/core-manifest.json
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: core-manifest

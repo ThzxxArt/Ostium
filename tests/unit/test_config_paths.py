@@ -120,10 +120,13 @@ def test_save_and_load_roundtrip(tmp_path: Path) -> None:
 
 def test_save_to_explicit_path_and_none_fields(tmp_path: Path) -> None:
     value = _settings(tmp_path, acme_email=None)
+    value.engine_path = tmp_path / "bin" / "sing-box"
     explicit = tmp_path / "custom" / "config.toml"
     saved = value.save(explicit)
     assert saved == explicit
     assert "acme_email" not in explicit.read_text()
+    assert "engine_path" in explicit.read_text()
+    assert Settings.load(explicit).engine_path == tmp_path / "bin" / "sing-box"
 
 
 def test_loaded_client_config_saves_back_to_the_same_file(

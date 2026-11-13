@@ -90,6 +90,11 @@ class CoreSupervisor:
                 allowed_ports=set(self.settings.proxy_ports),
                 allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
                 tun_interface=self.settings.tun_interface,
+                # The last-good file was already accepted by an authenticated
+                # apply.  Re-validating it must not reject a LAN-bound config
+                # after a reboot just because the core process has a separate
+                # settings file from the UI.
+                allow_lan=True,
             )
         except Exception as exc:
             self._last_error = f"last-good config rejected: {exc}"
@@ -102,7 +107,9 @@ class CoreSupervisor:
             self._last_error = str(exc)
             self._write_state()
 
-    async def apply(self, config: dict[str, Any], expected_sha256: str) -> SupervisorStatus:
+    async def apply(
+        self, config: dict[str, Any], expected_sha256: str, *, allow_lan: bool = False
+    ) -> SupervisorStatus:
         if not self.engine.is_file():
             raise EngineUnavailable(
                 f"sing-box was not found at {self.engine}; install the Ostium core first"
@@ -118,6 +125,7 @@ class CoreSupervisor:
             allowed_ports=set(self.settings.proxy_ports),
             allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
             tun_interface=self.settings.tun_interface,
+            allow_lan=allow_lan,
         )
         async with self._lock:
             temp = self.last_good.with_suffix(".json.tmp")

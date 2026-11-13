@@ -57,6 +57,8 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1))) -RunAsSystem
 ```
 
+**风险**：默认 UI 以当前用户运行，只有核心服务是 LocalSystem。`-RunAsSystem` 会取消这层隔离，UI/浏览器漏洞可能直接获得 SYSTEM 权限；只建议在隔离测试机使用。
+
 ## 安装器做了什么
 
 1. 检测 Linux/macOS、x86_64/arm64。
@@ -87,7 +89,7 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 | `--ui-port PORT` | 管理 UI 端口（默认 8443） |
 | `--public-ui` | 允许公网管理 UI（必须先 TLS + TOTP） |
 | `--no-start` | 注册服务但不启动 |
-| `--local-dir DIR` | 离线安装：Release 目录或源码 checkout |
+| `--local-dir DIR` | 离线安装：包含 `scripts/install.sh` 的源码 checkout 或解压后的源码包 |
 | `--no-verify` | 跳过 SHA256（仅限本地开发） |
 
 ## 没有 Python 也能装
@@ -112,6 +114,8 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role server \
 - 把 `admin.example.com` 加入 `trusted_hosts`。
 
 然后按 [Nginx 共存指南](nginx.md) 配置证书和反代，并把 Reality/Trojan 改到 9443/tcp。`--behind-proxy` 只影响管理 UI，不会改变代理入口端口。
+
+`--behind-proxy` 与 `--public-ui` 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS；安装器会拒绝同时使用。
 
 ## root 模式（不创建 ostium 用户）
 
@@ -167,7 +171,7 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 也可以直接指向源码 checkout；脚本会从 `dist/` 或目录内查找 wheel 和核心包。没有 `SHA256SUMS` 时可用 `--no-verify`，但生产环境不建议。
+`--local-dir` 必须指向包含 `scripts/install.sh` 的源码 checkout 或解压后的源码包；只有 Release 下载资产的目录不含安装脚本，不能直接使用。
 
 ## 升级
 

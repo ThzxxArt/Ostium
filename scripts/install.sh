@@ -120,6 +120,10 @@ fi
 if [[ "$PUBLIC_UI" == "true" ]]; then
   SECURE_COOKIES="true"
 fi
+if [[ "$BEHIND_PROXY" == "true" && "$PUBLIC_UI" == "true" ]]; then
+  echo "--behind-proxy 与 --public-ui 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS" >&2
+  exit 2
+fi
 
 validate_install_path() {
   local path="$1" label="$2" normalized
@@ -151,6 +155,8 @@ validate_install_path "$DATA" "数据目录"
 validate_install_path "$CONFIG" "配置目录"
 validate_install_path "$CLIENT_DATA" "客户端核心数据目录"
 validate_install_path "$CLIENT_UI_DATA" "客户端 UI 数据目录"
+validate_install_path "$BIN_LINK" "可执行链接"
+validate_install_path "$SYSTEMD_DIR" "systemd 目录"
 TRUSTED_HOSTS_TOML='["localhost", "127.0.0.1", "::1"'
 if [[ -n "$DOMAIN" ]]; then
   TRUSTED_HOSTS_TOML+=", \"$DOMAIN\""
@@ -271,13 +277,15 @@ else
     id -u ostium-core >/dev/null 2>&1 || useradd --system --gid ostium --home-dir "$CLIENT_DATA" --shell /usr/sbin/nologin ostium-core
     install -d -m 0750 -o ostium-core -g ostium "$CLIENT_DATA" "$CLIENT_DATA/runtime" "$CLIENT_DATA/logs" "$CLIENT_DATA/core"
     install -d -m 0755 "$CONFIG"
-    if [[ -n "${SUDO_USER:-}" ]]; then
-      usermod -aG ostium "$SUDO_USER"
-      USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
-      UI_DATA="$USER_HOME/.local/share/ostium"
-      UI_CONFIG="$UI_DATA/config.toml"
-      install -d -m 0700 -o "$SUDO_USER" -g ostium "$UI_DATA"
+    if [[ -z "${SUDO_USER:-}" ]]; then
+      echo "无法确定桌面用户；请通过 sudo 运行，或显式使用 --run-as-root" >&2
+      exit 1
     fi
+    usermod -aG ostium "$SUDO_USER"
+    USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+    UI_DATA="$USER_HOME/.local/share/ostium"
+    UI_CONFIG="$UI_DATA/config.toml"
+    install -d -m 0700 -o "$SUDO_USER" -g ostium "$UI_DATA"
   fi
 fi
 
@@ -321,7 +329,17 @@ if [[ "$UPGRADE" == "true" ]]; then
     echo "无法切换虚拟环境，已回滚" >&2
     exit 1
   fi
+  OLD_VENV="$NEW_VENV"
   NEW_VENV=""
+  # pip writes the temporary venv path into console-script shebangs.  After
+  # the atomic rename those paths no longer exist, so rewrite the scripts to
+  # the final location before declaring the upgrade successful.
+  for script in "$PREFIX/venv/bin/"*; do
+    [[ -f "$script" && ! -L "$script" ]] || continue
+    if [[ "$(head -n 1 "$script")" == "#!$OLD_VENV/"* ]]; then
+      sed -i "1s|^#!$OLD_VENV/|#!$PREFIX/venv/|" "$script"
+    fi
+  done
   rm -rf "$PREFIX/venv.old"
 else
   "$PYTHON_BIN" -m venv "$PREFIX/venv"
@@ -358,6 +376,7 @@ data_dir = "$DATA"
 config_dir = "$CONFIG"
 log_level = "info"
 engine_version = "1.14.4-ostium.1"
+engine_path = "$DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
 EOF
     chmod 0600 "$CONFIG/config.toml"
@@ -422,6 +441,7 @@ data_dir = "$CLIENT_DATA"
 config_dir = "$CONFIG"
 log_level = "info"
 engine_version = "1.14.4-ostium.1"
+engine_path = "$CLIENT_DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
 mode = "system_proxy"
 EOF
@@ -443,6 +463,7 @@ data_dir = "$UI_DATA"
 config_dir = "$UI_DATA"
 log_level = "info"
 engine_version = "1.14.4-ostium.1"
+engine_path = "$CLIENT_DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
 mode = "system_proxy"
 EOF

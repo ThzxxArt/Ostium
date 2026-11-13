@@ -67,6 +67,23 @@ def test_setup_login_and_user_subscription_flow(api_client: TestClient, session_
     assert "user.updated" in actions
 
 
+def test_subscription_header_supports_unicode_user_names(
+    api_client: TestClient, session_token: str
+) -> None:
+    created = api_client.post(
+        "/api/v1/users",
+        json={"name": "香港用户", "quota_bytes": 1024**3},
+        headers=_auth(session_token),
+    )
+    assert created.status_code == 201, created.text
+    token = created.json()["subscription"]["formats"][0]["url"].split("/sub/")[1].split("?")[0]
+    response = api_client.get(f"/sub/{token}?format=ostium")
+    assert response.status_code == 200, response.text
+    disposition = response.headers["content-disposition"]
+    assert "filename*=UTF-8''" in disposition
+    assert "ostium-subscription" in disposition
+
+
 def test_client_only_endpoints_reject_server(api_client: TestClient, session_token: str) -> None:
     response = api_client.get("/api/v1/profiles")
     assert response.status_code == 400

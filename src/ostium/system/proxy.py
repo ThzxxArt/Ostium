@@ -333,6 +333,12 @@ class WindowsProxy(BaseProxy):
                     original[name] = None
             winreg.SetValueEx(key, "ProxyEnable", 0, winreg.REG_DWORD, 1)
             winreg.SetValueEx(key, "ProxyServer", 0, winreg.REG_SZ, f"{host}:{port}")
+            # A PAC URL takes precedence over the manual proxy on Windows.
+            # Remove it while the proxy is active and restore it on disable.
+            try:
+                winreg.DeleteValue(key, "AutoConfigURL")
+            except FileNotFoundError:
+                pass
             winreg.SetValueEx(
                 key,
                 "ProxyOverride",
@@ -377,6 +383,15 @@ class WindowsProxy(BaseProxy):
                 winreg.SetValueEx(
                     key, "ProxyOverride", 0, winreg.REG_SZ, str(original["ProxyOverride"])
                 )
+            if original.get("AutoConfigURL") is not None:
+                winreg.SetValueEx(
+                    key, "AutoConfigURL", 0, winreg.REG_SZ, str(original["AutoConfigURL"])
+                )
+            else:
+                try:
+                    winreg.DeleteValue(key, "AutoConfigURL")
+                except FileNotFoundError:
+                    pass
         _notify_wininet()
         entry.update({"enabled": False, "clean_shutdown": True})
         state[STATE_KEY] = entry

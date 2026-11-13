@@ -41,7 +41,7 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 391 backend tests, 136 frontend tests
+- Comprehensive audit and coverage suite: 400 backend tests, 137 frontend tests
   and 21 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 
@@ -98,6 +98,17 @@ SemVer.
 - Replaced `vite-plugin-pwa`/`workbox-build` with a small in-repo service
   worker generator and added npm overrides; full `npm audit` is now 0
   vulnerabilities, and PWA registration is covered by Playwright.
+- Third audit: Allow LAN now passes through the privileged core validator and
+  survives a core restart; TUN and Allow LAN are mutually exclusive.
+- Third audit: Linux upgrades rewrite pip console-script shebangs after the
+  atomic venv rename, so `ostium`/`pip` keep working after `--upgrade`.
+- Third audit: Windows release bundles the full PyInstaller service directory,
+  stores the LocalSystem core config and binary under `%ProgramFiles%`, and
+  avoids self-copies during the release build.
+- Third audit: PyPI publishing stages only the wheel/sdist, and release jobs
+  use scoped permissions; Docker bakes the actual release version.
+- Third audit: subscription responses support Unicode user names, Windows PAC
+  settings are restored, and the PWA cache key now hashes asset contents.
 
 ### Known boundaries
 

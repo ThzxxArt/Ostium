@@ -6,7 +6,32 @@ Inno Setup installer via ``ostium-service --startup auto install``.
 
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
+
+
+def service_paths(
+    *,
+    program_data: Path | None = None,
+    install_dir: Path | None = None,
+) -> tuple[Path, Path]:
+    """Return the machine-wide (data dir, core config) used by the service.
+
+    The service executable lives in ``<install_dir>/service``.  Keeping its
+    configuration next to the admin-only executable prevents a local user from
+    pointing ``engine_path`` at a binary that LocalSystem would execute.
+    """
+
+    data_root = program_data or Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData"))
+    data_dir = data_root / "Ostium"
+    if install_dir is None:
+        if getattr(sys, "frozen", False):
+            install_dir = Path(sys.executable).resolve().parent.parent
+        else:
+            install_dir = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Ostium"
+    return data_dir, install_dir / "service" / "core.toml"
+
 
 if sys.platform != "win32":  # pragma: no cover - import guard
 
@@ -14,9 +39,7 @@ if sys.platform != "win32":  # pragma: no cover - import guard
         raise SystemExit("Windows services are only available on Windows")
 
 else:  # pragma: no cover - exercised on Windows
-    import os
     import threading
-    from pathlib import Path
 
     import servicemanager
     import uvicorn
@@ -47,11 +70,12 @@ else:  # pragma: no cover - exercised on Windows
         def SvcDoRun(self) -> None:
             servicemanager.LogInfoMsg("Ostium core service starting")
             # Windows services run as LocalSystem and do not inherit the
-            # installer's environment. Use the machine-wide client layout.
-            program_data = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Ostium"
-            os.environ.setdefault("OSTIUM_ROLE", "client")
-            os.environ.setdefault("OSTIUM_DATA_DIR", str(program_data))
-            os.environ.setdefault("OSTIUM_CONFIG_FILE", str(program_data / "config.toml"))
+            # installer's environment.  Force the machine-wide layout instead
+            # of accepting a potentially user-controlled inherited value.
+            data_dir, config_file = service_paths()
+            os.environ["OSTIUM_ROLE"] = "client"
+            os.environ["OSTIUM_DATA_DIR"] = str(data_dir)
+            os.environ["OSTIUM_CONFIG_FILE"] = str(config_file)
             settings = Settings.load()
             app = create_core_app(settings)
             config = uvicorn.Config(

@@ -17,7 +17,7 @@
 #   sudo bash install-online.sh status
 #
 # 离线/内网：
-#   sudo bash install-online.sh install --local-dir /path/to/release-or-checkout
+#   sudo bash install-online.sh install --local-dir /path/to/source-checkout
 set -euo pipefail
 
 VERSION="${OSTIUM_VERSION:-0.1.0}"
@@ -62,7 +62,7 @@ Ostium 一键安装器
   --password PASSWORD        初始管理员密码（省略则随机生成）
   --version VERSION          Release 版本（默认 0.1.0，可写 latest）
   --prefix PATH              安装目录（默认 /opt/ostium）
-  --local-dir DIR            离线安装：Release 目录或源码 checkout
+  --local-dir DIR            离线安装：包含 scripts/install.sh 的源码 checkout
   --run-as-root              不创建 ostium 用户，所有服务以 root 运行（降低隔离，谨慎使用）
   --no-service               不注册 systemd/launchd，交给 OpenRC/runit/s6/supervisord
   --behind-proxy             Nginx/Caddy 反代模式：UI 只监听 127.0.0.1，启用 Secure Cookie
@@ -447,6 +447,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$ROLE" == "server" || "$ROLE" == "client" ]] || die "--role 必须是 server 或 client"
+if [[ "$BEHIND_PROXY" == "true" && "$PUBLIC_UI" == "true" ]]; then
+  die "--behind-proxy 与 --public-ui 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS"
+fi
 if [[ "$ACTION" == "status" ]]; then
   detect_platform
   show_status
@@ -459,6 +462,8 @@ validate_install_path "$DATA" "数据目录"
 validate_install_path "$CONFIG" "配置目录"
 validate_install_path "$CLIENT_DATA" "客户端核心数据目录"
 validate_install_path "$CLIENT_UI_DATA" "客户端 UI 数据目录"
+validate_install_path "$BIN_LINK" "可执行链接"
+validate_install_path "$SYSTEMD_DIR" "systemd 目录"
 
 if [[ "$ACTION" == "uninstall" ]]; then
   uninstall_ostium

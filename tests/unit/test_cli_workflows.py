@@ -67,6 +67,13 @@ def test_cli_profiles_and_backup(tmp_path: Path, monkeypatch) -> None:  # type: 
 
     result = runner.invoke(app, ["backup", "create", "--password", "backup-pass"])
     assert result.exit_code == 0, result.output
+    custom = tmp_path / "custom-backup.ostb"
+    result = runner.invoke(
+        app,
+        ["backup", "create", "--password", "backup-pass", "--output", str(custom)],
+    )
+    assert result.exit_code == 0, result.output
+    assert custom.is_file()
     assert runner.invoke(app, ["backup", "list"]).exit_code == 0
     result = runner.invoke(app, ["cert", "list"])
     assert result.exit_code == 0

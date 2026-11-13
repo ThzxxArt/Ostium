@@ -202,6 +202,7 @@ class Settings(BaseModel):
             "config_dir": str(self.config_dir),
             "log_level": self.log_level,
             "core_url": self.core_url,
+            "engine_path": str(self.engine_path) if self.engine_path else None,
             "engine_version": self.engine_version,
             "acme_email": self.acme_email,
             "acme_directory": self.acme_directory,

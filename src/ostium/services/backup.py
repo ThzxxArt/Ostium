@@ -39,13 +39,21 @@ def create_backup(
     *,
     password: str | None = None,
     include_master_key: bool = True,
+    target: Path | None = None,
 ) -> dict[str, Any]:
     paths = settings.paths
     paths.backups_dir.mkdir(parents=True, exist_ok=True)
     stamp = utcnow().strftime("%Y%m%d-%H%M%S")
     encrypted = bool(password)
     filename = f"{BACKUP_PREFIX}{stamp}.{'ostb' if encrypted else 'tar.gz'}"
-    target = paths.backups_dir / filename
+    if target is None:
+        target = paths.backups_dir / filename
+    else:
+        target = target.expanduser()
+        if target.is_dir():
+            raise BackupError("backup output must be a file path", "invalid_target", 400)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        filename = target.name
     if target.exists():
         raise BackupError("a backup with the same timestamp already exists", "exists", 409)
     with tempfile.TemporaryDirectory(prefix="ostium-backup-") as temp:

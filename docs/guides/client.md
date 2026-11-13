@@ -18,8 +18,9 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 
 - 程序在 `%ProgramFiles%\Ostium`；
 - `OstiumCore` 服务以 LocalSystem 运行 TUN 核心；
+- 核心二进制在 `%ProgramFiles%\Ostium\core`，服务配置在 `%ProgramFiles%\Ostium\service\core.toml`（普通用户不可写）；
 - Web UI 在当前用户登录时启动；
-- 数据在 `%ProgramData%\Ostium`；
+- UI 数据在 `%ProgramData%\Ostium`；
 - 初始密码由在线安装器打印；离线 setup 保存在 `%ProgramData%\Ostium\initial-password.txt`，首次登录后请删除。
 
 需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：
@@ -27,6 +28,8 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 ```powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1))) -RunAsSystem
 ```
+
+**风险**：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。
 
 未签名构建会触发 SmartScreen。请先校验 SHA256，确认来源可信后再选择“仍要运行”。
 

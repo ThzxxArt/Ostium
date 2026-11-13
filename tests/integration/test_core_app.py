@@ -141,10 +141,10 @@ def test_core_reload_stop_logs_config_and_errors(tmp_path: Path, monkeypatch) ->
     async def stop() -> SupervisorStatus:
         return _status(False)
 
-    async def apply(config, sha256):  # type: ignore[no-untyped-def]
+    async def apply(config, sha256, **kwargs):  # type: ignore[no-untyped-def]
         raise EngineUnavailable("engine missing")
 
-    async def unhandled(config, sha256):  # type: ignore[no-untyped-def]
+    async def unhandled(config, sha256, **kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("boom")
 
     supervisor.reload = reload  # type: ignore[method-assign]
@@ -192,6 +192,33 @@ def test_core_reload_stop_logs_config_and_errors(tmp_path: Path, monkeypatch) ->
         )
         assert crash.status_code == 500
         assert crash.json()["code"] == "internal_error"
+
+
+def test_core_apply_forwards_allow_lan(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    settings.role = Role.CLIENT
+    app = create_core_app(settings)
+    supervisor = app.state.supervisor
+    captured: list[bool] = []
+
+    async def apply(config, sha256, *, allow_lan=False):  # type: ignore[no-untyped-def]
+        captured.append(allow_lan)
+        return _status(False)
+
+    supervisor.apply = apply  # type: ignore[method-assign]
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/apply",
+            json={
+                "config": {"inbounds": [], "outbounds": []},
+                "sha256": "0" * 64,
+                "role": "client",
+                "allow_lan": True,
+            },
+            headers=_headers(settings),
+        )
+        assert response.status_code == 200
+        assert captured == [True]
 
 
 def test_core_lifespan_start_failure_is_reported(tmp_path: Path) -> None:
@@ -246,7 +273,7 @@ def test_core_error_handler_redacts(tmp_path: Path, monkeypatch) -> None:
     app = create_core_app(settings)
     supervisor = app.state.supervisor
 
-    async def secret_error(config, sha256):  # type: ignore[no-untyped-def]
+    async def secret_error(config, sha256, **kwargs):  # type: ignore[no-untyped-def]
         raise CoreError("token=secret", "test_error")
 
     supervisor.apply = secret_error  # type: ignore[method-assign]

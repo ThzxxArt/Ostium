@@ -195,6 +195,16 @@ def test_generated_configs_pass_singbox_check(tmp_path: Path) -> None:
         ),
     )
     client_config = build_client_config(ClientConfigSpec(endpoints=[endpoint], clash_secret="test"))
+    lan_config = build_client_config(
+        ClientConfigSpec(endpoints=[endpoint], allow_lan=True, clash_secret="test")
+    )
+    validate_config(
+        lan_config,
+        role=Role.CLIENT,
+        allowed_ports=set(),
+        allowed_paths=[tmp_path],
+        allow_lan=True,
+    )
     server_config = build_server_config(
         ServerConfigSpec(
             inbounds=[
@@ -221,7 +231,11 @@ def test_generated_configs_pass_singbox_check(tmp_path: Path) -> None:
             enable_v2ray_api=False,
         )
     )
-    for name, config in (("client", client_config), ("server", server_config)):
+    for name, config in (
+        ("client", client_config),
+        ("client-lan", lan_config),
+        ("server", server_config),
+    ):
         path = tmp_path / f"{name}.json"
         path.write_text(json.dumps(config))
         result = subprocess.run(

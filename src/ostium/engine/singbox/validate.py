@@ -53,6 +53,7 @@ def validate_config(
     allowed_ports: set[int],
     allowed_paths: list[Path],
     tun_interface: str = "ostium0",
+    allow_lan: bool = False,
 ) -> None:
     if not isinstance(config, dict):
         raise ConfigRejected("configuration must be a JSON object")
@@ -69,7 +70,7 @@ def validate_config(
     for inbound in config["inbounds"]:
         if not isinstance(inbound, dict):
             raise ConfigRejected("each inbound must be an object")
-        _validate_inbound(inbound, role, allowed_ports, tun_interface)
+        _validate_inbound(inbound, role, allowed_ports, tun_interface, allow_lan)
         tag = inbound.get("tag")
         if isinstance(tag, str):
             if tag in tags:
@@ -122,7 +123,11 @@ def validate_config(
 
 
 def _validate_inbound(
-    inbound: dict[str, Any], role: Role, allowed_ports: set[int], tun_interface: str
+    inbound: dict[str, Any],
+    role: Role,
+    allowed_ports: set[int],
+    tun_interface: str,
+    allow_lan: bool,
 ) -> None:
     kind = inbound.get("type")
     if role is Role.SERVER:
@@ -142,8 +147,16 @@ def _validate_inbound(
         if kind not in CLIENT_INBOUND_TYPES:
             raise ConfigRejected(f"client inbound type {kind!r} is not allowed", "role_mismatch")
         if kind in {"mixed", "socks", "http"}:
-            if not _is_local(str(inbound.get("listen", ""))):
-                raise ConfigRejected("client proxy inbound must bind to 127.0.0.1")
+            listen = str(inbound.get("listen", ""))
+            # Allow LAN is an explicit client policy: the only additional bind
+            # address permitted is the wildcard.  Never accept an arbitrary
+            # public interface here, even when the switch is on.
+            wildcard = listen in {"0.0.0.0", "::"}
+            if not _is_local(listen) and not (allow_lan and wildcard):
+                raise ConfigRejected(
+                    "client proxy inbound must bind to 127.0.0.1, or to 0.0.0.0/:: "
+                    "when Allow LAN is enabled"
+                )
         if kind == "tun":
             interface = inbound.get("interface_name")
             if interface not in {tun_interface, "Ostium"}:

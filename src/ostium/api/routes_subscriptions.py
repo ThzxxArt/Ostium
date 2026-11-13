@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,7 +44,16 @@ async def subscription(
         "X-Robots-Tag": "noindex, nofollow",
     }
     if fmt in {"clash"}:
-        headers["Content-Disposition"] = f'attachment; filename="ostium-{user.name}.yaml"'
+        extension = "yaml"
+        disposition = "attachment"
     else:
-        headers["Content-Disposition"] = f'inline; filename="ostium-{user.name}.txt"'
+        extension = "txt"
+        disposition = "inline"
+    # HTTP headers are latin-1.  ASCII fallback plus RFC 5987 gives Chinese
+    # user names a working download instead of a UnicodeEncodeError.
+    encoded_name = quote(f"ostium-{user.name}.{extension}", safe="")
+    headers["Content-Disposition"] = (
+        f'{disposition}; filename="ostium-subscription.{extension}"; '
+        f"filename*=UTF-8''{encoded_name}"
+    )
     return Response(content=content, media_type=media_type, headers=headers)
