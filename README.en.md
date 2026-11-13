@@ -37,7 +37,7 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-95.7%25%20statements%20%C2%B7%2091.5%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.2%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-474%20backend%20%C2%B7%20158%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-483%20backend%20%C2%B7%20158%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -77,7 +77,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 474 backend tests (9 live sing-box integration tests), 158 frontend tests and 69 Playwright cases; 95.7% backend statements / 91.5% branches. |
+| 🧪 **Verified** | 483 backend tests (474 regular + 9 live sing-box integration), 158 frontend tests and 69 Playwright cases; 95.7% backend statements / 91.5% branches. |
 
 ---
 
@@ -841,8 +841,8 @@ npx playwright test
 
 Current results:
 
-- Backend: **474 passed / 0 skipped** (465 regular tests + 9 live-engine integration tests),
-  **95.7%** statements / **91.5%** branches.
+- Backend: **474 passed / 0 skipped** (regular suite) + **9 passed / 0 skipped**
+  (live sing-box integration), **95.7%** statements / **91.5%** branches.
 - Frontend: **158 passed**, **90.7%** statements / **85.2%** branches /
   **88.5%** functions / **91.8%** lines.
 - Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual

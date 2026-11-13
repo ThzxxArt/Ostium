@@ -620,7 +620,7 @@ shellcheck + bash -n                                  -> PASS
 
 ### 16.2 已在本环境验证
 
-- 后端：474 passed / 0 skipped；语句 95.7%、分支 91.5%；覆盖率门禁通过。
+- 后端：474 常规 + 9 真实 sing-box 集成 = 483 passed / 0 skipped；语句 95.7%、分支 91.5%；覆盖率门禁通过。
 - 真实 sing-box 1.14.4：`sing-box check`、SS2022 多用户回环流量、apply 失败保留旧配置。
 - 前端：158 passed；语句 90.7%、分支 85.2%；首屏 JS 191.8 KiB gzip（预算 300 KiB）。
 - Playwright：69 passed，含全核心页面 axe、dashboard/users/settings 视觉基线、LCP/CLS 预算。

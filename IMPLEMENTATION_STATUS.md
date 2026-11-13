@@ -28,7 +28,7 @@ platform/external validation, `[ ]` not done yet.
       release provenance/SBOM scaffolding.
 - [~] Windows/macOS/Docker/Nginx/ACME/TUN/72h/performance/5-user and code signing
       remain external validation; see `MANUAL_TASKS.md`.
-- [x] Local final gates: 474 backend tests + 9 real sing-box integration tests,
+- [x] Local final gates: 474 regular backend tests + 9 real sing-box integration tests,
       95.7%/91.5% coverage; 158 frontend tests, 90.7%/85.2% coverage;
       69 Playwright cases (axe/visual/performance/PWA); ruff/mypy/shellcheck/
       mkdocs/pip-audit/npm audit green.
