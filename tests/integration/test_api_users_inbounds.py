@@ -126,16 +126,19 @@ def test_user_lifecycle_and_subscriptions(api_client: TestClient, settings: Sett
             "UPDATE proxy_users SET subscription_token_enc=NULL WHERE id=?", (user_id,)
         )
         connection.commit()
-    regenerated = api_client.get(f"/api/v1/users/{user_id}/subscription")
+    regenerated = api_client.get(f"/api/v1/users/{user_id}/subscription?reveal=true")
     assert regenerated.status_code == 200
     assert regenerated.json()["token"]
 
     sub_before = api_client.get(f"/api/v1/users/{user_id}/subscription")
     assert sub_before.status_code == 200
-    assert sub_before.json()["links"]
+    assert sub_before.json()["reveal_required"] is True
+    assert "token" not in sub_before.json()
+    revealed = api_client.get(f"/api/v1/users/{user_id}/subscription?reveal=true")
+    assert revealed.json()["links"]
     rotated = api_client.post(f"/api/v1/users/{user_id}/subscription/rotate", headers=headers)
     assert rotated.status_code == 200
-    assert rotated.json()["token"] != sub_before.json()["token"]
+    assert rotated.json()["token"] != revealed.json()["token"]
 
     credentials = api_client.post(
         f"/api/v1/users/{user_id}/rotate",
@@ -263,10 +266,9 @@ def test_inbound_management(api_client: TestClient, session_token: str) -> None:
     assert vless["params"]["public_key"]
 
     assert api_client.patch("/api/v1/inbounds/nope", json={}, headers=headers).status_code == 404
-    assert (
-        api_client.patch("/api/v1/inbounds/vless", json={"port": 8443}, headers=headers).status_code
-        == 400
-    )
+    reserved = api_client.patch("/api/v1/inbounds/vless", json={"port": 8788}, headers=headers)
+    assert reserved.status_code == 409
+    assert reserved.json()["code"] == "port_reserved"
     same_port = api_client.patch("/api/v1/inbounds/vless", json={"port": 443}, headers=headers)
     assert same_port.status_code == 200
 

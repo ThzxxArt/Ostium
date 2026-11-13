@@ -25,10 +25,16 @@ class ProfileError(Exception):
         self.status_code = status_code
 
 
+MAX_SUBSCRIPTION_BYTES = 2 * 1024 * 1024
+MAX_SUBSCRIPTION_ENDPOINTS = 500
+
+
 def parse_subscription_text(text: str) -> list[Endpoint]:
     stripped = text.strip()
     if not stripped:
         raise ProfileError("the subscription is empty")
+    if len(stripped.encode("utf-8")) > MAX_SUBSCRIPTION_BYTES:
+        raise ProfileError("the subscription exceeds the 2 MiB size limit")
     if stripped.startswith("{"):
         try:
             payload = json.loads(stripped)
@@ -36,35 +42,48 @@ def parse_subscription_text(text: str) -> list[Endpoint]:
             raise ProfileError("invalid JSON subscription") from exc
         if isinstance(payload, dict) and "endpoints" in payload:
             try:
-                return ProfileDocument.model_validate(payload).endpoints
+                return _limit(ProfileDocument.model_validate(payload).endpoints)
             except ValidationError as exc:
                 raise ProfileError("invalid Ostium profile subscription") from exc
         if isinstance(payload, dict) and "outbounds" in payload:
             try:
-                return _from_singbox_outbounds(payload["outbounds"])
+                return _limit(_from_singbox_outbounds(payload["outbounds"]))
             except (ValidationError, TypeError, ValueError) as exc:
                 raise ProfileError("invalid sing-box subscription") from exc
         raise ProfileError("JSON subscription does not contain endpoints or outbounds")
     if stripped.startswith("proxies:") or "\nproxies:" in stripped:
         try:
-            return _from_clash(stripped)
+            return _limit(_from_clash(stripped))
         except (TypeError, ValueError) as exc:
             raise ProfileError("invalid Clash subscription") from exc
     decoded = _maybe_base64(stripped)
     if decoded is not None and "://" in decoded:
         stripped = decoded
     endpoints = []
-    for line in stripped.splitlines():
+    invalid: list[str] = []
+    for number, line in enumerate(stripped.splitlines(), start=1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        if "://" in line:
-            try:
-                endpoints.append(Endpoint.from_uri(line))
-            except ValueError:
-                continue
+        if "://" not in line:
+            continue
+        try:
+            endpoints.append(Endpoint.from_uri(line))
+        except ValueError as exc:
+            invalid.append(f"line {number}: {exc}")
+    if invalid:
+        preview = "; ".join(invalid[:5])
+        raise ProfileError(f"the subscription contains unsupported entries: {preview}")
     if not endpoints:
         raise ProfileError("no supported proxy URI was found")
+    return _limit(endpoints)
+
+
+def _limit(endpoints: list[Endpoint]) -> list[Endpoint]:
+    if len(endpoints) > MAX_SUBSCRIPTION_ENDPOINTS:
+        raise ProfileError(
+            f"the subscription contains more than {MAX_SUBSCRIPTION_ENDPOINTS} endpoints"
+        )
     return endpoints
 
 
@@ -303,6 +322,14 @@ async def refresh_profile(session: AsyncSession, store: SecretStore, profile: Pr
     url = subscription_url_of(profile, store)
     if not url:
         raise ProfileError("this profile has no subscription URL")
+    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+
+    try:
+        url = validate_remote_url(url, allow_private=True)
+    except UnsafeUrlError as exc:
+        profile.last_refresh_error = str(exc)[:500]
+        await session.flush()
+        raise ProfileError(str(exc), "unsafe_url", 400) from exc
     try:
         async with httpx.AsyncClient(
             timeout=20.0,
@@ -312,6 +339,8 @@ async def refresh_profile(session: AsyncSession, store: SecretStore, profile: Pr
         ) as client:
             response = await client.get(url)
             response.raise_for_status()
+            if len(response.content) > MAX_SUBSCRIPTION_BYTES:
+                raise ProfileError("the subscription exceeds the 2 MiB size limit")
         endpoints = parse_subscription_text(response.text)
     except (httpx.HTTPError, ProfileError) as exc:
         profile.last_refresh_error = str(exc)[:500]

@@ -92,13 +92,38 @@ def challenge_server(port: int = 80) -> Iterator[_ChallengeStore]:
         thread.join(timeout=5)
 
 
+def preflight_port(port: int = 80) -> None:
+    """Fail before creating an ACME order when HTTP-01 cannot bind its port."""
+
+    import socket
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        probe.bind(("0.0.0.0", port))
+    except PermissionError:
+        # A non-root process will fail at the real challenge server with a
+        # clear error; do not mask the issuance tests / logic behind a
+        # privilege check here.
+        return
+    except OSError as exc:
+        raise AcmeError(
+            f"port {port} is not available for the ACME HTTP-01 challenge: {exc}",
+            "port_80_unavailable",
+            409,
+        ) from exc
+    finally:
+        probe.close()
+
+
 class AcmeIssuer:
     def __init__(self, settings: Settings, store: SecretStore) -> None:
         self.settings = settings
         self.store = store
 
-    def _directory_url(self) -> str:
-        if self.settings.acme_staging:
+    def _directory_url(self, staging: bool | None = None) -> str:
+        effective_staging = self.settings.acme_staging if staging is None else staging
+        if effective_staging:
             return "https://acme-staging-v02.api.letsencrypt.org/directory"
         return self.settings.acme_directory
 
@@ -131,16 +156,53 @@ class AcmeIssuer:
             path.chmod(0o600)
         return key
 
-    async def issue(self, domain: str, *, timeout_seconds: int = 180) -> tuple[str, str]:
-        return await asyncio.to_thread(self._issue_sync, domain, timeout_seconds)
+    async def issue(
+        self,
+        domain: str,
+        *,
+        timeout_seconds: int = 180,
+        staging: bool | None = None,
+        email: str | None = None,
+    ) -> tuple[str, str]:
+        return await asyncio.to_thread(self._issue_sync, domain, timeout_seconds, staging, email)
 
-    def _issue_sync(self, domain: str, timeout_seconds: int) -> tuple[str, str]:
+    def _issue_sync(
+        self,
+        domain: str,
+        timeout_seconds: int,
+        staging: bool | None = None,
+        email: str | None = None,
+    ) -> tuple[str, str]:
+        from filelock import FileLock, Timeout
+
         from ostium.services.certificates import CertificateError, validate_domain
 
         try:
             domain = validate_domain(domain)
         except CertificateError as exc:
             raise AcmeError(str(exc), "invalid_domain", 400) from exc
+        lock_path = self.settings.data_dir / "acme" / "issue.lock"
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock = FileLock(str(lock_path), timeout=1)
+        try:
+            lock.acquire()
+        except Timeout as exc:
+            raise AcmeError(
+                "another ACME issuance is already in progress", "acme_busy", 409
+            ) from exc
+        try:
+            preflight_port(80)
+            return self._issue_locked(domain, timeout_seconds, staging, email)
+        finally:
+            lock.release()
+
+    def _issue_locked(
+        self,
+        domain: str,
+        timeout_seconds: int,
+        staging: bool | None,
+        email: str | None,
+    ) -> tuple[str, str]:
         account_key = self._load_account_key()
         acme_key = jose.JWKRSA(key=account_key)  # type: ignore[attr-defined]
         net = client.ClientNetwork(
@@ -149,12 +211,13 @@ class AcmeIssuer:
             timeout=30,
         )
         try:
-            directory = messages.Directory.from_json(net.get(self._directory_url()).json())
+            directory = messages.Directory.from_json(net.get(self._directory_url(staging)).json())
             acme_client = client.ClientV2(directory, net)
             with contextlib.suppress(errors.ConflictError):
                 acme_client.new_account(
                     messages.NewRegistration.from_data(
-                        email=self.settings.acme_email, terms_of_service_agreed=True
+                        email=email or self.settings.acme_email,
+                        terms_of_service_agreed=True,
                     )
                 )
             cert_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

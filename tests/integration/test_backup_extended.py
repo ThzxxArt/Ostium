@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import sqlite3
 import tarfile
 from pathlib import Path
 
@@ -89,7 +90,7 @@ def test_backup_name_collision(tmp_path: Path, monkeypatch) -> None:
     frozen = datetime(2024, 1, 1, tzinfo=UTC)
     monkeypatch.setattr(backup_service, "utcnow", lambda: frozen)
     first = create_backup(settings)
-    assert first["filename"] == "ostium-backup-20240101-000000.tar.gz"
+    assert first["filename"] == "ostium-backup-20240101-000000-000000.tar.gz"
     with pytest.raises(BackupError) as excinfo:
         create_backup(settings)
     assert excinfo.value.code == "exists"
@@ -254,5 +255,123 @@ def test_apply_pending_restore_invalid_metadata(tmp_path: Path) -> None:
     metadata.write_text("{invalid")
     with pytest.raises(json.JSONDecodeError):
         apply_pending_restore(settings)
+    assert payload.exists()
+    assert metadata.exists()
+    assert (settings.paths.backups_dir / "restore-last-error.txt").is_file()
+
+
+def test_restore_rejects_role_mismatch_and_bad_archive(tmp_path: Path) -> None:
+    server = _settings(tmp_path, "server")
+    _seed(server)
+    created = create_backup(server)
+    client = Settings(
+        role=Role.CLIENT,
+        data_dir=tmp_path / "client",
+        config_dir=tmp_path / "client-config",
+        state_dir=tmp_path / "client-state",
+        core_token_file=tmp_path / "client" / "runtime" / "core.token",
+        dev=True,
+    )
+    client.paths.ensure()
+    _seed(client)
+    with pytest.raises(BackupError) as mismatch:
+        restore_backup(client, Path(created["path"]))
+    assert mismatch.value.code == "role_mismatch"
+    assert mismatch.value.status_code == 409
+
+    garbage = tmp_path / "garbage.tar.gz"
+    garbage.write_bytes(b"not an archive")
+    with pytest.raises(BackupError) as invalid:
+        restore_backup(server, garbage)
+    assert invalid.value.code == "invalid_archive"
+
+    with pytest.raises(BackupError) as staged_invalid:
+        stage_restore(server, garbage)
+    assert staged_invalid.value.code == "invalid_archive"
+
+
+def test_automatic_backup_retention(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, "retention")
+    _seed(settings)
+    for _index in range(9):
+        create_backup(settings, automatic=True)
+    removed = backup_service.prune_automatic_backups(settings, keep=7)
+    assert len(removed) == 2
+    remaining = list(settings.paths.backups_dir.glob("ostium-auto-backup-*"))
+    assert len(remaining) == 7
+
+
+def test_backup_rejects_directory_target_and_corrupt_database(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, "target")
+    _seed(settings)
+    with pytest.raises(BackupError) as target:
+        create_backup(settings, target=tmp_path)
+    assert target.value.code == "invalid_target"
+
+    with sqlite3.connect(settings.paths.db_path) as connection:
+        connection.execute("DROP TABLE admin_users")
+        connection.execute("CREATE TABLE admin_users (broken TEXT)")
+        connection.commit()
+    settings.paths.db_path.write_bytes(b"garbage")
+    with pytest.raises(BackupError) as corrupt:
+        create_backup(settings)
+    assert corrupt.value.code in {"corrupt_database", "no_database"}
+
+
+def test_safe_extract_rejects_unsafe_entries(tmp_path: Path) -> None:
+    absolute = tmp_path / "absolute.tar.gz"
+    with tarfile.open(absolute, "w:gz") as archive:
+        info = tarfile.TarInfo("/etc/passwd")
+        info.size = 1
+        archive.addfile(info, io.BytesIO(b"x"))
+    with tarfile.open(absolute) as archive, pytest.raises(BackupError):
+        _safe_extract(archive, tmp_path / "out")
+
+    non_regular = tmp_path / "link.tar.gz"
+    with tarfile.open(non_regular, "w:gz") as archive:
+        info = tarfile.TarInfo("link")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "/etc/passwd"
+        archive.addfile(info)
+    with tarfile.open(non_regular) as archive, pytest.raises(BackupError):
+        _safe_extract(archive, tmp_path / "out")
+
+
+def test_apply_pending_restore_success_consumes_files(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, "pending-ok")
+    _seed(settings)
+    created = create_backup(settings)
+    source = Path(created["path"])
+    payload = settings.paths.backups_dir / "restore-pending.bin"
+    metadata = settings.paths.backups_dir / "restore-pending.json"
+    payload.write_bytes(source.read_bytes())
+    metadata.write_text(json.dumps({"filename": source.name, "encrypted": False}))
+    result = apply_pending_restore(settings)
+    assert result is not None and result["restored"] is True
     assert not payload.exists()
     assert not metadata.exists()
+
+
+def test_stage_restore_rejects_missing_or_foreign_manifest(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, "stage-manifest")
+    _seed(settings)
+
+    no_manifest = tmp_path / "no-manifest.tar.gz"
+    with tarfile.open(no_manifest, "w:gz") as archive:
+        data = b"database"
+        info = tarfile.TarInfo("ostium.db")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    with pytest.raises(BackupError) as missing:
+        stage_restore(settings, no_manifest)
+    assert missing.value.code == "invalid_archive"
+
+    foreign = tmp_path / "foreign.tar.gz"
+    with tarfile.open(foreign, "w:gz") as archive:
+        data = json.dumps({"format": "something-else"}).encode()
+        info = tarfile.TarInfo("manifest.json")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    with pytest.raises(BackupError) as bad_format:
+        stage_restore(settings, foreign)
+    assert bad_format.value.code == "invalid_archive"

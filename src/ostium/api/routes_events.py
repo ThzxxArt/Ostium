@@ -15,6 +15,9 @@ from ostium.util.time import iso, utcnow
 
 router = APIRouter()
 
+PING_INTERVAL_SECONDS = 25
+AUTH_REVALIDATE_SECONDS = 50
+
 
 def _origin_matches(origin: str, host: str) -> bool:
     try:
@@ -46,15 +49,26 @@ async def events(websocket: WebSocket) -> None:
         await session.commit()
     await websocket.accept()
     queue = await services.bus.subscribe()
+    last_auth_check = asyncio.get_running_loop().time()
     try:
         await websocket.send_json(
             {"type": "hello", "ts": iso(utcnow()), "data": {"version": __version__}}
         )
         while True:
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=25)
+                event = await asyncio.wait_for(queue.get(), timeout=PING_INTERVAL_SECONDS)
                 await websocket.send_json(event)
             except TimeoutError:
+                # Revalidate long-lived sessions so a logout, password change
+                # or revocation closes the stream instead of leaking events.
+                if asyncio.get_running_loop().time() - last_auth_check >= AUTH_REVALIDATE_SECONDS:
+                    async with services.session_factory() as session:
+                        resolved = await resolve_session(session, token)
+                        await session.commit()
+                    if resolved is None:
+                        await websocket.close(code=4401, reason="session revoked")
+                        return
+                    last_auth_check = asyncio.get_running_loop().time()
                 await websocket.send_json({"type": "ping", "ts": iso(utcnow()), "data": {}})
     except WebSocketDisconnect:
         pass

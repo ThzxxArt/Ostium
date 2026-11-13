@@ -23,14 +23,49 @@ LAN_CIDRS = [
     "::1/128",
 ]
 
-SERVER_EGRESS_BLOCK_CIDRS = [
-    "169.254.169.254/32",  # cloud metadata
-    "169.254.170.2/32",  # ECS task metadata
-    "127.0.0.0/8",
-    "::1/128",
-    "fe80::/10",
-    "fc00::/7",
+TUN_EXCLUDE_CIDRS = [
+    *LAN_CIDRS,
+    "224.0.0.0/4",
+    "240.0.0.0/4",
+    "255.255.255.255/32",
+    "ff00::/8",
 ]
+
+SERVER_EGRESS_BLOCK_CIDRS = [
+    # IPv4 private, CGNAT and special-use ranges.
+    "0.0.0.0/8",
+    "10.0.0.0/8",
+    "100.64.0.0/10",  # CGNAT / carrier-grade NAT
+    "127.0.0.0/8",
+    "169.254.0.0/16",  # complete link-local range (cloud metadata lives here)
+    "172.16.0.0/12",
+    "192.0.0.0/24",
+    "192.0.2.0/24",
+    "192.168.0.0/16",
+    "198.18.0.0/15",
+    "198.51.100.0/24",
+    "203.0.113.0/24",
+    "224.0.0.0/4",  # multicast
+    "240.0.0.0/4",  # reserved
+    "255.255.255.255/32",
+    # Cloud metadata services (AWS/GCP/Azure/OpenStack/Alibaba).
+    "169.254.169.254/32",
+    "169.254.170.2/32",
+    "169.254.170.23/32",
+    "100.100.100.200/32",
+    # IPv6 loopback, ULA, link-local and multicast.
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+    "ff00::/8",
+    # IPv6 cloud metadata endpoints.
+    "fd00:ec2::254/128",
+    "fe80::a9fe:a9fe/128",
+]
+
+# Always blocked, even when private egress is explicitly allowed: an open
+# relay must never be usable to send mail.
+SERVER_EGRESS_BLOCK_PORTS = [25]
 
 DEFAULT_RULE_SETS = {
     "geosite-cn": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
@@ -193,7 +228,7 @@ def build_server_config(
     route_rules: list[dict[str, Any]] = []
     if spec.block_private_egress:
         route_rules.append({"action": "reject", "ip_cidr": SERVER_EGRESS_BLOCK_CIDRS})
-    route_rules.append({"action": "reject", "port": [25]})
+    route_rules.append({"action": "reject", "port": SERVER_EGRESS_BLOCK_PORTS})
 
     config: dict[str, Any] = {
         "log": {"level": spec.log_level, "timestamp": True},
@@ -355,7 +390,7 @@ def build_client_config(
                 "dns_mode": spec.tun.dns_mode,
                 "auto_route": spec.tun.auto_route,
                 "strict_route": spec.tun.strict_route,
-                "route_exclude_address": LAN_CIDRS,
+                "route_exclude_address": TUN_EXCLUDE_CIDRS,
             }
         )
     if not tun_enabled or spec.mode != "tun":
@@ -450,6 +485,14 @@ def _rule_sets(spec: ClientConfigSpec) -> list[dict[str, Any]]:
 
 
 def _client_dns(spec: ClientConfigSpec, tun_enabled: bool) -> dict[str, Any]:
+    if spec.routing_mode == "direct":
+        # Direct mode must not send DNS queries through a proxy outbound that
+        # is not used for traffic; use the local resolver only.
+        return {
+            "servers": [{"type": "udp", "tag": "local", "server": spec.dns_local}],
+            "rules": [],
+            "final": "local",
+        }
     servers: list[dict[str, Any]] = [
         {
             "type": "https",
@@ -483,3 +526,44 @@ def config_digest(config: dict[str, Any]) -> str:
 
     canonical = json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def namespace_endpoint_tags(
+    groups: list[tuple[str, list[Endpoint]]],
+) -> tuple[list[Endpoint], dict[tuple[str, str], str]]:
+    """Make endpoint tags unique across profiles without renaming unique ones.
+
+    Returns the flattened endpoints plus a ``(profile_name, original_tag) ->
+    effective_tag`` mapping so persisted selections keep working.
+    """
+
+    counts: dict[str, int] = {}
+    for _profile, endpoints in groups:
+        for endpoint in endpoints:
+            counts[endpoint.tag] = counts.get(endpoint.tag, 0) + 1
+    flattened: list[Endpoint] = []
+    mapping: dict[tuple[str, str], str] = {}
+    for profile_name, endpoints in groups:
+        for endpoint in endpoints:
+            effective = endpoint.tag
+            if counts.get(endpoint.tag, 0) > 1:
+                prefix = _tag_slug(profile_name)
+                effective = f"{prefix}-{endpoint.tag}"[:64]
+                candidate = effective
+                suffix = 2
+                while any(item.tag == candidate for item in flattened):
+                    candidate = f"{effective[:58]}-{suffix}"
+                    suffix += 1
+                effective = candidate
+            mapping[(profile_name, endpoint.tag)] = effective
+            flattened.append(
+                endpoint
+                if effective == endpoint.tag
+                else endpoint.model_copy(update={"tag": effective})
+            )
+    return flattened, mapping
+
+
+def _tag_slug(name: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() else "-" for ch in name.lower()).strip("-")
+    return (cleaned or "profile")[:24]

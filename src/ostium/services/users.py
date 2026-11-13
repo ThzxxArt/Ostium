@@ -263,12 +263,18 @@ async def endpoints_for_user(
     server_host: str,
     server_name: str | None = None,
 ) -> list[Endpoint]:
+    from ostium.services.certificates import certificate_pin_sha256
+
     inbounds = (await session.execute(select(Inbound))).scalars().all()
     certificates = {
-        row.id: row for row in (await session.execute(select(Certificate))).scalars().all()
+        row.id: row
+        for row in (await session.execute(select(Certificate))).scalars().all()
+        if row.status == "ready"
+        and row.expires_at is not None
+        and as_utc(row.expires_at) > utcnow()
     }
     password = decrypt_password(user, store)
-    ss_password = decrypt_ss_password(user, store)
+    ss_user_key = decrypt_ss_password(user, store)
     endpoints: list[Endpoint] = []
     display = server_name or server_host
     for inbound in sorted(
@@ -282,6 +288,8 @@ async def endpoints_for_user(
         params = inbound_params(inbound, store)
         cert = certificates.get(inbound.certificate_id or "")
         if inbound.kind == "vless":
+            if not params.get("private_key") or not params.get("public_key"):
+                continue
             endpoints.append(
                 Endpoint(
                     tag=f"{user.name}-reality",
@@ -300,6 +308,7 @@ async def endpoints_for_user(
                 )
             )
         elif inbound.kind == "hysteria2" and cert is not None:
+            pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
             endpoints.append(
                 Endpoint(
                     tag=f"{user.name}-hy2",
@@ -310,12 +319,13 @@ async def endpoints_for_user(
                     password=password,
                     tls=TLSConfig(
                         server_name=cert.domain,
-                        insecure=cert.source != "acme",
-                        certificate_pin_sha256=None,
+                        insecure=False,
+                        certificate_pin_sha256=pin,
                     ),
                 )
             )
         elif inbound.kind == "trojan" and cert is not None:
+            pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
             endpoints.append(
                 Endpoint(
                     tag=f"{user.name}-trojan",
@@ -324,10 +334,19 @@ async def endpoints_for_user(
                     server=server_host,
                     port=inbound.port,
                     password=password,
-                    tls=TLSConfig(server_name=cert.domain, insecure=cert.source != "acme"),
+                    tls=TLSConfig(
+                        server_name=cert.domain,
+                        insecure=False,
+                        certificate_pin_sha256=pin,
+                    ),
                 )
             )
         elif inbound.kind == "shadowsocks":
+            server_key = str(params.get("server_key") or "").strip()
+            # Shadowsocks 2022 multi-user outbound passwords are
+            # ``server_key:user_key``.  The server inbound keeps the server key
+            # and each user entry keeps only the user key.
+            client_password = f"{server_key}:{ss_user_key}" if server_key else ss_user_key
             endpoints.append(
                 Endpoint(
                     tag=f"{user.name}-ss2022",
@@ -335,7 +354,7 @@ async def endpoints_for_user(
                     name=f"{display} · SS2022",
                     server=server_host,
                     port=inbound.port,
-                    password=ss_password,
+                    password=client_password,
                     method="2022-blake3-aes-128-gcm",
                     tls=TLSConfig(enabled=False),
                 )

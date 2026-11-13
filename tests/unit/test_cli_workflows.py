@@ -42,28 +42,36 @@ def _init_server(tmp_path: Path, monkeypatch) -> CliRunner:  # type: ignore[no-u
 
 def test_cli_user_lifecycle(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     runner = _init_server(tmp_path, monkeypatch)
-    assert runner.invoke(app, ["user", "add", "alice", "--quota", "1G"]).exit_code == 0
-    assert runner.invoke(app, ["user", "list"]).exit_code == 0
-    assert runner.invoke(app, ["user", "show", "alice"]).exit_code == 0
-    assert runner.invoke(app, ["user", "disable", "alice"]).exit_code == 0
-    assert runner.invoke(app, ["user", "enable", "alice"]).exit_code == 0
-    assert runner.invoke(app, ["user", "quota", "alice", "--quota", "2G"]).exit_code == 0
-    assert runner.invoke(app, ["user", "subscription", "alice"]).exit_code == 0
-    assert runner.invoke(app, ["user", "rotate", "alice"]).exit_code == 0
+
+    def run(*args: str, **kwargs):
+        return runner.invoke(app, ["--allow-degraded", *args], **kwargs)
+
+    assert run("user", "add", "alice", "--quota", "1G").exit_code == 0
+    assert run("user", "list").exit_code == 0
+    assert run("user", "show", "alice").exit_code == 0
+    assert run("user", "disable", "alice").exit_code == 0
+    assert run("user", "enable", "alice").exit_code == 0
+    assert run("user", "quota", "alice", "--quota", "2G").exit_code == 0
+    assert run("user", "subscription", "alice").exit_code == 0
+    assert run("user", "rotate", "alice").exit_code == 0
     output = tmp_path / "alice.json"
-    assert runner.invoke(app, ["user", "export", "alice", "--output", str(output)]).exit_code == 0
+    assert run("user", "export", "alice", "--output", str(output)).exit_code == 0
     assert output.is_file()
-    assert runner.invoke(app, ["user", "remove", "alice", "--yes"]).exit_code == 0
+    assert run("user", "remove", "alice", "--yes").exit_code == 0
 
 
 def test_cli_profiles_and_backup(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     runner = _init_server(tmp_path, monkeypatch)
+
+    def run(*args: str, **kwargs):
+        return runner.invoke(app, ["--allow-degraded", *args], **kwargs)
+
     profile_file = tmp_path / "profile.txt"
     profile_file.write_text(VLESS)
-    result = runner.invoke(app, ["profile", "import", str(profile_file), "--name", "HK"])
+    result = run("profile", "import", str(profile_file), "--name", "HK")
     assert result.exit_code == 0, result.output
-    assert runner.invoke(app, ["profile", "list"]).exit_code == 0
-    assert runner.invoke(app, ["profile", "remove", "HK", "--yes"]).exit_code == 0
+    assert run("profile", "list").exit_code == 0
+    assert run("profile", "remove", "HK", "--yes").exit_code == 0
 
     result = runner.invoke(app, ["backup", "create", "--password", "backup-pass"])
     assert result.exit_code == 0, result.output

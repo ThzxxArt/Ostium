@@ -110,8 +110,10 @@ def test_rule_set_update_and_serialization(tmp_path: Path) -> None:
             assert result["updated"] is False
             assert rule_set.last_error
 
-            assert path_for(settings, "ads") == settings.paths.rulesets_dir / "ads.srs"
+            assert Path(str(rule_set.path)).name == f"{rule_set.id}.srs"
+            assert Path(str(rule_set.path)).is_file()
             assert path_for(settings, "missing") is None
+            assert path_for(settings, "../../etc/passwd") is None
         await engine.dispose()
 
     asyncio.run(_run())

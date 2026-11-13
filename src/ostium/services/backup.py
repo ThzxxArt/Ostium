@@ -24,6 +24,7 @@ from ostium.util.security import CryptoError, decrypt_blob, encrypt_blob
 from ostium.util.time import iso, utcnow
 
 BACKUP_PREFIX = "ostium-backup-"
+AUTO_BACKUP_PREFIX = "ostium-auto-backup-"
 ALLOWED_MEMBERS = {"ostium.db", "master.key", "config.toml", "manifest.json"}
 
 
@@ -40,12 +41,14 @@ def create_backup(
     password: str | None = None,
     include_master_key: bool = True,
     target: Path | None = None,
+    automatic: bool = False,
 ) -> dict[str, Any]:
     paths = settings.paths
     paths.backups_dir.mkdir(parents=True, exist_ok=True)
-    stamp = utcnow().strftime("%Y%m%d-%H%M%S")
+    stamp = utcnow().strftime("%Y%m%d-%H%M%S-%f")
     encrypted = bool(password)
-    filename = f"{BACKUP_PREFIX}{stamp}.{'ostb' if encrypted else 'tar.gz'}"
+    prefix = AUTO_BACKUP_PREFIX if automatic else BACKUP_PREFIX
+    filename = f"{prefix}{stamp}.{'ostb' if encrypted else 'tar.gz'}"
     if target is None:
         target = paths.backups_dir / filename
     else:
@@ -98,6 +101,7 @@ def create_backup(
         "size": len(payload),
         "sha256": digest,
         "encrypted": encrypted,
+        "automatic": automatic,
         "created_at": iso(utcnow()),
     }
 
@@ -105,9 +109,18 @@ def create_backup(
 def _sqlite_backup(source: Path, destination: Path) -> None:
     if not source.is_file():
         raise BackupError("the Ostium database does not exist", "no_database", 404)
+    from ostium.db.session import check_database_integrity
+
+    try:
+        check_database_integrity(source)
+    except Exception as exc:
+        raise BackupError(f"database integrity check failed: {exc}", "corrupt_database") from exc
     src = sqlite3.connect(source)
     dst = sqlite3.connect(destination)
     try:
+        # Fold the WAL into the main database before copying so a backup taken
+        # while the service is running is self-contained.
+        src.execute("PRAGMA wal_checkpoint(FULL)")
         src.backup(dst)
     finally:
         dst.close()
@@ -148,16 +161,44 @@ def restore_backup(
             raise BackupError("not an Ostium backup", "invalid_archive")
         if not (staging / "ostium.db").is_file():
             raise BackupError("backup does not contain a database", "invalid_archive")
+        manifest_role = manifest.get("role")
+        if manifest_role and manifest_role != settings.role.value:
+            raise BackupError(
+                f"backup belongs to the {manifest_role} role, not {settings.role.value}",
+                "role_mismatch",
+                409,
+            )
+        from ostium.db.session import check_database_integrity, migrate_database
+
+        try:
+            check_database_integrity(staging / "ostium.db")
+        except Exception as exc:
+            raise BackupError(f"backup database is corrupt: {exc}", "invalid_archive") from exc
         paths = settings.paths
         paths.ensure()
         db_target = paths.db_path
         wal = paths.data_dir / "ostium.db-wal"
         shm = paths.data_dir / "ostium.db-shm"
+        previous_db = staging / "previous.db"
+        if db_target.is_file():
+            shutil.copy2(db_target, previous_db)
         for leftover in (wal, shm):
             leftover.unlink(missing_ok=True)
         shutil.copy2(staging / "ostium.db", db_target)
         if os.name == "posix":
             db_target.chmod(0o600)
+        try:
+            migrate_database(db_target)
+        except Exception as exc:
+            if previous_db.is_file():
+                shutil.copy2(previous_db, db_target)
+            else:
+                db_target.unlink(missing_ok=True)
+            raise BackupError(
+                f"database migration failed after restore: {exc}; previous database restored",
+                "migration_failed",
+            ) from exc
+
         if include_master_key and (staging / "master.key").is_file():
             shutil.copy2(staging / "master.key", paths.master_key_path)
             if os.name == "posix":
@@ -202,6 +243,24 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination, filter="data")
 
 
+def prune_automatic_backups(settings: Settings, *, keep: int = 7) -> list[str]:
+    """Delete the oldest automatic plaintext backups beyond ``keep``."""
+
+    files = sorted(
+        settings.paths.backups_dir.glob(f"{AUTO_BACKUP_PREFIX}*"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    removed: list[str] = []
+    for path in files[keep:]:
+        try:
+            path.unlink()
+            removed.append(path.name)
+        except OSError:
+            continue
+    return removed
+
+
 def backup_record(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "filename": payload["filename"],
@@ -230,6 +289,38 @@ def stage_restore(
             decrypt_blob(raw, password)
         except CryptoError as exc:
             raise BackupError(str(exc), "invalid_password", 400) from exc
+    # Validate the archive and role now, while the service is still running,
+    # so a bad backup is rejected instead of breaking the next startup.
+    import io as _io
+
+    blob = raw
+    if encrypted:
+        assert password is not None
+        blob = decrypt_blob(raw, password)
+    try:
+        with tarfile.open(name=None, fileobj=_io.BytesIO(blob), mode="r:gz") as archive:
+            manifest_member = next(
+                (member for member in archive.getmembers() if member.name == "manifest.json"),
+                None,
+            )
+            if manifest_member is None:
+                raise BackupError("backup is missing its manifest", "invalid_archive")
+            extracted = archive.extractfile(manifest_member)
+            if extracted is None:
+                raise BackupError("backup manifest is unreadable", "invalid_archive")
+            manifest = json.loads(extracted.read())
+    except BackupError:
+        raise
+    except (tarfile.TarError, OSError, ValueError) as exc:
+        raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
+    if manifest.get("format") != "ostium-backup":
+        raise BackupError("not an Ostium backup", "invalid_archive")
+    if manifest.get("role") and manifest["role"] != settings.role.value:
+        raise BackupError(
+            f"backup belongs to the {manifest['role']} role, not {settings.role.value}",
+            "role_mismatch",
+            409,
+        )
     store = SecretStore.from_data_dir(settings.data_dir)
     password_token = (
         store.encrypt(password, table="settings", record_id="restore", field="password")
@@ -259,7 +350,11 @@ def stage_restore(
 
 
 def apply_pending_restore(settings: Settings) -> dict[str, Any] | None:
-    """Apply a staged restore before the app opens the database."""
+    """Apply a staged restore before the app opens the database.
+
+    On failure the staged files are kept so the operator can retry or inspect
+    the error; a successful restore consumes them.
+    """
 
     from ostium.services.crypto import SecretStore
 
@@ -278,7 +373,12 @@ def apply_pending_restore(settings: Settings) -> dict[str, Any] | None:
             )
         result = restore_backup(settings, payload_path, password=password)
         result["filename"] = metadata.get("filename")
-        return result
-    finally:
-        payload_path.unlink(missing_ok=True)
-        metadata_path.unlink(missing_ok=True)
+    except Exception as exc:
+        error_path = paths.backups_dir / "restore-last-error.txt"
+        error_path.write_text(f"{iso(utcnow())}: {exc}\n", encoding="utf-8")
+        if os.name == "posix":
+            error_path.chmod(0o600)
+        raise
+    payload_path.unlink(missing_ok=True)
+    metadata_path.unlink(missing_ok=True)
+    return result

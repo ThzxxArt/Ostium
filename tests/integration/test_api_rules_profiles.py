@@ -78,12 +78,22 @@ def test_rules_crud_reorder_and_test(api_client: TestClient, session_token: str)
     assert api_client.patch("/api/v1/rules/missing", json={}, headers=headers).status_code == 404
     assert api_client.delete("/api/v1/rules/missing", headers=headers).status_code == 404
 
+    second_id = second.json()["rule"]["id"]
+    third_id = third.json()["rule"]["id"]
     reordered = api_client.post(
         "/api/v1/rules/reorder",
-        json={"ids": [second.json()["rule"]["id"], "missing", first_id]},
+        json={"ids": [second_id, third_id, first_id]},
         headers=headers,
     )
     assert reordered.status_code == 200
+
+    invalid_reorder = api_client.post(
+        "/api/v1/rules/reorder",
+        json={"ids": [second_id, "missing", first_id]},
+        headers=headers,
+    )
+    assert invalid_reorder.status_code == 422
+    assert invalid_reorder.json()["code"] == "invalid_reorder"
 
     assert api_client.delete(f"/api/v1/rules/{first_id}", headers=headers).status_code == 200
 
@@ -140,15 +150,22 @@ def test_rule_sets_lifecycle(api_client: TestClient, session_token: str, setting
     )
 
 
-def test_client_profiles_crud_import_refresh_errors(client_api: TestClient) -> None:
+def test_client_profiles_crud_import_refresh_errors(client_api: TestClient, monkeypatch) -> None:
     token = setup_admin(client_api, role="client")
     headers = _headers(token)
+    monkeypatch.setattr(
+        "socket.getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))],
+    )
 
     async def no_profile(session: object) -> dict:
         raise EngineError("no profile", "no_profile", 400)
 
     client_api.app.state.services.engine.apply_client = no_profile  # type: ignore[method-assign]
-    assert client_api.get("/api/v1/profiles").json() == {"profiles": []}
+    assert client_api.get("/api/v1/profiles").json() == {
+        "profiles": [],
+        "active_profile_id": None,
+    }
 
     bad = client_api.post("/api/v1/profiles", json={"name": "bad"}, headers=headers)
     assert bad.status_code == 400
@@ -228,7 +245,7 @@ def test_client_profiles_crud_import_refresh_errors(client_api: TestClient) -> N
 
     tested = client_api.get(f"/api/v1/profiles/{profile['id']}/test")
     assert tested.status_code == 200
-    assert tested.json()["results"][0]["error"] == "not loaded in the running core"
+    assert tested.json()["results"][0]["error"].startswith("not loaded in the running core")
 
     assert (
         client_api.delete(f"/api/v1/profiles/{profile['id']}", headers=headers).status_code == 200

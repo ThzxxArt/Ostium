@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
@@ -45,6 +45,7 @@ class SetupRequest(BaseModel):
     domain: str | None = None
     public_ui: bool = False
     acme_email: str | None = None
+    lines: Literal["reality", "later", "hysteria2", "both"] = "reality"
 
 
 class PasswordRequest(BaseModel):
@@ -148,12 +149,23 @@ async def setup(
         session, username=payload.username, password=payload.password, must_change_password=False
     )
     if services.settings.role.value == "server":
-        await ensure_inbounds(session, services.store)
+        if payload.lines in {"hysteria2", "both"}:
+            raise ApiError(
+                409,
+                "Hysteria2/Trojan require a TLS certificate before they can be enabled; "
+                "complete setup with Reality, issue a certificate, then enable TLS lines",
+                "certificate_required",
+            )
+        inbounds = await ensure_inbounds(session, services.store)
+        if payload.lines == "later":
+            for inbound in inbounds:
+                inbound.enabled = False
     server_info = {
         "domain": payload.domain.strip().lower() if payload.domain else None,
         "public_host": payload.domain.strip().lower() if payload.domain else None,
         "public_ui": False,
         "acme_email": payload.acme_email,
+        "lines": payload.lines,
     }
     await set_setting(session, "server", server_info)
     await set_setting(session, "initialized", True)
@@ -277,14 +289,21 @@ async def change_password(
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     if not await auth_service.check_password(admin, payload.current_password):
         raise ApiError(403, "current password is incorrect", "invalid_password")
     await auth_service.set_password(session, admin, payload.new_password)
-    await audit(
-        session, actor=admin.username, action="auth.password_changed", ip=client_ip(request)
+    revoked = await auth_service.revoke_other_sessions(
+        session, admin, request.cookies.get(SESSION_COOKIE)
     )
-    return {"ok": True}
+    await audit(
+        session,
+        actor=admin.username,
+        action="auth.password_changed",
+        ip=client_ip(request),
+        detail={"sessions_revoked": revoked},
+    )
+    return {"ok": True, "sessions_revoked": revoked}
 
 
 @router.post("/auth/totp/start")
@@ -316,6 +335,20 @@ async def totp_confirm(
     return {"ok": True}
 
 
+@router.post("/auth/totp/cancel")
+async def totp_cancel(
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, bool]:
+    """Abandon a pending TOTP enrollment without changing login policy."""
+
+    auth_service.cancel_totp(admin)
+    await audit(session, actor=admin.username, action="auth.totp_cancelled", ip=client_ip(request))
+    return {"ok": True}
+
+
 @router.get("/auth/local-login")
 async def local_login(
     token: str,
@@ -327,8 +360,10 @@ async def local_login(
 
     if not is_loopback(request):
         raise ApiError(403, "local login links are loopback-only", "loopback_required")
-    if not auth_service.verify_local_login_token(services.settings, token):
-        raise ApiError(401, "local login link is invalid or expired", "local_login_invalid")
+    if not auth_service.consume_local_login_token(services.settings, token):
+        raise ApiError(
+            401, "local login link is invalid, expired or already used", "local_login_invalid"
+        )
     admin = await auth_service.get_admin(session)
     if admin is None:
         raise ApiError(409, "Ostium is not initialised", "not_initialized")

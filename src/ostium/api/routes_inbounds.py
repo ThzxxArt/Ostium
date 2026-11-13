@@ -25,7 +25,9 @@ from ostium.util.time import iso
 
 router = APIRouter(tags=["inbounds"])
 KINDS = {"vless", "hysteria2", "trojan", "shadowsocks"}
+TCP_KINDS = {"vless", "trojan", "shadowsocks"}
 DEFAULT_PORTS = {"vless": 443, "hysteria2": 443, "trojan": 443, "shadowsocks": 8388}
+RESERVED_PORTS = {8788, 19090, 19091}
 
 
 class InboundPatch(BaseModel):
@@ -48,12 +50,18 @@ async def _get_inbound(session: AsyncSession, kind: str) -> Inbound:
 
 
 def _serialize(
-    inbound: Inbound, params: dict[str, Any], certificate: Certificate | None
+    inbound: Inbound,
+    params: dict[str, Any],
+    certificate: Certificate | None,
+    *,
+    skipped_reason: str | None = None,
+    port_conflict: str | None = None,
 ) -> dict[str, Any]:
     return {
         "id": inbound.id,
         "kind": inbound.kind,
         "enabled": inbound.enabled,
+        "active": inbound.enabled and skipped_reason is None,
         "listen": inbound.listen,
         "port": inbound.port,
         "default_port": DEFAULT_PORTS.get(inbound.kind, inbound.port),
@@ -68,7 +76,45 @@ def _serialize(
         },
         "certificate": serialize_certificate(certificate) if certificate else None,
         "requires_certificate": inbound.kind in {"hysteria2", "trojan"},
+        "skipped_reason": skipped_reason,
+        "port_conflict": port_conflict,
         "updated_at": iso(inbound.updated_at),
+    }
+
+
+def _skipped_reason(
+    inbound: Inbound,
+    params: dict[str, Any],
+    certificate: Certificate | None,
+) -> str | None:
+    if not inbound.enabled:
+        return None
+    if inbound.kind == "vless" and not params.get("private_key"):
+        return "Reality private key is missing; rotate the keys"
+    if inbound.kind in {"hysteria2", "trojan"}:
+        if certificate is None:
+            return "no certificate is assigned to this inbound"
+        if certificate.status != "ready" or certificate.expires_at is None:
+            return "the assigned certificate is not ready"
+        from ostium.util.time import as_utc, utcnow
+
+        if as_utc(certificate.expires_at) <= utcnow():
+            return "the assigned certificate has expired"
+    return None
+
+
+def _conflict_map(rows: list[Inbound]) -> dict[str, str]:
+    by_port: dict[int, list[str]] = {}
+    for inbound in rows:
+        if inbound.enabled and inbound.kind in TCP_KINDS:
+            by_port.setdefault(inbound.port, []).append(inbound.kind)
+    return {
+        kind: f"TCP port {port} is also used by {', '.join(other)}"
+        for port, kinds in by_port.items()
+        if len(kinds) > 1
+        for kind in kinds
+        for other in [sorted(item for item in kinds if item != kind)]
+        if other
     }
 
 
@@ -80,10 +126,17 @@ async def list_inbounds(
 ) -> dict[str, Any]:
     rows = (await session.execute(select(Inbound).order_by(Inbound.kind))).scalars().all()
     certs = {cert.id: cert for cert in (await session.execute(select(Certificate))).scalars().all()}
+    conflicts = _conflict_map(list(rows))
     return {
         "inbounds": [
             _serialize(
-                row, inbound_params(row, services.store), certs.get(row.certificate_id or "")
+                row,
+                inbound_params(row, services.store),
+                certs.get(row.certificate_id or ""),
+                skipped_reason=_skipped_reason(
+                    row, inbound_params(row, services.store), certs.get(row.certificate_id or "")
+                ),
+                port_conflict=conflicts.get(row.kind),
             )
             for row in rows
         ]
@@ -106,14 +159,35 @@ async def update_inbound(
     changes = payload.model_dump(exclude_unset=True)
     if "port" in changes and changes["port"] is not None:
         port = int(changes["port"])
-        # Hysteria2 is QUIC/UDP, so it may share a port number with the
-        # TCP-only core API/admin UI listeners (for example 8443/udp).
-        if kind != "hysteria2" and port in {8788, 8443, int(services.settings.port)}:
+        # Hysteria2 is QUIC/UDP, so it may share a port number with TCP
+        # listeners.  All other inbounds are TCP and must not collide.
+        if port in RESERVED_PORTS or port == int(services.settings.port):
             raise ApiError(
-                400,
+                409,
                 f"port {port} is reserved by the core API or the admin UI",
                 "port_reserved",
             )
+        if kind in TCP_KINDS:
+            others = (
+                (
+                    await session.execute(
+                        select(Inbound).where(
+                            Inbound.id != inbound.id,
+                            Inbound.enabled.is_(True),
+                            Inbound.port == port,
+                            Inbound.kind.in_(TCP_KINDS),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if others:
+                raise ApiError(
+                    409,
+                    f"TCP port {port} is already used by {', '.join(row.kind for row in others)}",
+                    "port_conflict",
+                )
         inbound.port = port
         if port not in services.settings.proxy_ports:
             services.settings.proxy_ports = sorted({*services.settings.proxy_ports, port})
@@ -178,7 +252,14 @@ async def update_inbound(
         },
     )
     return {
-        "inbound": _serialize(inbound, params, await _certificate_for(session, inbound)),
+        "inbound": _serialize(
+            inbound,
+            params,
+            await _certificate_for(session, inbound),
+            skipped_reason=_skipped_reason(
+                inbound, params, await _certificate_for(session, inbound)
+            ),
+        ),
         **applied,
     }
 
@@ -219,23 +300,13 @@ async def rotate_reality_keys(
 async def _resolve_certificate(
     session: AsyncSession, inbound: Inbound, certificate_id: str | None
 ) -> Certificate | None:
+    from ostium.services.certificates import select_ready_certificate
+
     if certificate_id:
-        return await session.get(Certificate, certificate_id)
+        return await select_ready_certificate(session, certificate_id)
     if inbound.certificate_id:
-        existing = await session.get(Certificate, inbound.certificate_id)
-        if existing is not None:
-            return existing
-    return (
-        (
-            await session.execute(
-                select(Certificate)
-                .where(Certificate.status == "ready")
-                .order_by(Certificate.created_at)
-            )
-        )
-        .scalars()
-        .first()
-    )
+        return await select_ready_certificate(session, inbound.certificate_id)
+    return None
 
 
 async def _certificate_for(session: AsyncSession, inbound: Inbound) -> Certificate | None:

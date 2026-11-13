@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import ipaddress
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -17,6 +18,7 @@ from ostium.db.session import create_engine, create_schema, create_session_facto
 from ostium.services import certificates as cert_service
 from ostium.services.crypto import SecretStore
 from ostium.services.users import ensure_inbounds
+from ostium.util.time import utcnow
 
 
 def _bundle(
@@ -183,6 +185,8 @@ def test_inbound_assignment_and_deletion(settings: Settings) -> None:
 
             await cert_service.delete_certificate(session, certificate)
             await session.commit()
+            assert not Path(certificate.cert_path).exists()
+            assert not Path(certificate.key_path).exists()
             rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
             assert rows["hysteria2"].enabled is False
             assert rows["trojan"].enabled is False
@@ -208,6 +212,91 @@ def test_certificate_pin_and_serialization(settings: Settings) -> None:
             assert cert_service.serialize_certificate(certificate)["days_remaining"] is None
             rows = await cert_service.list_certificates(session)
             assert len(rows) == 1
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_ready_certificate_selection_and_unbound_assignment(settings: Settings) -> None:
+    async def _run() -> None:
+        engine, factory, store = await _setup(settings)
+        async with factory() as session:
+            await ensure_inbounds(session, store)
+            certificate = await cert_service.create_self_signed(
+                session, settings, domain="vpn.example.com"
+            )
+            await session.commit()
+
+            selected = await cert_service.select_ready_certificate(session, certificate.id)
+            assert selected is not None
+            assert await cert_service.select_ready_certificate(session, None) is None
+            assert await cert_service.select_ready_certificate(session, "missing") is None
+
+            path = Path(certificate.cert_path)
+            path.unlink()
+            assert await cert_service.select_ready_certificate(session, certificate.id) is None
+            path.write_text("restored")
+            certificate.status = "pending"
+            await session.flush()
+            assert await cert_service.select_ready_certificate(session, certificate.id) is None
+            certificate.status = "ready"
+            await session.flush()
+            certificate.expires_at = utcnow() - dt.timedelta(days=1)
+            await session.flush()
+            assert cert_service.certificate_is_ready(certificate) is False
+            assert await cert_service.select_ready_certificate(session, certificate.id) is None
+            certificate.expires_at = utcnow() + dt.timedelta(days=30)
+            await session.flush()
+
+            await cert_service.use_for_unbound(session, certificate, kinds=["hysteria2"])
+            await session.commit()
+            rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
+            assert rows["hysteria2"].certificate_id == certificate.id
+            assert rows["trojan"].certificate_id is None
+
+            with pytest.raises(cert_service.CertificateError, match="not supported"):
+                await cert_service.use_for_inbounds(session, certificate, kinds=["vless"])
+
+            certificate.status = "pending"
+            await session.flush()
+            with pytest.raises(cert_service.CertificateError, match="ready certificate"):
+                await cert_service.use_for_inbounds(session, certificate)
+            with pytest.raises(cert_service.CertificateError, match="ready certificate"):
+                await cert_service.use_for_unbound(session, certificate)
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_serialize_expired_certificate(settings: Settings) -> None:
+    async def _run() -> None:
+        engine, factory, _store = await _setup(settings)
+        async with factory() as session:
+            certificate = await cert_service.create_self_signed(
+                session, settings, domain="vpn.example.com"
+            )
+            certificate.expires_at = utcnow() - dt.timedelta(days=1)
+            await session.flush()
+            assert cert_service.serialize_certificate(certificate)["status"] == "expired"
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_manual_chain_validation(settings: Settings) -> None:
+    async def _run() -> None:
+        engine, factory, _store = await _setup(settings)
+        async with factory() as session:
+            leaf, key = _bundle("vpn.example.com")
+            other, _other_key = _bundle("other.example.com")
+            with pytest.raises(cert_service.CertificateError, match="out of order"):
+                await cert_service.import_manual(
+                    session,
+                    settings,
+                    domain="vpn.example.com",
+                    cert_pem=leaf + other,
+                    key_pem=key,
+                )
         await engine.dispose()
 
     asyncio.run(_run())

@@ -94,16 +94,16 @@ def test_server_spec_certificates_and_protocols(tmp_path: Path) -> None:
             assert "hysteria2" not in by_type
             assert "trojan" not in by_type
 
-            # A ready certificate is used as a fallback when inbound.certificate_id is empty.
+            # Certificates are bound per inbound; there is no global fallback.
             cert.expires_at = utcnow() + timedelta(days=30)
             cert.status = "ready"
-            inbounds["trojan"].certificate_id = None
+            inbounds["trojan"].certificate_id = cert.id
             await session.flush()
             preview = await manager.server_preview(session)
             trojan = next(item for item in preview["inbounds"] if item["type"] == "trojan")
             assert trojan["tls"]["certificate_path"] == cert.cert_path
 
-            cert.status = "pending"
+            inbounds["trojan"].certificate_id = None
             await session.flush()
             preview = await manager.server_preview(session)
             assert all(item["type"] != "trojan" for item in preview["inbounds"])
@@ -176,15 +176,15 @@ def test_client_spec_selection_rules_and_errors(tmp_path: Path) -> None:
             config = await manager.client_preview(session)
             assert config["route"]["final"] == "proxy"
             selector = next(item for item in config["outbounds"] if item["type"] == "selector")
-            assert selector["default"] == "hk"
+            assert selector["default"] == "first-hk"
             assert any(rule.get("outbound") == "direct" for rule in config["route"]["rules"])
             assert [item["tag"] for item in config["route"]["rule_set"]] == ["ads"]
 
             explicit = await manager.client_preview(
-                session, selected="other", routing_mode="direct"
+                session, selected="second-hk", routing_mode="direct"
             )
             selector = next(item for item in explicit["outbounds"] if item["type"] == "selector")
-            assert selector["default"] == "other"
+            assert selector["default"] == "second-hk"
             assert explicit["route"]["final"] == "direct"
 
             settings.mode = Mode.TUN

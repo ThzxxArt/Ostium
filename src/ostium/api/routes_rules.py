@@ -67,6 +67,18 @@ def serialize_rule(rule: Rule) -> dict[str, Any]:
     }
 
 
+async def _defined_rule_sets(session: AsyncSession) -> set[str]:
+    rows = (await session.execute(select(RuleSet.name))).scalars().all()
+    return {str(name) for name in rows}
+
+
+def _validate_match(match: dict[str, Any], defined: set[str]) -> dict[str, Any]:
+    try:
+        return rule_service.validate_rule_match(match, defined_rule_sets=defined)
+    except rule_service.RuleValidationError as exc:
+        raise ApiError(422, str(exc), "invalid_rule") from exc
+
+
 async def _apply_client(services: Services, session: AsyncSession) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         return {
@@ -110,7 +122,7 @@ async def add_rule(
 ) -> dict[str, Any]:
     rule = Rule(
         action=payload.action,
-        match_json=payload.match,
+        match_json=_validate_match(payload.match, await _defined_rule_sets(session)),
         note=payload.note,
         priority=payload.priority,
         enabled=payload.enabled,
@@ -140,7 +152,7 @@ async def update_rule(
     if changes.get("action"):
         rule.action = changes["action"]
     if "match" in changes and changes["match"] is not None:
-        rule.match_json = changes["match"]
+        rule.match_json = _validate_match(changes["match"], await _defined_rule_sets(session))
     if "note" in changes and changes["note"] is not None:
         rule.note = changes["note"]
     if "priority" in changes and changes["priority"] is not None:
@@ -190,9 +202,18 @@ async def reorder(
 ) -> dict[str, Any]:
     rows = (await session.execute(select(Rule))).scalars().all()
     by_id = {rule.id: rule for rule in rows}
+    if len(payload.ids) != len(set(payload.ids)):
+        raise ApiError(422, "reorder payload contains duplicate rule ids", "invalid_reorder")
+    if set(payload.ids) != set(by_id):
+        missing = sorted(set(by_id) - set(payload.ids))
+        unknown = sorted(set(payload.ids) - set(by_id))
+        raise ApiError(
+            422,
+            f"reorder must contain every rule exactly once (missing={missing}, unknown={unknown})",
+            "invalid_reorder",
+        )
     for index, rule_id in enumerate(payload.ids):
-        if rule_id in by_id:
-            by_id[rule_id].priority = index * 10
+        by_id[rule_id].priority = index * 10
     await session.flush()
     applied = await _apply_client(services, session)
     await audit(session, actor=admin.username, action="rule.reordered", ip=client_ip(request))
@@ -253,9 +274,13 @@ async def add_rule_set(
     ).scalar_one_or_none()
     if existing is not None:
         raise ApiError(409, "a rule set with this name already exists", "name_taken")
-    rule_set = RuleSet(
-        name=payload.name, url=payload.url, format=payload.format, enabled=payload.enabled
-    )
+    try:
+        name = rule_service.validate_rule_set_name(payload.name)
+    except rule_service.RuleValidationError as exc:
+        raise ApiError(422, str(exc), "invalid_rule_set") from exc
+    if not payload.url.startswith(("http://", "https://")):
+        raise ApiError(422, "rule set URL must use http(s)", "invalid_rule_set")
+    rule_set = RuleSet(name=name, url=payload.url, format=payload.format, enabled=payload.enabled)
     session.add(rule_set)
     await session.flush()
     await audit(
@@ -303,6 +328,16 @@ async def delete_rule_set(
     rule_set = await session.get(RuleSet, rule_set_id)
     if rule_set is None:
         raise ApiError(404, "rule set not found", "not_found")
+    rules = (await session.execute(select(Rule))).scalars().all()
+    referenced_by = [
+        rule.id for rule in rules if rule_set.name in (rule.match_json or {}).get("rule_set", [])
+    ]
+    if referenced_by:
+        raise ApiError(
+            409,
+            f"rule set is still referenced by {len(referenced_by)} rule(s)",
+            "rule_set_in_use",
+        )
     await session.delete(rule_set)
     await session.flush()
     applied = await _apply_client(services, session)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import signal
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,7 +41,7 @@ class EngineCheckFailed(CoreError):
 
 
 class EngineStartFailed(CoreError):
-    status_code = 500
+    status_code = 502
     code = "engine_start_failed"
 
 
@@ -81,6 +80,7 @@ class CoreSupervisor:
         self._rotate_logs()
         if not self.last_good.is_file():
             return
+        persisted_lan = self._read_persisted_allow_lan()
         try:
             raw = self.last_good.read_bytes()
             config = json.loads(raw)
@@ -90,11 +90,10 @@ class CoreSupervisor:
                 allowed_ports=set(self.settings.proxy_ports),
                 allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
                 tun_interface=self.settings.tun_interface,
-                # The last-good file was already accepted by an authenticated
-                # apply.  Re-validating it must not reject a LAN-bound config
-                # after a reboot just because the core process has a separate
-                # settings file from the UI.
-                allow_lan=True,
+                # Re-validating a last-good file must reproduce the policy that
+                # was persisted when it was accepted.  Missing metadata (an
+                # upgraded 0.1.0 runtime) defaults to the safe value: LAN off.
+                allow_lan=persisted_lan,
             )
         except Exception as exc:
             self._last_error = f"last-good config rejected: {exc}"
@@ -140,6 +139,11 @@ class CoreSupervisor:
             if os.name == "posix":
                 temp.chmod(0o600)
             previous = self.last_good.read_bytes() if self.last_good.is_file() else None
+            previous_meta = (
+                self.paths.last_good_meta_path.read_bytes()
+                if self.paths.last_good_meta_path.is_file()
+                else None
+            )
             replaced = False
             try:
                 await self._check(temp)
@@ -147,7 +151,10 @@ class CoreSupervisor:
                 replaced = True
                 if os.name == "posix":
                     self.last_good.chmod(0o600)
+                self._write_meta(allow_lan)
                 if self._process is not None and self._process.returncode is None:
+                    # A SIGHUP only proves the signal was delivered, not that
+                    # the new configuration is active.  Restart and verify.
                     await self._reload_running()
                 else:
                     await self._spawn()
@@ -156,13 +163,13 @@ class CoreSupervisor:
             except CoreError:
                 temp.unlink(missing_ok=True)
                 if replaced:
-                    await self._rollback(previous)
+                    await self._rollback(previous, previous_meta)
                 self._write_state()
                 raise
             except Exception as exc:
                 temp.unlink(missing_ok=True)
                 if replaced:
-                    await self._rollback(previous)
+                    await self._rollback(previous, previous_meta)
                 self._last_error = redact(str(exc))
                 self._write_state()
                 raise EngineStartFailed(f"failed to apply configuration: {exc}") from exc
@@ -277,30 +284,35 @@ class CoreSupervisor:
             detail = self.read_logs(80)
             self._last_error = detail or f"sing-box exited with code {process.returncode}"
             raise EngineStartFailed(self._last_error)
+        # A second observation catches configurations that pass the initial
+        # grace period but fail while binding TUN ports or loading rule sets.
+        await asyncio.sleep(0.3)
+        if process.returncode is not None:
+            detail = self.read_logs(80)
+            self._last_error = detail or f"sing-box exited with code {process.returncode}"
+            raise EngineStartFailed(self._last_error)
         self._process = process
         self._started_at = utcnow()
         self._last_error = None
         self._append_log("supervisor", f"started sing-box pid={process.pid}")
 
-    async def _rollback(self, previous: bytes | None) -> None:
-        """Restore the previous last-good config and try to start it again."""
+    async def _rollback(self, previous: bytes | None, previous_meta: bytes | None) -> None:
+        """Restore the previous last-good config and start it again."""
 
         if previous is None:
             self.last_good.unlink(missing_ok=True)
+            self.paths.last_good_meta_path.unlink(missing_ok=True)
             await self._terminate()
             return
         self.last_good.write_bytes(previous)
         if os.name == "posix":
             self.last_good.chmod(0o600)
+        if previous_meta is None:
+            self.paths.last_good_meta_path.unlink(missing_ok=True)
+        else:
+            self.paths.last_good_meta_path.write_bytes(previous_meta)
         try:
-            if self._process is not None and self._process.returncode is None:
-                if os.name == "posix":
-                    self._process.send_signal(signal.SIGHUP)
-                    await asyncio.sleep(0.4)
-                else:  # pragma: no cover - Windows restart path
-                    await self._spawn()
-            else:
-                await self._spawn()
+            await self._spawn()
             self._append_log("supervisor", "rollback to previous configuration")
         except Exception as exc:
             self._last_error = f"rollback failed: {exc}"
@@ -309,17 +321,11 @@ class CoreSupervisor:
 
     async def _reload_running(self) -> None:
         assert self._process is not None
-        if os.name == "posix":
-            self._process.send_signal(signal.SIGHUP)
-            await asyncio.sleep(0.5)
-            if self._process.returncode is not None:
-                self._last_error = self.read_logs(80) or "sing-box exited after reload"
-                await self._spawn()
-            else:
-                self._append_log("supervisor", "reloaded via SIGHUP")
-            return
-        # sing-box does not handle SIGHUP on Windows; restart the child instead.
+        # sing-box offers no verifiable "configuration revision" handshake on
+        # SIGHUP, so a successful signal would be reported as success even if
+        # the new config was rejected.  Restart the child and verify liveness.
         await self._spawn()
+        self._append_log("supervisor", "restarted sing-box to apply configuration")
 
     async def _terminate(self) -> None:
         process = self._process
@@ -355,6 +361,27 @@ class CoreSupervisor:
                 handle.write(f"{timestamp} [{source}] {redact(message, redact_ids=False)}\n")
         except OSError:
             pass
+
+    def _read_persisted_allow_lan(self) -> bool:
+        path = self.paths.last_good_meta_path
+        if not path.is_file():
+            return False
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        return bool(payload.get("allow_lan", False))
+
+    def _write_meta(self, allow_lan: bool) -> None:
+        payload = {
+            "allow_lan": bool(allow_lan),
+            "updated_at": iso(utcnow()),
+        }
+        path = self.paths.last_good_meta_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        if os.name == "posix":
+            path.chmod(0o600)
 
     def _write_state(self) -> None:
         status = self.status()

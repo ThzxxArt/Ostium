@@ -24,6 +24,7 @@ router = APIRouter(tags=["backups"])
 
 class BackupRequest(BaseModel):
     password: str | None = None
+    acknowledge_plaintext: bool = False
 
 
 class RestoreRequest(BaseModel):
@@ -39,7 +40,11 @@ async def list_backups(
     rows = (
         (await session.execute(select(Backup).order_by(Backup.created_at.desc()))).scalars().all()
     )
-    files = {path.name for path in services.settings.paths.backups_dir.glob("ostium-backup-*")}
+    files = {
+        path.name
+        for pattern in ("ostium-backup-*", "ostium-auto-backup-*")
+        for path in services.settings.paths.backups_dir.glob(pattern)
+    }
     return {
         "backups": [
             {
@@ -66,6 +71,13 @@ async def create_backup(
 ) -> dict[str, Any]:
     if payload.password is not None and len(payload.password) < 8:
         raise ApiError(400, "backup password must be at least 8 characters", "weak_password")
+    if payload.password is None and not payload.acknowledge_plaintext:
+        raise ApiError(
+            400,
+            "an unencrypted backup contains master.key; set a password or "
+            "acknowledge_plaintext=true after reading the warning",
+            "plaintext_backup_requires_acknowledgement",
+        )
 
     async def job(context: JobContext) -> dict[str, Any]:
         await context.progress(20, "snapshotting database")

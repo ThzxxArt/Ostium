@@ -45,7 +45,7 @@ def test_singbox_outbounds_all_protocols() -> None:
     assert hy2["type"] == "hysteria2"
     assert hy2["tls"]["server_name"] == "www.apple.com"
     assert hy2["tls"]["insecure"] is False
-    assert "certificate_public_key_sha256" not in hy2["tls"]
+    assert "certificate_sha256" not in hy2["tls"]
 
     trojan = _endpoint(Protocol.TROJAN).to_singbox_outbound()
     assert trojan["type"] == "trojan"
@@ -64,7 +64,7 @@ def test_tls_pin_and_empty_flow() -> None:
     )
     outbound = endpoint.to_singbox_outbound()
     assert outbound["tls"]["insecure"] is True
-    assert outbound["tls"]["certificate_public_key_sha256"] == "pin"
+    assert outbound["tls"]["certificate_sha256"] == "pin"
     assert endpoint.to_clash_proxy()["fingerprint"] == "pin"
     assert endpoint.to_uri().endswith("#HK%20%E8%8A%82%E7%82%B9")
 

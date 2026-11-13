@@ -14,14 +14,25 @@ def _release() -> dict:
 def test_release_gates_publication_on_verification() -> None:
     jobs = _release()["jobs"]
     assert "verify" in jobs
-    assert set(jobs["publish"]["needs"]) == {"verify", "wheel", "core", "windows", "docker"}
+    assert set(jobs["publish"]["needs"]) == {
+        "verify",
+        "wheel",
+        "core",
+        "windows",
+        "macos",
+        "linux-packages",
+        "docker",
+    }
     assert jobs["publish"]["environment"] == "pypi"
     verify_runs = "\n".join(
         str(step.get("run", "")) for step in jobs["verify"]["steps"] if isinstance(step, dict)
     )
     assert "coverage_gate.py" in verify_runs
     assert "pip-audit" in verify_runs
-    assert "npm run test" in verify_runs
+    assert "npm run test:coverage" in verify_runs
+    assert "mkdocs build --strict" in verify_runs
+    assert "shellcheck" in verify_runs
+    assert "npx playwright test" in verify_runs
 
 
 def test_release_publishes_every_checksummed_asset() -> None:

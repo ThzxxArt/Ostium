@@ -24,7 +24,10 @@ def service_paths(
     """
 
     data_root = program_data or Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData"))
-    data_dir = data_root / "Ostium"
+    # The privileged core keeps its token, last-good config and database in a
+    # separate directory whose ACL grants write access only to SYSTEM and
+    # Administrators.  The user-writable UI data directory is ``Ostium``.
+    data_dir = data_root / "OstiumCore"
     if install_dir is None:
         if getattr(sys, "frozen", False):
             install_dir = Path(sys.executable).resolve().parent.parent

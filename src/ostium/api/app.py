@@ -17,7 +17,7 @@ from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ostium import __version__
-from ostium.api.deps import Services, ensure_cli_token
+from ostium.api.deps import Services, client_ip, ensure_cli_token
 from ostium.api.errors import ApiError, problem_response
 from ostium.config import Role, Settings
 from ostium.db.session import create_engine, create_schema, create_session_factory
@@ -37,8 +37,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from ostium.config import InsecureBindError
         from ostium.services.backup import apply_pending_restore
 
+        try:
+            settings.validate_bind()
+        except InsecureBindError as exc:
+            raise RuntimeError(str(exc)) from exc
         with contextlib.suppress(Exception):
             apply_pending_restore(settings)
         engine = create_engine(settings.paths.db_path, echo=False)
@@ -153,6 +158,23 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 status_code=403,
                 content={"detail": "cross-origin request rejected", "code": "origin_rejected"},
             )
+        if request.url.path in {"/api/docs", "/api/openapi.json"}:
+            authorized = await _docs_authorized(request)
+            if not authorized:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "authentication required", "code": "unauthorized"},
+                )
+        if (
+            settings.ui_allowlist
+            and request.url.path not in {"/healthz", "/readyz"}
+            and not request.url.path.startswith("/sub/")
+        ):
+            if not _ip_allowed(client_ip(request), settings.ui_allowlist):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "client address is not allowlisted", "code": "ip_denied"},
+                )
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith(
             "/api/"
         ):
@@ -190,9 +212,11 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; "
-            "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+            "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; font-src 'self'; "
+            "connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; "
+            "form-action 'self'"
         )
         if settings.secure_cookies:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -297,6 +321,51 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+async def _docs_authorized(request: Request) -> bool:
+    """The OpenAPI UI and schema are admin-only, never anonymous."""
+
+    services = getattr(request.app.state, "services", None)
+    if services is None:
+        return False
+    from ostium.services.auth import get_admin, resolve_api_token, resolve_session
+
+    authorization = request.headers.get("authorization", "")
+    if authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+        if _is_loopback_request(request):
+            expected = services.cli_token()
+            if expected and secrets.compare_digest(token, expected):
+                async with services.session_factory() as session:
+                    return await get_admin(session) is not None
+        async with services.session_factory() as session:
+            return await resolve_api_token(session, token) is not None
+    cookie = request.cookies.get("ostium_session")
+    if not cookie:
+        return False
+    async with services.session_factory() as session:
+        return await resolve_session(session, cookie) is not None
+
+
+def _is_loopback_request(request: Request) -> bool:
+    host = request.client.host if request.client else ""
+    return host in {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+def _ip_allowed(raw: str, networks: list[str]) -> bool:
+    try:
+        address = ipaddress.ip_address(raw)
+    except ValueError:
+        return False
+    for entry in networks:
+        try:
+            if address in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            # An invalid entry must never widen access.
+            continue
+    return False
+
+
 def _host_allowed(host_header: str, settings: Settings) -> bool:
     host = host_header
     if host.startswith("["):
@@ -311,10 +380,13 @@ def _host_allowed(host_header: str, settings: Settings) -> bool:
     if host in allowed:
         return True
     try:
-        ipaddress.ip_address(host)
-        return True
+        address = ipaddress.ip_address(host)
     except ValueError:
-        pass
+        address = None
+    if address is not None:
+        # Accept loopback/private interface literals (LAN access, containers)
+        # but never an arbitrary public IP: that is a DNS-rebinding pivot.
+        return address.is_loopback or address.is_private or address.is_link_local
     return any(host == item or host.endswith("." + item) for item in allowed if item != "*")
 
 
@@ -343,33 +415,59 @@ async def _housekeeping(
 
 
 async def _run_housekeeping(services: Services) -> None:
+    from datetime import timedelta
+
     from sqlalchemy import select
 
-    from ostium.db.models import Certificate, Job, Session
+    from ostium.db.models import AuditLog, Certificate, Job, Session, TrafficDaily
     from ostium.services.audit import create_alert
+    from ostium.services.backup import create_backup, prune_automatic_backups
+    from ostium.services.settings import get_setting
     from ostium.util.time import as_utc, utcnow
 
     now = utcnow()
     async with services.session_factory() as session:
-        sessions = (
+        audit_days = int(await get_setting(session, "audit_retention_days", 90) or 90)
+        traffic_days = int(await get_setting(session, "traffic_retention_days", 365) or 365)
+        job_days = int(await get_setting(session, "job_retention_days", 7) or 7)
+        auto_backup = bool(await get_setting(session, "auto_backup", False))
+        for row in (
             (await session.execute(select(Session).where(Session.expires_at < now))).scalars().all()
-        )
-        for row in sessions:
+        ):
             await session.delete(row)
-        jobs = (
+        for job in (
             (
                 await session.execute(
-                    select(Job).where(
-                        Job.created_at < now.replace(hour=0, minute=0, second=0, microsecond=0)
+                    select(Job).where(Job.created_at < now - timedelta(days=job_days))
+                )
+            )
+            .scalars()
+            .all()
+        ):
+            if job.status in {"succeeded", "failed", "cancelled", "interrupted"}:
+                await session.delete(job)
+        for entry in (
+            (
+                await session.execute(
+                    select(AuditLog).where(AuditLog.created_at < now - timedelta(days=audit_days))
+                )
+            )
+            .scalars()
+            .all()
+        ):
+            await session.delete(entry)
+        for traffic_row in (
+            (
+                await session.execute(
+                    select(TrafficDaily).where(
+                        TrafficDaily.day < (now - timedelta(days=traffic_days)).date()
                     )
                 )
             )
             .scalars()
             .all()
-        )
-        for job in jobs:
-            if job.status in {"succeeded", "failed", "cancelled", "interrupted"}:
-                await session.delete(job)
+        ):
+            await session.delete(traffic_row)
         certs = (await session.execute(select(Certificate))).scalars().all()
         for cert in certs:
             if cert.expires_at is not None:
@@ -381,6 +479,7 @@ async def _run_housekeeping(services: Services) -> None:
                         level="warning" if days >= 0 else "critical",
                         code="certificate_expiring",
                         message=f"certificate for {cert.domain} expires in {days} days",
+                        dedupe_key=cert.domain,
                     )
         await session.commit()
     try:
@@ -395,10 +494,28 @@ async def _run_housekeeping(services: Services) -> None:
                     level="critical",
                     code="disk_low",
                     message=f"data disk is {disk.percent:.0f}% full",
+                    dedupe_key="data",
                 )
                 await session.commit()
     except Exception:
         pass
+    if auto_backup:
+        try:
+            newest = max(
+                (
+                    path.stat().st_mtime
+                    for path in services.settings.paths.backups_dir.glob("ostium-auto-backup-*")
+                ),
+                default=0.0,
+            )
+            if now.timestamp() - newest >= 24 * 3600:
+                result = await asyncio.to_thread(
+                    create_backup, services.settings, automatic=True, include_master_key=True
+                )
+                services.bus.log("info", "automatic backup created", filename=result["filename"])
+                prune_automatic_backups(services.settings, keep=7)
+        except Exception as exc:
+            services.bus.log("error", "automatic backup failed", error=str(exc))
 
 
 async def _cert_renewal(

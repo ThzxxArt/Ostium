@@ -58,6 +58,27 @@ class ClashApi:
         except Exception:
             return {}
 
+    async def delay(self, tag: str, *, url: str, timeout_ms: int = 5000) -> int | None:
+        """Measure real latency through a proxy group via the Clash API."""
+
+        from urllib.parse import quote
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout_ms / 1000 + 2, connect=1.0), trust_env=False
+            ) as client:
+                response = await client.get(
+                    f"{self.base_url}/proxies/{quote(tag, safe='')}/delay",
+                    params={"url": url, "timeout": timeout_ms},
+                    headers=self._headers(),
+                )
+                response.raise_for_status()
+                payload = response.json()
+            value = payload.get("delay")
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
     async def close_all(self) -> bool:
         try:
             async with httpx.AsyncClient(

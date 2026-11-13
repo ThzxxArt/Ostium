@@ -43,6 +43,10 @@ class ProfilePatch(BaseModel):
     sort_order: int | None = None
 
 
+class ReorderProfiles(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
 class ImportRequest(BaseModel):
     name: str | None = None
     text: str | None = None
@@ -88,7 +92,15 @@ async def list_profiles(
         .scalars()
         .all()
     )
-    return {"profiles": [serialize_profile(profile, services.store) for profile in profiles]}
+    from ostium.services.settings import get_setting
+
+    active_profile_id = await get_setting(session, "active_profile_id")
+    payloads = []
+    for profile in profiles:
+        data = serialize_profile(profile, services.store)
+        data["active"] = profile.id == active_profile_id
+        payloads.append(data)
+    return {"profiles": payloads, "active_profile_id": active_profile_id}
 
 
 @router.post("/profiles", status_code=201)
@@ -102,6 +114,14 @@ async def add_profile(
     _require_client(services)
     text = payload.text
     subscription_url = payload.url
+    if subscription_url:
+        from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+        from ostium.services.profiles import MAX_SUBSCRIPTION_BYTES
+
+        try:
+            subscription_url = validate_remote_url(subscription_url, allow_private=True)
+        except UnsafeUrlError as exc:
+            raise ApiError(400, str(exc), "unsafe_url") from exc
     if subscription_url and not text:
         async with httpx.AsyncClient(
             timeout=20.0,
@@ -116,6 +136,8 @@ async def add_profile(
                     f"subscription download failed: HTTP {response.status_code}",
                     "refresh_failed",
                 )
+            if len(response.content) > MAX_SUBSCRIPTION_BYTES:
+                raise ApiError(400, "the subscription exceeds the 2 MiB size limit", "too_large")
             text = response.text
     if not text:
         raise ApiError(400, "either text or url is required", "bad_request")
@@ -193,6 +215,60 @@ async def update_profile(
     return {"profile": serialize_profile(profile, services.store), **applied}
 
 
+@router.post("/profiles/reorder")
+async def reorder_profiles(
+    payload: ReorderProfiles,
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    _require_client(services)
+    profiles = (await session.execute(select(Profile))).scalars().all()
+    by_id = {profile.id: profile for profile in profiles}
+    if len(payload.ids) != len(set(payload.ids)) or set(payload.ids) != set(by_id):
+        raise ApiError(422, "reorder must contain every profile exactly once", "invalid_reorder")
+    for index, profile_id in enumerate(payload.ids):
+        by_id[profile_id].sort_order = index * 10
+    await session.flush()
+    await audit(
+        session,
+        actor=admin.username,
+        action="profile.reordered",
+        ip=client_ip(request),
+        detail={"count": len(payload.ids)},
+    )
+    return {"ok": True}
+
+
+@router.post("/profiles/{profile_id}/activate")
+async def activate_profile(
+    profile_id: str,
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    _require_client(services)
+    profile = await _get_profile(session, profile_id)
+    if not profile.enabled:
+        raise ApiError(409, "enable the profile before activating it", "profile_disabled")
+    from ostium.services.settings import set_setting
+
+    await set_setting(session, "active_profile_id", profile.id)
+    applied = await _apply_client(services, session)
+    await audit(
+        session,
+        actor=admin.username,
+        action="profile.activated",
+        target=profile.name,
+        ip=client_ip(request),
+    )
+    data = serialize_profile(profile, services.store)
+    data["active"] = True
+    return {"profile": data, **applied}
+
+
 @router.delete("/profiles/{profile_id}")
 async def delete_profile(
     profile_id: str,
@@ -204,6 +280,10 @@ async def delete_profile(
     _require_client(services)
     profile = await _get_profile(session, profile_id)
     name = profile.name
+    from ostium.services.settings import get_setting, set_setting
+
+    if await get_setting(session, "active_profile_id") == profile.id:
+        await set_setting(session, "active_profile_id", None)
     await session.delete(profile)
     await session.flush()
     applied = await _apply_client(services, session)
@@ -266,16 +346,25 @@ async def test_profile(
     _require_client(services)
     profile = await _get_profile(session, profile_id)
     endpoints = endpoints_from_profile(profile, services.store)
-    results = []
     proxies = (await services.clash.proxies()).get("proxies", {})
-    for endpoint in endpoints:
-        item = {"tag": endpoint.tag, "name": endpoint.name, "delay_ms": None, "error": None}
-        proxy = proxies.get(endpoint.tag)
-        if proxy is None:
-            item["error"] = "not loaded in the running core"
+    import asyncio
+
+    async def measure(endpoint: Any) -> dict[str, Any]:
+        item: dict[str, Any] = {
+            "tag": endpoint.tag,
+            "name": endpoint.name,
+            "delay_ms": None,
+            "error": None,
+        }
+        if endpoint.tag not in proxies:
+            item["error"] = "not loaded in the running core; apply the profile first"
+            return item
+        delay = await services.clash.delay(endpoint.tag, url="https://www.gstatic.com/generate_204")
+        if delay is None:
+            item["error"] = "latency probe failed or timed out"
         else:
-            item["delay_ms"] = (
-                proxy.get("history", [{}])[-1].get("delay") if proxy.get("history") else None
-            )
-        results.append(item)
+            item["delay_ms"] = delay
+        return item
+
+    results = await asyncio.gather(*(measure(endpoint) for endpoint in endpoints))
     return {"profile": profile.name, "results": results}

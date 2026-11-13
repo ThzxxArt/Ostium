@@ -90,7 +90,7 @@ Issues = "https://github.com/ThzxxArt/Ostium/issues"
 source = "vcs"
 
 [tool.hatch.version.raw-options]
-fallback_version = "0.1.0"
+fallback_version = "0.1.1"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/ostium/_version.py"
@@ -100,6 +100,7 @@ packages = ["src/ostium"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "web/dist" = "ostium/web/dist"
+"alembic" = "ostium/db/alembic"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -109,6 +110,8 @@ include = [
   "/scripts",
   "/deploy",
   "/protos",
+  "/alembic",
+  "/alembic.ini",
   "/web/src",
   "/web/tests",
   "/web/public",

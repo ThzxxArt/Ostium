@@ -69,10 +69,40 @@ async def create_alert(
     level: str,
     code: str,
     message: str,
+    dedupe_key: str | None = None,
 ) -> Alert:
     from ostium.services.settings import get_setting
 
-    alert = Alert(level=level, code=code, message=redact(message)[:500])
+    text = redact(message)[:500]
+    effective_code = code
+    if dedupe_key:
+        import hashlib
+
+        effective_code = f"{code}:{hashlib.sha256(dedupe_key.encode()).hexdigest()[:10]}"
+    existing = (
+        await session.execute(
+            select(Alert)
+            .where(Alert.code == effective_code, Alert.acknowledged_at.is_(None))
+            .order_by(Alert.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.level = level
+        existing.message = text
+        existing.created_at = utcnow()
+        await session.flush()
+        await bus.publish(
+            "alert.updated",
+            {
+                "id": existing.id,
+                "level": level,
+                "code": effective_code,
+                "message": text,
+            },
+        )
+        return existing
+    alert = Alert(level=level, code=effective_code, message=text)
     session.add(alert)
     await session.flush()
     await bus.publish(
@@ -82,13 +112,14 @@ async def create_alert(
     webhook_url = await get_setting(session, "webhook_url")
     if webhook_url:
         secret = await get_setting(session, "webhook_secret", "")
-        asyncio.create_task(
-            send_webhook(
-                str(webhook_url),
-                {"type": "alert", "level": level, "code": code, "message": alert.message},
-                str(secret or ""),
-            )
-        )
+        payload = {"type": "alert", "level": level, "code": code, "message": alert.message}
+
+        async def _deliver() -> None:
+            delivered = await send_webhook(str(webhook_url), payload, str(secret or ""))
+            if not delivered:
+                bus.log("warning", "webhook delivery failed", code=code)
+
+        asyncio.create_task(_deliver())
     return alert
 
 
@@ -124,13 +155,26 @@ async def send_webhook(url: str, payload: dict[str, Any], secret: str = "") -> b
     import hmac
     import json
 
+    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+
+    try:
+        url = validate_remote_url(url, allow_private=False)
+    except UnsafeUrlError:
+        return False
     body = json.dumps(payload, ensure_ascii=False).encode()
     headers = {"Content-Type": "application/json", "User-Agent": "Ostium/0.1"}
     if secret:
         headers["X-Ostium-Signature"] = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    try:
-        async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
-            response = await client.post(url, content=body, headers=headers)
-        return response.status_code < 300
-    except httpx.HTTPError:
-        return False
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
+                response = await client.post(url, content=body, headers=headers)
+            if response.status_code < 300:
+                return True
+            if response.status_code < 500:
+                return False
+        except httpx.HTTPError:
+            pass
+        if attempt < 2:
+            await asyncio.sleep(2**attempt)
+    return False

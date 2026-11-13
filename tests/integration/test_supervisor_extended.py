@@ -332,14 +332,18 @@ def test_rollback_and_reload_branches(tmp_path: Path, monkeypatch) -> None:
         async def no_sleep(seconds):  # type: ignore[no-untyped-def]
             return None
 
+        async def fake_spawn() -> None:
+            supervisor._process = FakeProcess()
+
         monkeypatch.setattr(supervisor_module.asyncio, "sleep", no_sleep)
-        await supervisor._rollback(previous)
-        assert process.signals
-        assert "rollback to previous" in supervisor.read_logs(10)
+        monkeypatch.setattr(supervisor, "_spawn", fake_spawn)
+        await supervisor._rollback(previous, None)
+        assert "rollback to previous configuration" in supervisor.read_logs(10)
+        assert supervisor._process is not process
 
         await supervisor._reload_running()
-        assert "reloaded via SIGHUP" in supervisor.read_logs(10)
-        assert supervisor._process is process
+        assert "restarted sing-box" in supervisor.read_logs(10)
+        assert supervisor._process is not process
 
         # reload without a configuration or engine.
         supervisor.last_good.unlink()

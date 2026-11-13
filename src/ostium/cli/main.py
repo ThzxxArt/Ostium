@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ostium import __version__
-from ostium.config import Role, Settings
+from ostium.config import Mode, Role, Settings, is_loopback_host
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.services.crypto import SecretStore
 
@@ -46,6 +46,28 @@ app.add_typer(service_app, name="service")
 console = Console()
 err_console = Console(stderr=True)
 
+_ALLOW_DEGRADED = os.environ.get("OSTIUM_ALLOW_DEGRADED", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+
+@app.callback()
+def _main(
+    allow_degraded: bool = typer.Option(
+        False,
+        "--allow-degraded",
+        help="Continue with exit code 0 when a configuration cannot be applied",
+    ),
+) -> None:
+    """Ostium command line interface."""
+
+    global _ALLOW_DEGRADED
+    if allow_degraded:
+        _ALLOW_DEGRADED = True
+
 
 def _load_settings() -> Settings:
     return Settings.load()
@@ -53,6 +75,32 @@ def _load_settings() -> Settings:
 
 def _json(value: Any) -> None:
     console.print_json(json.dumps(value, ensure_ascii=False, default=str))
+
+
+async def _audit(session: Any, action: str, target: str | None = None, **detail: Any) -> None:
+    """Record CLI-initiated database changes in the audit trail."""
+
+    from ostium.services.audit import audit
+
+    await audit(session, actor="cli", action=action, target=target, detail=detail or None)
+
+
+def _audit_sync(settings: Settings, action: str, target: str | None = None, **detail: Any) -> None:
+    async def _write() -> None:
+        engine, factory, _store = await _database(settings)
+        try:
+            async with factory() as session:
+                await _audit(session, action, target, **detail)
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    try:
+        _run(_write())
+    except Exception:
+        # Auditing must never turn a successful backup/restore into a failure;
+        # the operation itself is still reported by its own output.
+        pass
 
 
 async def _database(settings: Settings) -> tuple[Any, Any, SecretStore]:
@@ -127,6 +175,11 @@ def init(
     host: str | None = typer.Option(None, "--host", help="UI listen address"),
     port: int | None = typer.Option(None, "--port", help="UI listen port"),
     public_ui: bool = typer.Option(False, "--public-ui/--no-public-ui"),
+    allow_insecure_bind: bool = typer.Option(
+        False,
+        "--allow-insecure-bind",
+        help="Explicitly permit a non-loopback plaintext admin UI",
+    ),
     no_input: bool = typer.Option(False, "--no-input"),
     force: bool = typer.Option(
         False, "--force", help="Reinitialise configuration files (never deletes data)"
@@ -157,11 +210,29 @@ def init(
         settings.config_path = config_dir / "config.toml"
     settings.role = role_value
     settings.dev = dev
-    settings.host = host or (
-        "127.0.0.1" if dev else ("0.0.0.0" if role_value is Role.SERVER else "127.0.0.1")
+    configured_host = host or os.environ.get("OSTIUM_HOST") or "127.0.0.1"
+    configured_allow = allow_insecure_bind or (
+        os.environ.get("OSTIUM_ALLOW_INSECURE_BIND", "").strip().lower()
+        in {"1", "true", "yes", "on"}
     )
+    settings.host = configured_host
     settings.port = port or (8443 if role_value is Role.SERVER else 8787)
     settings.public_ui = public_ui and role_value is Role.SERVER
+    settings.allow_insecure_bind = configured_allow and role_value is Role.SERVER
+    if (
+        role_value is Role.SERVER
+        and not settings.public_ui
+        and not settings.allow_insecure_bind
+        and not is_loopback_host(settings.host)
+    ):
+        _fail(
+            f"--host {settings.host} would expose the admin UI over plaintext HTTP; "
+            "use 127.0.0.1 or pass --allow-insecure-bind explicitly",
+            2,
+        )
+    if settings.public_ui and not settings.allow_insecure_bind:
+        # Public UI terminates TLS itself, so no insecure-bind opt-in is needed.
+        settings.allow_insecure_bind = False
     if role_value is Role.SERVER or settings.dev:
         settings.core_token_file = settings.data_dir / "runtime" / "core.token"
     settings.paths.ensure()
@@ -208,6 +279,8 @@ def init(
                         "public_ui": settings.public_ui,
                     },
                 )
+                if domain:
+                    await set_setting(session, "public_base_url", f"https://{domain}")
                 await session.commit()
                 if generated:
                     console.print(
@@ -230,6 +303,11 @@ def init(
 def serve(
     host: str | None = typer.Option(None, "--host"),
     port: int | None = typer.Option(None, "--port"),
+    allow_insecure_bind: bool = typer.Option(
+        False,
+        "--allow-insecure-bind",
+        help="Explicitly permit a non-loopback plaintext admin UI",
+    ),
     reload: bool = typer.Option(False, "--reload", help="Development auto-reload"),
 ) -> None:
     """Run the Ostium control plane (Web UI + API)."""
@@ -244,6 +322,26 @@ def serve(
         settings.host = host
     if port:
         settings.port = port
+    if allow_insecure_bind:
+        settings.allow_insecure_bind = True
+    if settings.host_migrated:
+        err_console.print(
+            "[yellow]Legacy host=0.0.0.0 was migrated to 127.0.0.1 for safety. "
+            "Use an SSH tunnel, Public UI with TLS, or allow_insecure_bind = true "
+            "to expose the admin UI deliberately.[/yellow]"
+        )
+        with contextlib.suppress(OSError):
+            settings.save()
+    try:
+        settings.validate_bind()
+    except Exception as exc:
+        err_console.print(f"[red]refusing to start:[/red] {exc}")
+        raise typer.Exit(code=6) from exc
+    if settings.allow_insecure_bind and not is_loopback_host(settings.host):
+        err_console.print(
+            "[yellow]warning: admin UI is listening on a non-loopback plaintext address "
+            "because allow_insecure_bind is enabled; restrict the port with a firewall.[/yellow]"
+        )
     with contextlib.suppress(Exception):
         result = apply_pending_restore(settings)
         if result:
@@ -429,6 +527,32 @@ def doctor(
     """Run local diagnostics."""
 
     settings = _load_settings()
+    fixes: list[str] = []
+    if fix:
+        settings.paths.ensure()
+        targets = [
+            (settings.data_dir, 0o700),
+            (settings.paths.runtime_dir, 0o700),
+            (settings.paths.logs_dir, 0o700),
+            (settings.paths.certs_dir, 0o700),
+            (settings.paths.backups_dir, 0o700),
+            (settings.paths.master_key_path, 0o600),
+            (settings.paths.db_path, 0o600),
+            (settings.config_file, 0o600),
+        ]
+        for path, mode in targets:
+            if path.exists():
+                try:
+                    path.chmod(mode)
+                    fixes.append(str(path))
+                except OSError:
+                    pass
+        if not settings.config_file.is_file():
+            try:
+                settings.save()
+                fixes.append(str(settings.config_file))
+            except OSError:
+                pass
     checks: list[dict[str, Any]] = []
 
     def add(name: str, status: str, message: str) -> None:
@@ -455,8 +579,20 @@ def doctor(
         add("core_api", "pass" if health.get("status") == "ok" else "warn", json.dumps(health))
     except Exception as exc:
         add("core_api", "fail", str(exc))
+    if settings.role is Role.SERVER and not is_loopback_host(settings.host):
+        add(
+            "bind",
+            "warn" if settings.allow_insecure_bind or settings.public_ui else "fail",
+            f"admin UI listens on {settings.host}:{settings.port}",
+        )
     if json_output:
-        _json({"checks": checks})
+        _json(
+            {
+                "checks": checks,
+                "fixed": fixes,
+                "host_migrated": settings.host_migrated,
+            }
+        )
     else:
         table = Table(title="Ostium doctor")
         table.add_column("Check")
@@ -466,6 +602,8 @@ def doctor(
             color = {"pass": "green", "warn": "yellow", "fail": "red"}[check["status"]]
             table.add_row(check["id"], f"[{color}]{check['status']}[/{color}]", check["message"])
         console.print(table)
+        if fixes:
+            console.print(f"[green]fixed {len(fixes)} path/permission issue(s)[/green]")
     if any(check["status"] == "fail" for check in checks):
         raise typer.Exit(code=1)
 
@@ -500,9 +638,22 @@ def proxy(
     manager = system_proxy(settings)
     try:
         if action == "on":
+            if settings.tun_enabled:
+                _fail("TUN mode is enabled; disable it before using the system proxy", 5)
+            _client_apply(settings)
             result = manager.enable("127.0.0.1", settings.mixed_port)
+            settings.mode = Mode.SYSTEM_PROXY
+            try:
+                settings.save()
+            except OSError:
+                pass
         elif action == "off":
             result = manager.disable()
+            settings.mode = Mode.MIXED
+            try:
+                settings.save()
+            except OSError:
+                pass
         else:
             result = manager.status()
     except ProxyError as exc:
@@ -529,10 +680,37 @@ def update(check: bool = typer.Option(False, "--check")) -> None:
     """Check for updates (installation is explicit)."""
 
     console.print(f"Current version: {__version__}")
-    console.print(
-        "Automatic updates are disabled by design. "
-        "Download a signed release from GitHub and install it."
-    )
+    if not check:
+        console.print(
+            "Automatic updates are disabled by design. "
+            "Download a signed release from GitHub and install it."
+        )
+        return
+    from packaging.version import InvalidVersion, Version
+
+    url = "https://api.github.com/repos/ThzxxArt/Ostium/releases/latest"
+    try:
+        response = httpx.get(
+            url,
+            timeout=15,
+            follow_redirects=True,
+            trust_env=False,
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "Ostium"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        latest = str(payload.get("tag_name", "")).lstrip("v")
+        if not latest:
+            _fail("the update check returned no release tag", 4)
+        if Version(latest) > Version(__version__):
+            console.print(f"[yellow]update available: {latest}[/yellow]")
+            console.print(
+                str(payload.get("html_url", "https://github.com/ThzxxArt/Ostium/releases"))
+            )
+        else:
+            console.print("[green]Ostium is up to date.[/green]")
+    except (httpx.HTTPError, ValueError, InvalidVersion) as exc:
+        _fail(f"update check failed: {exc}", 4)
 
 
 @app.command("diagnostics")
@@ -545,6 +723,7 @@ def diagnostics_export(
     if action != "export":
         _fail("only the 'export' action is supported", 2)
     settings = _load_settings()
+    from ostium.util.redact import redact
     from ostium.util.time import iso, utcnow
 
     payload = {
@@ -557,15 +736,50 @@ def diagnostics_export(
         "config_file": str(settings.config_file),
         "database_exists": settings.paths.db_path.is_file(),
         "core_binary_exists": _engine_binary(settings).is_file(),
+        "host": settings.host,
+        "port": settings.port,
+        "public_ui": settings.public_ui,
+        "allow_insecure_bind": settings.allow_insecure_bind,
     }
+    doctor_payload: dict[str, Any] = {"checks": []}
+    try:
+        health = httpx.get(f"{settings.core_url}/v1/health", timeout=3, trust_env=False).json()
+        doctor_payload["core_health"] = health
+    except Exception as exc:
+        doctor_payload["core_health"] = {"error": redact(str(exc))}
+    config_text = ""
+    if settings.config_file.is_file():
+        config_text = redact(settings.config_file.read_text(encoding="utf-8", errors="replace"))
+    log_text = ""
+    log_path = settings.paths.logs_dir / "ostium.log"
+    if log_path.is_file():
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-500:]
+        log_text = redact("\n".join(lines))
     with tarfile.open(output, "w:gz") as archive:
         import io
 
-        data = json.dumps(payload, indent=2).encode()
-        info = tarfile.TarInfo("ostium-diagnostics.json")
-        info.size = len(data)
-        archive.addfile(info, io.BytesIO(data))
+        entries = {
+            "ostium-diagnostics.json": json.dumps(payload, indent=2),
+            "doctor.json": json.dumps(doctor_payload, indent=2),
+            "config.redacted.toml": config_text,
+            "ostium.log.tail": log_text,
+        }
+        for name, content in entries.items():
+            data = content.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = 0o600
+            archive.addfile(info, io.BytesIO(data))
     console.print(f"wrote {output}")
+
+
+def _apply_failure(message: str) -> None:
+    if _ALLOW_DEGRADED:
+        err_console.print(
+            f"[yellow]configuration saved but not applied (--allow-degraded): {message}[/yellow]"
+        )
+        return
+    _fail(f"configuration saved but not applied: {message}", 3)
 
 
 def _server_apply(settings: Settings) -> None:
@@ -582,9 +796,8 @@ def _server_apply(settings: Settings) -> None:
                     await session.commit()
                     console.print("[green]configuration applied[/green]")
                 except EngineError as exc:
-                    err_console.print(
-                        f"[yellow]configuration saved but not applied: {exc}[/yellow]"
-                    )
+                    await session.rollback()
+                    _apply_failure(str(exc))
         finally:
             await engine.dispose()
 
@@ -605,9 +818,8 @@ def _client_apply(settings: Settings) -> None:
                     await session.commit()
                     console.print("[green]client configuration applied[/green]")
                 except EngineError as exc:
-                    err_console.print(
-                        f"[yellow]configuration saved but not applied: {exc}[/yellow]"
-                    )
+                    await session.rollback()
+                    _apply_failure(str(exc))
         finally:
             await engine.dispose()
 
@@ -692,6 +904,13 @@ def user_add(
                     expires_at=datetime.fromisoformat(expires) if expires else None,
                     note=note,
                 )
+                await _audit(
+                    session,
+                    "user.created",
+                    user.name,
+                    quota_bytes=user.quota_bytes,
+                    quota_cycle=user.quota_cycle,
+                )
                 await session.commit()
                 result = {"user": user.name, "token": token, "id": user.id}
         finally:
@@ -751,6 +970,7 @@ def _set_user_enabled(name: str, enabled: bool) -> None:
                 user.enabled = enabled
                 if enabled:
                     user.disabled_reason = None
+                await _audit(session, "user.enabled" if enabled else "user.disabled", name)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -782,6 +1002,9 @@ def user_rotate(name: str, subscription: bool = typer.Option(False, "--subscript
                     _fail("user not found", 1)
                 await rotate_credentials(session, store, user)
                 token = await rotate_subscription(session, store, user) if subscription else None
+                await _audit(
+                    session, "user.credentials_rotated", name, subscription=bool(subscription)
+                )
                 await session.commit()
         finally:
             await engine.dispose()
@@ -816,6 +1039,7 @@ def user_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
                 if user is None:
                     _fail("user not found", 1)
                 await session.delete(user)
+                await _audit(session, "user.deleted", name)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -850,6 +1074,7 @@ def user_quota(
                     _fail("user not found", 1)
                 user.quota_bytes = _parse_bytes(quota)
                 user.quota_cycle = cycle
+                await _audit(session, "user.quota_updated", name, quota=quota, cycle=cycle)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -892,12 +1117,17 @@ def user_subscription(name: str, rotate: bool = typer.Option(False, "--rotate"))
                 if token is None:
                     token = await rotate_subscription(session, store, user)
                 host = await server_hostname(session)
+                from ostium.services.public_url import public_base_url
+
+                base = await public_base_url(session, settings)
+                await _audit(session, "user.subscription_viewed", user.name)
                 await session.commit()
                 data = {
                     "token": token,
                     "host": host,
+                    "base_url": base,
                     "formats": {
-                        fmt: f"http://127.0.0.1:{settings.port}/sub/{token}?format={fmt}"
+                        fmt: f"{base}/sub/{token}?format={fmt}"
                         for fmt in ("ostium", "base64", "clash", "singbox")
                     },
                 }
@@ -1015,13 +1245,20 @@ def profile_import(
         try:
             async with factory() as session:
                 endpoints = parse_subscription_text(text)
-                await create_profile(
+                profile = await create_profile(
                     session,
                     store,
                     name=name,
                     endpoints=endpoints,
                     kind="subscription" if subscription_url else "manual",
                     subscription_url=subscription_url,
+                )
+                await _audit(
+                    session,
+                    "profile.created",
+                    profile.name,
+                    endpoints=len(endpoints),
+                    subscription=bool(subscription_url),
                 )
                 await session.commit()
         finally:
@@ -1055,6 +1292,7 @@ def profile_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
                 if profile is None:
                     _fail("profile not found", 1)
                 await session.delete(profile)
+                await _audit(session, "profile.deleted", name)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -1086,6 +1324,7 @@ def profile_refresh(name: str) -> None:
                 if profile is None:
                     _fail("profile not found", 1)
                 count = await refresh_profile(session, store, profile)
+                await _audit(session, "profile.refreshed", name, endpoints=count)
                 await session.commit()
         finally:
             await engine.dispose()
@@ -1142,6 +1381,16 @@ def core_install(
     settings = _load_settings()
     target = _engine_binary(settings)
     target.parent.mkdir(parents=True, exist_ok=True)
+    previous = target.read_bytes() if target.is_file() else None
+
+    def _restore_previous() -> None:
+        if previous is not None:
+            target.write_bytes(previous)
+            if os.name == "posix":
+                target.chmod(0o755)
+        else:
+            target.unlink(missing_ok=True)
+
     if manifest:
         try:
             if manifest.startswith(("http://", "https://")):
@@ -1171,7 +1420,15 @@ def core_install(
             candidates = [item for item in candidates if item.get("version") == version]
         if not candidates:
             _fail(f"no core artifact for {os_name}/{arch} in the manifest", 6)
-        artifact = sorted(candidates, key=lambda item: str(item.get("version")))[-1]
+        from packaging.version import InvalidVersion, Version
+
+        def _version_key(item: dict[str, Any]) -> Version:
+            try:
+                return Version(str(item.get("version", "0")))
+            except InvalidVersion:
+                return Version("0")
+
+        artifact = max(candidates, key=_version_key)
         artifact_url = str(artifact["url"])
         if not artifact_url.startswith("https://"):
             _fail("core manifest artifact URL must use HTTPS", 6)
@@ -1180,6 +1437,19 @@ def core_install(
         digest = hashlib.sha256(response.content).hexdigest()
         if digest != artifact["sha256"]:
             _fail("SHA256 mismatch; refusing to install", 6)
+        attestation = artifact.get("attestation") or artifact.get("attestation_sha256")
+        if isinstance(attestation, dict):
+            attestation_url = str(attestation.get("url", ""))
+            expected_attestation = str(attestation.get("sha256", ""))
+            if attestation_url and expected_attestation:
+                if not attestation_url.startswith("https://"):
+                    _fail("attestation URL must use HTTPS", 6)
+                proof = httpx.get(
+                    attestation_url, timeout=30, follow_redirects=True, trust_env=False
+                )
+                proof.raise_for_status()
+                if hashlib.sha256(proof.content).hexdigest() != expected_attestation:
+                    _fail("attestation digest mismatch; refusing to install", 6)
         with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
             archive_path = Path(temp) / "core.tar.gz"
             archive_path.write_bytes(response.content)
@@ -1235,7 +1505,22 @@ def core_install(
         _fail("provide --binary, --url or --manifest", 2)
     if os.name == "posix":
         target.chmod(0o755)
+    import subprocess
+
+    try:
+        probe = subprocess.run(
+            [str(target), "version"], capture_output=True, text=True, timeout=20, check=False
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        _restore_previous()
+        _fail(f"installed core could not be executed: {exc}", 6)
+    if probe.returncode != 0:
+        _restore_previous()
+        _fail(f"installed core failed its version check: {probe.stderr.strip()}", 6)
     console.print(f"installed core at {target}")
+    console.print(
+        probe.stdout.strip().splitlines()[0] if probe.stdout.strip() else "core is runnable"
+    )
 
 
 @core_app.command("update")
@@ -1264,7 +1549,18 @@ def backup_create(
     from ostium.services.backup import create_backup
 
     settings = _load_settings()
+    if not password:
+        err_console.print(
+            "[yellow]warning: an unencrypted backup contains master.key and the full "
+            "database; store it on encrypted media or pass --password.[/yellow]"
+        )
     result = create_backup(settings, password=password, target=output)
+    _audit_sync(
+        settings,
+        "backup.created",
+        str(result.get("filename")),
+        encrypted=bool(result.get("encrypted")),
+    )
     console.print_json(json.dumps(result))
 
 
@@ -1273,8 +1569,9 @@ def backup_list() -> None:
     """List backup files."""
 
     settings = _load_settings()
-    for path in sorted(settings.paths.backups_dir.glob("ostium-backup-*")):
-        console.print(f"{path.name}  {path.stat().st_size} bytes")
+    for pattern in ("ostium-backup-*", "ostium-auto-backup-*"):
+        for path in sorted(settings.paths.backups_dir.glob(pattern)):
+            console.print(f"{path.name}  {path.stat().st_size} bytes")
 
 
 @backup_app.command("restore")
@@ -1293,6 +1590,7 @@ def backup_restore(
         )
     settings = _load_settings()
     result = restore_backup(settings, path, password=password)
+    _audit_sync(settings, "backup.restored", path.name)
     console.print_json(json.dumps(result))
 
 
@@ -1339,6 +1637,7 @@ def cert_issue(domain: str, self_signed: bool = typer.Option(False, "--self-sign
         engine, factory, _store = await _database(settings)
         async with factory() as session:
             cert = await create_self_signed(session, settings, domain=domain)
+            await _audit(session, "certificate.self_signed", cert.domain)
             await session.commit()
             result = {
                 "domain": cert.domain,
@@ -1371,7 +1670,13 @@ def service_install() -> None:
         )
     for unit in source.glob("*.service"):
         shutil.copy2(unit, Path("/etc/systemd/system") / unit.name)
-    os.system("systemctl daemon-reload")  # noqa: S605 - fixed command
+    import subprocess
+
+    result = subprocess.run(
+        ["systemctl", "daemon-reload"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        _fail(f"systemctl daemon-reload failed: {result.stderr.strip()}", 5)
     console.print("systemd units installed; enable with systemctl enable --now ostium-core ostium")
 
 
@@ -1383,7 +1688,13 @@ def service_uninstall() -> None:
         _fail("run as root on Linux", 5)
     for name in ("ostium.service", "ostium-core.service"):
         Path("/etc/systemd/system", name).unlink(missing_ok=True)
-    os.system("systemctl daemon-reload")  # noqa: S605 - fixed command
+    import subprocess
+
+    result = subprocess.run(
+        ["systemctl", "daemon-reload"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        _fail(f"systemctl daemon-reload failed: {result.stderr.strip()}", 5)
     console.print("systemd units removed (data is preserved)")
 
 

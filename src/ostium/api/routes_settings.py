@@ -27,6 +27,7 @@ class SettingsPatch(BaseModel):
     allow_lan: bool | None = None
     routing_mode: str | None = None
     trusted_hosts: list[str] | None = None
+    ui_allowlist: list[str] | None = None
     auto_connect: bool | None = None
     auto_reconnect: bool | None = None
     webhook_url: str | None = None
@@ -34,8 +35,13 @@ class SettingsPatch(BaseModel):
     update_channel: str | None = None
     audit_retention_days: int | None = Field(default=None, ge=7, le=3650)
     traffic_retention_days: int | None = Field(default=None, ge=30, le=3650)
+    job_retention_days: int | None = Field(default=None, ge=1, le=365)
     auto_backup: bool | None = None
     notifications_enabled: bool | None = None
+    public_base_url: str | None = Field(default=None, max_length=500)
+    acme_email: str | None = Field(default=None, max_length=254)
+    acme_staging: bool | None = None
+    block_private_egress: bool | None = None
 
 
 class PublicUiRequest(BaseModel):
@@ -80,10 +86,13 @@ async def read_settings(
             "domain": server_info.get("domain"),
             "acme_email": services.settings.acme_email,
             "acme_staging": services.settings.acme_staging,
+            "public_base_url": stored.get("public_base_url"),
+            "block_private_egress": services.settings.block_private_egress,
         },
         "security": {
             "secure_cookies": services.settings.secure_cookies,
             "trusted_hosts": services.settings.trusted_hosts,
+            "ui_allowlist": services.settings.ui_allowlist,
             "api_tokens": await _list_tokens(session),
         },
         "notifications": {
@@ -95,6 +104,7 @@ async def read_settings(
             "update_channel": stored.get("update_channel", "stable"),
             "audit_retention_days": stored.get("audit_retention_days", 90),
             "traffic_retention_days": stored.get("traffic_retention_days", 365),
+            "job_retention_days": stored.get("job_retention_days", 7),
             "auto_backup": stored.get("auto_backup", False),
         },
     }
@@ -121,12 +131,41 @@ async def update_settings(
         )
     if changes.get("mixed_port"):
         services.settings.mixed_port = changes["mixed_port"]
+    if "public_base_url" in changes and changes["public_base_url"] is not None:
+        from ostium.services.public_url import normalize_base_url
+
+        value = changes["public_base_url"].strip()
+        if value:
+            try:
+                await set_setting(session, "public_base_url", normalize_base_url(value))
+            except ValueError as exc:
+                raise ApiError(400, str(exc), "invalid_public_base_url") from exc
+        else:
+            await set_setting(session, "public_base_url", None)
+    if "acme_email" in changes and changes["acme_email"] is not None:
+        services.settings.acme_email = changes["acme_email"] or None
+    if changes.get("acme_staging") is not None:
+        services.settings.acme_staging = bool(changes["acme_staging"])
+    if changes.get("block_private_egress") is not None:
+        services.settings.block_private_egress = bool(changes["block_private_egress"])
     if changes.get("allow_lan") is not None:
         services.settings.allow_lan = bool(changes["allow_lan"])
     if changes.get("log_level"):
         services.settings.log_level = changes["log_level"]
     if "trusted_hosts" in changes and changes["trusted_hosts"] is not None:
         services.settings.trusted_hosts = changes["trusted_hosts"]
+    if "ui_allowlist" in changes and changes["ui_allowlist"] is not None:
+        import ipaddress
+
+        validated: list[str] = []
+        for entry in changes["ui_allowlist"]:
+            try:
+                validated.append(str(ipaddress.ip_network(entry, strict=False)))
+            except ValueError as exc:
+                raise ApiError(
+                    400, f"invalid CIDR in ui_allowlist: {entry}", "invalid_allowlist"
+                ) from exc
+        services.settings.ui_allowlist = validated
     if changes.get("routing_mode"):
         await set_setting(session, "routing_mode", changes["routing_mode"])
     if changes.get("auto_connect") is not None:
@@ -138,6 +177,7 @@ async def update_settings(
         "update_channel",
         "audit_retention_days",
         "traffic_retention_days",
+        "job_retention_days",
         "auto_backup",
         "notifications_enabled",
     ):
@@ -221,6 +261,8 @@ async def public_ui(
             server_info = {}
         server_info.update({"domain": payload.domain, "public_ui": True})
         await set_setting(session, "server", server_info)
+        if not await get_setting(session, "public_base_url"):
+            await set_setting(session, "public_base_url", f"https://{payload.domain}")
     else:
         services.settings.public_ui = False
         services.settings.secure_cookies = False

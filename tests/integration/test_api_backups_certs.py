@@ -65,7 +65,12 @@ def test_backup_create_list_restore_delete(
     api_client: TestClient, session_token: str, settings: Settings
 ) -> None:
     headers = _headers(session_token)
-    created = api_client.post("/api/v1/backups", json={}, headers=headers)
+    rejected = api_client.post("/api/v1/backups", json={}, headers=headers)
+    assert rejected.status_code == 400
+    assert rejected.json()["code"] == "plaintext_backup_requires_acknowledgement"
+    created = api_client.post(
+        "/api/v1/backups", json={"acknowledge_plaintext": True}, headers=headers
+    )
     assert created.status_code == 202
     job = _wait_job(api_client, created.json()["job_id"])
     assert job["status"] == "succeeded", job
@@ -152,7 +157,9 @@ def test_backup_job_failure(api_client: TestClient, session_token: str, monkeypa
         raise RuntimeError("backup failed")
 
     monkeypatch.setattr("ostium.services.backup.create_backup", fail)
-    created = api_client.post("/api/v1/backups", json={}, headers=headers)
+    created = api_client.post(
+        "/api/v1/backups", json={"acknowledge_plaintext": True}, headers=headers
+    )
     job = _wait_job(api_client, created.json()["job_id"])
     assert job["status"] == "failed"
     assert "backup failed" in job["error"]
@@ -204,12 +211,16 @@ def test_certificate_upload_use_and_delete(api_client: TestClient, session_token
 class FakeIssuer:
     error: ClassVar[Exception | None] = None
     calls: ClassVar[list[str]] = []
+    options: ClassVar[list[dict[str, object]]] = []
 
     def __init__(self, settings, store) -> None:
         pass
 
-    async def issue(self, domain: str) -> tuple[str, str]:
+    async def issue(
+        self, domain: str, *, staging: bool | None = None, email: str | None = None
+    ) -> tuple[str, str]:
         FakeIssuer.calls.append(domain)
+        FakeIssuer.options.append({"staging": staging, "email": email})
         if FakeIssuer.error:
             raise FakeIssuer.error
         return _bundle(domain)

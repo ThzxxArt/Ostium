@@ -706,7 +706,9 @@ def test_backup_endpoints(api_client: TestClient, session_token: str) -> None:
     weak = api_client.post("/api/v1/backups", json={"password": "short"}, headers=headers)
     assert weak.status_code == 400
 
-    created = api_client.post("/api/v1/backups", json={}, headers=headers)
+    created = api_client.post(
+        "/api/v1/backups", json={"acknowledge_plaintext": True}, headers=headers
+    )
     assert created.status_code == 202
     assert created.json()["status"] == "queued"
 

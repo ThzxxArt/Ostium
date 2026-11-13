@@ -61,12 +61,14 @@ def test_job_cancel(tmp_path: Path, settings: Settings) -> None:
         manager = JobManager(factory, EventBus())
 
         async def slow(context):  # type: ignore[no-untyped-def]
-            await asyncio.sleep(5)
+            for _ in range(50):
+                context.raise_if_cancelled()
+                await asyncio.sleep(0.05)
 
         job = await manager.submit("test.slow", slow)
         await asyncio.sleep(0.05)
         assert await manager.cancel(job.id)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.15)
         async with factory() as session:
             from ostium.db.models import Job
 

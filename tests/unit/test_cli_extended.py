@@ -165,6 +165,7 @@ def test_proxy_tun_and_update_commands(tmp_path: Path, monkeypatch) -> None:
             return {"enabled": False}
 
     monkeypatch.setattr("ostium.system.proxy.system_proxy", lambda settings: Proxy())
+    monkeypatch.setattr(cli, "_client_apply", lambda settings: None)
     assert runner.invoke(app, ["proxy", "on"]).exit_code == 0
     assert runner.invoke(app, ["proxy", "off"]).exit_code == 0
     assert runner.invoke(app, ["proxy", "status"]).exit_code == 0
@@ -183,6 +184,131 @@ def test_proxy_tun_and_update_commands(tmp_path: Path, monkeypatch) -> None:
     assert runner.invoke(app, ["tun", "bad"]).exit_code == 2
     assert runner.invoke(app, ["update"]).exit_code == 0
     assert "Automatic updates are disabled" in runner.invoke(app, ["update"]).output
+
+
+def test_v011_cli_safety_and_update_checks(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+
+    # serve refuses a plaintext public bind without an explicit opt-in.
+    monkeypatch.setenv("OSTIUM_HOST", "0.0.0.0")
+    refused = runner.invoke(app, ["serve"])
+    assert refused.exit_code == 6
+    assert "refusing to start" in refused.output
+
+    # init requires the same opt-in for a non-loopback plaintext listener.
+    data = tmp_path / "bind-data"
+    config = tmp_path / "bind-config"
+    blocked = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "server",
+            "--no-input",
+            "--password",
+            "verysecret123",
+            "--data-dir",
+            str(data),
+            "--config-dir",
+            str(config),
+            "--host",
+            "0.0.0.0",
+        ],
+    )
+    assert blocked.exit_code == 2
+    allowed = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "server",
+            "--no-input",
+            "--password",
+            "verysecret123",
+            "--data-dir",
+            str(data),
+            "--config-dir",
+            str(config),
+            "--host",
+            "0.0.0.0",
+            "--allow-insecure-bind",
+        ],
+    )
+    assert allowed.exit_code == 0, allowed.output
+
+    # update --check compares semantic versions and does not download.
+    class UpdateResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"tag_name": "v9.9.9", "html_url": "https://example.com/release"}
+
+    monkeypatch.setattr(cli.httpx, "get", lambda *a, **k: UpdateResponse())
+    checked = runner.invoke(app, ["update", "--check"])
+    assert checked.exit_code == 0
+    assert "update available: 9.9.9" in checked.output
+
+    monkeypatch.setattr(
+        cli.httpx,
+        "get",
+        lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("offline")),
+    )
+    assert runner.invoke(app, ["update", "--check"]).exit_code == 4
+
+    import uvicorn
+
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    monkeypatch.setenv("OSTIUM_PUBLIC_UI", "true")
+    public_refused = runner.invoke(app, ["serve"])
+    assert public_refused.exit_code == 6
+    assert "TOTP is not configured" in public_refused.output
+    monkeypatch.setenv("OSTIUM_PUBLIC_UI", "false")
+
+    monkeypatch.setenv("OSTIUM_HOST", "0.0.0.0")
+    allowed_serve = runner.invoke(app, ["serve", "--allow-insecure-bind"])
+    assert allowed_serve.exit_code == 0, allowed_serve.output
+    assert "warning: admin UI" in allowed_serve.output
+
+    forced = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "server",
+            "--no-input",
+            "--force",
+            "--password",
+            "newpassword123",
+            "--domain",
+            "vpn.example.com",
+            "--host",
+            "127.0.0.1",
+        ],
+    )
+    assert forced.exit_code == 0, forced.output
+
+    # A failed core probe restores the previous binary instead of deleting it.
+    core = tmp_path / "data" / "core" / "sing-box"
+    core.parent.mkdir(parents=True, exist_ok=True)
+    core.write_text("old-core")
+    source = tmp_path / "new-core"
+    source.write_text("new-core")
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="bad core"),
+    )
+    failed_install = runner.invoke(app, ["core", "install", "--binary", str(source)])
+    assert failed_install.exit_code == 6
+    assert core.read_text() == "old-core"
+
+    # doctor --fix recreates a missing configuration file and reports fixes.
+    settings_file = tmp_path / "config" / "config.toml"
+    settings_file.unlink(missing_ok=True)
+    monkeypatch.setattr(cli, "_engine_binary", lambda settings: tmp_path / "missing-engine")
+    fixed = runner.invoke(app, ["doctor", "--fix", "--json"])
+    assert settings_file.is_file()
+    assert fixed.exit_code == 1
 
 
 def test_logs_and_doctor(tmp_path: Path, monkeypatch) -> None:
@@ -208,14 +334,17 @@ def test_logs_and_doctor(tmp_path: Path, monkeypatch) -> None:
         "get",
         lambda *a, **k: SimpleNamespace(json=lambda: {"status": "ok"}),
     )
+    absent = tmp_path / "data" / "core" / "absent"
+    monkeypatch.setattr(cli, "_engine_binary", lambda settings: absent)
     result = runner.invoke(app, ["doctor", "--json"])
-    assert result.exit_code == 1  # core binary is absent in the data dir
+    assert result.exit_code == 1
     parsed = json.loads(result.output[result.output.index("{") :])
     assert any(check["id"] == "core_api" for check in parsed["checks"])
 
     engine = tmp_path / "data" / "core" / "sing-box"
     engine.parent.mkdir(parents=True, exist_ok=True)
     engine.write_text("binary")
+    monkeypatch.setattr(cli, "_engine_binary", lambda settings: engine)
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
 
@@ -233,7 +362,12 @@ def test_diagnostics_and_service_commands(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "diag.tar.gz"
     assert runner.invoke(app, ["diagnostics", "export", "--output", str(output)]).exit_code == 0
     with tarfile.open(output) as archive:
-        assert archive.getnames() == ["ostium-diagnostics.json"]
+        assert set(archive.getnames()) == {
+            "ostium-diagnostics.json",
+            "doctor.json",
+            "config.redacted.toml",
+            "ostium.log.tail",
+        }
     assert runner.invoke(app, ["diagnostics", "bad"]).exit_code == 2
 
     monkeypatch.setattr(cli.sys, "platform", "darwin")
@@ -248,7 +382,10 @@ def test_diagnostics_and_service_commands(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(cli.os, "geteuid", lambda: 0)
     monkeypatch.setattr(cli.shutil, "copy2", lambda *a, **k: calls.append("copy"))
-    monkeypatch.setattr(cli.os, "system", lambda command: calls.append(command))
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=""),
+    )
     assert runner.invoke(app, ["service", "install"]).exit_code == 0
     assert calls
 
@@ -276,7 +413,7 @@ def test_core_commands(tmp_path: Path, monkeypatch) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("binary")
     monkeypatch.setattr(
-        "subprocess.run", lambda *a, **k: SimpleNamespace(stdout="1.14.4", stderr="")
+        "subprocess.run", lambda *a, **k: SimpleNamespace(stdout="1.14.4", stderr="", returncode=0)
     )
     assert runner.invoke(app, ["core", "version"]).exit_code == 0
 
@@ -353,6 +490,10 @@ def test_core_commands(tmp_path: Path, monkeypatch) -> None:
 
 def test_core_manifest_install(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout="sing-box 1.14.4", stderr=""),
+    )
 
     archive = io.BytesIO()
     with tarfile.open(fileobj=archive, mode="w:gz") as tar:
@@ -410,43 +551,53 @@ def test_core_manifest_install(tmp_path: Path, monkeypatch) -> None:
 
 def test_user_command_errors_and_rotation(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch)
-    assert runner.invoke(app, ["user", "add", "alice", "--quota", "1G"]).exit_code == 0
-    assert runner.invoke(app, ["user", "add", "alice"]).exit_code == 1  # constraint violation
-    assert runner.invoke(app, ["user", "show", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["user", "disable", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["user", "rotate", "alice", "--subscription"]).exit_code == 0
-    assert runner.invoke(app, ["user", "subscription", "alice", "--rotate"]).exit_code == 0
-    assert runner.invoke(app, ["user", "export", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["user", "quota", "alice", "--quota", "2M"]).exit_code == 0
+
+    def run(*args: str, **kwargs):
+        return runner.invoke(app, ["--allow-degraded", *args], **kwargs)
+
+    assert run("user", "add", "alice", "--quota", "1G").exit_code == 0
+    assert run("user", "add", "alice").exit_code == 1  # constraint violation
+    assert run("user", "show", "missing").exit_code == 1
+    assert run("user", "disable", "missing").exit_code == 1
+    assert run("user", "rotate", "alice", "--subscription").exit_code == 0
+    assert run("user", "subscription", "alice", "--rotate").exit_code == 0
+    assert run("user", "export", "missing").exit_code == 1
+    assert run("user", "quota", "alice", "--quota", "2M").exit_code == 0
 
     # Declining the destructive confirmation aborts with a non-zero exit.
-    assert runner.invoke(app, ["user", "remove", "alice"], input="n\n").exit_code == 1
-    assert runner.invoke(app, ["user", "remove", "alice", "--yes"]).exit_code == 0
+    assert run("user", "remove", "alice", input="n\n").exit_code == 1
+    assert run("user", "remove", "alice", "--yes").exit_code == 0
 
 
 def test_profile_url_import_refresh_and_errors(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch, role="client")
+    monkeypatch.setattr(
+        "socket.getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))],
+    )
+
+    def run(*args: str, **kwargs):
+        return runner.invoke(app, ["--allow-degraded", *args], **kwargs)
+
     with respx.mock:
         respx.get("https://sub.example.com/list").mock(return_value=httpx.Response(200, text=VLESS))
         respx.post("http://127.0.0.1:8788/v1/apply").mock(
             return_value=httpx.Response(200, json={"running": True})
         )
-        imported = runner.invoke(
-            app, ["profile", "import", "https://sub.example.com/list", "--name", "HK"]
-        )
+        imported = run("profile", "import", "https://sub.example.com/list", "--name", "HK")
     assert imported.exit_code == 0, imported.output
-    assert runner.invoke(app, ["profile", "list", "--json"]).exit_code == 0
+    assert run("profile", "list", "--json").exit_code == 0
 
     with respx.mock:
         respx.get("https://sub.example.com/list").mock(return_value=httpx.Response(200, text=VLESS))
         respx.post("http://127.0.0.1:8788/v1/apply").mock(
             return_value=httpx.Response(200, json={"running": True})
         )
-        assert runner.invoke(app, ["profile", "refresh", "HK"]).exit_code == 0
+        assert run("profile", "refresh", "HK").exit_code == 0
 
-    assert runner.invoke(app, ["profile", "refresh", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["profile", "remove", "missing", "--yes"]).exit_code == 1
-    assert runner.invoke(app, ["profile", "remove", "HK"], input="n\n").exit_code == 1
+    assert run("profile", "refresh", "missing").exit_code == 1
+    assert run("profile", "remove", "missing", "--yes").exit_code == 1
+    assert run("profile", "remove", "HK", input="n\n").exit_code == 1
 
     literal = runner.invoke(app, ["profile", "import", VLESS, "--name", "literal"])
     assert literal.exit_code == 0
@@ -662,11 +813,15 @@ def test_api_helper_paths(tmp_path: Path, monkeypatch) -> None:
 
 def test_user_not_found_branches(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch)
-    assert runner.invoke(app, ["user", "rotate", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["user", "quota", "missing", "--quota", "1G"]).exit_code == 1
-    assert runner.invoke(app, ["user", "subscription", "missing"]).exit_code == 1
-    assert runner.invoke(app, ["user", "add", "alice", "--json"]).exit_code == 0
-    assert '"user": "bob"' in runner.invoke(app, ["user", "add", "bob", "--json"]).output
+
+    def run(*args: str, **kwargs):
+        return runner.invoke(app, ["--allow-degraded", *args], **kwargs)
+
+    assert run("user", "rotate", "missing").exit_code == 1
+    assert run("user", "quota", "missing", "--quota", "1G").exit_code == 1
+    assert run("user", "subscription", "missing").exit_code == 1
+    assert run("user", "add", "alice", "--json").exit_code == 0
+    assert '"user": "bob"' in run("user", "add", "bob", "--json").output
 
     import sqlite3
 
@@ -674,7 +829,7 @@ def test_user_not_found_branches(tmp_path: Path, monkeypatch) -> None:
     with sqlite3.connect(db) as connection:
         connection.execute("UPDATE proxy_users SET subscription_token_enc=NULL WHERE name='alice'")
         connection.commit()
-    assert runner.invoke(app, ["user", "subscription", "alice"]).exit_code == 0
+    assert run("user", "subscription", "alice").exit_code == 0
 
 
 def test_logs_core_missing_and_journalctl(tmp_path: Path, monkeypatch) -> None:
@@ -695,6 +850,10 @@ def test_logs_core_missing_and_journalctl(tmp_path: Path, monkeypatch) -> None:
 
 def test_core_manifest_url_version_and_bad_archive(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout="sing-box 1.14.4", stderr=""),
+    )
     monkeypatch.setattr(cli.platform, "system", lambda: "Linux")
     monkeypatch.setattr(cli.platform, "machine", lambda: "x86_64")
 
@@ -779,7 +938,7 @@ def test_service_uninstall_success(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli.os, "geteuid", lambda: 0)
 
     unlinked: list[tuple[str, str]] = []
-    system_calls: list[str] = []
+    system_calls: list[list[str]] = []
 
     class FakePath:
         def __init__(self, *parts: str) -> None:
@@ -789,11 +948,16 @@ def test_service_uninstall_success(tmp_path: Path, monkeypatch) -> None:
             unlinked.append(self.parts)
 
     monkeypatch.setattr(cli, "Path", FakePath)
-    monkeypatch.setattr(cli.os, "system", lambda command: system_calls.append(command))
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: (
+            system_calls.append(list(a[0])) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        ),
+    )
     result = runner.invoke(app, ["service", "uninstall"])
     assert result.exit_code == 0
     assert len(unlinked) == 2
-    assert system_calls == ["systemctl daemon-reload"]
+    assert system_calls == [["systemctl", "daemon-reload"]]
 
 
 def test_cli_module_main_guard(monkeypatch) -> None:

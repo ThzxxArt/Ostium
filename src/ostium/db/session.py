@@ -1,13 +1,16 @@
-"""Async engine/session factory and schema bootstrap."""
+"""Async engine/session factory and schema migration bootstrap."""
 
 from __future__ import annotations
 
 import os
+import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from sqlalchemy import event
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -18,6 +21,12 @@ from sqlalchemy.ext.asyncio import (
 from ostium.db.base import Base
 
 INITIAL_REVISION = "8c9f85297917"
+# Keep this in sync with the newest file under ``alembic/versions``.
+SCHEMA_HEAD = INITIAL_REVISION
+
+
+class DatabaseVersionError(RuntimeError):
+    """The database was created by a newer Ostium release."""
 
 
 def database_url(path: Path) -> str:
@@ -50,19 +59,106 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     return async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
+def _migrations_dir() -> Path:
+    """Locate the packaged Alembic environment (wheel) or the repo checkout."""
+
+    candidates = [
+        Path(__file__).resolve().parent / "alembic",
+        Path(__file__).resolve().parents[3] / "alembic",
+    ]
+    for candidate in candidates:
+        if (candidate / "env.py").is_file():
+            return candidate
+    raise RuntimeError("Ostium database migrations are not bundled with this installation")
+
+
+def _alembic_config(db_path: Path) -> Config:
+    config = Config()
+    config.set_main_option("script_location", str(_migrations_dir()))
+    config.attributes["database_url"] = f"sqlite:///{db_path}"
+    return config
+
+
+def _read_version(db_path: Path) -> str | None:
+    if not db_path.is_file():
+        return None
+    try:
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute("SELECT version_num FROM alembic_version LIMIT 1").fetchone()
+            return str(row[0]) if row else None
+    except sqlite3.DatabaseError:
+        return None
+
+
+def _has_tables(db_path: Path) -> bool:
+    if not db_path.is_file():
+        return False
+    try:
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='admin_users'"
+            ).fetchone()
+            return row is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _check_version(db_path: Path) -> None:
+    version = _read_version(db_path)
+    if version is not None and version > SCHEMA_HEAD:
+        raise DatabaseVersionError(
+            f"database schema revision {version} is newer than this Ostium build "
+            f"({SCHEMA_HEAD}); upgrade Ostium or restore a compatible backup"
+        )
+
+
+def migrate_database(db_path: Path) -> None:
+    """Run Alembic ``upgrade head`` synchronously.
+
+    Called before the app opens the database, so blocking briefly is preferable
+    to serving requests against an unmigrated schema.  The Alembic environment
+    is synchronous to avoid nested event loops.
+    """
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    _check_version(db_path)
+    command.upgrade(_alembic_config(db_path), "head")
+
+
 async def create_schema(engine: AsyncEngine) -> None:
     from ostium.db import models  # noqa: F401 - register mappers before create_all
 
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-        await connection.exec_driver_sql(
-            "CREATE TABLE IF NOT EXISTS alembic_version "
-            "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
-        )
-        await connection.exec_driver_sql(
-            "INSERT OR IGNORE INTO alembic_version(version_num) VALUES (?)",
-            (INITIAL_REVISION,),
-        )
+    raw_path = engine.url.database
+    if not raw_path:
+        raise RuntimeError("the database URL does not contain a file path")
+    db_path = Path(str(raw_path))
+    fresh = not _has_tables(db_path)
+    if fresh:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+            names = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
+            if "alembic_version" not in names:
+                await connection.exec_driver_sql(
+                    "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+                )
+            await connection.exec_driver_sql(
+                "INSERT OR IGNORE INTO alembic_version(version_num) VALUES (?)",
+                (SCHEMA_HEAD,),
+            )
+        return
+    _check_version(db_path)
+    migrate_database(db_path)
+
+
+def check_database_integrity(path: Path) -> None:
+    """Raise when SQLite reports corruption; used before backup/restore swaps."""
+
+    if not path.is_file():
+        raise RuntimeError(f"database does not exist: {path}")
+    with sqlite3.connect(path) as connection:
+        row = connection.execute("PRAGMA integrity_check").fetchone()
+        if row is None or str(row[0]).lower() != "ok":
+            raise RuntimeError(f"SQLite integrity check failed: {row[0] if row else 'no result'}")
 
 
 @asynccontextmanager

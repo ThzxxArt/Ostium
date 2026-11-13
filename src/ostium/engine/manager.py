@@ -21,6 +21,7 @@ from ostium.engine.singbox.config import (
     build_client_config,
     build_server_config,
     config_digest,
+    namespace_endpoint_tags,
 )
 from ostium.services.crypto import SecretStore
 from ostium.services.events import EventBus
@@ -132,19 +133,21 @@ class EngineManager:
             for user in users
         ]
         certs = (await session.execute(select(Certificate))).scalars().all()
-        ready = [
-            cert
+        ready = {
+            cert.id: cert
             for cert in certs
-            if cert.status == "ready" and cert.expires_at and as_utc(cert.expires_at) > utcnow()
-        ]
+            if cert.status == "ready"
+            and cert.expires_at is not None
+            and as_utc(cert.expires_at) > utcnow()
+        }
         inbound_rows = (await session.execute(select(Inbound))).scalars().all()
         inbounds: list[ServerInbound] = []
         for inbound in inbound_rows:
             params = inbound_params(inbound, self.store)
-            certificate = next(
-                (cert for cert in ready if cert.id == inbound.certificate_id),
-                ready[0] if ready else None,
-            )
+            # Certificates are bound per inbound.  Never fall back to an
+            # arbitrary ready certificate: that silently serves a mismatched
+            # domain and breaks client verification.
+            certificate = ready.get(inbound.certificate_id or "")
             reality = None
             if inbound.kind == "vless" and params.get("private_key"):
                 reality = RealitySpec(
@@ -176,6 +179,7 @@ class EngineManager:
             users=credentials,
             clash_secret=self._clash_secret(),
             log_level=self.settings.log_level,
+            block_private_egress=self.settings.block_private_egress,
             enable_v2ray_api=True,
         )
 
@@ -189,6 +193,7 @@ class EngineManager:
         routing_mode: str | None = None,
     ) -> ClientConfigSpec:
         from ostium.services.profiles import endpoints_from_profile
+        from ostium.services.settings import get_setting
 
         profiles = (
             (
@@ -199,15 +204,25 @@ class EngineManager:
             .scalars()
             .all()
         )
-        endpoints = []
-        for profile in profiles:
-            endpoints.extend(endpoints_from_profile(profile, self.store))
+        active_profile_id = await get_setting(session, "active_profile_id")
+        if isinstance(active_profile_id, str) and active_profile_id:
+            profiles = [profile for profile in profiles if profile.id == active_profile_id]
+        if not profiles:
+            raise EngineError("no client profile is configured", "no_profile", 400)
+        groups = [
+            (profile.name, endpoints_from_profile(profile, self.store)) for profile in profiles
+        ]
+        endpoints, tag_mapping = namespace_endpoint_tags(groups)
         if not endpoints:
             raise EngineError("no client profile is configured", "no_profile", 400)
         chosen = selected
         if chosen is None:
-            active = next((profile for profile in profiles if profile.selected_endpoint), None)
-            chosen = active.selected_endpoint if active else None
+            source = next((profile for profile in profiles if profile.selected_endpoint), None)
+            if source is not None and source.selected_endpoint:
+                chosen = tag_mapping.get((source.name, source.selected_endpoint))
+        tags = {endpoint.tag for endpoint in endpoints}
+        if chosen is not None and chosen not in tags:
+            chosen = None
         rules = (
             (
                 await session.execute(
@@ -224,8 +239,6 @@ class EngineManager:
         )
         effective_mode = mode or self.settings.mode.value
         effective_tun = self.settings.tun_enabled if tun_enabled is None else tun_enabled
-        from ostium.services.settings import get_setting
-
         stored_routing = await get_setting(session, "routing_mode", "smart")
         return ClientConfigSpec(
             endpoints=endpoints,
@@ -247,6 +260,8 @@ class EngineManager:
             tun=ClientTunSpec(
                 enabled=effective_tun,
                 interface_name=self.settings.tun_interface,
+                mtu=self.settings.tun_mtu,
+                stack=self.settings.tun_stack,
             ),
             clash_secret=self._clash_secret(),
             log_level=self.settings.log_level,

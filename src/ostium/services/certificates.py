@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
-import hashlib
 import ipaddress
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -140,7 +139,8 @@ async def import_manual(
 ) -> Certificate:
     domain = validate_domain(domain)
     try:
-        certificate = x509.load_pem_x509_certificate(cert_pem.encode())
+        certificates = x509.load_pem_x509_certificates(cert_pem.encode())
+        certificate = certificates[0]
         key = serialization.load_pem_private_key(key_pem.encode(), password=None)
     except Exception as exc:
         raise CertificateError("certificate or private key is not valid PEM") from exc
@@ -157,6 +157,9 @@ async def import_manual(
     expires = as_utc(certificate.not_valid_after_utc)
     if expires <= utcnow():
         raise CertificateError("certificate has already expired")
+    if as_utc(certificate.not_valid_before_utc) > utcnow():
+        raise CertificateError("certificate is not valid yet")
+    _verify_chain(certificates)
     return await _persist(
         session,
         settings,
@@ -167,6 +170,36 @@ async def import_manual(
         source=source,
         expires_at=expires,
     )
+
+
+def _verify_chain(certificates: list[x509.Certificate]) -> None:
+    """Verify ordering/signatures when an uploaded PEM contains a chain."""
+
+    for index, certificate in enumerate(certificates):
+        if as_utc(certificate.not_valid_after_utc) <= utcnow():
+            raise CertificateError(f"certificate chain entry {index + 1} has already expired")
+        if index + 1 >= len(certificates):
+            break
+        issuer = certificates[index + 1]
+        if certificate.issuer != issuer.subject:
+            raise CertificateError(
+                "certificate chain is out of order or contains an unrelated issuer"
+            )
+        try:
+            verifier = cast(Any, issuer.public_key())
+            parameters = certificate.signature_algorithm_parameters
+            if parameters is None:
+                verifier.verify(certificate.signature, certificate.tbs_certificate_bytes)
+            else:
+                verifier.verify(
+                    certificate.signature,
+                    certificate.tbs_certificate_bytes,
+                    parameters,
+                )
+        except Exception as exc:
+            raise CertificateError(
+                f"certificate chain signature verification failed at entry {index + 1}"
+            ) from exc
 
 
 def _covers_domain(certificate: x509.Certificate, domain: str) -> bool:
@@ -243,13 +276,67 @@ async def list_certificates(session: AsyncSession) -> list[Certificate]:
 async def use_for_inbounds(
     session: AsyncSession, certificate: Certificate, *, kinds: list[str] | None = None
 ) -> None:
-    targets = kinds or ["hysteria2", "trojan"]
+    allowed = {"hysteria2", "trojan"}
+    targets = kinds or sorted(allowed)
+    unknown = set(targets) - allowed
+    if unknown:
+        raise CertificateError(
+            f"certificate assignment is not supported for: {sorted(unknown)}", "bad_request"
+        )
+    if certificate.status != "ready" or certificate.expires_at is None:
+        raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
     inbounds = (
         (await session.execute(select(Inbound).where(Inbound.kind.in_(targets)))).scalars().all()
     )
     for inbound in inbounds:
         inbound.certificate_id = certificate.id
     await session.flush()
+
+
+async def use_for_unbound(
+    session: AsyncSession, certificate: Certificate, *, kinds: list[str] | None = None
+) -> None:
+    """Assign a certificate only to TLS inbounds that have none yet."""
+
+    allowed = {"hysteria2", "trojan"}
+    targets = kinds or sorted(allowed)
+    if certificate.status != "ready" or certificate.expires_at is None:
+        raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
+    inbounds = (
+        (
+            await session.execute(
+                select(Inbound).where(Inbound.kind.in_(targets), Inbound.certificate_id.is_(None))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for inbound in inbounds:
+        inbound.certificate_id = certificate.id
+    await session.flush()
+
+
+def certificate_is_ready(certificate: Certificate) -> bool:
+    return (
+        certificate.status == "ready"
+        and certificate.expires_at is not None
+        and as_utc(certificate.expires_at) > utcnow()
+    )
+
+
+async def select_ready_certificate(
+    session: AsyncSession, certificate_id: str | None
+) -> Certificate | None:
+    """Return exactly the certificate bound to an inbound, if it is usable."""
+
+    if not certificate_id:
+        return None
+    certificate = await session.get(Certificate, certificate_id)
+    if certificate is None or not certificate_is_ready(certificate):
+        return None
+    if not (Path(certificate.cert_path).is_file() and Path(certificate.key_path).is_file()):
+        return None
+    return certificate
 
 
 async def delete_certificate(session: AsyncSession, certificate: Certificate) -> None:
@@ -261,8 +348,19 @@ async def delete_certificate(session: AsyncSession, certificate: Certificate) ->
     for inbound in inbounds:
         inbound.enabled = False
         inbound.certificate_id = None
+    paths = [Path(certificate.cert_path), Path(certificate.key_path)]
     await session.delete(certificate)
     await session.flush()
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            continue
+        parent = path.parent
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
 
 
 def certificate_pin_sha256(cert_path: str) -> str | None:
@@ -270,24 +368,24 @@ def certificate_pin_sha256(cert_path: str) -> str | None:
         certificate = x509.load_pem_x509_certificate(Path(cert_path).read_bytes())
     except Exception:
         return None
-    der = certificate.public_key().public_bytes(
-        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return hashlib.sha256(der).hexdigest()
+    return certificate.fingerprint(hashes.SHA256()).hex()
 
 
 def serialize_certificate(certificate: Certificate) -> dict[str, Any]:
+    expires = as_utc(certificate.expires_at) if certificate.expires_at else None
+    status = certificate.status
+    if expires is not None and expires <= utcnow():
+        status = "expired"
     return {
         "id": certificate.id,
         "domain": certificate.domain,
         "issuer": certificate.issuer,
         "expires_at": iso(certificate.expires_at),
         "auto_renew": certificate.auto_renew,
-        "status": certificate.status,
+        "status": status,
+        "stored_status": certificate.status,
         "source": certificate.source,
         "last_error": certificate.last_error,
         "created_at": iso(certificate.created_at),
-        "days_remaining": (
-            (as_utc(certificate.expires_at) - utcnow()).days if certificate.expires_at else None
-        ),
+        "days_remaining": ((expires - utcnow()).days if expires else None),
     }

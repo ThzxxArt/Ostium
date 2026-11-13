@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ostium.api.deps import Services, client_ip, get_services, get_session
 from ostium.api.ratelimit import LIMITER
 from ostium.services.subscriptions import SubscriptionInactive, render_subscription
-from ostium.services.users import get_user_by_subscription_token
+from ostium.services.users import UserError, get_user_by_subscription_token
 
 router = APIRouter(tags=["subscriptions"])
 
@@ -38,6 +38,13 @@ async def subscription(
         content, media_type = await render_subscription(session, services.store, user, fmt)
     except SubscriptionInactive:
         return Response(status_code=403, content=b"subscription inactive", media_type="text/plain")
+    except UserError as exc:
+        status = 403 if exc.code == "subscription_inactive" else 400
+        return Response(
+            status_code=status,
+            content=str(exc).encode(),
+            media_type="text/plain",
+        )
     headers = {
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",

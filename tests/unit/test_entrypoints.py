@@ -26,7 +26,7 @@ def test_windows_service_paths_are_machine_scoped(tmp_path) -> None:  # type: ig
         program_data=tmp_path / "ProgramData",
         install_dir=tmp_path / "Program Files" / "Ostium",
     )
-    assert data_dir == tmp_path / "ProgramData" / "Ostium"
+    assert data_dir == tmp_path / "ProgramData" / "OstiumCore"
     assert config_file == tmp_path / "Program Files" / "Ostium" / "service" / "core.toml"
 
 
@@ -41,7 +41,7 @@ def test_windows_service_paths_from_environment_and_frozen_executable(
     monkeypatch.setenv("PROGRAMFILES", str(tmp_path / "Program Files"))
     monkeypatch.delattr(sys, "frozen", raising=False)
     data_dir, config_file = service_paths()
-    assert data_dir == tmp_path / "ProgramData" / "Ostium"
+    assert data_dir == tmp_path / "ProgramData" / "OstiumCore"
     assert config_file == tmp_path / "Program Files" / "Ostium" / "service" / "core.toml"
 
     monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -51,7 +51,7 @@ def test_windows_service_paths_from_environment_and_frozen_executable(
         str(tmp_path / "Program Files" / "Ostium" / "service" / "ostium-service.exe"),
     )
     data_dir, config_file = service_paths()
-    assert data_dir == tmp_path / "ProgramData" / "Ostium"
+    assert data_dir == tmp_path / "ProgramData" / "OstiumCore"
     assert config_file == tmp_path / "Program Files" / "Ostium" / "service" / "core.toml"
 
 

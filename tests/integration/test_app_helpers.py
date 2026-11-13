@@ -294,7 +294,7 @@ def test_housekeeping_cleans_expired_rows_and_alerts(tmp_path: Path, monkeypatch
     with TestClient(app) as client:
         services = app.state.services
         now = utcnow()
-        old = (now - timedelta(days=2)).isoformat()
+        old = (now - timedelta(days=10)).isoformat()
         _sql(
             settings,
             "INSERT INTO sessions "

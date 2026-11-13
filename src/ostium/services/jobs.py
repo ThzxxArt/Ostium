@@ -93,10 +93,9 @@ class JobManager:
     async def cancel(self, job_id: str) -> bool:
         context = self._contexts.get(job_id)
         if context is not None:
+            # Cooperative cancellation: the job decides where it is safe to
+            # stop.  Killing the task mid-write can leave partial files.
             context.request_cancel()
-            task = self._tasks.get(job_id)
-            if task is not None:
-                task.cancel()
             return True
         async with self.session_factory() as session:
             job = await session.get(Job, job_id)
@@ -164,7 +163,7 @@ async def recover_jobs(session_factory: async_sessionmaker[AsyncSession]) -> int
     async with session_factory() as session:
         result = await session.execute(
             update(Job)
-            .where(Job.status == "running")
+            .where(Job.status.in_(("running", "queued")))
             .values(status="interrupted", finished_at=utcnow())
         )
         await session.commit()

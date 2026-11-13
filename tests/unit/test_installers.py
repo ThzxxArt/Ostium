@@ -45,6 +45,37 @@ def test_release_bundles_include_license_and_sbom() -> None:
     assert 'foreach ($doc in @("LICENSE", "SBOM.txt"))' in windows
 
 
+def test_installers_default_to_loopback_and_require_insecure_opt_in() -> None:
+    install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+    online = (ROOT / "scripts" / "install-online.sh").read_text(encoding="utf-8")
+    assert 'UI_HOST="${OSTIUM_UI_HOST:-127.0.0.1}"' in install
+    assert "--allow-insecure-bind" in install
+    assert "allow_insecure_bind = $ALLOW_INSECURE_BIND" in install
+    assert "--allow-insecure-bind" in online
+    assert "ALLOW_INSECURE_BIND" in online
+    assert "0.0.0.0 已收敛为 127.0.0.1" in install
+
+
+def test_linux_uninstall_restores_proxy_and_preserves_data_by_default() -> None:
+    install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+    assert "--uninstall" in install
+    assert "--purge" in install
+    assert "proxy off" in install
+    assert 'rm -rf "$DATA" "$CONFIG" "$PREFIX" "$CLIENT_DATA" "$CLIENT_UI_DATA"' in install
+    assert "Ostium 程序与服务已移除；数据保留在" in install
+
+
+def test_release_workflow_publishes_all_platform_assets_immutably() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "overwrite_files: false" in workflow
+    assert "macos-dmg" in workflow
+    assert "linux-packages" in workflow
+    assert "build-linux-packages.sh" in workflow
+    assert "build-sbom.py" in workflow
+    assert "ostium-sbom.cdx.json" in workflow
+    assert "npx playwright test" in workflow
+
+
 def test_core_checksum_file_is_download_friendly() -> None:
     script = (ROOT / "scripts" / "build-core.sh").read_text(encoding="utf-8")
     assert '(cd "$OUT_DIR" && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")' in script

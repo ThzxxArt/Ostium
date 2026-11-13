@@ -53,7 +53,7 @@ def test_parse_errors() -> None:
         parse_subscription_text('{"endpoints":')
     with pytest.raises(ProfileError, match="does not contain"):
         parse_subscription_text('{"something": true}')
-    with pytest.raises(ProfileError, match="no supported proxy URI"):
+    with pytest.raises(ProfileError, match="unsupported entries"):
         parse_subscription_text("vmess://abc")
     assert parse_subscription_text("\n# comment\n" + VLESS).__len__() == 1
 

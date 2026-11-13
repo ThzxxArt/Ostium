@@ -1,4 +1,4 @@
-"""Rule matching and remote rule-set updates."""
+"""Rule matching, validation and remote rule-set updates."""
 
 from __future__ import annotations
 
@@ -14,6 +14,110 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ostium.config import Settings
 from ostium.db.models import RuleSet
 from ostium.util.time import utcnow
+
+RULE_MATCH_KEYS = {
+    "domain",
+    "domain_suffix",
+    "domain_keyword",
+    "domain_regex",
+    "ip_cidr",
+    "port",
+    "source_port",
+    "process_name",
+    "rule_set",
+    "network",
+    "protocol",
+}
+RULE_SET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+MAX_RULE_SET_BYTES = 32 * 1024 * 1024
+
+
+class RuleValidationError(ValueError):
+    """A rule or rule-set reference is invalid."""
+
+
+def validate_rule_match(
+    match: dict[str, Any], *, defined_rule_sets: set[str] | None = None
+) -> dict[str, Any]:
+    if not isinstance(match, dict) or not match:
+        raise RuleValidationError("a rule must contain at least one match condition")
+    unknown = set(match) - RULE_MATCH_KEYS
+    if unknown:
+        raise RuleValidationError(f"unknown match keys: {sorted(unknown)}")
+    normalized: dict[str, Any] = {}
+    for key, value in match.items():
+        if key in {"domain", "domain_suffix", "domain_keyword", "domain_regex"}:
+            values = _string_list(value, key)
+            if key == "domain_regex":
+                for pattern in values:
+                    try:
+                        re.compile(pattern)
+                    except re.error as exc:
+                        raise RuleValidationError(
+                            f"invalid domain_regex {pattern!r}: {exc}"
+                        ) from exc
+            normalized[key] = values
+        elif key == "ip_cidr":
+            values = _string_list(value, key)
+            for cidr in values:
+                try:
+                    ipaddress.ip_network(cidr, strict=False)
+                except ValueError as exc:
+                    raise RuleValidationError(f"invalid ip_cidr {cidr!r}") from exc
+            normalized[key] = values
+        elif key in {"port", "source_port"}:
+            ports = _int_list(value, key)
+            for port in ports:
+                if not 1 <= port <= 65535:
+                    raise RuleValidationError(f"{key} must be between 1 and 65535")
+            normalized[key] = ports
+        elif key == "network":
+            values = _string_list(value, key)
+            if any(item not in {"tcp", "udp"} for item in values):
+                raise RuleValidationError("network must be tcp or udp")
+            normalized[key] = values
+        elif key == "rule_set":
+            values = _string_list(value, key)
+            if defined_rule_sets is not None:
+                missing = [item for item in values if item not in defined_rule_sets]
+                if missing:
+                    raise RuleValidationError(f"undefined rule_set references: {missing}")
+            normalized[key] = values
+        else:
+            normalized[key] = _string_list(value, key)
+    return normalized
+
+
+def _string_list(value: Any, key: str) -> list[str]:
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not value:
+        raise RuleValidationError(f"{key} must be a non-empty list")
+    result: list[str] = []
+    for item in value:
+        text = str(item).strip()
+        if not text or len(text) > 500:
+            raise RuleValidationError(f"{key} contains an empty or oversized value")
+        result.append(text)
+    return result
+
+
+def _int_list(value: Any, key: str) -> list[int]:
+    if not isinstance(value, list) or not value:
+        raise RuleValidationError(f"{key} must be a non-empty list")
+    try:
+        return [int(item) for item in value]
+    except (TypeError, ValueError) as exc:
+        raise RuleValidationError(f"{key} must contain integers") from exc
+
+
+def validate_rule_set_name(name: str) -> str:
+    value = name.strip()
+    if not RULE_SET_NAME_RE.fullmatch(value) or value in {".", ".."}:
+        raise RuleValidationError(
+            "rule set names may only contain letters, digits, dot, dash and underscore"
+        )
+    return value
 
 
 def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
@@ -77,9 +181,14 @@ def evaluate(rules: list[dict[str, Any]], target: dict[str, Any]) -> dict[str, A
 async def update_rule_set(
     session: AsyncSession, settings: Settings, rule_set: RuleSet
 ) -> dict[str, Any]:
-    target_dir = settings.paths.rulesets_dir
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / f"{rule_set.name}.srs"
+    target_dir = (settings.paths.rulesets_dir / f"{rule_set.id}.srs").resolve()
+    root = settings.paths.rulesets_dir.resolve()
+    try:
+        target_dir.relative_to(root)
+    except ValueError as exc:
+        raise RuleValidationError("rule set path escapes the rules directory") from exc
+    root.mkdir(parents=True, exist_ok=True)
+    target = target_dir
     try:
         async with httpx.AsyncClient(
             timeout=30.0,
@@ -97,6 +206,10 @@ async def update_rule_set(
                 return {"updated": False, "reason": "not_modified"}
             response.raise_for_status()
         payload = response.content
+        if len(payload) > MAX_RULE_SET_BYTES:
+            rule_set.last_error = "rule set exceeds the 32 MiB size limit"
+            await session.flush()
+            return {"updated": False, "error": rule_set.last_error}
         digest = hashlib.sha256(payload).hexdigest()
         temp = target.with_suffix(".srs.tmp")
         temp.write_bytes(payload)
@@ -129,5 +242,14 @@ def serialize_rule_set(rule_set: RuleSet) -> dict[str, Any]:
 
 
 def path_for(settings: Settings, name: str) -> Path | None:
-    candidate = settings.paths.rulesets_dir / f"{name}.srs"
+    try:
+        safe = validate_rule_set_name(name)
+    except RuleValidationError:
+        return None
+    root = settings.paths.rulesets_dir.resolve()
+    candidate = (root / f"{safe}.srs").resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
     return candidate if candidate.is_file() else None

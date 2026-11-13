@@ -234,8 +234,15 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
                 "shadowsocks",
             }
             hy2 = next(item for item in endpoints if item.protocol.value == "hysteria2")
-            assert hy2.tls.insecure is True
+            assert hy2.tls.insecure is False
+            assert hy2.tls.certificate_pin_sha256
             assert "Display" in hy2.name
+
+            shadowsocks = next(item for item in endpoints if item.protocol.value == "shadowsocks")
+            ss_inbound = next(item for item in inbounds if item.kind == "shadowsocks")
+            server_key = str(inbound_params(ss_inbound, store).get("server_key", ""))
+            assert server_key
+            assert shadowsocks.password == f"{server_key}:{decrypt_ss_password(user, store)}"
 
             cert.source = "acme"
             await session.flush()
@@ -244,6 +251,7 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
             )
             hy2 = next(item for item in endpoints if item.protocol.value == "hysteria2")
             assert hy2.tls.insecure is False
+            assert hy2.tls.certificate_pin_sha256 is None
 
             for inbound in inbounds:
                 inbound.enabled = False

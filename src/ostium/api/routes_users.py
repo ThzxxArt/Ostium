@@ -69,11 +69,10 @@ def _online_names(services: Services) -> set[str]:
     return {str(item["name"]) for item in users if item.get("online")}
 
 
-def _base_url(request: Request, services: Services) -> str:
-    server = services.settings
-    if server.public_ui:
-        return str(request.base_url).rstrip("/")
-    return str(request.base_url).rstrip("/")
+async def _public_base_url(session: AsyncSession, services: Services) -> str:
+    from ostium.services.public_url import public_base_url
+
+    return await public_base_url(session, services.settings)
 
 
 async def _get_user(session: AsyncSession, user_id: str) -> ProxyUser:
@@ -139,7 +138,11 @@ async def add_user(
         detail={"quota_bytes": user.quota_bytes, "quota_cycle": user.quota_cycle},
     )
     data = await subscription_payload(
-        session, services.store, user, base_url=_base_url(request, services), token=token
+        session,
+        services.store,
+        user,
+        base_url=await _public_base_url(session, services),
+        token=token,
     )
     return {
         "user": serialize_user(user),
@@ -296,16 +299,37 @@ async def user_usage(
 async def get_subscription(
     user_id: str,
     request: Request,
-    _: AdminUser = Depends(get_current_admin),
+    reveal: bool = False,
+    admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     token = decrypt_subscription_token(user, services.store)
+    hint = f"{token[:6]}…{token[-4:]}" if token and len(token) > 12 else None
+    if not reveal:
+        return {
+            "user": user.name,
+            "has_token": token is not None,
+            "token_hint": hint,
+            "reveal_required": True,
+            "status": status_of(user),
+        }
     if token is None:
         token = await rotate_subscription(session, services.store, user)
+    await audit(
+        session,
+        actor=admin.username,
+        action="user.subscription_revealed",
+        target=user.name,
+        ip=client_ip(request),
+    )
     data = await subscription_payload(
-        session, services.store, user, base_url=_base_url(request, services), token=token
+        session,
+        services.store,
+        user,
+        base_url=await _public_base_url(session, services),
+        token=token,
     )
     return {"token": token, **data}
 
@@ -328,7 +352,11 @@ async def rotate_user_subscription(
         ip=client_ip(request),
     )
     data = await subscription_payload(
-        session, services.store, user, base_url=_base_url(request, services), token=token
+        session,
+        services.store,
+        user,
+        base_url=await _public_base_url(session, services),
+        token=token,
     )
     return {"token": token, **data}
 
@@ -379,8 +407,26 @@ async def bulk_users(
     if payload.action != "export":
         await session.flush()
         applied = await _apply_server(services, session)
+        exports: list[dict[str, Any]] = []
     else:
         applied = {}
+        exports = []
+        for user in users:
+            endpoints = await endpoints_for_user(
+                session, services.store, user, server_host=await server_hostname(session)
+            )
+            exports.append(
+                {
+                    "user": user.name,
+                    "profile": json.loads(
+                        ProfileDocument(
+                            name=user.name,
+                            generated_at=iso(utcnow()),
+                            endpoints=endpoints,
+                        ).to_json()
+                    ),
+                }
+            )
     await audit(
         session,
         actor=admin.username,
@@ -389,12 +435,11 @@ async def bulk_users(
         ip=client_ip(request),
         detail={"count": len(touched)},
     )
-    return {"count": len(touched), "action": payload.action, **applied}
+    return {"count": len(touched), "action": payload.action, "exports": exports, **applied}
 
 
 @router.get("/subscriptions")
 async def subscriptions_overview(
-    request: Request,
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
@@ -420,4 +465,4 @@ async def subscriptions_overview(
                 ),
             }
         )
-    return {"subscriptions": items, "base_url": _base_url(request, services)}
+    return {"subscriptions": items, "base_url": await _public_base_url(session, services)}

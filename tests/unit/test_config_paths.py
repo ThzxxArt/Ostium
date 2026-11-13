@@ -232,7 +232,8 @@ def test_load_defaults_for_missing_file_and_empty_engine(
 
     loaded = Settings.load()
     assert loaded.role is Role.SERVER
-    assert loaded.host == "0.0.0.0"
+    assert loaded.host == "127.0.0.1"
+    assert loaded.host_migrated is False
     assert loaded.port == 8443
     assert loaded.engine_path == tmp_path / "data" / "core" / (
         "sing-box.exe" if os.name == "nt" else "sing-box"
@@ -349,3 +350,55 @@ def test_paths_accepts_optional_web_dist(tmp_path: Path) -> None:
         rulesets_dir=tmp_path / "d" / "rulesets",
     )
     assert paths.web_dist is None
+
+
+def test_legacy_public_plaintext_bind_is_migrated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        "\n".join(
+            [
+                'role = "server"',
+                'host = "0.0.0.0"',
+                "port = 8443",
+                "public_ui = false",
+                f'data_dir = "{tmp_path / "data"}"',
+                f'config_dir = "{tmp_path / "config"}"',
+                f'state_dir = "{tmp_path / "state"}"',
+            ]
+        )
+    )
+    monkeypatch.setenv("OSTIUM_CONFIG_FILE", str(config_file))
+    monkeypatch.delenv("OSTIUM_HOST", raising=False)
+    loaded = Settings.load()
+    assert loaded.host == "127.0.0.1"
+    assert loaded.host_migrated is True
+    assert loaded.allow_insecure_bind is False
+
+
+def test_legacy_public_bind_can_be_preserved_explicitly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        "\n".join(
+            [
+                'role = "server"',
+                'host = "0.0.0.0"',
+                "port = 8443",
+                "public_ui = false",
+                "allow_insecure_bind = true",
+                f'data_dir = "{tmp_path / "data"}"',
+                f'config_dir = "{tmp_path / "config"}"',
+                f'state_dir = "{tmp_path / "state"}"',
+            ]
+        )
+    )
+    monkeypatch.setenv("OSTIUM_CONFIG_FILE", str(config_file))
+    monkeypatch.delenv("OSTIUM_HOST", raising=False)
+    loaded = Settings.load()
+    assert loaded.host == "0.0.0.0"
+    assert loaded.allow_insecure_bind is True
+    assert loaded.host_migrated is False
+    loaded.validate_bind()

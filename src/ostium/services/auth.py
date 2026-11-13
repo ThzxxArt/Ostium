@@ -65,7 +65,14 @@ class LoginLimiter:
     def key(self, ip: str, username: str) -> str:
         return f"{ip}|{username.lower()}"
 
+    def _cleanup(self) -> None:
+        now = time.monotonic()
+        expired = [key for key, (_, until) in self.failures.items() if until <= now]
+        for key in expired:
+            self.failures.pop(key, None)
+
     def check(self, ip: str, username: str) -> None:
+        self._cleanup()
         record = self.failures.get(self.key(ip, username))
         if record and record[0] >= MAX_FAILURES and time.monotonic() < record[1]:
             raise AuthError("too many failed attempts; try again later", "rate_limited", 429)
@@ -136,7 +143,12 @@ async def authenticate(
         secret = _decrypt_totp(admin, settings)
     if secret and not verify_totp(secret, totp_code or ""):
         if not recovery_code or not consume_recovery_code(admin, recovery_code):
+            admin.failed_attempts += 1
+            if admin.failed_attempts >= MAX_FAILURES:
+                admin.locked_until = utcnow() + timedelta(seconds=LOCK_SECONDS)
+                admin.failed_attempts = 0
             LIMITER.fail(ip, username)
+            await session.flush()
             raise AuthError("a valid TOTP code is required", "totp_required", 401)
     admin.failed_attempts = 0
     admin.locked_until = None
@@ -213,27 +225,68 @@ async def set_password(session: AsyncSession, admin: AdminUser, password: str) -
     await session.flush()
 
 
+async def revoke_other_sessions(
+    session: AsyncSession, admin: AdminUser, current_token: str | None
+) -> int:
+    """Revoke every other session after a password change."""
+
+    keep_hash = hash_token(current_token) if current_token else None
+    rows = (
+        (
+            await session.execute(
+                select(Session).where(Session.admin_id == admin.id, Session.revoked.is_(False))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    revoked = 0
+    for row in rows:
+        if keep_hash is not None and constant_time_equal(row.token_hash, keep_hash):
+            continue
+        row.revoked = True
+        ACTIVITY.pop(row.id, None)
+        revoked += 1
+    await session.flush()
+    return revoked
+
+
 async def check_password(admin: AdminUser, password: str) -> bool:
     return verify_password(password, admin.password_hash)
 
 
+# Pending TOTP enrollments are deliberately kept out of the database until a
+# valid code confirms them; otherwise a user who opens the setup modal and
+# closes it would silently be required to enter a TOTP code at next login.
+_TOTP_PENDING: dict[str, tuple[str, list[str], float]] = {}
+TOTP_PENDING_TTL = 10 * 60
+
+
 def start_totp(admin: AdminUser, settings: Settings) -> tuple[str, str, list[str]]:
     secret = generate_totp_secret()
+    codes = generate_recovery_codes()
+    _TOTP_PENDING[admin.id] = (secret, codes, time.time() + TOTP_PENDING_TTL)
+    return secret, totp_uri(secret, admin.username), codes
+
+
+def cancel_totp(admin: AdminUser) -> None:
+    _TOTP_PENDING.pop(admin.id, None)
+
+
+def confirm_totp(admin: AdminUser, settings: Settings, code: str) -> None:
+    pending = _TOTP_PENDING.get(admin.id)
+    if pending is None or pending[2] <= time.time():
+        _TOTP_PENDING.pop(admin.id, None)
+        raise AuthError("TOTP setup has not started or has expired", "totp_not_started", 400)
+    secret, codes, _expiry = pending
+    if not verify_totp(secret, code):
+        raise AuthError("the TOTP code is not valid", "totp_invalid", 400)
     store = SecretStore.from_data_dir(settings.data_dir)
     admin.totp_secret_enc = store.encrypt(
         secret, table="admin_users", record_id=admin.id, field="totp_secret"
     )
-    codes = generate_recovery_codes()
     admin.recovery_codes_hash = hash_recovery_codes(codes)
-    return secret, totp_uri(secret, admin.username), codes
-
-
-def confirm_totp(admin: AdminUser, settings: Settings, code: str) -> None:
-    if not admin.totp_secret_enc:
-        raise AuthError("TOTP setup has not started", "totp_not_started", 400)
-    secret = _decrypt_totp(admin, settings)
-    if not verify_totp(secret, code):
-        raise AuthError("the TOTP code is not valid", "totp_invalid", 400)
+    _TOTP_PENDING.pop(admin.id, None)
 
 
 async def disable_totp(session: AsyncSession, admin: AdminUser) -> None:
@@ -295,6 +348,14 @@ def new_id_for_tests() -> str:
 
 
 LOCAL_LOGIN_TTL = 300
+_LOCAL_LOGIN_USED: dict[str, float] = {}
+
+
+def _cleanup_local_login() -> None:
+    now = time.time()
+    for key, expiry in list(_LOCAL_LOGIN_USED.items()):
+        if expiry < now:
+            _LOCAL_LOGIN_USED.pop(key, None)
 
 
 def make_local_login_token(settings: Settings) -> str:
@@ -340,3 +401,15 @@ def verify_local_login_token(settings: Settings, token: str) -> bool:
     key = load_or_create_master_key(settings.paths.master_key_path)
     expected = hmac.new(key, payload_bytes, hashlib.sha256).digest()
     return hmac.compare_digest(signature, expected)
+
+
+def consume_local_login_token(settings: Settings, token: str) -> bool:
+    """Verify a local-login token and make it single-use."""
+
+    _cleanup_local_login()
+    if token in _LOCAL_LOGIN_USED:
+        return False
+    if not verify_local_login_token(settings, token):
+        return False
+    _LOCAL_LOGIN_USED[token] = time.time() + LOCAL_LOGIN_TTL
+    return True

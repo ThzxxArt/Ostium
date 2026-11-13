@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -23,7 +24,10 @@ from ostium.engine.singbox.validate import ConfigRejected, validate_config
 
 
 def _engine() -> Path | None:
-    for candidate in (Path("/tmp/opencode/sing-box"), Path("/usr/local/bin/sing-box")):
+    override = os.environ.get("OSTIUM_TEST_ENGINE")
+    candidates = [Path(override)] if override else []
+    candidates += [Path("/tmp/opencode/sing-box"), Path("/usr/local/bin/sing-box")]
+    for candidate in candidates:
         if candidate.is_file():
             return candidate
     return None

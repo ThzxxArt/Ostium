@@ -24,6 +24,8 @@ class IssueRequest(BaseModel):
     domain: str = Field(min_length=1, max_length=253)
     method: Literal["acme", "self-signed"] = "acme"
     auto_renew: bool = True
+    staging: bool | None = None
+    email: str | None = Field(default=None, max_length=254)
 
 
 class UploadRequest(BaseModel):
@@ -35,6 +37,11 @@ class UploadRequest(BaseModel):
 
 class UseRequest(BaseModel):
     kinds: list[str] = Field(default_factory=lambda: ["hysteria2", "trojan"])
+
+
+class RenewRequest(BaseModel):
+    staging: bool | None = None
+    email: str | None = Field(default=None, max_length=254)
 
 
 async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
@@ -76,7 +83,10 @@ async def issue_certificate(
             raise ApiError(exc.status_code, str(exc), exc.code) from exc
         certificate.auto_renew = False
         await session.flush()
-        await cert_service.use_for_inbounds(session, certificate)
+        try:
+            await cert_service.use_for_inbounds(session, certificate)
+        except cert_service.CertificateError as exc:
+            raise ApiError(exc.status_code, str(exc), exc.code) from exc
         applied = await _apply_server(services, session)
         await audit(
             session,
@@ -93,8 +103,13 @@ async def issue_certificate(
     existing = (
         await session.execute(select(Certificate).where(Certificate.domain == domain))
     ).scalar_one_or_none()
+    previous_ready = False
     if existing is not None:
-        existing.status = "pending"
+        previous_ready = cert_service.certificate_is_ready(existing)
+        # Never downgrade a working certificate while a renewal is in flight;
+        # existing clients must keep a valid TLS endpoint if issuance fails.
+        if not previous_ready:
+            existing.status = "pending"
         existing.last_error = None
         existing.auto_renew = payload.auto_renew
         certificate_id = existing.id
@@ -114,33 +129,46 @@ async def issue_certificate(
     await session.commit()
 
     async def job(context: JobContext) -> dict[str, Any]:
-        await context.progress(10, "creating ACME order")
-        issuer = AcmeIssuer(services.settings, services.store)
-        fullchain, key_pem = await issuer.issue(domain)
-        await context.progress(75, "storing certificate")
-        async with services.session_factory() as job_session:
-            cert = await job_session.get(Certificate, certificate_id)
-            if cert is None:
-                raise RuntimeError("certificate row disappeared during issuance")
-            await cert_service.import_manual(
-                job_session,
-                services.settings,
-                domain=domain,
-                cert_pem=fullchain,
-                key_pem=key_pem,
-                source="acme",
+        try:
+            await context.progress(10, "creating ACME order")
+            issuer = AcmeIssuer(services.settings, services.store)
+            fullchain, key_pem = await issuer.issue(
+                domain, staging=payload.staging, email=payload.email
             )
-            cert.auto_renew = payload.auto_renew
-            await cert_service.use_for_inbounds(job_session, cert)
-            await job_session.commit()
-            try:
-                await services.engine.apply_server(job_session)
-            except Exception as exc:
-                services.bus.log(
-                    "warning", "certificate stored but engine apply failed", error=str(exc)
+            await context.progress(75, "storing certificate")
+            async with services.session_factory() as job_session:
+                cert = await job_session.get(Certificate, certificate_id)
+                if cert is None:
+                    raise RuntimeError("certificate row disappeared during issuance")
+                await cert_service.import_manual(
+                    job_session,
+                    services.settings,
+                    domain=domain,
+                    cert_pem=fullchain,
+                    key_pem=key_pem,
+                    source="acme",
                 )
-        await context.progress(100, "certificate ready")
-        return {"domain": domain}
+                cert.auto_renew = payload.auto_renew
+                if not previous_ready:
+                    await cert_service.use_for_unbound(job_session, cert)
+                await job_session.commit()
+                try:
+                    await services.engine.apply_server(job_session)
+                except Exception as exc:
+                    services.bus.log(
+                        "warning", "certificate stored but engine apply failed", error=str(exc)
+                    )
+            await context.progress(100, "certificate ready")
+            return {"domain": domain}
+        except Exception as exc:
+            async with services.session_factory() as failure_session:
+                cert = await failure_session.get(Certificate, certificate_id)
+                if cert is not None:
+                    cert.last_error = str(exc)[:1000]
+                    if not previous_ready:
+                        cert.status = "error"
+                    await failure_session.commit()
+            raise
 
     job_row = await services.jobs.submit(
         "acme.issue", job, message=f"issue certificate for {domain}"
@@ -175,7 +203,10 @@ async def upload_certificate(
     except cert_service.CertificateError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     certificate.auto_renew = payload.auto_renew
-    await cert_service.use_for_inbounds(session, certificate)
+    try:
+        await cert_service.use_for_inbounds(session, certificate)
+    except cert_service.CertificateError as exc:
+        raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_server(services, session)
     await audit(
         session,
@@ -191,6 +222,7 @@ async def upload_certificate(
 async def renew_certificate(
     certificate_id: str,
     request: Request,
+    payload: RenewRequest | None = None,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
@@ -201,27 +233,42 @@ async def renew_certificate(
     if certificate.source != "acme":
         raise ApiError(400, "only ACME certificates can be renewed automatically", "not_acme")
     domain = certificate.domain
+    previous_ready = cert_service.certificate_is_ready(certificate)
 
     async def job(context: JobContext) -> dict[str, Any]:
-        await context.progress(10, "creating ACME order")
-        issuer = AcmeIssuer(services.settings, services.store)
-        fullchain, key_pem = await issuer.issue(domain)
-        await context.progress(80, "storing renewed certificate")
-        async with services.session_factory() as job_session:
-            await cert_service.import_manual(
-                job_session,
-                services.settings,
-                domain=domain,
-                cert_pem=fullchain,
-                key_pem=key_pem,
-                source="acme",
+        try:
+            await context.progress(10, "creating ACME order")
+            issuer = AcmeIssuer(services.settings, services.store)
+            fullchain, key_pem = await issuer.issue(
+                domain,
+                staging=payload.staging if payload else None,
+                email=payload.email if payload else None,
             )
-            await job_session.commit()
-            try:
-                await services.engine.apply_server(job_session)
-            except Exception as exc:
-                services.bus.log("warning", "renewed certificate apply failed", error=str(exc))
-        return {"domain": domain}
+            await context.progress(80, "storing renewed certificate")
+            async with services.session_factory() as job_session:
+                await cert_service.import_manual(
+                    job_session,
+                    services.settings,
+                    domain=domain,
+                    cert_pem=fullchain,
+                    key_pem=key_pem,
+                    source="acme",
+                )
+                await job_session.commit()
+                try:
+                    await services.engine.apply_server(job_session)
+                except Exception as exc:
+                    services.bus.log("warning", "renewed certificate apply failed", error=str(exc))
+            return {"domain": domain}
+        except Exception as exc:
+            async with services.session_factory() as failure_session:
+                cert = await failure_session.get(Certificate, certificate_id)
+                if cert is not None:
+                    cert.last_error = str(exc)[:1000]
+                    if not previous_ready:
+                        cert.status = "error"
+                    await failure_session.commit()
+            raise
 
     row = await services.jobs.submit("acme.renew", job, message=f"renew certificate for {domain}")
     await audit(
@@ -247,7 +294,10 @@ async def use_certificate(
     certificate = await session.get(Certificate, certificate_id)
     if certificate is None:
         raise ApiError(404, "certificate not found", "not_found")
-    await cert_service.use_for_inbounds(session, certificate, kinds=payload.kinds)
+    try:
+        await cert_service.use_for_inbounds(session, certificate, kinds=payload.kinds)
+    except cert_service.CertificateError as exc:
+        raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_server(services, session)
     await audit(
         session,

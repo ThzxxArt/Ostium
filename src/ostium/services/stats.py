@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ostium.db.models import ProxyUser, StatsEpoch, TrafficDaily
@@ -64,6 +64,11 @@ class StatsCollector:
         self._tick = 0
         self._last_error: str | None = None
         self._last_flush = time.monotonic()
+        self._pending_disable: set[str] = set()
+        self._alerted: dict[str, set[int]] = defaultdict(set)
+        self._epochs: dict[str, int] = defaultdict(int)
+        self._epoch_pending: dict[str, int] = {}
+        self._first_enforce = True
 
     async def start(self) -> None:
         if self._task is None:
@@ -71,6 +76,12 @@ class StatsCollector:
             await self.bus.publish("stats.started", {})
 
     async def stop(self) -> None:
+        # Persist traffic sampled since the last flush before cancelling the
+        # loop; otherwise the final interval is silently lost on shutdown.
+        try:
+            await self.flush()
+        except Exception as exc:
+            self.bus.log("warning", "final statistics flush failed", error=str(exc))
         self._stop.set()
         if self._task is not None:
             self._task.cancel()
@@ -115,10 +126,14 @@ class StatsCollector:
                 continue
             delta_up = up - previous[0]
             delta_down = down - previous[1]
-            if delta_up < 0:
-                delta_up = up  # counter reset by SIGHUP; new epoch begins at zero
-            if delta_down < 0:
-                delta_down = down
+            reset = delta_up < 0 or delta_down < 0
+            if reset:
+                # Counter reset by a core restart/reload; the new epoch starts
+                # at zero, so the new sample itself is the first delta.
+                delta_up = max(0, up)
+                delta_down = max(0, down)
+                self._epochs[user.id] += 1
+                self._epoch_pending[user.id] = self._epochs[user.id]
             usage = self.usage.setdefault(user.id, UserUsage(user_id=user.id, name=user.name))
             usage.up += delta_up
             usage.down += delta_down
@@ -183,6 +198,14 @@ class StatsCollector:
                 else:
                     row.uplink += delta.up
                     row.downlink += delta.down
+            for user_id, epoch in self._epoch_pending.items():
+                await session.execute(
+                    update(StatsEpoch)
+                    .where(StatsEpoch.user_id == user_id, StatsEpoch.active.is_(True))
+                    .values(active=False)
+                )
+                session.add(StatsEpoch(user_id=user_id, epoch=epoch, active=True))
+            self._epoch_pending.clear()
             await session.commit()
         self._pending.clear()
         self._last_flush = time.monotonic()
@@ -204,10 +227,20 @@ class StatsCollector:
             )
 
     async def enforce_quotas(self) -> None:
+        from ostium.services.audit import create_alert
+
         to_disable: list[str] = []
+        changed = False
         now = utcnow()
         async with self.session_factory() as session:
             users = (await session.execute(select(ProxyUser))).scalars().all()
+            if self._first_enforce:
+                self._first_enforce = False
+                for user in users:
+                    if not user.enabled and user.disabled_reason in {"quota_exceeded", "expired"}:
+                        # The previous process may have crashed after writing
+                        # the database but before the core accepted the change.
+                        self._pending_disable.add(user.name)
             for user in users:
                 if not user.enabled:
                     continue
@@ -216,28 +249,68 @@ class StatsCollector:
                     if started.year != now.year or started.month != now.month:
                         user.used_bytes = 0
                         user.cycle_started_at = now
+                        changed = True
+                        self._alerted.pop(user.id, None)
+                        self._epochs[user.id] += 1
+                        await session.execute(
+                            update(StatsEpoch)
+                            .where(StatsEpoch.user_id == user.id, StatsEpoch.active.is_(True))
+                            .values(active=False)
+                        )
+                        session.add(
+                            StatsEpoch(user_id=user.id, epoch=self._epochs[user.id], active=True)
+                        )
+                pending = self._pending[user.id]
+                effective = user.used_bytes + pending.up + pending.down
                 if user.expires_at is not None and as_utc(user.expires_at) <= now:
                     user.enabled = False
                     user.disabled_reason = "expired"
                     to_disable.append(user.name)
+                    changed = True
                     continue
-                if user.quota_bytes > 0 and user.used_bytes >= user.quota_bytes:
-                    user.enabled = False
-                    user.disabled_reason = "quota_exceeded"
-                    to_disable.append(user.name)
-            if to_disable:
+                if user.quota_bytes > 0:
+                    ratio = effective / user.quota_bytes
+                    for threshold in (80, 90):
+                        if ratio * 100 >= threshold and threshold not in self._alerted[user.id]:
+                            self._alerted[user.id].add(threshold)
+                            await create_alert(
+                                session,
+                                self.bus,
+                                level="warning" if threshold < 90 else "critical",
+                                code=f"quota_{threshold}",
+                                message=(
+                                    f"user {user.name} has used {ratio * 100:.0f}% of their quota"
+                                ),
+                                dedupe_key=user.name,
+                            )
+                            await self.bus.publish(
+                                "quota.threshold",
+                                {"user": user.name, "percent": threshold},
+                            )
+                    if effective >= user.quota_bytes:
+                        user.enabled = False
+                        user.disabled_reason = "quota_exceeded"
+                        to_disable.append(user.name)
+                        changed = True
+            if changed:
                 await session.commit()
         if to_disable:
+            self._pending_disable.update(to_disable)
             self.bus.log("warning", "users disabled by policy", users=", ".join(to_disable))
             await self.bus.publish("quota.exceeded", {"users": to_disable})
-            await self._disable(to_disable)
+        if self._pending_disable:
+            names = sorted(self._pending_disable)
+            if await self._disable(names):
+                self._pending_disable.difference_update(names)
 
-    async def _disable(self, names: list[str]) -> None:
+    async def _disable(self, names: list[str]) -> bool:
         if self.on_quota is not None:
             try:
                 await self.on_quota(names)
             except Exception as exc:
                 self.bus.log("error", "failed to apply quota configuration", error=str(exc))
+                return False
+        return True
 
     def snapshot(self) -> dict[str, object]:
         users = list(self.usage.values())

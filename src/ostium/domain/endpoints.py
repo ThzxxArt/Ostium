@@ -110,7 +110,7 @@ class Endpoint(BaseModel):
             "insecure": self.tls.insecure,
         }
         if self.tls.certificate_pin_sha256:
-            block["certificate_public_key_sha256"] = self.tls.certificate_pin_sha256
+            block["certificate_sha256"] = self.tls.certificate_pin_sha256
         return {key: value for key, value in block.items() if value is not None}
 
     def to_clash_proxy(self) -> dict[str, Any]:
