@@ -100,6 +100,10 @@ function Install-Ostium([string]$ResolvedVersion) {
 
         $installDir = Join-Path $env:ProgramFiles "Ostium"
         $passwordFile = Join-Path $env:ProgramData "Ostium\initial-password.txt"
+        $service = Get-Service OstiumCore -ErrorAction SilentlyContinue
+        if (-not $service -or $service.Status -ne "Running") {
+            throw "OstiumCore 服务未运行；请检查 ProgramData\Ostium\logs 和 Windows 服务日志。"
+        }
         if (Test-Path $passwordFile) {
             $initialPassword = Get-Content -LiteralPath $passwordFile -Raw
             Write-Host "初始管理员密码：$initialPassword" -ForegroundColor Yellow

@@ -29,9 +29,9 @@
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/ostium-ui.log</string>
+  <string>/Library/Application Support/Ostium UI/logs/ui.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/ostium-ui.log</string>
+  <string>/Library/Application Support/Ostium UI/logs/ui.log</string>
   <key>ProcessType</key>
   <string>Interactive</string>
 </dict>

@@ -351,10 +351,12 @@ def test_client_proxy_and_tun_toggles(client_api: TestClient, fake_proxy: FakePr
         raise EngineError("tun failed", "engine_start_failed", 500)
 
     services.engine.apply_client = fail  # type: ignore[method-assign]
+    fake_proxy.enabled = True
     failed_tun = client_api.post("/api/v1/system/tun", json={"enabled": True}, headers=headers)
     assert failed_tun.status_code == 500
     assert services.settings.tun_enabled is False
     assert services.settings.mode.value == "mixed"
+    assert fake_proxy.enabled is True
 
     failed_untun = client_api.post("/api/v1/system/tun", json={"enabled": False}, headers=headers)
     assert failed_untun.status_code == 500

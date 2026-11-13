@@ -445,13 +445,19 @@ engine_path = "$CLIENT_DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
 mode = "system_proxy"
 EOF
-    chmod 0660 "$CLIENT_CONFIG"
+    chmod 0640 "$CLIENT_CONFIG"
     if [[ "$RUN_AS_ROOT" != "true" ]]; then
       chown root:ostium "$CLIENT_CONFIG"
     fi
   elif [[ ! -f "$CLIENT_CONFIG" ]]; then
     echo "升级模式需要已有配置：$CLIENT_CONFIG" >&2
     exit 1
+  fi
+  # The UI user only needs read access to the privileged core config; group
+  # write would let the UI rewrite engine_path before the core starts.
+  chmod 0640 "$CLIENT_CONFIG" 2>/dev/null || true
+  if [[ "$RUN_AS_ROOT" != "true" ]]; then
+    chown root:ostium "$CLIENT_CONFIG" 2>/dev/null || true
   fi
 
   if [[ ! -f "$UI_CONFIG" ]]; then

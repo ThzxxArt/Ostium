@@ -178,6 +178,38 @@ class KdeProxy(BaseProxy):
             shutil.which("kwriteconfig6") is not None or shutil.which("kwriteconfig5") is not None
         )
 
+    @property
+    def _can_read(self) -> bool:
+        return shutil.which("kreadconfig6") is not None or shutil.which("kreadconfig5") is not None
+
+    def _read(self, key: str) -> str | None:
+        command = shutil.which("kreadconfig6") or shutil.which("kreadconfig5")
+        if not command:
+            return None
+        result = _run([command, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", key])
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip()
+
+    def _delete(self, key: str) -> None:
+        command = shutil.which("kwriteconfig6") or shutil.which("kwriteconfig5")
+        if not command:
+            raise ProxyError("kwriteconfig is not available")
+        result = _run(
+            [
+                command,
+                "--file",
+                "kioslaverc",
+                "--group",
+                "Proxy Settings",
+                "--key",
+                key,
+                "--delete",
+            ]
+        )
+        if result.returncode != 0:
+            raise ProxyError(result.stderr.strip() or f"could not restore KDE proxy {key}")
+
     def _write(self, key: str, value: str) -> None:
         command = shutil.which("kwriteconfig6") or shutil.which("kwriteconfig5")
         if not command:
@@ -190,6 +222,8 @@ class KdeProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
+        keys = ("ProxyType", "httpProxy", "httpsProxy", "socksProxy", "NoProxyFor")
+        original = {key: self._read(key) for key in keys} if self._can_read else {}
         self._write("ProxyType", "1")
         self._write("httpProxy", f"http://{host} {port}")
         self._write("httpsProxy", f"http://{host} {port}")
@@ -202,16 +236,27 @@ class KdeProxy(BaseProxy):
             "enabled": True,
             "host": host,
             "port": port,
+            "original": original,
             "clean_shutdown": False,
         }
         _write_state(self.state_path, state)
         return self.status()
 
     def disable(self) -> dict[str, Any]:
-        self._write("ProxyType", "0")
-        self._notify()
         state = _read_state(self.state_path)
-        state.setdefault(STATE_KEY, {}).update({"enabled": False, "clean_shutdown": True})
+        entry = state.get(STATE_KEY, {})
+        original = entry.get("original") or {}
+        if original:
+            for key, value in original.items():
+                if value is None:
+                    self._delete(key)
+                else:
+                    self._write(key, value)
+        else:
+            self._write("ProxyType", "0")
+        self._notify()
+        entry.update({"enabled": False, "clean_shutdown": True})
+        state[STATE_KEY] = entry
         _write_state(self.state_path, state)
         return self.status()
 
@@ -379,10 +424,20 @@ class WindowsProxy(BaseProxy):
                 winreg.SetValueEx(
                     key, "ProxyServer", 0, winreg.REG_SZ, str(original["ProxyServer"])
                 )
+            else:
+                try:
+                    winreg.DeleteValue(key, "ProxyServer")
+                except FileNotFoundError:
+                    pass
             if original.get("ProxyOverride") is not None:
                 winreg.SetValueEx(
                     key, "ProxyOverride", 0, winreg.REG_SZ, str(original["ProxyOverride"])
                 )
+            else:
+                try:
+                    winreg.DeleteValue(key, "ProxyOverride")
+                except FileNotFoundError:
+                    pass
             if original.get("AutoConfigURL") is not None:
                 winreg.SetValueEx(
                     key, "AutoConfigURL", 0, winreg.REG_SZ, str(original["AutoConfigURL"])

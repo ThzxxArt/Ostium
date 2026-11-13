@@ -8,6 +8,40 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.11.14"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.19.0"
+      - run: uv sync
+      - run: uv run ruff check src tests scripts
+      - run: uv run ruff format --check src tests scripts
+      - run: uv run mypy src/ostium
+      - run: uv run pytest -m "not integration" -q
+      - name: Audit Python dependencies
+        run: |
+          uv export --no-hashes --no-emit-project --all-groups -o /tmp/requirements.txt
+          uv run pip-audit --strict -r /tmp/requirements.txt
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npm audit --registry=https://registry.npmjs.org
+        working-directory: web
+      - run: npm run lint
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm run test
+        working-directory: web
+      - run: npm run format:check
+        working-directory: web
+
   wheel:
     runs-on: ubuntu-24.04
     steps:
@@ -26,7 +60,8 @@ jobs:
         with:
           version: "0.11.14"
       - run: uv build
-      - run: sha256sum dist/* > dist/SHA256SUMS-wheel.txt
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
       - uses: actions/upload-artifact@v7
         with:
           name: wheel
@@ -80,6 +115,7 @@ jobs:
           path: dist/windows/*-setup.exe
 
   docker:
+    needs: verify
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -105,7 +141,7 @@ jobs:
             ghcr.io/thzxxart/ostium:latest
 
   publish:
-    needs: [wheel, core, windows, docker]
+    needs: [verify, wheel, core, windows, docker]
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:
@@ -143,7 +179,14 @@ jobs:
           sha256sum $(find . -type f ! -name SHA256SUMS ! -name '*.sig' ! -path './pypi/*' | sort) > SHA256SUMS
       - uses: actions/attest-build-provenance@v4
         with:
-          subject-path: "dist/**"
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/core/*.tar.gz
+            dist/core/*.sha256
+            dist/core-manifest.json
+            dist/windows/*-setup.exe
+            dist/SHA256SUMS
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/pypi
@@ -151,6 +194,7 @@ jobs:
         with:
           files: |
             dist/*.whl
+            dist/*.tar.gz
             dist/core/*.tar.gz
             dist/core/*.sha256
             dist/core-manifest.json

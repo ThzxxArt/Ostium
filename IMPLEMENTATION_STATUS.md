@@ -101,11 +101,11 @@ platform/external validation, `[ ]` not done yet.
 
 - `ruff check` / `ruff format --check`: pass (136 files).
 - `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 400 passed, 0 skipped, 0 failed, including real sing-box config
+- `pytest`: 403 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 98.29%, branches 95.70%; every module ≥85% and
+- Backend coverage: statements 98.19%, branches 95.48%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
 - Frontend coverage: statements 91.38%, branches 85.27%, functions 89.04%,

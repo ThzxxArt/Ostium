@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.29%25%20statements%20%C2%B7%2095.70%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.19%25%20statements%20%C2%B7%2095.48%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-400%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-403%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 400 backend tests, 137 frontend tests and 21 Playwright tests; 98.29% backend statements / 95.70% branches. |
+| 🧪 **Verified** | 403 backend tests, 137 frontend tests and 21 Playwright tests; 98.19% backend statements / 95.48% branches. |
 
 ---
 
@@ -799,8 +799,8 @@ npx playwright test
 
 Current results:
 
-- Backend: **400 passed / 0 skipped** (394 regular tests + 6 live-engine integration tests),
-  **98.29%** statements / **95.70%** branches.
+- Backend: **403 passed / 0 skipped** (397 regular tests + 6 live-engine integration tests),
+  **98.19%** statements / **95.48%** branches.
 - Frontend: **137 passed**, **91.38%** statements / **85.27%** branches /
   **89.04%** functions / **92.13%** lines.
 - Playwright: **21 passed**, covering 1440/1024/390, dark/light visual baselines,

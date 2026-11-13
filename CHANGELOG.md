@@ -41,7 +41,7 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 400 backend tests, 137 frontend tests
+- Comprehensive audit and coverage suite: 403 backend tests, 137 frontend tests
   and 21 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 
@@ -109,6 +109,9 @@ SemVer.
   use scoped permissions; Docker bakes the actual release version.
 - Third audit: subscription responses support Unicode user names, Windows PAC
   settings are restored, and the PWA cache key now hashes asset contents.
+- Third audit: KDE proxy state is restored/removed correctly, the client core
+  config is read-only to the UI group, and tag releases now run a `verify`
+  job before Docker/PyPI/GitHub publication.
 
 ### Known boundaries
 

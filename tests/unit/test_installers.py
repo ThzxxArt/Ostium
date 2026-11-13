@@ -22,3 +22,5 @@ def test_installers_reject_conflicting_tls_and_unsafe_links() -> None:
     assert 'validate_install_path "$BIN_LINK"' in online
     assert 'validate_install_path "$SYSTEMD_DIR"' in install
     assert 'validate_install_path "$SYSTEMD_DIR"' in online
+    assert 'chmod 0640 "$CLIENT_CONFIG"' in install
+    assert 'chmod 0660 "$CLIENT_CONFIG"' not in install

@@ -191,6 +191,39 @@ def test_kde_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
         proxy._write("ProxyType", "1")
 
 
+def test_kde_restores_missing_original_keys(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(proxy_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def responder(command: list[str]) -> Result:
+        if "kreadconfig6" in command[0]:
+            return Result(returncode=1)
+        return Result()
+
+    calls = _patch_run(monkeypatch, responder)
+    proxy = KdeProxy(settings)
+    proxy.enable(port=7891)
+    proxy.disable()
+    assert any("--delete" in call for call in calls)
+
+
+def test_kde_without_read_tool_only_disables_proxy_type(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        proxy_module.shutil,
+        "which",
+        lambda name: "/usr/bin/kwriteconfig6" if name == "kwriteconfig6" else None,
+    )
+    calls = _patch_run(monkeypatch, Result())
+    proxy = KdeProxy(settings)
+    proxy.enable(port=7891)
+    proxy.disable()
+    assert any(call[-2:] == ["ProxyType", "0"] for call in calls)
+    assert not any("--delete" in call for call in calls)
+
+
 def test_kde_write_failure_and_no_dbus(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         proxy_module.shutil,
@@ -325,6 +358,24 @@ def test_windows_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(proxy_module.sys, "platform", "linux")
     assert WindowsProxy(settings).supported is False
+
+
+def test_windows_proxy_removes_values_it_created(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: dict[str, Any] = {}
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    proxy.enable(port=7894)
+    assert store["ProxyServer"] == "127.0.0.1:7894"
+    assert "ProxyOverride" in store
+    proxy.disable()
+    assert store["ProxyEnable"] == 0
+    assert "ProxyServer" not in store
+    assert "ProxyOverride" not in store
+    assert "AutoConfigURL" not in store
 
 
 def test_system_proxy_factory(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:

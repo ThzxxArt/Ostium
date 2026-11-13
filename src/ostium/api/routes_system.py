@@ -235,6 +235,9 @@ async def toggle_tun(
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "TUN is a client feature", "role_mismatch")
+    previous_tun = services.settings.tun_enabled
+    previous_mode = services.settings.mode
+    proxy_was_enabled = bool(services.proxy.status().get("enabled"))
     if payload.enabled:
         if services.settings.allow_lan:
             raise ApiError(
@@ -242,18 +245,29 @@ async def toggle_tun(
                 "disable Allow LAN before enabling TUN; the TUN LAN gateway is not supported",
                 "mode_conflict",
             )
-        if services.proxy.status().get("enabled"):
+        if proxy_was_enabled:
             try:
                 services.proxy.disable()
-            except Exception:
-                pass
+            except Exception as exc:
+                raise ApiError(
+                    500, f"could not disable the system proxy: {exc}", "proxy_failed"
+                ) from exc
         services.settings.tun_enabled = True
         services.settings.mode = Mode.TUN
         try:
             result = await services.engine.apply_client(session, mode="tun", tun_enabled=True)
         except Exception as exc:
-            services.settings.tun_enabled = False
-            services.settings.mode = Mode.MIXED
+            services.settings.tun_enabled = previous_tun
+            services.settings.mode = previous_mode
+            if proxy_was_enabled:
+                try:
+                    services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+                except Exception:
+                    pass
+            try:
+                services.settings.save()
+            except OSError:
+                pass
             raise ApiError(500, f"TUN could not be enabled: {exc}", "tun_failed") from exc
         message = "TUN enabled"
     else:
@@ -262,6 +276,12 @@ async def toggle_tun(
         try:
             result = await services.engine.apply_client(session, mode="mixed", tun_enabled=False)
         except Exception as exc:
+            services.settings.tun_enabled = previous_tun
+            services.settings.mode = previous_mode
+            try:
+                services.settings.save()
+            except OSError:
+                pass
             raise ApiError(500, f"TUN could not be disabled cleanly: {exc}", "tun_failed") from exc
         message = "TUN disabled and routes cleaned up"
     try:

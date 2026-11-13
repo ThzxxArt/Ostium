@@ -29,14 +29,14 @@ jobs:
         with:
           version: "0.11.14"
       - run: uv sync
-      - name: Export runtime dependencies
-        run: uv export --no-dev --no-emit-project --format requirements.txt -o /tmp/ostium-requirements.txt
+      - name: Export dependencies
+        run: uv export --no-hashes --no-emit-project --all-groups --format requirements.txt -o /tmp/ostium-requirements.txt
       - name: Audit Python dependencies
         run: uv run pip-audit --strict -r /tmp/ostium-requirements.txt
       - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
-      - run: npm audit --audit-level=high --registry=https://registry.npmjs.org
+      - run: npm audit --registry=https://registry.npmjs.org
         working-directory: web
 
   trivy:

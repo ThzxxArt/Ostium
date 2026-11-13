@@ -11,8 +11,8 @@
 
 | 项目 | 基线 | 最终 | 门禁 |
 |---|---|---|---|
-| 后端语句覆盖率 | 66.81% | **98.29%** | ≥85% PASS |
-| 后端分支覆盖率 | 39.46% | **95.70%** | ≥85% PASS |
+| 后端语句覆盖率 | 66.81% | **98.19%** | ≥85% PASS |
+| 后端分支覆盖率 | 39.46% | **95.48%** | ≥85% PASS |
 | `api/` 覆盖 | — | 语句 97.47% / 分支 96.62% | ≥90% PASS |
 | `core/` 覆盖 | — | 语句 98.48% / 分支 91.67% | ≥90% PASS |
 | `services/` 覆盖 | — | 语句 98.03% / 分支 94.08% | ≥90% PASS |
@@ -21,7 +21,7 @@
 | 前端 branches | 1.62% | **85.27%** | ≥85% PASS |
 | 前端 functions | 0.56% | **89.04%** | ≥85% PASS |
 | 前端 lines | 0.83% | **92.13%** | ≥85% PASS |
-| 后端测试 | 69 | **400 passed / 0 skipped** | — |
+| 后端测试 | 69 | **403 passed / 0 skipped** | — |
 | 前端测试 | 5 | **137 passed** | — |
 | Playwright | 12 passed / 3 skipped | **21 passed / 0 skipped** | — |
 
@@ -52,7 +52,7 @@
 | Python lint | `uv run ruff check src tests scripts` | PASS |
 | Python format | `uv run ruff format --check src tests scripts` | PASS（136 files） |
 | Python types | `uv run mypy src/ostium` | PASS（69 files） |
-| Backend tests | `uv run pytest -q` | 400 passed, 0 skipped |
+| Backend tests | `uv run pytest -q` | 403 passed, 0 skipped |
 | Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
@@ -282,8 +282,8 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 uv run ruff check src tests scripts                  -> All checks passed
 uv run ruff format --check src tests scripts         -> 136 files already formatted
 uv run mypy src/ostium                               -> Success: no issues in 69 files
-uv run pytest -q                                     -> 400 passed, 0 skipped
-uv run pytest -m "not integration" --cov=ostium ...  -> 394 passed, coverage 98.29/95.70
+uv run pytest -q                                     -> 403 passed, 0 skipped
+uv run pytest -m "not integration" --cov=ostium ...  -> 397 passed, coverage 98.19/95.48
 uv run python scripts/coverage_gate.py coverage.json -> Coverage gate passed
 npm run lint                                         -> pass
 npm run typecheck                                    -> pass
@@ -421,18 +421,22 @@ shellcheck + bash -n                                  -> PASS
 | R3-13 | Release 顶层权限过大；Docker 镜像硬编码 `0.1.0`；Windows checkout 无 tag 导致版本为 dev；独立 core manifest 未按 tag 生成 | workflow/Dockerfile 未按 job 收窄权限、未传版本 | job 级最小权限；Docker `ARG OSTIUM_VERSION` + `build-args`；Windows `fetch-depth: 0` + `SETUPTOOLS_SCM_PRETEND_VERSION`；core manifest 按 tag | YAML 解析、构建脚本静态核对；真实 tag 运行待授权 |
 | R3-14 | WebSocket 事件流只校验会话 Cookie，不校验 Origin，存在跨站 WebSocket 读取风险 | `routes_events` 未比较 `Origin` 与 `Host` | Origin 存在且不匹配时 4403 拒绝 | `test_websocket_rejects_cross_origin` |
 | R3-15 | 公网 UI 可在证书仍为 pending/已过期时被启用，重启后 `serve` 才发现无可用证书 | 只检查证书行存在 | 要求 `status=ready` 且未过期 | 现有 public-ui 测试；新增条件逻辑 |
+| R3-16 | KDE 系统代理从未保存/恢复原代理设置；Windows 也会残留 `ProxyServer`/`ProxyOverride` | KDE 只写 `ProxyType=0`；Windows 只恢复存在的原值，不删除自己创建的临时值 | KDE 保存 `kioslaverc` 原值并按原值恢复/删除；Windows 对原本不存在的值执行删除 | `test_kde_restores...`、`test_kde_without_read_tool...`、`test_windows_proxy_removes_values_it_created` |
+| R3-17 | Linux 客户端核心配置对 UI 组可写，UI 用户可改 `engine_path` 后由带网络权限的核心执行 | `CLIENT_CONFIG` 使用 `0660 root:ostium` | 改为 `0640 root:ostium`，升级路径也收紧权限 | `test_installers` 静态断言；安装脚本路径复核 |
+| R3-18 | Release 工作流没有验证门禁：tag 推送可绕过测试直接发布 | `publish` 只依赖构建 job，不依赖测试/审计 | 新增 `verify` job（ruff/mypy/pytest/前后端审计/前端测试），`docker`/`publish` 均依赖它；同时补齐 sdist 上传与 provenance 范围 | workflow 静态核对；真实 tag 待授权 |
+| R3-19 | macOS 非 root UI LaunchAgent 把日志写到 `/tmp`，本机其他用户可读 | plist 使用固定 `/tmp/ostium-ui.log` | 改为用户可写的 `Ostium UI/logs/ui.log` | `com.ostium.ui.plist` 静态核对 |
 
 ### 13.3 第三轮回归矩阵
 
 | 检查 | 结果 |
 |---|---|
-| 后端非集成测试 | **394 passed / 0 skipped**；覆盖率 **98.29% statements / 95.70% branches**；`coverage_gate.py` PASS |
+| 后端非集成测试 | **397 passed / 0 skipped**；覆盖率 **98.19% statements / 95.48% branches**；`coverage_gate.py` PASS |
 | 后端真实核心集成测试 | **6 passed**（sing-box 1.14.4 + 定制 v2ray core） |
 | 前端单元测试 | **137 passed**；覆盖率 91.38 / 85.27 / 89.04 / 92.13 |
 | Playwright | **21 passed**（1440/1024/390、深浅色基线、PWA、axe） |
 | Python lint/format/types | `ruff` PASS；`ruff format --check` 136 files；`mypy` PASS |
 | npm audit / npm ls | **0 vulnerabilities**；`npm ls` exit 0（仅可选依赖 UNMET，无 invalid/extraneous） |
-| Python 依赖审计 | 导出运行依赖后 `pip-audit --strict` 0 漏洞；本地 editable 项目不作为 PyPI 依赖审计 |
+| Python 依赖审计 | 导出**全部依赖组**后 `pip-audit --strict` 0 漏洞；本地 editable 项目不作为 PyPI 依赖审计 |
 | 文档 | `mkdocs build --strict` PASS；内部链接检查 PASS |
 | Shell / PowerShell | `bash -n`、`shellcheck` PASS；PowerShell 7.7 解析 `scripts/*.ps1` 与 `deploy/windows/*.ps1` 全部通过（4 个） |
 | wheel / sdist | 含 `ostium/web/dist/index.html`、`manifest.webmanifest`、`sw.js`；sdist 含前端构建源 |
@@ -441,8 +445,8 @@ shellcheck + bash -n                                  -> PASS
 | 升级 | 坏 wheel 退出 1 且旧 venv 可执行；好 wheel 保留数据/管理员，修复后 `ostium`/`pip` 可执行 |
 | 卸载 | `install-online.sh uninstall` 删除程序/链接，保留数据和配置 |
 | 客户端隔离 | 核心/UI 配置分离；`core-run` 在 `runtime/core.token` 生成令牌，`/v1/status` 鉴权 200 |
-| 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、权限按 job 收窄 |
-| 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、394 非集成后端测试、wheel 含 SPA 全部通过（基线 `9886352`） |
+| 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、sdist 已上传、权限按 job 收窄、`verify` 门禁依赖正确 |
+| 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、397 非集成后端测试、wheel 含 SPA 全部通过（基线 `9886352`；最终修复后需再跑一次） |
 | GitHub Actions | `cbf9b70`：CI 43342090358、E2E 43342090301、Security 43342090359、Docs 43342090287 全部 success |
 
 ### 13.4 仍未验证 / 外部阻塞
@@ -458,7 +462,7 @@ shellcheck + bash -n                                  -> PASS
 - **性能/可用性**：72h soak、Lighthouse 性能预算、5 用户可用性未执行。
 - **浏览器覆盖**：PWA 只在 Chromium E2E 验证，Safari/Firefox 未覆盖。
 - **数据库迁移**：仍是 `create_all + stamp`；未来新增 Alembic 版本时需要补“已有库 upgrade”路径。
-- **PyPI Trusted Publishing**：需要在 PyPI 配置对应的 GitHub 环境/发布者；workflow 没有假设 `pypi` environment。
+- **PyPI Trusted Publishing**：workflow 已绑定 `release.yml` + `pypi` environment；真实 tag 发布仍未执行。
 - **代码签名**：Windows/macOS 证书、SmartScreen/Gatekeeper 未处理。
 
 ### 13.5 结论
