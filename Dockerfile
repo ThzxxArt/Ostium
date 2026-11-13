@@ -17,13 +17,14 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -o /out/sing-box ./cmd/sing-box
 
 FROM python:3.13.5-slim-bookworm AS runtime
-ARG OSTIUM_VERSION=0.1.0
+ARG OSTIUM_VERSION=0.1.1
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     OSTIUM_ROLE=server \
     OSTIUM_DATA_DIR=/var/lib/ostium \
     OSTIUM_CONFIG_DIR=/etc/ostium \
     OSTIUM_HOST=0.0.0.0 \
+    OSTIUM_ALLOW_INSECURE_BIND=true \
     OSTIUM_PORT=8443 \
     OSTIUM_ENGINE_PATH=/opt/ostium/core/sing-box
 RUN apt-get update \

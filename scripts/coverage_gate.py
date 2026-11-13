@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enforce Ostium's coverage policy from coverage.py's JSON report.
 
-Policy (PLAN.md v0.1.0):
+Policy (V0.1.1_PLAN.md):
 * overall statement coverage >= 85% and branch coverage >= 85%;
 * every non-generated Python module >= 85% statements and >= 85% branches;
 * the api/core/services/engine packages >= 90% statements and >= 90% branches.

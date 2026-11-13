@@ -7,14 +7,25 @@ param(
 
 $ErrorActionPreference = "SilentlyContinue"
 $serviceExe = Join-Path $InstallDir "service\ostium-service.exe"
+
+# Restore the desktop proxy before removing the CLI that knows the original
+# WinINET values; stopping the service tears down the TUN adapter.
+$env:OSTIUM_ROLE = "client"
+$env:OSTIUM_DATA_DIR = $DataDir
+$env:OSTIUM_CONFIG_FILE = "$DataDir\config.toml"
+$ostiumExe = Join-Path $InstallDir "ostium.exe"
+if (Test-Path $ostiumExe) {
+    & $ostiumExe proxy off | Out-Null
+}
+Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
+Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force
 Stop-Service OstiumCore
 if (Test-Path $serviceExe) {
     & $serviceExe remove
 }
-Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
-Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force
 if ($RemoveData) {
     Remove-Item $DataDir -Recurse -Force
+    Remove-Item "$env:ProgramData\OstiumCore" -Recurse -Force
 }
 # Inno Setup removes its own installation directory and registry entry after
 # [UninstallRun].  Only remove files here for the portable bundle.

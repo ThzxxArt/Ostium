@@ -1,7 +1,7 @@
 # Build the Windows x64 client bundle and Inno Setup installer.
 # Run from the repository root in an elevated PowerShell with uv, Node and Inno Setup 6 installed.
 param(
-    [string]$Version = "0.1.0",
+    [string]$Version = "0.1.1",
     [string]$CoreBinary = "",
     [string]$WintunDll = ""
 )
@@ -36,6 +36,19 @@ if ($WintunDll) {
 
 uv run pyinstaller --noconfirm --clean deploy\pyinstaller\ostium.spec
 uv run pyinstaller --noconfirm --clean deploy\pyinstaller\ostium-service.spec
+
+if ($env:OSTIUM_SIGN_THUMBPRINT) {
+    $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    if (-not $signtool) { throw "signtool.exe is required when OSTIUM_SIGN_THUMBPRINT is set" }
+    foreach ($exe in @("dist\Ostium\ostium.exe", "dist\OstiumService\ostium-service.exe")) {
+        if (Test-Path $exe) {
+            & $signtool.Source sign /sha1 $env:OSTIUM_SIGN_THUMBPRINT /tr http://timestamp.digicert.com /td sha256 /fd sha256 $exe
+            if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $exe" }
+        }
+    }
+} else {
+    Write-Warning "OSTIUM_SIGN_THUMBPRINT is not set; Windows binaries will be unsigned"
+}
 
 $out = "dist\windows\Ostium"
 New-Item -ItemType Directory -Force -Path $out, "$out\core", "$out\service" | Out-Null

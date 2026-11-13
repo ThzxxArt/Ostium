@@ -2,8 +2,7 @@
 Description=Ostium control plane (Web UI, API, ACME)
 Documentation=https://github.com/ThzxxArt/Ostium
 After=network-online.target ostium-core.service
-Wants=network-online.target
-Requires=ostium-core.service
+Wants=network-online.target ostium-core.service
 
 [Service]
 Type=simple

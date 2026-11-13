@@ -1,13 +1,30 @@
+# Hardened single-container server deployment.
+#
+# The container must bind 0.0.0.0 for Docker port publishing, so the admin UI
+# is plaintext inside the container.  Restrict 8443 on the host firewall or
+# put Nginx/Caddy with TLS in front; never publish 8443 directly to the
+# internet.
 services:
   ostium:
-    image: ghcr.io/thzxxart/ostium:0.1.0
+    image: ghcr.io/thzxxart/ostium:0.1.1
     container_name: ostium
     restart: unless-stopped
     network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
     cap_add:
       - NET_BIND_SERVICE
+    # File capabilities on the Python/sing-box binaries are used to bind
+    # 80/443 as the non-root `ostium` user; no-new-privileges would disable
+    # them, so it is intentionally not set here.  The image is read-only,
+    # drops all other capabilities and runs unprivileged.
     environment:
       OSTIUM_ROLE: server
+      OSTIUM_HOST: 0.0.0.0
+      OSTIUM_ALLOW_INSECURE_BIND: "true"
       OSTIUM_ADMIN_PASSWORD: ${OSTIUM_ADMIN_PASSWORD:-}
       OSTIUM_DOMAIN: ${OSTIUM_DOMAIN:-}
     volumes:

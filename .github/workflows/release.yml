@@ -28,6 +28,14 @@ jobs:
           uv run pytest -m "not integration" --cov=ostium --cov-report=xml
           --cov-report=json:coverage.json --cov-report=term
       - run: uv run python scripts/coverage_gate.py coverage.json
+      - name: Shell scripts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh deploy/**/*.sh install.sh deploy/launchd/*.sh
+          bash -n scripts/*.sh deploy/**/*.sh install.sh deploy/launchd/*.sh
+      - name: Docs
+        run: uvx --from mkdocs-material==9.7.0 mkdocs build --strict
       - name: Audit Python dependencies
         run: |
           uv export --no-hashes --no-emit-project --all-groups -o /tmp/requirements.txt
@@ -40,10 +48,39 @@ jobs:
         working-directory: web
       - run: npm run typecheck
         working-directory: web
-      - run: npm run test
+      - run: npm run test:coverage
+        working-directory: web
+      - run: npm run build
         working-directory: web
       - run: npm run format:check
         working-directory: web
+      - name: Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Start Ostium for E2E
+        run: |
+          export OSTIUM_ROLE=server
+          export OSTIUM_DATA_DIR=/tmp/ostium-e2e
+          export OSTIUM_PORT=18443
+          export OSTIUM_DEV=1
+          .venv/bin/ostium init --role server --no-input --password 'verysecret123' --domain example.com
+          nohup .venv/bin/ostium serve > /tmp/ostium-e2e.log 2>&1 &
+          echo $! > /tmp/ostium-e2e.pid
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18443/healthz && break; sleep 1; done
+      - run: npx playwright test
+        working-directory: web
+        env:
+          OSTIUM_BASE_URL: http://127.0.0.1:18443
+          OSTIUM_ADMIN_PASSWORD: verysecret123
+      - name: Stop Ostium
+        if: always()
+        run: |
+          if [ -f /tmp/ostium-e2e.pid ]; then kill "$(cat /tmp/ostium-e2e.pid)" 2>/dev/null || true; fi
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report
 
   wheel:
     runs-on: ubuntu-24.04
@@ -83,6 +120,10 @@ jobs:
         with:
           name: wheel
           path: dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: web/dist
 
   core:
     uses: ./.github/workflows/core-build.yml
@@ -124,6 +165,22 @@ jobs:
           Copy-Item $wintun.FullName dist/core/wintun.dll
           $version = "${{ github.ref_name }}".TrimStart("v")
           ./scripts/build-windows.ps1 -Version $version -CoreBinary dist/core/sing-box.exe -WintunDll dist/core/wintun.dll
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            "scripts/install-online.ps1",
+            "scripts/build-windows.ps1",
+            "deploy/windows/install.ps1",
+            "deploy/windows/uninstall.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file), [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) { throw "$file has $($errors.Count) parse error(s): $($errors[0])" }
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -137,6 +194,71 @@ jobs:
         with:
           name: windows-installer
           path: dist/windows/*-setup.exe
+
+  macos:
+    needs: [wheel, core]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download wheel
+        uses: actions/download-artifact@v8
+        with:
+          name: wheel
+          path: dist
+      - name: Download darwin arm64 core
+        uses: actions/download-artifact@v8
+        with:
+          name: core-darwin-arm64
+          path: dist
+      - name: Build DMG
+        env:
+          OSTIUM_CODESIGN_IDENTITY: ${{ secrets.OSTIUM_CODESIGN_IDENTITY }}
+          OSTIUM_NOTARY_PROFILE: ${{ secrets.OSTIUM_NOTARY_PROFILE }}
+        run: |
+          chmod +x scripts/build-macos.sh
+          VERSION="${{ github.ref_name }}"
+          ./scripts/build-macos.sh "${VERSION#v}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: dist/*.dmg
+
+  linux-packages:
+    needs: [wheel, core]
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.11.14"
+      - uses: actions/download-artifact@v8
+        with:
+          name: wheel
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: core-linux-${{ matrix.arch }}
+          path: dist
+      - run: uv sync
+      - run: uv run pyinstaller --noconfirm --clean deploy/pyinstaller/ostium.spec
+      - name: Build DEB and AppImage
+        run: |
+          chmod +x scripts/build-linux-packages.sh
+          CORE="$(find dist -maxdepth 1 -name 'ostium-core-*-linux-${{ matrix.arch }}.tar.gz' | head -1)"
+          ./scripts/build-linux-packages.sh --version "${{ github.ref_name }}" \
+            --arch "${{ matrix.arch }}" --core "$CORE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-packages-${{ matrix.arch }}
+          path: dist/packages/*
 
   docker:
     needs: verify
@@ -177,7 +299,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   publish:
-    needs: [verify, wheel, core, windows, docker]
+    needs: [verify, wheel, core, windows, macos, linux-packages, docker]
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:
@@ -186,6 +308,9 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.11.14"
       - uses: actions/download-artifact@v8
         with:
           name: wheel
@@ -199,6 +324,17 @@ jobs:
         with:
           name: windows-installer
           path: dist/windows
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-dmg
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: linux-packages-*
+          merge-multiple: true
+          path: dist/packages
+      - name: Generate application SBOM
+        run: uv run python scripts/build-sbom.py --output dist/ostium-sbom.cdx.json
       - run: >-
           python3 scripts/build-core-manifest.py --dir dist/core
           --release-version "${{ github.ref_name }}"
@@ -225,6 +361,9 @@ jobs:
           cp dist/core/*.tar.gz dist/core/*.sha256 dist/release/
           cp dist/core-manifest.json dist/release/
           cp dist/windows/*-setup.exe dist/release/
+          cp dist/*.dmg dist/release/
+          cp dist/packages/*.deb dist/packages/*.AppImage dist/release/
+          cp dist/ostium-sbom.cdx.json dist/release/
       - name: Verify core checksums
         run: cd dist/release && sha256sum -c ./*.sha256
       - name: Checksums
@@ -245,12 +384,17 @@ jobs:
             dist/release/*.sha256
             dist/release/core-manifest.json
             dist/release/*-setup.exe
+            dist/release/*.dmg
+            dist/release/*.deb
+            dist/release/*.AppImage
+            dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/pypi
       - uses: softprops/action-gh-release@v3
         with:
+          overwrite_files: false
           files: |
             dist/release/*.whl
             dist/release/*.tar.gz
@@ -259,5 +403,9 @@ jobs:
             dist/release/*.sha256
             dist/release/core-manifest.json
             dist/release/*-setup.exe
+            dist/release/*.dmg
+            dist/release/*.deb
+            dist/release/*.AppImage
+            dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
           generate_release_notes: true

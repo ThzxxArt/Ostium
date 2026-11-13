@@ -6,7 +6,7 @@
 # --no-service installs files only, for OpenRC/runit/s6/supervisord or manual use.
 #
 # Usage:
-#   sudo ./install.sh --role server --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
+#   sudo ./install.sh --role server --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
 #        --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz --domain vpn.example.com
 #   sudo ./install.sh --role client --wheel ... --core ...
 #   sudo ./install.sh --role server ... --run-as-root
@@ -20,8 +20,9 @@ DOMAIN=""
 PUBLIC_UI="false"
 BEHIND_PROXY="false"
 SECURE_COOKIES="false"
-UI_HOST="${OSTIUM_UI_HOST:-0.0.0.0}"
+UI_HOST="${OSTIUM_UI_HOST:-127.0.0.1}"
 UI_PORT="${OSTIUM_UI_PORT:-8443}"
+ALLOW_INSECURE_BIND="${OSTIUM_ALLOW_INSECURE_BIND:-false}"
 START="true"
 ADMIN_PASSWORD=""
 PREFIX="${OSTIUM_PREFIX:-/opt/ostium}"
@@ -38,6 +39,8 @@ PYTHON_BIN="${OSTIUM_PYTHON:-}"
 RUN_AS_ROOT="false"
 NO_SERVICE="false"
 UPGRADE="false"
+UNINSTALL="false"
+PURGE="false"
 
 usage() {
   cat <<'EOF'
@@ -48,7 +51,8 @@ Ostium 安装器参数：
   --domain DOMAIN            服务端域名（Reality 可省略）
   --public-ui                已禁用；请在登录后签发证书、启用 TOTP，再从 Settings 开启
   --behind-proxy             Nginx/Caddy 反向代理模式：UI 只监听 127.0.0.1，启用 Secure Cookie
-  --ui-host HOST             管理 UI 监听地址（默认 0.0.0.0；--behind-proxy 强制 127.0.0.1）
+  --ui-host HOST             管理 UI 监听地址（默认 127.0.0.1；非 loopback 需 --allow-insecure-bind）
+  --allow-insecure-bind      显式允许非 loopback 明文管理 UI（必须配合防火墙/反代）
   --ui-port PORT             管理 UI 端口（默认 8443）
   --secure-cookies           强制 Secure Cookie（HTTPS 反代时使用）
   --password PASSWORD        初始管理员密码（省略则随机生成）
@@ -56,6 +60,8 @@ Ostium 安装器参数：
   --run-as-root              不创建 ostium 用户，ostium/ostium-core 均以 root 运行
   --no-service               只安装文件，不注册 systemd（供 OpenRC/runit/s6/supervisord 使用）
   --upgrade                  升级模式：保留数据和配置，只替换程序与核心
+  --uninstall                停止并移除服务与程序链接（默认保留数据/配置）
+  --purge                    与 --uninstall 配合删除数据、配置、证书与密钥
   --no-start                 注册服务但不启动
   -h, --help                 显示帮助
 
@@ -74,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --public-ui) PUBLIC_UI="true"; shift ;;
     --behind-proxy) BEHIND_PROXY="true"; shift ;;
     --ui-host) UI_HOST="$2"; shift 2 ;;
+    --allow-insecure-bind) ALLOW_INSECURE_BIND="true"; shift ;;
     --ui-port) UI_PORT="$2"; shift 2 ;;
     --secure-cookies) SECURE_COOKIES="true"; shift ;;
     --password) ADMIN_PASSWORD="$2"; shift 2 ;;
@@ -81,6 +88,8 @@ while [[ $# -gt 0 ]]; do
     --run-as-root) RUN_AS_ROOT="true"; shift ;;
     --no-service) NO_SERVICE="true"; shift ;;
     --upgrade) UPGRADE="true"; shift ;;
+    --uninstall) UNINSTALL="true"; shift ;;
+    --purge) PURGE="true"; shift ;;
     --no-start) START="false"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "未知参数: $1" >&2; usage; exit 2 ;;
@@ -124,6 +133,19 @@ fi
 if [[ "$PUBLIC_UI" == "true" ]]; then
   SECURE_COOKIES="true"
 fi
+if [[ "$BEHIND_PROXY" == "true" ]]; then
+  UI_HOST="127.0.0.1"
+  ALLOW_INSECURE_BIND="false"
+fi
+case "$UI_HOST" in
+  127.0.0.1|localhost|::1) ;;
+  *)
+    if [[ "$PUBLIC_UI" != "true" && "$ALLOW_INSECURE_BIND" != "true" ]]; then
+      echo "拒绝在 $UI_HOST 上明文暴露管理 UI：请使用 127.0.0.1（SSH 隧道），或显式传入 --allow-insecure-bind 并配置防火墙/Nginx" >&2
+      exit 2
+    fi
+    ;;
+esac
 if [[ "$BEHIND_PROXY" == "true" && "$PUBLIC_UI" == "true" ]]; then
   echo "--behind-proxy 与 --public-ui 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS" >&2
   exit 2
@@ -170,6 +192,46 @@ validate_install_path "$CLIENT_DATA" "客户端核心数据目录"
 validate_install_path "$CLIENT_UI_DATA" "客户端 UI 数据目录"
 validate_install_path "$BIN_LINK" "可执行链接"
 validate_install_path "$SYSTEMD_DIR" "systemd 目录"
+
+if [[ "$UNINSTALL" == "true" ]]; then
+  echo "停止 Ostium 服务……"
+  if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    systemctl disable --now ostium ostium-core 2>/dev/null || true
+    rm -f "$SYSTEMD_DIR/ostium.service" "$SYSTEMD_DIR/ostium-core.service"
+    rm -rf "$SYSTEMD_DIR/ostium.service.d" "$SYSTEMD_DIR/ostium-core.service.d"
+    systemctl daemon-reload 2>/dev/null || true
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+      sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+        systemctl --user disable --now ostium 2>/dev/null || true
+      rm -f "$user_home/.config/systemd/user/ostium.service"
+      sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+        systemctl --user daemon-reload 2>/dev/null || true
+    fi
+  fi
+  # Restore the desktop proxy before deleting the CLI that knows how.
+  if [[ -x "$BIN_LINK" ]]; then
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      sudo -u "$SUDO_USER" "$BIN_LINK" proxy off >/dev/null 2>&1 || true
+    else
+      "$BIN_LINK" proxy off >/dev/null 2>&1 || true
+    fi
+  fi
+  rm -f "$BIN_LINK"
+  if [[ "$PURGE" == "true" ]]; then
+    echo "删除数据、配置与程序目录（不可恢复）……" >&2
+    rm -rf "$DATA" "$CONFIG" "$PREFIX" "$CLIENT_DATA" "$CLIENT_UI_DATA"
+    echo "Ostium 已完全卸载（--purge）。"
+  else
+    echo "Ostium 程序与服务已移除；数据保留在："
+    echo "  $DATA"
+    echo "  $CONFIG"
+    echo "  $CLIENT_DATA"
+    echo "使用 --purge 可同时删除数据（不可恢复）。"
+  fi
+  exit 0
+fi
+
 TRUSTED_HOSTS_TOML='["localhost", "127.0.0.1", "::1"'
 if [[ -n "$DOMAIN" ]]; then
   TRUSTED_HOSTS_TOML+=", \"$DOMAIN\""
@@ -200,6 +262,48 @@ stop_services() {
         systemctl --user stop ostium 2>/dev/null || true
     fi
   fi
+}
+
+wait_for_url() {
+  local url="$1"
+  for _ in $(seq 1 20); do
+    if curl -fsSk --max-time 2 "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+rollback_control_plane() {
+  local reason="$1"
+  echo "升级健康检查失败（$reason），回滚到旧控制面……" >&2
+  if systemd_available; then
+    systemctl stop ostium 2>/dev/null || true
+  fi
+  if [[ -d "$PREFIX/venv.old" ]]; then
+    rm -rf "$PREFIX/venv.failed"
+    mv "$PREFIX/venv" "$PREFIX/venv.failed" 2>/dev/null || true
+    mv "$PREFIX/venv.old" "$PREFIX/venv"
+    if systemd_available; then
+      systemctl start ostium 2>/dev/null || true
+    fi
+  fi
+  echo "旧控制面已恢复；失败的新环境保留在 $PREFIX/venv.failed（如存在）。" >&2
+  exit 1
+}
+
+rollback_core() {
+  local destination="$1"
+  echo "核心启动检查失败，回滚旧核心……" >&2
+  if [[ -f "$destination.old" ]]; then
+    mv -f "$destination.old" "$destination"
+    if systemd_available; then
+      systemctl restart ostium-core 2>/dev/null || true
+    fi
+  fi
+  echo "旧核心已恢复。" >&2
+  exit 1
 }
 
 write_root_dropin() {
@@ -379,7 +483,6 @@ if [[ "$UPGRADE" == "true" ]]; then
       sed -i "1s|^#!$OLD_VENV/|#!$PREFIX/venv/|" "$script"
     fi
   done
-  rm -rf "$PREFIX/venv.old"
 else
   "$PYTHON_BIN" -m venv "$PREFIX/venv"
   "$PREFIX/venv/bin/pip" install --no-cache-dir --upgrade pip wheel
@@ -390,6 +493,9 @@ ln -sfn "$PREFIX/venv/bin/ostium" "$BIN_LINK"
 
 install_core() {
   local destination="$1" owner="$2" temporary="$1.new.$$"
+  if [[ -f "$destination" ]]; then
+    cp -p "$destination" "$destination.old"
+  fi
   if ! install -m 0755 "$CORE_TMP/sing-box" "$temporary"; then
     rm -f "$temporary"
     echo "无法写入核心二进制：$destination" >&2
@@ -428,6 +534,7 @@ role = "server"
 host = "$UI_HOST"
 port = $UI_PORT
 public_ui = $PUBLIC_UI
+allow_insecure_bind = $ALLOW_INSECURE_BIND
 secure_cookies = $SECURE_COOKIES
 trusted_hosts = $TRUSTED_HOSTS_TOML
 data_dir = "$DATA"
@@ -444,11 +551,25 @@ EOF
     INIT_ARGS=(init --role server --no-input --password "$ADMIN_PASSWORD" --host "$UI_HOST" --port "$UI_PORT")
     [[ -n "$DOMAIN" ]] && INIT_ARGS+=(--domain "$DOMAIN")
     [[ "$PUBLIC_UI" == "true" ]] && INIT_ARGS+=(--public-ui)
+    [[ "$ALLOW_INSECURE_BIND" == "true" ]] && INIT_ARGS+=(--allow-insecure-bind)
     OSTIUM_ROLE=server OSTIUM_DATA_DIR="$DATA" OSTIUM_CONFIG_FILE="$CONFIG/config.toml" \
       "$PREFIX/venv/bin/ostium" "${INIT_ARGS[@]}"
   elif [[ ! -f "$CONFIG/config.toml" ]]; then
     echo "升级模式需要已有配置：$CONFIG/config.toml" >&2
     exit 1
+  fi
+  if [[ "$UPGRADE" == "true" && -f "$CONFIG/config.toml" ]]; then
+    if [[ "$ALLOW_INSECURE_BIND" != "true" && "$PUBLIC_UI" != "true" ]]; then
+      if grep -Eq '^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"' "$CONFIG/config.toml"; then
+        sed -i 's|^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"|host = "127.0.0.1"|' "$CONFIG/config.toml"
+        echo "安全迁移：旧配置 host=0.0.0.0 已收敛为 127.0.0.1；如需保留请使用 --allow-insecure-bind 并配置防火墙。" >&2
+      fi
+    fi
+    if grep -Eq '^[[:space:]]*allow_insecure_bind[[:space:]]*=' "$CONFIG/config.toml"; then
+      sed -i "s|^[[:space:]]*allow_insecure_bind[[:space:]]*=.*|allow_insecure_bind = $ALLOW_INSECURE_BIND|" "$CONFIG/config.toml"
+    else
+      printf 'allow_insecure_bind = %s\n' "$ALLOW_INSECURE_BIND" >>"$CONFIG/config.toml"
+    fi
   fi
   # `init` runs as root during install, so SQLite/WAL and master.key are
   # created with root ownership.  The service runs as ostium and must be able
@@ -471,6 +592,21 @@ EOF
     if [[ "$START" == "true" ]]; then
       systemctl restart ostium-core
       systemctl restart ostium
+      if [[ "$UPGRADE" == "true" ]]; then
+        sleep 1
+        if ! systemctl is-active --quiet ostium-core \
+          || ! curl -fsS --max-time 3 http://127.0.0.1:8788/v1/health 2>/dev/null \
+            | grep -q '"running"[[:space:]]*:[[:space:]]*true'; then
+          rollback_core "$DATA/core/sing-box"
+        fi
+        HEALTH_SCHEME="http"
+        [[ "$PUBLIC_UI" == "true" ]] && HEALTH_SCHEME="https"
+        if ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz"; then
+          rollback_control_plane "control plane health check"
+        fi
+        rm -rf "$PREFIX/venv.old"
+        rm -f "$DATA/core/sing-box.old"
+      fi
     fi
   else
     print_manual_start
@@ -568,6 +704,15 @@ EOF
         sleep 1
         chmod 0640 "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
         chgrp ostium "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
+        if [[ "$UPGRADE" == "true" ]]; then
+          if ! systemctl is-active --quiet ostium-core \
+            || ! curl -fsS --max-time 3 http://127.0.0.1:8788/v1/health 2>/dev/null \
+              | grep -q '"running"[[:space:]]*:[[:space:]]*true'; then
+            rollback_core "$CLIENT_DATA/core/sing-box"
+          fi
+          rm -rf "$PREFIX/venv.old"
+          rm -f "$CLIENT_DATA/core/sing-box.old"
+        fi
       fi
       if [[ -n "${SUDO_USER:-}" ]]; then
         USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"

@@ -22,9 +22,61 @@ if [[ "$(id -u)" -ne 0 ]]; then
   echo "run as root: sudo ./install-macos.sh client" >&2
   exit 1
 fi
-if [[ "$ROLE" != "client" ]]; then
-  echo "macOS is supported as a client; run the Linux installer for the server." >&2
+if [[ "$ROLE" != "client" && "$ROLE" != "uninstall" ]]; then
+  echo "usage: sudo ./install-macos.sh client|uninstall" >&2
   exit 1
+fi
+
+# A configured prefix is used verbatim in launchd plists and rm -rf paths.
+# Reject roots, system trees and traversal instead of trusting the environment.
+validate_prefix() {
+  local path="$1" normalized
+  if [[ -z "$path" || "$path" != /* ]]; then
+    echo "OSTIUM_PREFIX must be an absolute path: $path" >&2
+    exit 2
+  fi
+  case "$path" in
+    *[[:space:]\&\#\|\\\"\']*)
+      echo "OSTIUM_PREFIX contains unsafe characters: $path" >&2
+      exit 2
+      ;;
+  esac
+  normalized="$(cd / && realpath -m "$path" 2>/dev/null || echo "$path")"
+  case "$normalized" in
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/private|/private/etc|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|/var/lib|/Library|/System|/Users|/Applications)
+      echo "refusing to use system root as OSTIUM_PREFIX: $normalized" >&2
+      exit 2
+      ;;
+  esac
+  case "/$normalized/" in
+    */../*)
+      echo "OSTIUM_PREFIX must not contain ..: $path" >&2
+      exit 2
+      ;;
+  esac
+}
+validate_prefix "$PREFIX"
+
+if [[ "$ROLE" == "uninstall" ]]; then
+  launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
+  launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
+  if [[ -n "${SUDO_USER:-}" ]] && [[ -x /usr/local/bin/ostium ]]; then
+    sudo -u "$SUDO_USER" /usr/local/bin/ostium proxy off >/dev/null 2>&1 || true
+  fi
+  rm -f /Library/LaunchDaemons/com.ostium.core.plist \
+    /Library/LaunchDaemons/com.ostium.ui.plist \
+    /Library/LaunchAgents/com.ostium.ui.plist \
+    /usr/local/bin/ostium
+  if [[ "${OSTIUM_PURGE:-false}" == "true" ]]; then
+    rm -rf "$PREFIX" "$DATA" "$UI_DATA"
+    echo "Ostium fully removed (OSTIUM_PURGE=true)."
+  else
+    echo "Ostium services and program removed; data preserved in:"
+    echo "  $DATA"
+    echo "  $UI_DATA"
+    echo "Set OSTIUM_PURGE=true to delete data (irreversible)."
+  fi
+  exit 0
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,6 +116,16 @@ render_plist() {
   sed "s#/opt/ostium#$PREFIX#g" "$source" >"$target"
   chmod 0644 "$target"
 }
+
+wait_for_ui() {
+  for _ in $(seq 1 20); do
+    if curl -fsS --max-time 2 http://127.0.0.1:8787/healthz >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
 VENV="$PREFIX/venv"
 OLD_VENV=""
 if [[ -d "$VENV" ]]; then
@@ -82,7 +144,7 @@ if ! "$PYTHON_BIN" -m venv "$VENV" \
   exit 1
 fi
 if [[ -n "$OLD_VENV" ]]; then
-  rm -rf "$OLD_VENV"
+  : # Keep the previous venv until the new UI passes its health check.
 fi
 ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
@@ -210,6 +272,23 @@ if [[ "$NO_START" != "true" ]]; then
     launchctl asuser "$(id -u "$SUDO_USER")" launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
   else
     launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
+  fi
+  if [[ -n "$OLD_VENV" ]]; then
+    if ! wait_for_ui; then
+      echo "升级健康检查失败，回滚旧虚拟环境……" >&2
+      launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
+      launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+      rm -rf "$PREFIX/venv.failed"
+      mv "$VENV" "$PREFIX/venv.failed" 2>/dev/null || true
+      mv "$OLD_VENV" "$VENV"
+      if [[ "$RUN_AS_ROOT" == "true" ]]; then
+        launchctl load -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
+      elif [[ -n "${SUDO_USER:-}" ]]; then
+        launchctl asuser "$(id -u "$SUDO_USER")" launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+      fi
+      exit 1
+    fi
+    rm -rf "$OLD_VENV"
   fi
 fi
 

@@ -5,7 +5,7 @@ Ostium 一键在线安装器（Windows 客户端）。
   irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
 
 带参数：
-  & ([scriptblock]::Create((irm .../install-online.ps1))) -Version 0.1.0 -RunAsSystem
+  & ([scriptblock]::Create((irm .../install-online.ps1))) -Version 0.1.1 -RunAsSystem
 
 离线：
   .\install-online.ps1 -LocalDir D:\Ostium-release
@@ -15,7 +15,7 @@ Ostium 一键在线安装器（Windows 客户端）。
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.0",
+    [string]$Version = "0.1.1",
     [ValidateSet("client")]
     [string]$Role = "client",
     [string]$LocalDir = "",
@@ -99,16 +99,9 @@ function Install-Ostium([string]$ResolvedVersion) {
         if ($process.ExitCode -ne 0) { throw "安装程序退出码：$($process.ExitCode)" }
 
         $installDir = Join-Path $env:ProgramFiles "Ostium"
-        $passwordFile = Join-Path $env:ProgramData "Ostium\initial-password.txt"
         $service = Get-Service OstiumCore -ErrorAction SilentlyContinue
         if (-not $service -or $service.Status -ne "Running") {
-            throw "OstiumCore 服务未运行；请检查 ProgramData\Ostium\logs 和 Windows 服务日志。"
-        }
-        if (Test-Path $passwordFile) {
-            $initialPassword = Get-Content -LiteralPath $passwordFile -Raw
-            Write-Host "初始管理员密码：$initialPassword" -ForegroundColor Yellow
-            Write-Host "该密码只显示一次，登录后请立即启用 TOTP。"
-            Remove-Item -LiteralPath $passwordFile -Force
+            throw "OstiumCore 服务未运行；请检查 ProgramData\OstiumCore\logs 和 Windows 服务日志。"
         }
 
         if ($RunAsSystem) {
@@ -142,6 +135,8 @@ function Uninstall-Ostium {
         if ($process.ExitCode -ne 0) { throw "卸载程序退出码：$($process.ExitCode)" }
         if ($Purge) {
             Remove-Item -LiteralPath (Join-Path $env:ProgramData "Ostium") `
+                -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $env:ProgramData "OstiumCore") `
                 -Recurse -Force -ErrorAction SilentlyContinue
         }
         Write-Step "已卸载"

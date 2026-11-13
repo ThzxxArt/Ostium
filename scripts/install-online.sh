@@ -20,7 +20,7 @@
 #   sudo bash install-online.sh install --local-dir /path/to/source-checkout
 set -euo pipefail
 
-VERSION="${OSTIUM_VERSION:-0.1.0}"
+VERSION="${OSTIUM_VERSION:-0.1.1}"
 CORE_VERSION="${OSTIUM_CORE_VERSION:-1.14.4-ostium.1}"
 UV_VERSION="${OSTIUM_UV_VERSION:-0.11.14}"
 ROLE="server"
@@ -42,6 +42,7 @@ NO_SERVICE="false"
 BEHIND_PROXY="false"
 UI_HOST=""
 UI_PORT=""
+ALLOW_INSECURE_BIND="false"
 PURGE="false"
 VERIFY="true"
 WORK_DIR=""
@@ -60,13 +61,14 @@ Ostium 一键安装器
   --role server|client       角色（默认 server；macOS 仅支持 client）
   --domain DOMAIN            服务端域名
   --password PASSWORD        初始管理员密码（省略则随机生成）
-  --version VERSION          Release 版本（默认 0.1.0，可写 latest）
+  --version VERSION          Release 版本（默认 0.1.1，可写 latest）
   --prefix PATH              安装目录（默认 /opt/ostium）
   --local-dir DIR            离线安装：包含 scripts/install.sh 的源码 checkout
   --run-as-root              不创建 ostium 用户，所有服务以 root 运行（降低隔离，谨慎使用）
   --no-service               不注册 systemd/launchd，交给 OpenRC/runit/s6/supervisord
   --behind-proxy             Nginx/Caddy 反代模式：UI 只监听 127.0.0.1，启用 Secure Cookie
-  --ui-host HOST             管理 UI 监听地址（默认 0.0.0.0）
+  --ui-host HOST             管理 UI 监听地址（默认 127.0.0.1；非 loopback 需 --allow-insecure-bind）
+  --allow-insecure-bind      显式允许非 loopback 明文管理 UI（需防火墙/反代）
   --ui-port PORT             管理 UI 端口（默认 8443）
   --public-ui                已禁用；请在登录后签发证书、启用 TOTP，再从 Settings 开启
   --no-start                 注册服务但不启动
@@ -375,6 +377,7 @@ run_platform_installer() {
   if [[ "$OS" == "linux" ]]; then
     [[ "$BEHIND_PROXY" == "true" ]] && extra+=(--behind-proxy)
     [[ -n "$UI_HOST" ]] && extra+=(--ui-host "$UI_HOST")
+    [[ "$ALLOW_INSECURE_BIND" == "true" ]] && extra+=(--allow-insecure-bind)
     [[ -n "$UI_PORT" ]] && extra+=(--ui-port "$UI_PORT")
   elif [[ "$BEHIND_PROXY" == "true" ]]; then
     warn "macOS 一键安装暂不支持 --behind-proxy；请安装后编辑 launchd 配置"
@@ -405,6 +408,13 @@ run_platform_installer() {
 
 uninstall_ostium() {
   say "停止并移除 Ostium 服务"
+  if [[ -x "$BIN_LINK" ]]; then
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      sudo -u "$SUDO_USER" "$BIN_LINK" proxy off >/dev/null 2>&1 || true
+    else
+      "$BIN_LINK" proxy off >/dev/null 2>&1 || true
+    fi
+  fi
   if [[ "$OS" == "linux" ]]; then
     if systemd_available; then
       systemctl disable --now ostium ostium-core 2>/dev/null || true
@@ -483,6 +493,7 @@ while [[ $# -gt 0 ]]; do
     --no-service) NO_SERVICE="true"; shift ;;
     --behind-proxy) BEHIND_PROXY="true"; shift ;;
     --ui-host) UI_HOST="$2"; shift 2 ;;
+    --allow-insecure-bind) ALLOW_INSECURE_BIND="true"; shift ;;
     --ui-port) UI_PORT="$2"; shift 2 ;;
     --public-ui) PUBLIC_UI="true"; shift ;;
     --no-start) START="false"; shift ;;

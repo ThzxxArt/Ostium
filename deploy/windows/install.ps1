@@ -2,6 +2,7 @@
 param(
     [string]$InstallDir = "$env:ProgramFiles\Ostium",
     [string]$DataDir = "$env:ProgramData\Ostium",
+    [string]$CoreDataDir = "$env:ProgramData\OstiumCore",
     [switch]$RunAsSystem
 )
 
@@ -14,7 +15,11 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 $Source = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ServiceDir = Join-Path $InstallDir "service"
 $CoreDir = Join-Path $InstallDir "core"
-New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $DataDir, "$DataDir\runtime", "$DataDir\logs" | Out-Null
+New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $DataDir, "$DataDir\runtime", "$DataDir\logs", $CoreDataDir, "$CoreDataDir\runtime", "$CoreDataDir\logs" | Out-Null
+# The service runs as LocalSystem.  Keep its token, last-good config and
+# database out of the user-writable ProgramData\Ostium tree; only
+# Administrators and SYSTEM may write there.
+icacls $CoreDataDir /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" | Out-Null
 # Inno Setup already copied the bundle into $InstallDir before running this
 # script.  Copying a directory onto itself makes PowerShell fail, so only do
 # the copy for the portable/zip workflow where source and destination differ.
@@ -28,12 +33,13 @@ if ($sourceFull -ne $installFull) {
 # service must never execute a binary from a directory the interactive user can
 # modify.
 $dataToml = $DataDir.Replace('\', '/')
+$coreDataToml = $CoreDataDir.Replace('\', '/')
 $engineToml = (Join-Path $CoreDir "sing-box.exe").Replace('\', '/')
 $coreConfig = Join-Path $ServiceDir "core.toml"
 $coreToml = @"
 role = "client"
-data_dir = "$dataToml"
-config_dir = "$dataToml"
+data_dir = "$coreDataToml"
+config_dir = "$coreDataToml"
 log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$engineToml"
@@ -57,25 +63,17 @@ log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$engineToml"
 core_url = "http://127.0.0.1:8788"
-core_token_file = "$($DataDir.Replace('\', '/'))/runtime/core.token"
+core_token_file = "$coreDataToml/runtime/core.token"
 mode = "system_proxy"
 "@
     [IO.File]::WriteAllText($uiConfig, $uiToml)
 }
 
+# All client platforms use the same first-run wizard; do not create an
+# administrator or a plaintext password file during installation.
 $env:OSTIUM_ROLE = "client"
 $env:OSTIUM_DATA_DIR = $DataDir
 $env:OSTIUM_CONFIG_FILE = "$DataDir\config.toml"
-
-$passwordFile = "$DataDir\initial-password.txt"
-if (-not (Test-Path "$DataDir\ostium.db")) {
-    $password = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
-    & "$InstallDir\ostium.exe" init --role client --no-input --password $password
-    Set-Content -LiteralPath $passwordFile -Value $password -NoNewline -Encoding ascii
-    Write-Host "Initial administrator password: $password" -ForegroundColor Yellow
-    Write-Host "Saved to: $passwordFile"
-    Write-Host "Store it now; it is not shown again."
-}
 
 # The UI runs as a normal user (or SYSTEM with -RunAsSystem). The wrapper
 # makes the machine-wide ProgramData layout explicit.
@@ -107,6 +105,18 @@ if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
 }
 & $serviceExe --startup auto install
 Start-Service OstiumCore -ErrorAction Stop
+
+# The unprivileged UI may read the core token, but must never be able to
+# overwrite it (that would let a local user hijack the privileged API).
+$tokenPath = Join-Path $CoreDataDir "runtime\core.token"
+for ($i = 0; $i -lt 30 -and -not (Test-Path $tokenPath); $i++) { Start-Sleep -Seconds 1 }
+icacls $CoreDataDir /grant "Users:(X)" | Out-Null
+icacls "$CoreDataDir\runtime" /grant "Users:(RX)" | Out-Null
+if (Test-Path $tokenPath) {
+    icacls $tokenPath /inheritance:r /grant:r "SYSTEM:R" "Administrators:F" "Users:R" | Out-Null
+} else {
+    Write-Warning "Core token not created yet; the UI may fail to authenticate until it is."
+}
 
 # Start the console at logon (default) or at boot as SYSTEM.
 if ($RunAsSystem) {

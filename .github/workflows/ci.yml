@@ -45,9 +45,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test
+      - run: npm run test:coverage
       - run: npm run build
+      - run: node ../scripts/check-web-budget.mjs
       - run: npm run format:check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-coverage
+          path: web/coverage
       - uses: actions/upload-artifact@v7
         with:
           name: web-dist

@@ -1,7 +1,7 @@
 ; Inno Setup 6 script for the Ostium Windows x64 client.
-; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.0
+; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.1
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.1"
 #endif
 
 [Setup]
@@ -15,6 +15,12 @@ DefaultDirName={autopf}\Ostium
 DefaultGroupName=Ostium
 OutputDir=..\..\dist\windows
 OutputBaseFilename=Ostium-{#AppVersion}-windows-x64-setup
+LicenseFile=..\..\LICENSE
+VersionInfoVersion={#AppVersion}
+VersionInfoProductName=Ostium
+VersionInfoCompany=Ostium Contributors
+VersionInfoDescription=Ostium Windows client
+AppCopyright=GPL-3.0-or-later
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
