@@ -1525,13 +1525,15 @@
 <ul>
 <li>程序在 <code>%ProgramFiles%\Ostium</code>；</li>
 <li><code>OstiumCore</code> 服务以 LocalSystem 运行 TUN 核心；</li>
+<li>核心二进制在 <code>%ProgramFiles%\Ostium\core</code>，服务配置在 <code>%ProgramFiles%\Ostium\service\core.toml</code>（普通用户不可写）；</li>
 <li>Web UI 在当前用户登录时启动；</li>
-<li>数据在 <code>%ProgramData%\Ostium</code>；</li>
+<li>UI 数据在 <code>%ProgramData%\Ostium</code>；</li>
 <li>初始密码由在线安装器打印；离线 setup 保存在 <code>%ProgramData%\Ostium\initial-password.txt</code>，首次登录后请删除。</li>
 </ul>
 <p>需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：</p>
 <div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">scripts</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
 </code></pre></div>
+<p><strong>风险</strong>：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。</p>
 <p>未签名构建会触发 SmartScreen。请先校验 SHA256，确认来源可信后再选择“仍要运行”。</p>
 <h3 id="macos-14">macOS 14+<a class="headerlink" href="#macos-14" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh<span class="w"> </span><span class="se">\</span>

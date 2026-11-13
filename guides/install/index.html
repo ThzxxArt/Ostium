@@ -1591,6 +1591,7 @@
 <p>需要连 UI 也以 SYSTEM 运行时：</p>
 <div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">scripts</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
 </code></pre></div>
+<p><strong>风险</strong>：默认 UI 以当前用户运行，只有核心服务是 LocalSystem。<code>-RunAsSystem</code> 会取消这层隔离，UI/浏览器漏洞可能直接获得 SYSTEM 权限；只建议在隔离测试机使用。</p>
 <h2 id="_2">安装器做了什么<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ol>
 <li>检测 Linux/macOS、x86_64/arm64。</li>
@@ -1664,7 +1665,7 @@
 </tr>
 <tr>
 <td><code>--local-dir DIR</code></td>
-<td>离线安装：Release 目录或源码 checkout</td>
+<td>离线安装：包含 <code>scripts/install.sh</code> 的源码 checkout 或解压后的源码包</td>
 </tr>
 <tr>
 <td><code>--no-verify</code></td>
@@ -1687,6 +1688,7 @@
 <li>把 <code>admin.example.com</code> 加入 <code>trusted_hosts</code>。</li>
 </ul>
 <p>然后按 <a href="../nginx/">Nginx 共存指南</a> 配置证书和反代，并把 Reality/Trojan 改到 9443/tcp。<code>--behind-proxy</code> 只影响管理 UI，不会改变代理入口端口。</p>
+<p><code>--behind-proxy</code> 与 <code>--public-ui</code> 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS；安装器会拒绝同时使用。</p>
 <h2 id="root-ostium">root 模式（不创建 ostium 用户）<a class="headerlink" href="#root-ostium" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>.../install-online.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span>--run-as-root
 </code></pre></div>
@@ -1723,7 +1725,7 @@ sudo<span class="w"> </span><span class="nv">OSTIUM_ROLE</span><span class="o">=
 <span class="w">  </span>--local-dir<span class="w"> </span>/path/to/release<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com
 </code></pre></div>
-<p><code>--local-dir</code> 也可以直接指向源码 checkout；脚本会从 <code>dist/</code> 或目录内查找 wheel 和核心包。没有 <code>SHA256SUMS</code> 时可用 <code>--no-verify</code>，但生产环境不建议。</p>
+<p><code>--local-dir</code> 必须指向包含 <code>scripts/install.sh</code> 的源码 checkout 或解压后的源码包；只有 Release 下载资产的目录不含安装脚本，不能直接使用。</p>
 <h2 id="_5">升级<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>upgrade
 </code></pre></div>
