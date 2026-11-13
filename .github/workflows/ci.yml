@@ -86,6 +86,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: "1.25.5"
+          cache: false
       - name: Fetch pinned sing-box for integration checks
         run: |
           curl -sL -o /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz
