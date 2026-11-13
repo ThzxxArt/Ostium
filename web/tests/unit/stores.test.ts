@@ -205,6 +205,34 @@ describe('stores', () => {
     vi.useRealTimers()
   })
 
+  it('stops reconnecting when the server revokes the session', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('WebSocket', FakeSocket)
+    const unauthorized = vi.fn()
+    window.addEventListener('ostium:unauthorized', unauthorized)
+    const store = useEventStore()
+
+    store.connect()
+    const first = FakeSocket.instances[0]
+    first.emit('open')
+    first.emit('close', { code: 4401 })
+    expect(store.connected).toBe(false)
+    expect(unauthorized).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(30_000)
+    expect(FakeSocket.instances).toHaveLength(1)
+
+    store.connect()
+    const second = FakeSocket.instances[1]
+    second.emit('open')
+    second.emit('close', { code: 4403 })
+    vi.advanceTimersByTime(30_000)
+    expect(FakeSocket.instances).toHaveLength(2)
+
+    window.removeEventListener('ostium:unauthorized', unauthorized)
+    store.disconnect()
+    vi.useRealTimers()
+  })
+
   it('schedules reconnects after a close and catches constructor errors', () => {
     vi.useFakeTimers()
     const store = useEventStore()

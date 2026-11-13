@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { NModal } from 'naive-ui'
 import QrcodeVue from 'qrcode.vue'
+import { useI18n } from 'vue-i18n'
 import OCopyButton from './OCopyButton.vue'
 import { useCopy } from '@/composables/useCopy'
 
@@ -20,11 +21,12 @@ const visible = computed({
 })
 
 const { copy } = useCopy()
+const { t } = useI18n()
 </script>
 
 <template>
   <NModal v-model:show="visible" preset="card" style="max-width: 420px" :bordered="false">
-    <template #header>{{ title || 'Scan to import' }}</template>
+    <template #header>{{ title || t('common.scan_to_import') }}</template>
     <div class="qr-wrap">
       <div class="qr">
         <QrcodeVue :value="value" :size="232" level="M" foreground="#0b1220" background="#ffffff" />
@@ -34,7 +36,7 @@ const { copy } = useCopy()
         <code class="o-truncate">{{ value }}</code>
         <OCopyButton :value="value" size="tiny" />
       </div>
-      <button class="manual" type="button" @click="copy(value)">Copy link</button>
+      <button class="manual" type="button" @click="copy(value)">{{ t('common.copy_link') }}</button>
     </div>
   </NModal>
 </template>

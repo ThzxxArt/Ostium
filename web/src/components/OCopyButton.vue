@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Check, Copy } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -15,6 +16,7 @@ const props = withDefaults(
 )
 
 const message = useMessage()
+const { t } = useI18n()
 const copied = ref(false)
 
 async function copy() {
@@ -38,9 +40,9 @@ async function copy() {
   if (ok) {
     copied.value = true
     window.setTimeout(() => (copied.value = false), 1500)
-    message.success('Copied')
+    message.success(t('common.copied'))
   } else {
-    message.error('Copy failed; select the text manually')
+    message.error(t('common.copy_failed'))
   }
 }
 </script>
@@ -50,11 +52,11 @@ async function copy() {
     type="button"
     class="copy"
     :class="[`size-${size}`, { secondary, block }]"
-    :aria-label="label || 'Copy'"
+    :aria-label="label || t('common.copy')"
     @click.stop="copy"
   >
     <component :is="copied ? Check : Copy" :size="size === 'tiny' ? 13 : 15" :stroke-width="1.8" />
-    <span v-if="label">{{ copied ? 'Copied' : label }}</span>
+    <span v-if="label">{{ copied ? t('common.copied') : label }}</span>
   </button>
 </template>
 

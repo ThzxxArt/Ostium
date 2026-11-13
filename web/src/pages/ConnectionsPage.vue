@@ -102,7 +102,8 @@ function closeAll() {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.stats.closeAll()
+        const result = await api.stats.closeAll()
+        if (!result.closed) throw new Error(t('errors.core_unreachable'))
         message.success(t('connections.close_all'))
         await load(true)
       } catch (err) {

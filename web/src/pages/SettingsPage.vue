@@ -67,6 +67,7 @@ const general = ref({
   block_private_egress: true,
 })
 const notifications = ref({ webhook_url: '', webhook_secret: '', enabled: true })
+const clearWebhookSecret = ref(false)
 const maintenance = ref({
   update_channel: 'stable',
   audit_retention_days: 90,
@@ -85,6 +86,8 @@ const totpCode = ref('')
 const qrOpen = ref(false)
 const qrValue = ref('')
 const disablingTotp = ref(false)
+const disableTotpOpen = ref(false)
+const disableTotpPassword = ref('')
 
 const tokenOpen = ref(false)
 const tokenName = ref('')
@@ -139,6 +142,7 @@ async function load() {
       webhook_secret: '',
       enabled: data.notifications.enabled,
     }
+    clearWebhookSecret.value = false
     maintenance.value = {
       update_channel: data.maintenance.update_channel,
       audit_retention_days: data.maintenance.audit_retention_days,
@@ -182,11 +186,15 @@ async function saveGeneral() {
 async function saveNotifications() {
   saving.value = true
   try {
-    await api.settings.update({
+    const payload: Record<string, unknown> = {
       webhook_url: notifications.value.webhook_url || null,
-      webhook_secret: notifications.value.webhook_secret || null,
       notifications_enabled: notifications.value.enabled,
-    })
+    }
+    if (clearWebhookSecret.value) payload.webhook_secret = null
+    else if (notifications.value.webhook_secret) {
+      payload.webhook_secret = notifications.value.webhook_secret
+    }
+    await api.settings.update(payload)
     message.success(t('settings.saved'))
     await load()
   } catch (err) {
@@ -303,12 +311,18 @@ async function cancelTotp() {
   }
 }
 
-async function disableTotp() {
-  const password = window.prompt(t('auth.password')) || ''
-  if (!password) return
+function disableTotp() {
+  disableTotpPassword.value = ''
+  disableTotpOpen.value = true
+}
+
+async function confirmDisableTotp() {
+  if (!disableTotpPassword.value) return
   disablingTotp.value = true
   try {
-    await api.auth.totpDisable(password)
+    await api.auth.totpDisable(disableTotpPassword.value)
+    disableTotpOpen.value = false
+    disableTotpPassword.value = ''
     message.success(t('auth.totp_disabled'))
     await auth.refresh()
   } catch (err) {
@@ -419,7 +433,7 @@ onMounted(load)
     </OPageHeader>
 
     <div v-if="settings" class="settings-layout">
-      <nav class="settings-nav o-card" aria-label="Settings sections">
+      <nav class="settings-nav o-card" :aria-label="t('settings.sections')">
         <button
           v-for="tab in ['general', 'security', 'notifications', 'maintenance']"
           :key="tab"
@@ -695,6 +709,11 @@ onMounted(load)
                   :placeholder="settings?.notifications.has_webhook_secret ? '••••••••' : ''"
                 />
               </label>
+              <NCheckbox
+                v-if="settings?.notifications.has_webhook_secret"
+                v-model:checked="clearWebhookSecret"
+                >{{ t('settings.clear_webhook_secret') }}</NCheckbox
+              >
               <NCheckbox v-model:checked="notifications.enabled">{{
                 t('settings.notifications_enabled')
               }}</NCheckbox>
@@ -728,8 +747,8 @@ onMounted(load)
                 <NSelect
                   v-model:value="maintenance.update_channel"
                   :options="[
-                    { label: 'Stable', value: 'stable' },
-                    { label: 'Beta', value: 'beta' },
+                    { label: t('settings.update_channel_stable'), value: 'stable' },
+                    { label: t('settings.update_channel_beta'), value: 'beta' },
                   ]"
                 />
               </label>
@@ -787,7 +806,9 @@ onMounted(load)
                   <strong class="o-truncate">{{ backup.filename }}</strong>
                   <span class="o-micro o-subtle"
                     >{{ formatBytes(backup.size) }} · {{ formatDate(backup.created_at, locale) }} ·
-                    {{ backup.encrypted ? 'encrypted' : 'plain' }}</span
+                    {{
+                      backup.encrypted ? t('settings.backup_encrypted') : t('settings.backup_plain')
+                    }}</span
                   >
                 </div>
                 <NButton size="tiny" secondary @click="restore(backup)">{{
@@ -889,6 +910,35 @@ onMounted(load)
     </NModal>
 
     <NModal
+      v-model:show="disableTotpOpen"
+      preset="card"
+      :style="{ width: 'min(460px, calc(100vw - 32px))' }"
+      :bordered="false"
+    >
+      <template #header>{{ t('auth.totp_disable') }}</template>
+      <label class="field"
+        ><span>{{ t('auth.password') }}</span
+        ><NInput
+          v-model:value="disableTotpPassword"
+          type="password"
+          show-password-on="click"
+          @keyup.enter="confirmDisableTotp"
+      /></label>
+      <template #footer>
+        <div class="footer-actions">
+          <NButton secondary @click="disableTotpOpen = false">{{ t('common.cancel') }}</NButton>
+          <NButton
+            type="error"
+            :loading="disablingTotp"
+            :disabled="!disableTotpPassword"
+            @click="confirmDisableTotp"
+            >{{ t('auth.totp_disable') }}</NButton
+          >
+        </div>
+      </template>
+    </NModal>
+
+    <NModal
       v-model:show="backupOpen"
       preset="card"
       :style="{ width: 'min(480px, calc(100vw - 32px))' }"
@@ -928,7 +978,7 @@ onMounted(load)
       <template #header>{{ t('common.apply') }}</template>
       <p class="o-small o-muted">{{ restoring?.filename }}</p>
       <label v-if="restoring?.encrypted" class="field"
-        ><span>{{ t('settings.webhook_secret') }}</span
+        ><span>{{ t('settings.backup_password') }}</span
         ><NInput v-model:value="restorePassword" type="password" show-password-on="click"
       /></label>
       <template #footer>

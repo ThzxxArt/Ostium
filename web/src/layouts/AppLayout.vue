@@ -257,9 +257,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="shell" :class="{ collapsed: app.sidebarCollapsed }">
-    <a class="skip-link" href="#main-content">{{ t('common.skip') || 'Skip to content' }}</a>
+    <a class="skip-link" href="#main-content">{{ t('common.skip_content') }}</a>
 
-    <aside class="sidebar o-glass" aria-label="Primary navigation">
+    <aside class="sidebar o-glass" :aria-label="t('nav.primary')">
       <div class="sidebar-head">
         <RouterLink to="/" class="brand-link" :aria-label="t('app.name')">
           <OBrandMark :size="34" :wordmark="!app.sidebarCollapsed" />
@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="icon-btn collapse-btn"
-          :aria-label="app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="app.sidebarCollapsed ? t('nav.expand_sidebar') : t('nav.collapse_sidebar')"
           @click="app.toggleSidebar()"
         >
           <component :is="app.sidebarCollapsed ? PanelLeftOpen : PanelLeftClose" :size="17" />
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
       </footer>
     </div>
 
-    <nav class="mobile-nav o-glass" aria-label="Mobile navigation">
+    <nav class="mobile-nav o-glass" :aria-label="t('nav.mobile')">
       <RouterLink
         v-for="item in auth.isServer
           ? [

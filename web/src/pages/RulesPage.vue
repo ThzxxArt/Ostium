@@ -222,8 +222,12 @@ async function addRuleSet() {
 
 async function updateRuleSet(ruleSet: RuleSet) {
   try {
-    await api.rules.updateRuleSet(ruleSet.id)
-    message.success(t('rules.applied'))
+    const result = await api.rules.updateRuleSet(ruleSet.id)
+    if (result.result?.error) {
+      message.error(String(result.result.error))
+    } else {
+      message.success(t('rules.applied'))
+    }
     await load()
   } catch (err) {
     message.error((err as Error).message)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangle, RotateCw } from '@lucide/vue'
 import { NButton } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 defineProps<{
   title?: string
@@ -8,23 +9,24 @@ defineProps<{
 }>()
 
 defineEmits<{ retry: [] }>()
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="error-state" role="alert">
     <div class="icon"><AlertTriangle :size="22" :stroke-width="1.6" /></div>
-    <h3>{{ title || 'Something went wrong' }}</h3>
-    <p>{{ message || 'Please try again. If it keeps happening, check the logs.' }}</p>
+    <h3>{{ title || t('common.error') }}</h3>
+    <p>{{ message || t('common.error_hint') }}</p>
     <div class="actions">
       <slot name="actions">
         <NButton secondary size="small" @click="$emit('retry')">
           <template #icon><RotateCw :size="15" /></template>
-          Retry
+          {{ t('common.retry') }}
         </NButton>
       </slot>
     </div>
     <details v-if="$slots.details" class="details">
-      <summary>Details</summary>
+      <summary>{{ t('common.details') }}</summary>
       <slot name="details" />
     </details>
   </div>

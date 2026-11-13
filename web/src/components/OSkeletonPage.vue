@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 withDefaults(defineProps<{ cards?: number; rows?: number }>(), { cards: 4, rows: 3 })
+const { t } = useI18n()
 </script>
 
 <template>
-  <div class="skeleton-page" aria-busy="true" aria-label="Loading">
+  <div class="skeleton-page" aria-busy="true" :aria-label="t('common.loading')">
     <div class="header">
       <div class="bar w-40" />
       <div class="bar w-65" />

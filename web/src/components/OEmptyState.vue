@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Component } from 'vue'
 import { Inbox } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -14,6 +15,7 @@ const props = withDefaults(
 )
 
 const resolvedIcon = computed(() => props.icon ?? Inbox)
+const { t } = useI18n()
 </script>
 
 <template>
@@ -25,7 +27,7 @@ const resolvedIcon = computed(() => props.icon ?? Inbox)
         <component :is="resolvedIcon" :size="compact ? 20 : 26" :stroke-width="1.5" />
       </div>
     </div>
-    <h3>{{ title || 'Nothing here yet' }}</h3>
+    <h3>{{ title || t('common.empty') }}</h3>
     <p v-if="description">{{ description }}</p>
     <div v-if="$slots.default" class="actions"><slot /></div>
   </div>

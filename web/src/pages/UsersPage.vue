@@ -66,6 +66,7 @@ const drawerOpen = ref(false)
 const activeUser = ref<User | null>(null)
 const usageSeries = ref<TrafficPoint[]>([])
 const loadingUsage = ref(false)
+let detailRequest = 0
 
 const subscriptionOpen = ref(false)
 const subscription = ref<SubscriptionPayload | null>(null)
@@ -208,6 +209,7 @@ async function toggleUser(user: User, enabled: boolean) {
 }
 
 async function openDetail(user: User) {
+  const request = ++detailRequest
   activeUser.value = user
   drawerOpen.value = true
   loadingUsage.value = true
@@ -216,12 +218,15 @@ async function openDetail(user: User) {
       api.users.get(user.id),
       api.users.usage(user.id, 30),
     ])
+    // A slower response for a previously-clicked user must not overwrite the
+    // drawer that is now showing someone else.
+    if (request !== detailRequest) return
     activeUser.value = detail.user
     usageSeries.value = usage.series
   } catch (err) {
-    message.error((err as Error).message)
+    if (request === detailRequest) message.error((err as Error).message)
   } finally {
-    loadingUsage.value = false
+    if (request === detailRequest) loadingUsage.value = false
   }
 }
 
@@ -341,7 +346,7 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
       return
     }
     if (action === 'delete') {
-      await new Promise<void>((resolve, reject) => {
+      const confirmed = await new Promise<boolean>((resolve, reject) => {
         dialog.error({
           title: t('common.delete'),
           content: t('common.delete_confirm'),
@@ -350,14 +355,15 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
           onPositiveClick: async () => {
             try {
               await api.users.bulk('delete', ids)
-              resolve()
+              resolve(true)
             } catch (err) {
               reject(err)
             }
           },
-          onNegativeClick: () => resolve(),
+          onNegativeClick: () => resolve(false),
         })
       })
+      if (!confirmed) return
     } else {
       await api.users.bulk(action, ids)
     }

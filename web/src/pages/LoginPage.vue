@@ -85,39 +85,40 @@ async function submit() {
       <div class="visual-inner">
         <div class="brand-row">
           <OBrandMark :size="40" />
-          <span class="edition">PRIVATE NETWORK</span>
+          <span class="edition">{{ t('auth.hero_eyebrow') }}</span>
         </div>
-        <h1>One quiet place<br />for your whole network.</h1>
-        <p class="lead">
-          Reality, Hysteria2, TUN and per-user control — designed to stay out of your way.
-        </p>
+        <h1>{{ t('auth.hero_title_1') }}<br />{{ t('auth.hero_title_2') }}</h1>
+        <p class="lead">{{ t('auth.hero_lead') }}</p>
         <ul class="features">
           <li>
             <span class="ico"><Waypoints :size="17" /></span>
             <div>
-              <strong>Four mature protocols</strong
-              ><span>Reality, Hysteria2, Trojan and SS2022 in one console.</span>
+              <strong>{{ t('auth.hero_feature_protocols') }}</strong><span>{{
+                t('auth.hero_feature_protocols_desc')
+              }}</span>
             </div>
           </li>
           <li>
             <span class="ico"><ShieldCheck :size="17" /></span>
             <div>
-              <strong>Private by default</strong
-              ><span>Loopback admin, no telemetry, encrypted secrets.</span>
+              <strong>{{ t('auth.hero_feature_private') }}</strong><span>{{
+                t('auth.hero_feature_private_desc')
+              }}</span>
             </div>
           </li>
           <li>
             <span class="ico"><LockKeyhole :size="17" /></span>
             <div>
-              <strong>Two-service isolation</strong
-              ><span>The UI never runs with network privileges.</span>
+              <strong>{{ t('auth.hero_feature_isolation') }}</strong><span>{{
+                t('auth.hero_feature_isolation_desc')
+              }}</span>
             </div>
           </li>
         </ul>
         <div class="visual-foot">
           <span>Ostium {{ version }}</span>
           <span class="sep">·</span>
-          <span>GPL-3.0-or-later</span>
+          <span>{{ t('auth.hero_license') }}</span>
         </div>
       </div>
     </section>

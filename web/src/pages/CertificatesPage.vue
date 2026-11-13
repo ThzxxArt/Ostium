@@ -61,6 +61,11 @@ async function issue() {
       issueForm.value.domain.trim(),
       issueForm.value.method as 'acme' | 'self-signed',
       issueForm.value.auto_renew,
+      {
+        staging: issueForm.value.method === 'acme' ? issueForm.value.staging : undefined,
+        email:
+          issueForm.value.method === 'acme' ? issueForm.value.email.trim() || undefined : undefined,
+      },
     )
     if (result.job_id) {
       message.success(t('certs.acme_started'))
@@ -328,7 +333,7 @@ onMounted(load)
             :autosize="{ minRows: 4, maxRows: 8 }"
           />
         </label>
-        <NCheckbox v-model:checked="uploadForm.auto_renew">{{ t('certs.auto_renew') }}</NCheckbox>
+        <p class="o-micro o-subtle">{{ t('certs.upload_renew_hint') }}</p>
       </div>
       <template #footer>
         <div class="modal-actions">

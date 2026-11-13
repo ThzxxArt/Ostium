@@ -199,7 +199,7 @@ function onKeydown(event: KeyboardEvent) {
 
 <template>
   <NModal v-model:show="app.commandOpen" :mask-closable="true" class="palette-modal">
-    <div class="palette" role="dialog" aria-label="Command palette">
+    <div class="palette" role="dialog" :aria-label="t('command.palette')">
       <div class="search">
         <Search :size="18" :stroke-width="1.7" />
         <NInput
@@ -235,9 +235,9 @@ function onKeydown(event: KeyboardEvent) {
         <p v-if="!results.length" class="empty">{{ t('command.no_results') }}</p>
       </div>
       <footer class="footer">
-        <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-        <span><kbd>↵</kbd> open</span>
-        <span><kbd>Esc</kbd> close</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> {{ t('command.navigate') }}</span>
+        <span><kbd>↵</kbd> {{ t('command.open') }}</span>
+        <span><kbd>Esc</kbd> {{ t('command.close') }}</span>
       </footer>
     </div>
   </NModal>

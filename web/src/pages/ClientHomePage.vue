@@ -38,6 +38,7 @@ const rateUp = ref(0)
 const rateDown = ref(0)
 const connectedAt = ref<number | null>(null)
 let timer: number | null = null
+let firstSample = true
 let lastTotals = { up: 0, down: 0, at: Date.now() }
 
 const activeProfile = computed(
@@ -96,8 +97,14 @@ async function load() {
     const down = connectionData.download_total
     const now = Date.now()
     const elapsed = Math.max(1, (now - lastTotals.at) / 1000)
-    rateUp.value = Math.max(0, (up - lastTotals.up) / elapsed)
-    rateDown.value = Math.max(0, (down - lastTotals.down) / elapsed)
+    if (firstSample) {
+      firstSample = false
+      rateUp.value = 0
+      rateDown.value = 0
+    } else {
+      rateUp.value = Math.max(0, (up - lastTotals.up) / elapsed)
+      rateDown.value = Math.max(0, (down - lastTotals.down) / elapsed)
+    }
     lastTotals = { up, down, at: now }
     sessionUp.value = up
     sessionDown.value = down

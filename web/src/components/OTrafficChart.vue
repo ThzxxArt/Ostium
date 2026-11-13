@@ -6,6 +6,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import type { EChartsOption } from 'echarts'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { formatBytes, formatDay } from '@/utils/format'
 import type { TrafficPoint } from '@/api/types'
@@ -23,6 +24,7 @@ const props = withDefaults(
 )
 
 const app = useAppStore()
+const { t } = useI18n()
 
 const option = computed<EChartsOption>(() => {
   const text = app.isDark ? '#6F819B' : '#64748B'
@@ -74,7 +76,7 @@ const option = computed<EChartsOption>(() => {
     series: [
       props.showDownload
         ? {
-            name: 'Download',
+            name: t('common.download'),
             type: 'line',
             smooth: 0.35,
             symbol: 'none',
@@ -88,7 +90,7 @@ const option = computed<EChartsOption>(() => {
         : undefined,
       props.showUpload
         ? {
-            name: 'Upload',
+            name: t('common.up'),
             type: 'line',
             smooth: 0.35,
             symbol: 'none',
@@ -111,7 +113,7 @@ const option = computed<EChartsOption>(() => {
     <div v-else class="empty">
       <span class="line" />
       <span class="line short" />
-      <span class="hint">No traffic data yet</span>
+      <span class="hint">{{ t('common.no_traffic') }}</span>
     </div>
   </div>
 </template>

@@ -47,7 +47,9 @@ describe('page interactions', () => {
     await clickByText('Confirm')
     await clickAllButtons(1)
 
-    expect(calls.some((call) => call.path === '/api/v1/certificates/issue')).toBe(true)
+    const issueCall = calls.find((call) => call.path === '/api/v1/certificates/issue')
+    expect(issueCall).toBeTruthy()
+    expect(issueCall?.body).toMatchObject({ email: 'a@example.com', staging: false })
     expect(wrapper.html()).toBeTruthy()
   })
 

@@ -306,11 +306,8 @@ describe('page script branches', () => {
     state.totpCode = '123456'
     await state.confirmTotp()
     await state.disableTotp()
-    vi.stubGlobal(
-      'prompt',
-      vi.fn(() => ''),
-    )
-    await state.disableTotp()
+    state.disableTotpPassword = 'verysecret123'
+    await state.confirmDisableTotp()
 
     state.tokenName = ''
     await state.createToken()
@@ -323,6 +320,11 @@ describe('page script branches', () => {
     await state.confirmRestore()
     state.removeBackup(fixtures.backup)
     await state.saveGeneral()
+    await state.saveNotifications()
+    state.clearWebhookSecret = true
+    await state.saveNotifications()
+    state.clearWebhookSecret = false
+    state.notifications.webhook_secret = 'new-secret'
     await state.saveNotifications()
     await state.saveMaintenance()
     state.showQr('https://example.com')

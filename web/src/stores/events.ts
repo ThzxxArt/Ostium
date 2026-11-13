@@ -46,9 +46,20 @@ export const useEventStore = defineStore('events', () => {
         /* ignore malformed frames */
       }
     })
-    socket.addEventListener('close', () => {
+    socket.addEventListener('close', (event) => {
       connected.value = false
       socket = null
+      if (event.code === 4401) {
+        // Revoked/expired session: reconnecting with the same cookie only
+        // produces an endless 401 loop.  Let the shell route to login.
+        stopped = true
+        window.dispatchEvent(new CustomEvent('ostium:unauthorized'))
+        return
+      }
+      if (event.code === 4403) {
+        stopped = true
+        return
+      }
       if (!stopped) schedule()
     })
     socket.addEventListener('error', () => {
