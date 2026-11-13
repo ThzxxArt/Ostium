@@ -1561,7 +1561,7 @@
 <p>适用：Ubuntu 24.04 / Debian 13 服务器，Windows 10 22H2+ / 11，macOS 14+ 客户端。</p>
 </blockquote>
 <h2 id="linux">Linux 服务端<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com
 </code></pre></div>
 <p>安装完成后：</p>
@@ -1569,18 +1569,18 @@
 </code></pre></div>
 <p>打开 <a href="http://127.0.0.1:8443">http://127.0.0.1:8443</a>，用安装器打印的密码登录，立即启用 TOTP。</p>
 <h2 id="linux_1">Linux 客户端<a class="headerlink" href="#linux_1" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>client
 </code></pre></div>
 <p>然后打开 <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>，完成向导并导入订阅。</p>
 <h2 id="macos">macOS 客户端<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>client
 </code></pre></div>
 <p>macOS 只支持客户端；服务端请用 Linux。</p>
 <h2 id="windows">Windows 客户端<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h2>
 <p>以<strong>管理员 PowerShell</strong>运行：</p>
-<div class="highlight"><pre><span></span><code><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">scripts</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
+<div class="highlight"><pre><span></span><code><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">0</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
 </code></pre></div>
 <p>脚本会下载并静默运行 Windows 安装包、校验 SHA256，然后打印初始管理员密码。默认：</p>
 <ul>
@@ -1589,7 +1589,7 @@
 <li>数据在 <code>%ProgramData%\Ostium</code>。</li>
 </ul>
 <p>需要连 UI 也以 SYSTEM 运行时：</p>
-<div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">scripts</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
+<div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">0</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
 </code></pre></div>
 <p><strong>风险</strong>：默认 UI 以当前用户运行，只有核心服务是 LocalSystem。<code>-RunAsSystem</code> 会取消这层隔离，UI/浏览器漏洞可能直接获得 SYSTEM 权限；只建议在隔离测试机使用。</p>
 <h2 id="_2">安装器做了什么<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
@@ -1600,9 +1600,11 @@
 <li>用 <code>uv</code> 安装托管 Python 3.13 到 <code>/opt/ostium/python</code>，<strong>不碰系统 Python</strong>。</li>
 <li>从 GitHub Release 下载：</li>
 <li><code>ostium_ctl-&lt;version&gt;-py3-none-any.whl</code></li>
+<li><code>ostium_ctl-&lt;version&gt;.tar.gz</code>（sdist，内含安装脚本与 <code>deploy/</code>）</li>
 <li><code>ostium-core-1.14.4-ostium.1-&lt;os&gt;-&lt;arch&gt;.tar.gz</code></li>
 <li><code>SHA256SUMS</code></li>
-<li>校验通过后调用仓库内的 <code>scripts/install.sh</code> 或 <code>deploy/launchd/install-macos.sh</code>。</li>
+<li>校验通过后从 sdist 中取出 <code>scripts/install.sh</code> 或 <code>deploy/launchd/install-macos.sh</code> 并调用；
+   不会执行未校验的源码包。</li>
 <li>服务端创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动，打印一次性管理员密码。</li>
 <li>客户端不预置管理员密码；首次打开 UI 时完成客户端设置向导。</li>
 </ol>
@@ -1657,7 +1659,7 @@
 </tr>
 <tr>
 <td><code>--public-ui</code></td>
-<td>允许公网管理 UI（必须先 TLS + TOTP）</td>
+<td>已禁用；公网 UI 必须在登录后签发证书、启用 TOTP，再从 Settings 开启</td>
 </tr>
 <tr>
 <td><code>--no-start</code></td>
@@ -1665,7 +1667,7 @@
 </tr>
 <tr>
 <td><code>--local-dir DIR</code></td>
-<td>离线安装：包含 <code>scripts/install.sh</code> 的源码 checkout 或解压后的源码包</td>
+<td>离线安装：源码 checkout，或包含 wheel/sdist/core/<code>SHA256SUMS</code> 的扁平 Release 资产目录</td>
 </tr>
 <tr>
 <td><code>--no-verify</code></td>
@@ -1712,20 +1714,29 @@ sudo<span class="w"> </span><span class="nv">OSTIUM_ROLE</span><span class="o">=
 </code></pre></div>
 <p>完整示例见 <a href="../service-manager/">服务管理</a>。</p>
 <h2 id="_4">离线 / 内网安装<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<p>准备一个目录，包含：</p>
+<p>准备一个扁平目录，包含同一版本的 Release 资产：</p>
 <div class="highlight"><pre><span></span><code>release/
+├── install-online.sh
 ├── ostium_ctl-0.1.0-py3-none-any.whl
+├── ostium_ctl-0.1.0.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
-├── SHA256SUMS
-├── scripts/install.sh
-└── deploy/...
+├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz.sha256
+├── core-manifest.json
+└── SHA256SUMS
 </code></pre></div>
 <p>然后：</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--local-dir<span class="w"> </span>/path/to/release<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>sha256sum<span class="w"> </span>-c<span class="w"> </span>SHA256SUMS<span class="w"> </span>--ignore-missing
+
+sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--local-dir<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com
 </code></pre></div>
-<p><code>--local-dir</code> 必须指向包含 <code>scripts/install.sh</code> 的源码 checkout 或解压后的源码包；只有 Release 下载资产的目录不含安装脚本，不能直接使用。</p>
+<p><code>--local-dir</code> 同时支持源码 checkout 和扁平 Release 资产目录。安装器会先校验 sdist，
+再从 sdist 中取出 <code>scripts/install.sh</code> 与 <code>deploy/</code>，不会执行未校验的源码包。</p>
+<blockquote>
+<p>完全隔离的环境还需要预建 wheelhouse 或可访问的内网 PyPI 镜像；wheel 的 Python
+依赖不会打进 Release 资产。</p>
+</blockquote>
 <h2 id="_5">升级<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>upgrade
 </code></pre></div>
