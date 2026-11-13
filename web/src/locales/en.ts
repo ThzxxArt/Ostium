@@ -26,6 +26,7 @@ export default {
     group_network: 'Network',
     group_observe: 'Observe',
     group_system: 'System',
+    open_menu: 'Open navigation',
   },
   common: {
     save: 'Save',
@@ -213,6 +214,12 @@ export default {
     hysteria2_desc: 'QUIC-based; great on lossy, high-latency links. Requires TLS.',
     both: 'Reality + Hysteria2',
     both_desc: 'TCP and UDP together; clients pick the fastest path.',
+    configure_later: 'Configure lines later',
+    configure_later_desc:
+      'Finish the account and security setup first; add proxy entry points later on the Inbounds page.',
+    later_badge: 'Later',
+    later_hint:
+      'TLS lines need a certificate first; enable them on the Inbounds page after issuing one.',
     review_hint: 'Create the administrator and default inbound.',
     create: 'Create and open console',
     creating: 'Creating…',
@@ -251,6 +258,14 @@ export default {
     last_revision: 'Config revision',
     recent_events: 'Recent events',
     no_events: 'No events yet.',
+    event_applied: 'Configuration applied',
+    event_job_created: 'Job queued',
+    event_job_updated: 'Job updated',
+    event_alert_created: 'New alert',
+    event_alert_updated: 'Alert updated',
+    event_quota_exceeded: 'Quota enforced',
+    event_quota_threshold: 'Quota warning',
+    event_system_proxy: 'System proxy changed',
   },
   inbounds: {
     title: 'Inbounds',
@@ -283,6 +298,9 @@ export default {
     config_preview: 'Config preview',
     apply_warning: 'Saved, but the core did not apply it: {message}',
     copy_link: 'Copy share link',
+    select_certificate: 'Select certificate',
+    certificate_saved: 'Certificate assigned to this inbound',
+    skipped: 'Enabled but skipped: {reason}',
   },
   users: {
     title: 'Users',
@@ -305,6 +323,7 @@ export default {
     last_seen: 'Last seen',
     subscription: 'Subscription',
     rotate_credentials: 'Rotate credentials',
+    password_once: 'Initial password (shown once)',
     rotate_confirm:
       'Old credentials stop working immediately and active connections close. Continue?',
     delete_confirm: 'Delete user {name}? Their subscription link will stop working.',
@@ -313,6 +332,8 @@ export default {
     bulk_enable: 'Enable',
     bulk_disable: 'Disable',
     bulk_delete: 'Delete',
+    bulk_export: 'Export',
+    exported: 'Selected user profiles exported',
     selected: '{count} selected',
     empty_title: 'No users yet',
     empty_desc: 'Create your first user, then import the subscription in a client.',
@@ -330,6 +351,7 @@ export default {
     title: 'Subscriptions',
     subtitle: 'Import into Ostium or hand the link to a third-party client.',
     select_user: 'Select user',
+    base_url: 'Public base URL',
     formats: 'Formats',
     ostium: 'Ostium Profile v1',
     ostium_desc: 'Best for Ostium; includes full routing metadata.',
@@ -347,6 +369,9 @@ export default {
     no_users: 'Create a user before generating subscriptions.',
     links: 'Share links',
     scan_hint: 'Scan with a client to import.',
+    reveal: 'Reveal subscription token',
+    reveal_hint:
+      'Subscription links are hidden by default to reduce token leakage. Revealing is recorded in the audit log.',
   },
   connections: {
     title: 'Connections',
@@ -364,6 +389,9 @@ export default {
     empty_desc: 'Live connections appear here as devices use the proxy.',
     unavailable: 'The core is not running; connections are unavailable.',
     paused: 'Refresh paused',
+    close_all_confirm: 'Close every active connection? In-flight requests will be interrupted.',
+    filter_user: 'Filter by user',
+    details: 'Connection details',
   },
   rules: {
     title: 'Routing',
@@ -393,6 +421,14 @@ export default {
     port: 'Port',
     process: 'Process name',
     network: 'Network',
+    rule_set_ref: 'Rule set',
+    move_up: 'Move up',
+    move_down: 'Move down',
+    advanced: 'Advanced JSON match',
+    advanced_json: 'Match JSON',
+    advanced_hint:
+      'Combine domain/ip_cidr/port/process_name/rule_set/network; the server validates it before saving.',
+    advanced_invalid: 'The JSON must be valid and contain an object.',
     test: 'Rule test',
     test_hint: 'Enter a domain or IP to see the final match.',
     test_result: 'Result',
@@ -449,6 +485,7 @@ export default {
     download: 'Download',
     empty: 'No log lines yet.',
     unavailable: 'Core logs are unavailable: {message}',
+    all_levels: 'All levels',
   },
   jobs: {
     title: 'Jobs',
@@ -503,6 +540,20 @@ export default {
     saved: 'Settings saved',
     restart_hint: 'Some settings require a service restart.',
     language_hint: 'Language only affects this browser.',
+    public_base_url: 'Public base URL',
+    public_base_url_hint:
+      'Used by subscription links and QR codes; leave empty to derive it from the domain.',
+    acme_email: 'ACME email',
+    acme_staging: 'Use ACME staging',
+    block_private_egress: 'Block server access to private networks',
+    ip_allowlist: 'Admin UI IP allowlist',
+    ip_allowlist_hint:
+      'Comma-separated CIDRs; empty means no restriction. Behind a reverse proxy only trust the address it injects.',
+    job_retention: 'Job retention (days)',
+    backup_password: 'Backup password',
+    backup_plaintext_warning:
+      'An unencrypted backup contains master.key and the full database. Store it on encrypted media.',
+    backup_plaintext_ack: 'I understand the risk and want an unencrypted backup',
   },
   system: {
     title: 'System',
@@ -564,7 +615,14 @@ export default {
     url_hint: 'Supports Ostium, Base64, Clash YAML and sing-box JSON.',
     scan_qr: 'Scan QR code',
     qr_hint: 'Choose a QR image or allow camera access.',
+    use_camera: 'Scan with camera',
+    camera_hint: 'Camera access requires HTTPS or localhost; frames never leave the browser.',
+    camera_failed: 'Could not start the camera. Check permissions or import an image instead.',
     drag_hint: 'Drag cards to reorder.',
+    activate: 'Use this profile',
+    activated: 'Active profile changed',
+    reordered: 'Profile order saved',
+    active: 'Active',
   },
   home: {
     title: 'Home',
@@ -633,17 +691,18 @@ export default {
     lan_disabled: 'LAN sharing disabled',
     lan_failed: 'Could not change LAN sharing: {message}',
     lan_tun:
-      'LAN sharing applies to mixed/system proxy mode. TUN LAN gateway is not included in v0.1.0.',
+      'LAN sharing applies to mixed/system proxy mode. TUN LAN gateway is not included in the current release.',
   },
   stats: {
     title: 'Statistics',
-    subtitle: 'Traffic trends, sessions and per-profile usage.',
+    subtitle: 'Traffic trends, sessions and top destinations.',
     today: 'Today',
     week: 'This week',
     month: 'This month',
     total_up: 'Total upload',
     total_down: 'Total download',
-    by_profile: 'By profile',
+    by_profile: 'Top destinations',
+    top_destinations: 'Top destinations',
     no_data: 'No traffic data yet.',
   },
   diagnostics: {
@@ -706,6 +765,9 @@ export default {
     core_unreachable: 'Core service unreachable; start ostium-core.service',
     engine_check_failed: 'Config validation failed; the previous config was kept',
     unknown: 'An unknown error occurred',
+    boundary_title: 'This page failed to render',
+    boundary_desc:
+      'The UI hit an unhandled error. Reload to try again; if it persists, export a diagnostics bundle.',
   },
   shortcuts: {
     title: 'Keyboard shortcuts',

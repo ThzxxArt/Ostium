@@ -24,8 +24,10 @@ const loading = ref(true)
 const loadingSub = ref(false)
 const error = ref<string | null>(null)
 const search = ref('')
+const baseUrl = ref('')
 const qrOpen = ref(false)
 const qrValue = ref('')
+const revealed = ref(false)
 
 const filtered = computed(() => {
   if (!search.value.trim()) return users.value
@@ -42,10 +44,10 @@ async function load() {
   try {
     const [overview, userList] = await Promise.all([api.subscriptions.overview(), api.users.list()])
     users.value = userList.users
+    baseUrl.value = overview.base_url
     if (!selectedId.value && users.value.length) selectedId.value = users.value[0].id
     if (selectedId.value) await loadSubscription(selectedId.value)
     error.value = null
-    void overview
   } catch (err) {
     error.value = (err as Error).message
   } finally {
@@ -53,16 +55,22 @@ async function load() {
   }
 }
 
-async function loadSubscription(id: string) {
+async function loadSubscription(id: string, reveal = false) {
   loadingSub.value = true
   try {
-    subscription.value = await api.users.subscription(id)
+    subscription.value = await api.users.subscription(id, reveal)
+    revealed.value = reveal || !subscription.value.reveal_required
   } catch (err) {
     subscription.value = null
     message.error((err as Error).message)
   } finally {
     loadingSub.value = false
   }
+}
+
+async function revealSubscription() {
+  if (!selectedId.value) return
+  await loadSubscription(selectedId.value, true)
 }
 
 async function selectUser(user: User) {
@@ -85,6 +93,7 @@ function confirmRotate() {
     onPositiveClick: async () => {
       try {
         subscription.value = await api.users.rotateSubscription(selectedUser.value!.id)
+        revealed.value = true
         message.success(t('subscriptions.rotate'))
       } catch (err) {
         message.error((err as Error).message)
@@ -153,6 +162,9 @@ onMounted(load)
               <p class="o-kicker">{{ t('subscriptions.title') }}</p>
               <h2>{{ selectedUser.name }}</h2>
               <p class="o-muted o-small">{{ t('subscriptions.scan_hint') }}</p>
+              <p v-if="baseUrl" class="o-micro o-subtle">
+                {{ t('subscriptions.base_url') }}: <code>{{ baseUrl }}</code>
+              </p>
             </div>
             <NButton size="small" secondary @click="confirmRotate">
               <template #icon><RotateCcw :size="14" /></template>
@@ -165,33 +177,47 @@ onMounted(load)
             <span>{{ t('subscriptions.token_warning') }}</span>
           </div>
 
-          <div class="formats">
-            <article v-for="format in subscription.formats" :key="format.id" class="format-card">
-              <div class="format-head">
-                <span class="format-icon"><Link2 :size="17" /></span>
-                <div>
-                  <strong>{{ format.name }}</strong>
-                  <span class="o-micro o-subtle">{{ format.id }}</span>
-                </div>
-              </div>
-              <code class="url o-truncate">{{ format.url }}</code>
-              <div class="format-actions">
-                <OCopyButton :value="format.url" size="small" :label="t('common.copy')" />
-                <NButton size="small" secondary @click="showQr(format.url)">
-                  <template #icon><QrCode :size="14" /></template>
-                  {{ t('subscriptions.qr') }}
-                </NButton>
-              </div>
-            </article>
+          <div v-if="!revealed" class="locked">
+            <ShieldAlert :size="26" />
+            <p>{{ t('subscriptions.reveal_hint') }}</p>
+            <NButton type="primary" :loading="loadingSub" @click="revealSubscription">
+              {{ t('subscriptions.reveal') }}
+            </NButton>
           </div>
 
-          <div v-if="subscription.links.length" class="links">
-            <h3>{{ t('subscriptions.links') }}</h3>
-            <div v-for="(link, index) in subscription.links" :key="index" class="link-row">
-              <code class="o-truncate">{{ link }}</code>
-              <OCopyButton :value="link" size="tiny" />
+          <template v-else>
+            <div class="formats">
+              <article
+                v-for="format in subscription.formats || []"
+                :key="format.id"
+                class="format-card"
+              >
+                <div class="format-head">
+                  <span class="format-icon"><Link2 :size="17" /></span>
+                  <div>
+                    <strong>{{ format.name }}</strong>
+                    <span class="o-micro o-subtle">{{ format.id }}</span>
+                  </div>
+                </div>
+                <code class="url o-truncate">{{ format.url }}</code>
+                <div class="format-actions">
+                  <OCopyButton :value="format.url" size="small" :label="t('common.copy')" />
+                  <NButton size="small" secondary @click="showQr(format.url)">
+                    <template #icon><QrCode :size="14" /></template>
+                    {{ t('subscriptions.qr') }}
+                  </NButton>
+                </div>
+              </article>
             </div>
-          </div>
+
+            <div v-if="(subscription.links || []).length" class="links">
+              <h3>{{ t('subscriptions.links') }}</h3>
+              <div v-for="(link, index) in subscription.links || []" :key="index" class="link-row">
+                <code class="o-truncate">{{ link }}</code>
+                <OCopyButton :value="link" size="tiny" />
+              </div>
+            </div>
+          </template>
         </template>
         <OEmptyState
           v-else
@@ -320,6 +346,18 @@ onMounted(load)
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+.locked {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 34px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 13px;
+  color: var(--text-3);
+  text-align: center;
 }
 .format-card {
   padding: 14px;

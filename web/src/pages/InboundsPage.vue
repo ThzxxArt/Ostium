@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInputNumber, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
+import { NButton, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import {
   Cable,
   KeyRound,
@@ -20,7 +20,7 @@ import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
-import type { Inbound } from '@/api/types'
+import type { Certificate, Inbound } from '@/api/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -28,6 +28,7 @@ const dialog = useDialog()
 const message = useMessage()
 
 const inbounds = ref<Inbound[]>([])
+const certificates = ref<Certificate[]>([])
 const loading = ref(true)
 const busy = ref<string | null>(null)
 const error = ref<string | null>(null)
@@ -72,16 +73,46 @@ const meta: Record<
 }
 
 const enabledCount = computed(() => inbounds.value.filter((item) => item.enabled).length)
+const readyCertificates = computed(() =>
+  certificates.value.filter((item) => item.status === 'ready'),
+)
+
+const certificateOptions = computed(() =>
+  readyCertificates.value.map((item) => ({
+    label: `${item.domain} (${item.days_remaining ?? 0}d)`,
+    value: item.id,
+  })),
+)
 
 async function load() {
   loading.value = true
   try {
-    inbounds.value = (await api.inbounds.list()).inbounds
+    const [inboundResult, certResult] = await Promise.all([
+      api.inbounds.list(),
+      api.certificates.list(),
+    ])
+    inbounds.value = inboundResult.inbounds
+    certificates.value = certResult.certificates
     error.value = null
   } catch (err) {
     error.value = (err as Error).message
   } finally {
     loading.value = false
+  }
+}
+
+async function assignCertificate(inbound: Inbound, certificateId: string | null) {
+  busy.value = inbound.kind
+  warning.value = null
+  try {
+    const result = await api.inbounds.update(inbound.kind, { certificate_id: certificateId })
+    if (result.warning) warning.value = result.warning
+    message.success(t('inbounds.certificate_saved'))
+    await load()
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    busy.value = null
   }
 }
 
@@ -285,11 +316,24 @@ onMounted(load)
                 </NButton>
               </template>
             </div>
+            <NSelect
+              :value="inbound.certificate?.id || null"
+              :options="certificateOptions"
+              clearable
+              size="small"
+              :placeholder="t('inbounds.select_certificate')"
+              :disabled="!readyCertificates.length || busy === inbound.kind"
+              @update:value="(value: string | null) => assignCertificate(inbound, value)"
+            />
           </div>
         </div>
 
         <footer class="card-foot">
-          <p v-if="inbound.requires_certificate && !inbound.certificate" class="warn-text">
+          <p v-if="inbound.port_conflict" class="warn-text">{{ inbound.port_conflict }}</p>
+          <p v-else-if="inbound.skipped_reason" class="warn-text">
+            {{ t('inbounds.skipped', { reason: inbound.skipped_reason }) }}
+          </p>
+          <p v-else-if="inbound.requires_certificate && !inbound.certificate" class="warn-text">
             {{ t('inbounds.requires_cert') }}
           </p>
           <p v-else-if="inbound.kind === 'vless' && inbound.enabled" class="o-micro o-subtle">

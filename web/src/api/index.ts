@@ -42,12 +42,17 @@ export const api = {
       password: string
       domain?: string
       public_ui?: boolean
+      lines?: 'reality' | 'later'
     }) => http.post<{ ok: boolean; role: string; username: string }>(`${v1}/setup`, payload),
     changePassword: (current_password: string, new_password: string) =>
-      http.post<{ ok: boolean }>(`${v1}/auth/password`, { current_password, new_password }),
+      http.post<{ ok: boolean; sessions_revoked: number }>(`${v1}/auth/password`, {
+        current_password,
+        new_password,
+      }),
     totpStart: () =>
       http.post<{ secret: string; uri: string; recovery_codes: string[] }>(`${v1}/auth/totp/start`),
     totpConfirm: (code: string) => http.post<{ ok: boolean }>(`${v1}/auth/totp/confirm`, { code }),
+    totpCancel: () => http.post<{ ok: boolean }>(`${v1}/auth/totp/cancel`),
     totpDisable: (password: string) =>
       http.post<{ ok: boolean }>(`${v1}/auth/totp/disable`, { password }),
   },
@@ -93,18 +98,22 @@ export const api = {
         series: TrafficPoint[]
         today: TrafficPoint | Record<string, number>
       }>(`${v1}/users/${id}/usage?days=${days}`),
-    subscription: (id: string) => http.get<SubscriptionPayload>(`${v1}/users/${id}/subscription`),
+    subscription: (id: string, reveal = false) =>
+      http.get<SubscriptionPayload>(`${v1}/users/${id}/subscription?reveal=${reveal}`),
     rotateSubscription: (id: string) =>
       http.post<SubscriptionPayload>(`${v1}/users/${id}/subscription/rotate`),
     export: (id: string) => http.get<Record<string, unknown>>(`${v1}/users/${id}/export`),
     bulk: (action: string, ids: string[]) =>
-      http.post<{ count: number; action: string; applied?: boolean; warning?: string }>(
-        `${v1}/users/bulk`,
-        {
-          action,
-          ids,
-        },
-      ),
+      http.post<{
+        count: number
+        action: string
+        applied?: boolean
+        warning?: string
+        exports?: Array<Record<string, unknown>>
+      }>(`${v1}/users/bulk`, {
+        action,
+        ids,
+      }),
   },
   subscriptions: {
     overview: () =>
@@ -114,7 +123,8 @@ export const api = {
       }>(`${v1}/subscriptions`),
   },
   profiles: {
-    list: () => http.get<{ profiles: Profile[] }>(`${v1}/profiles`),
+    list: () =>
+      http.get<{ profiles: Profile[]; active_profile_id: string | null }>(`${v1}/profiles`),
     create: (payload: { name: string; text?: string; url?: string }) =>
       http.post<{ profile: Profile; applied: boolean; warning?: string }>(
         `${v1}/profiles`,
@@ -125,6 +135,11 @@ export const api = {
         `${v1}/profiles/${id}`,
         payload,
       ),
+    activate: (id: string) =>
+      http.post<{ profile: Profile; applied: boolean; warning?: string }>(
+        `${v1}/profiles/${id}/activate`,
+      ),
+    reorder: (ids: string[]) => http.post<{ ok: boolean }>(`${v1}/profiles/reorder`, { ids }),
     remove: (id: string) =>
       http.delete<{ deleted: boolean; applied: boolean; warning?: string }>(`${v1}/profiles/${id}`),
     refresh: (id: string) =>
@@ -189,13 +204,24 @@ export const api = {
   },
   certificates: {
     list: () => http.get<{ certificates: Certificate[] }>(`${v1}/certificates`),
-    issue: (domain: string, method: 'acme' | 'self-signed' = 'acme', autoRenew = true) =>
+    issue: (
+      domain: string,
+      method: 'acme' | 'self-signed' = 'acme',
+      autoRenew = true,
+      options: { staging?: boolean; email?: string } = {},
+    ) =>
       http.post<{
         certificate?: Certificate
         job_id?: string
         applied?: boolean
         warning?: string
-      }>(`${v1}/certificates/issue`, { domain, method, auto_renew: autoRenew }),
+      }>(`${v1}/certificates/issue`, {
+        domain,
+        method,
+        auto_renew: autoRenew,
+        staging: options.staging,
+        email: options.email,
+      }),
     upload: (payload: {
       domain: string
       cert_pem: string
@@ -265,7 +291,11 @@ export const api = {
   },
   backups: {
     list: () => http.get<{ backups: Backup[] }>(`${v1}/backups`),
-    create: (password?: string) => http.post<{ job_id: string }>(`${v1}/backups`, { password }),
+    create: (password?: string, acknowledgePlaintext = false) =>
+      http.post<{ job_id: string }>(`${v1}/backups`, {
+        password,
+        acknowledge_plaintext: acknowledgePlaintext,
+      }),
     restore: (id: string, password?: string) =>
       http.post<{ staged: boolean; restart_required: boolean; message: string }>(
         `${v1}/backups/${id}/restore`,

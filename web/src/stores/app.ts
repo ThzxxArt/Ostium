@@ -54,10 +54,15 @@ export const useAppStore = defineStore('app', () => {
     setTheme(isDark.value ? 'light' : 'dark')
   }
 
+  function applyLocale() {
+    document.documentElement.lang = locale.value.startsWith('zh') ? 'zh-CN' : 'en'
+  }
+
   function toggleLanguage() {
     const next = locale.value.startsWith('zh') ? 'en-US' : 'zh-CN'
     locale.value = next
     setLocale(next)
+    applyLocale()
   }
 
   function toggleSidebar() {
@@ -78,6 +83,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   applyTheme()
+  applyLocale()
 
   return {
     theme,

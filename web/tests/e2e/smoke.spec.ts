@@ -81,6 +81,66 @@ const visualCertificates = [
   },
 ]
 
+const visualUsers = [
+  {
+    id: 'user-1',
+    name: 'alice',
+    enabled: true,
+    uuid: '2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e',
+    expires_at: '2027-01-01T00:00:00Z',
+    quota_bytes: 10 * 1024 ** 3,
+    quota_cycle: 'monthly',
+    cycle_started_at: '2026-11-01T00:00:00Z',
+    used_bytes: 2 * 1024 ** 3,
+    note: 'visual',
+    status: 'active',
+    online: true,
+    last_seen_at: '2026-11-12T09:55:00Z',
+    created_at: '2026-10-01T00:00:00Z',
+    disabled_reason: null,
+    has_subscription: true,
+  },
+]
+
+const visualSettings = {
+  general: {
+    role: 'server',
+    version: '0.1.1',
+    log_level: 'info',
+    mixed_port: 7890,
+    allow_lan: false,
+    routing_mode: 'smart',
+    mode: 'mixed',
+    tun_enabled: false,
+    auto_connect: false,
+    auto_reconnect: true,
+    public_ui: false,
+    domain: 'vpn.example.com',
+    acme_email: 'admin@example.com',
+    acme_staging: false,
+    public_base_url: 'https://vpn.example.com',
+    block_private_egress: true,
+  },
+  security: {
+    secure_cookies: true,
+    trusted_hosts: ['localhost', 'vpn.example.com'],
+    ui_allowlist: [],
+    api_tokens: [],
+  },
+  notifications: {
+    webhook_url: null,
+    has_webhook_secret: false,
+    enabled: true,
+  },
+  maintenance: {
+    update_channel: 'stable',
+    audit_retention_days: 90,
+    traffic_retention_days: 365,
+    job_retention_days: 7,
+    auto_backup: false,
+  },
+}
+
 const visualInfo = {
   app: { name: 'Ostium', version: '0.1.0', role: 'server' },
   host: {
@@ -133,6 +193,9 @@ async function mockVisualDashboard(page: Page) {
       '/api/v1/inbounds': { inbounds: visualInbounds },
       '/api/v1/certificates': { certificates: visualCertificates },
       '/api/v1/system/info': visualInfo,
+      '/api/v1/users': { users: visualUsers, total: visualUsers.length },
+      '/api/v1/settings': visualSettings,
+      '/api/v1/backups': { backups: [] },
     }
     const payload = payloads[path]
     if (payload === undefined) {
@@ -199,6 +262,31 @@ test('login page has no serious accessibility violations', async ({ page }) => {
   expect(serious).toEqual([])
 })
 
+for (const path of [
+  '/',
+  '/users',
+  '/subscriptions',
+  '/inbounds',
+  '/certificates',
+  '/rules',
+  '/connections',
+  '/logs',
+  '/jobs',
+  '/settings',
+  '/system',
+]) {
+  test(`page ${path} has no serious accessibility violations`, async ({ page }) => {
+    await login(page)
+    await page.goto(path)
+    await page.waitForLoadState('networkidle')
+    const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze()
+    const serious = results.violations.filter((item) =>
+      ['serious', 'critical'].includes(item.impact || ''),
+    )
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([])
+  })
+}
+
 test('responsive layout has no horizontal scroll', async ({ page }) => {
   await login(page)
   const overflow = await page.evaluate(
@@ -235,4 +323,26 @@ for (const theme of ['dark', 'light'] as const) {
       maxDiffPixelRatio: 0.01,
     })
   })
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  for (const path of ['/users', '/settings'] as const) {
+    test(`visual ${path} ${theme} @visual`, async ({ page }) => {
+      await page.addInitScript((value) => {
+        localStorage.setItem('ostium.theme', value)
+      }, theme)
+      await mockVisualDashboard(page)
+      await login(page)
+      await page.goto(path)
+      await page.waitForLoadState('networkidle')
+      await page.addStyleTag({ content: '.mobile-nav { display: none !important; }' })
+      await page.waitForTimeout(300)
+      await expect(page).toHaveScreenshot(`${path.replace('/', '')}-${theme}.png`, {
+        fullPage: true,
+        animations: 'disabled',
+        caret: 'hide',
+        maxDiffPixelRatio: 0.01,
+      })
+    })
+  }
 }

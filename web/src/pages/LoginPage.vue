@@ -33,7 +33,7 @@ const useRecovery = ref(false)
 const needsTotp = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const version = computed(() => auth.status?.version || '0.1.0')
+const version = computed(() => auth.status?.version || '0.1.1')
 
 onMounted(async () => {
   if (!auth.ready) await auth.bootstrap()

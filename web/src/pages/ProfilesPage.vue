@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NModal, NRadio, NRadioGroup, useDialog, useMessage } from 'naive-ui'
 import { Check, Link2, Plus, RefreshCw, ScanLine, Trash2, Waypoints } from '@lucide/vue'
@@ -17,6 +17,8 @@ const message = useMessage()
 const dialog = useDialog()
 
 const profiles = ref<Profile[]>([])
+const activeProfileId = ref<string | null>(null)
+const dragId = ref<string | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const importOpen = ref(false)
@@ -27,18 +29,75 @@ const importText = ref('')
 const importing = ref(false)
 const busy = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const cameraOpen = ref(false)
+const videoRef = ref<HTMLVideoElement | null>(null)
+let cameraStream: MediaStream | null = null
+let scanHandle: number | null = null
 
 const sorted = computed(() => [...profiles.value].sort((a, b) => a.sort_order - b.sort_order))
 
 async function load() {
   loading.value = true
   try {
-    profiles.value = (await api.profiles.list()).profiles
+    const result = await api.profiles.list()
+    profiles.value = result.profiles
+    activeProfileId.value = result.active_profile_id
     error.value = null
   } catch (err) {
     error.value = (err as Error).message
   } finally {
     loading.value = false
+  }
+}
+
+async function activate(profile: Profile) {
+  busy.value = profile.id
+  try {
+    const result = await api.profiles.activate(profile.id)
+    if (result.warning) message.warning(result.warning)
+    activeProfileId.value = profile.id
+    message.success(t('profiles.activated'))
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    busy.value = null
+  }
+}
+
+async function toggleEnabled(profile: Profile) {
+  busy.value = profile.id
+  try {
+    const result = await api.profiles.update(profile.id, { enabled: !profile.enabled })
+    if (result.warning) message.warning(result.warning)
+    await load()
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    busy.value = null
+  }
+}
+
+function onDragStart(profile: Profile) {
+  dragId.value = profile.id
+}
+
+async function onDrop(target: Profile) {
+  const sourceId = dragId.value
+  dragId.value = null
+  if (!sourceId || sourceId === target.id) return
+  const next = [...sorted.value]
+  const from = next.findIndex((item) => item.id === sourceId)
+  const to = next.findIndex((item) => item.id === target.id)
+  if (from < 0 || to < 0) return
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
+  profiles.value = next.map((item, index) => ({ ...item, sort_order: index * 10 }))
+  try {
+    await api.profiles.reorder(next.map((item) => item.id))
+    message.success(t('profiles.reordered'))
+  } catch (err) {
+    message.error((err as Error).message)
+    await load()
   }
 }
 
@@ -141,6 +200,69 @@ async function onQrFile(event: Event) {
   }
 }
 
+function stopCamera() {
+  if (scanHandle !== null) {
+    cancelAnimationFrame(scanHandle)
+    scanHandle = null
+  }
+  cameraStream?.getTracks().forEach((track) => track.stop())
+  cameraStream = null
+  cameraOpen.value = false
+}
+
+async function startCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    message.error(t('profiles.camera_failed'))
+    return
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+    })
+    cameraOpen.value = true
+    await nextTick()
+    if (videoRef.value) {
+      videoRef.value.srcObject = cameraStream
+      await videoRef.value.play()
+    }
+    scanFrame()
+  } catch {
+    stopCamera()
+    message.error(t('profiles.camera_failed'))
+  }
+}
+
+function scanFrame() {
+  scanHandle = requestAnimationFrame(() => {
+    const video = videoRef.value
+    if (!video || video.readyState < 2) {
+      scanFrame()
+      return
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const context = canvas.getContext('2d')
+    if (!context) {
+      stopCamera()
+      return
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const data = context.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(data.data, data.width, data.height)
+    if (code?.data) {
+      importText.value = code.data
+      importMode.value = 'text'
+      stopCamera()
+      message.success(t('profiles.scan_qr'))
+      return
+    }
+    scanFrame()
+  })
+}
+
+onBeforeUnmount(stopCamera)
+
 onMounted(load)
 </script>
 
@@ -172,7 +294,16 @@ onMounted(load)
     </div>
 
     <div v-else class="profile-grid">
-      <article v-for="profile in sorted" :key="profile.id" class="profile o-card">
+      <article
+        v-for="profile in sorted"
+        :key="profile.id"
+        class="profile o-card"
+        :class="{ active: activeProfileId === profile.id, dragging: dragId === profile.id }"
+        draggable="true"
+        @dragstart="onDragStart(profile)"
+        @dragover.prevent
+        @drop.prevent="onDrop(profile)"
+      >
         <header class="profile-head">
           <div class="profile-icon"><Waypoints :size="19" /></div>
           <div class="profile-copy">
@@ -182,7 +313,13 @@ onMounted(load)
               {{ t('profiles.endpoints') }}</span
             >
           </div>
-          <OStatusPill :status="profile.enabled ? 'active' : 'disabled'" size="sm" />
+          <OStatusPill
+            :status="
+              activeProfileId === profile.id ? 'online' : profile.enabled ? 'active' : 'disabled'
+            "
+            :label="activeProfileId === profile.id ? t('profiles.active') : undefined"
+            size="sm"
+          />
         </header>
 
         <div class="endpoints">
@@ -232,6 +369,24 @@ onMounted(load)
             }}</span
           >
           <div class="profile-actions">
+            <NButton
+              v-if="activeProfileId !== profile.id && profile.enabled"
+              size="tiny"
+              secondary
+              :loading="busy === profile.id"
+              @click="activate(profile)"
+            >
+              <template #icon><Check :size="13" /></template>
+              {{ t('profiles.activate') }}
+            </NButton>
+            <NButton
+              size="tiny"
+              secondary
+              :loading="busy === profile.id"
+              @click="toggleEnabled(profile)"
+            >
+              {{ profile.enabled ? t('common.disable') : t('common.enable') }}
+            </NButton>
             <NButton
               v-if="profile.subscription_url"
               size="tiny"
@@ -288,6 +443,7 @@ onMounted(load)
             <strong>{{ t('profiles.scan_qr') }}</strong>
             <span>{{ t('profiles.qr_hint') }}</span>
           </button>
+          <NButton secondary block @click="startCamera">{{ t('profiles.use_camera') }}</NButton>
           <p v-if="importText" class="o-small o-muted o-truncate">{{ importText }}</p>
         </div>
       </div>
@@ -297,6 +453,22 @@ onMounted(load)
           <NButton type="primary" :loading="importing" @click="importProfile">{{
             t('profiles.add')
           }}</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <NModal
+      v-model:show="cameraOpen"
+      preset="card"
+      :title="t('profiles.use_camera')"
+      :style="{ width: 'min(520px, calc(100vw - 32px))' }"
+      @after-leave="stopCamera"
+    >
+      <p class="o-small o-muted">{{ t('profiles.camera_hint') }}</p>
+      <video ref="videoRef" class="camera-preview" muted playsinline />
+      <template #footer>
+        <div class="modal-actions">
+          <NButton secondary @click="stopCamera">{{ t('common.cancel') }}</NButton>
         </div>
       </template>
     </NModal>
@@ -314,6 +486,14 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 14px;
+  cursor: grab;
+}
+.profile.active {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.profile.dragging {
+  opacity: 0.55;
 }
 .profile-head {
   display: flex;
@@ -463,6 +643,14 @@ onMounted(load)
 .qr-drop span {
   color: var(--text-3);
   font-size: 10.5px;
+}
+.camera-preview {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: #000;
+  min-height: 220px;
+  object-fit: cover;
 }
 .modal-actions {
   display: flex;

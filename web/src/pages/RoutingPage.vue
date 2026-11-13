@@ -257,6 +257,7 @@ onMounted(load)
             <NSwitch
               :value="rule.enabled"
               size="small"
+              :aria-label="matchSummary(rule)"
               @update:value="(value: boolean) => toggleRule(rule, value)"
             />
             <NButton size="tiny" quaternary @click="openEdit(rule)">{{ t('common.edit') }}</NButton>

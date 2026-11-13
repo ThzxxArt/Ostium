@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NConfigProvider,
   NDialogProvider,
@@ -13,6 +14,7 @@ import {
   zhCN,
 } from 'naive-ui'
 import OCommandPalette from '@/components/OCommandPalette.vue'
+import OErrorBoundary from '@/components/OErrorBoundary.vue'
 import OJobDrawer from '@/components/OJobDrawer.vue'
 import OPwaUpdate from '@/components/OPwaUpdate.vue'
 import OShortcutModal from '@/components/OShortcutModal.vue'
@@ -22,11 +24,21 @@ import { darkThemeOverrides, lightThemeOverrides } from '@/design/theme'
 
 const app = useAppStore()
 const { locale } = useI18n()
+const router = useRouter()
+const route = useRoute()
 
 const theme = computed(() => (app.isDark ? darkTheme : null))
 const overrides = computed(() => (app.isDark ? darkThemeOverrides : lightThemeOverrides))
 const naiveLocale = computed(() => (locale.value.startsWith('zh') ? zhCN : enUS))
 const naiveDateLocale = computed(() => (locale.value.startsWith('zh') ? dateZhCN : dateEnUS))
+
+function onUnauthorized() {
+  if (route.path === '/login') return
+  void router.replace({ path: '/login', query: { next: route.fullPath } })
+}
+
+onMounted(() => window.addEventListener('ostium:unauthorized', onUnauthorized))
+onBeforeUnmount(() => window.removeEventListener('ostium:unauthorized', onUnauthorized))
 </script>
 
 <template>
@@ -41,7 +53,9 @@ const naiveDateLocale = computed(() => (locale.value.startsWith('zh') ? dateZhCN
       <NDialogProvider>
         <NNotificationProvider>
           <NMessageProvider>
-            <RouterView />
+            <OErrorBoundary>
+              <RouterView />
+            </OErrorBoundary>
             <OCommandPalette />
             <OJobDrawer v-model:show="app.jobDrawerOpen" />
             <OShortcutModal />

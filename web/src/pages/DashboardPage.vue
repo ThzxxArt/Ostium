@@ -65,7 +65,22 @@ const uptime = computed(() => {
   if (!start) return '—'
   return formatDuration((Date.now() - new Date(start).getTime()) / 1000)
 })
-const recentEvents = computed(() => events.frames.slice(-6).reverse())
+const EVENT_KEYS: Record<string, string> = {
+  'engine.applied': 'dashboard.event_applied',
+  'job.created': 'dashboard.event_job_created',
+  'job.updated': 'dashboard.event_job_updated',
+  'alert.created': 'dashboard.event_alert_created',
+  'alert.updated': 'dashboard.event_alert_updated',
+  'quota.exceeded': 'dashboard.event_quota_exceeded',
+  'quota.threshold': 'dashboard.event_quota_threshold',
+  'system.proxy': 'dashboard.event_system_proxy',
+}
+const recentEvents = computed(() =>
+  events.frames
+    .filter((frame) => EVENT_KEYS[frame.type])
+    .slice(-6)
+    .reverse(),
+)
 
 async function load(silent = false) {
   if (!silent) loading.value = true
@@ -96,23 +111,17 @@ async function load(silent = false) {
 
 onMounted(() => {
   void load()
-  timer = window.setInterval(() => load(true), 8000)
+  timer = window.setInterval(() => {
+    if (!document.hidden) void load(true)
+  }, 8000)
 })
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)
 })
 
 function eventLabel(type: string): string {
-  const map: Record<string, string> = {
-    'engine.applied': 'Configuration applied',
-    'stats.tick': 'Traffic sample',
-    'job.created': 'Job queued',
-    'job.updated': 'Job updated',
-    'alert.created': 'New alert',
-    'quota.exceeded': 'Quota enforced',
-    'system.proxy': 'System proxy changed',
-  }
-  return map[type] || type
+  const key = EVENT_KEYS[type]
+  return key ? t(key) : type
 }
 </script>
 
@@ -214,6 +223,7 @@ function eventLabel(type: string): string {
                 type="line"
                 :percentage="info?.metrics.cpu_percent || 0"
                 :show-indicator="false"
+                :aria-label="t('system.cpu')"
                 size="small"
               />
               <div class="health-item">
@@ -228,6 +238,7 @@ function eventLabel(type: string): string {
                 type="line"
                 :percentage="info?.metrics.memory_percent || 0"
                 :show-indicator="false"
+                :aria-label="t('system.memory')"
                 size="small"
               />
               <div class="health-item">
@@ -240,6 +251,7 @@ function eventLabel(type: string): string {
                 type="line"
                 :percentage="info?.metrics.disk_percent || 0"
                 :show-indicator="false"
+                :aria-label="t('system.disk')"
                 size="small"
               />
             </div>
@@ -550,6 +562,10 @@ h2 {
 .health-value {
   color: var(--text);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  min-height: 18px;
+  text-align: right;
 }
 .cert-list {
   display: flex;

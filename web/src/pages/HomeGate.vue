@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import DashboardPage from './DashboardPage.vue'
-import ClientHomePage from './ClientHomePage.vue'
+import { defineAsyncComponent } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
+const DashboardPage = defineAsyncComponent(() => import('./DashboardPage.vue'))
+const ClientHomePage = defineAsyncComponent(() => import('./ClientHomePage.vue'))
 const auth = useAuthStore()
 </script>
 

@@ -1,8 +1,28 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
-import { Ban, Compass, Database, Plus, RefreshCw, Route, Trash2, Zap } from '@lucide/vue'
+import {
+  NButton,
+  NCheckbox,
+  NInput,
+  NModal,
+  NSelect,
+  NSwitch,
+  useDialog,
+  useMessage,
+} from 'naive-ui'
+import {
+  Ban,
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  Database,
+  Plus,
+  RefreshCw,
+  Route,
+  Trash2,
+  Zap,
+} from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
@@ -32,10 +52,14 @@ const form = ref({
     | 'domain_regex'
     | 'ip_cidr'
     | 'port'
-    | 'process_name',
+    | 'process_name'
+    | 'rule_set'
+    | 'network',
   values: '',
   note: '',
 })
+const advanced = ref(false)
+const advancedJson = ref('{}')
 const ruleSetForm = ref({ name: '', url: '', format: 'binary' })
 
 const typeOptions = [
@@ -46,6 +70,8 @@ const typeOptions = [
   { label: t('rules.ip_cidr'), value: 'ip_cidr' },
   { label: t('rules.port'), value: 'port' },
   { label: t('rules.process'), value: 'process_name' },
+  { label: t('rules.rule_set_ref'), value: 'rule_set' },
+  { label: t('rules.network'), value: 'network' },
 ]
 const actionOptions = [
   { label: t('rules.action_proxy'), value: 'proxy' },
@@ -69,6 +95,8 @@ async function load() {
 function openAdd() {
   editing.value = null
   form.value = { action: 'proxy', type: 'domain_suffix', values: '', note: '' }
+  advanced.value = false
+  advancedJson.value = '{}'
   ruleOpen.value = true
 }
 
@@ -83,16 +111,32 @@ function openEdit(rule: Rule) {
     values: Array.isArray(raw) ? raw.join(', ') : String(raw || ''),
     note: rule.note,
   }
+  advancedJson.value = JSON.stringify(match, null, 2)
+  advanced.value = false
   ruleOpen.value = true
 }
 
 async function saveRule() {
-  const values = form.value.values
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-  if (!values.length) return
-  const match = { [form.value.type]: form.value.type === 'port' ? values.map(Number) : values }
+  let match: Record<string, unknown>
+  if (advanced.value) {
+    try {
+      const parsed = JSON.parse(advancedJson.value)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object')
+      match = parsed as Record<string, unknown>
+    } catch {
+      message.error(t('rules.advanced_invalid'))
+      return
+    }
+  } else {
+    const values = form.value.values
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    if (!values.length) return
+    match = {
+      [form.value.type]: form.value.type === 'port' ? values.map(Number) : values,
+    }
+  }
   try {
     if (editing.value)
       await api.rules.update(editing.value.id, {
@@ -105,6 +149,21 @@ async function saveRule() {
     await load()
   } catch (err) {
     message.error((err as Error).message)
+  }
+}
+
+async function moveRule(index: number, delta: number) {
+  const target = index + delta
+  if (target < 0 || target >= rules.value.length) return
+  const next = [...rules.value]
+  const [moved] = next.splice(index, 1)
+  next.splice(target, 0, moved)
+  rules.value = next
+  try {
+    await api.rules.reorder(next.map((rule) => rule.id))
+  } catch (err) {
+    message.error((err as Error).message)
+    await load()
   }
 }
 
@@ -227,7 +286,7 @@ onMounted(load)
           <NButton type="primary" size="small" @click="openAdd">{{ t('rules.add') }}</NButton>
         </OEmptyState>
         <div v-else class="rule-list">
-          <div v-for="rule in rules" :key="rule.id" class="rule">
+          <div v-for="(rule, index) in rules" :key="rule.id" class="rule">
             <span class="action" :class="actionTone(rule.action)">
               <component
                 :is="rule.action === 'block' ? Ban : rule.action === 'direct' ? Compass : Zap"
@@ -242,8 +301,27 @@ onMounted(load)
             <NSwitch
               :value="rule.enabled"
               size="small"
+              :aria-label="matchSummary(rule)"
               @update:value="(value: boolean) => toggleRule(rule, value)"
             />
+            <NButton
+              size="tiny"
+              quaternary
+              :disabled="index === 0"
+              :aria-label="t('rules.move_up')"
+              @click="moveRule(index, -1)"
+            >
+              <template #icon><ChevronUp :size="13" /></template>
+            </NButton>
+            <NButton
+              size="tiny"
+              quaternary
+              :disabled="index === rules.length - 1"
+              :aria-label="t('rules.move_down')"
+              @click="moveRule(index, 1)"
+            >
+              <template #icon><ChevronDown :size="13" /></template>
+            </NButton>
             <NButton size="tiny" quaternary @click="openEdit(rule)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" @click="removeRule(rule)">
               <template #icon><Trash2 :size="13" /></template>
@@ -329,6 +407,16 @@ onMounted(load)
           ><span>{{ t('common.note') }}</span
           ><NInput v-model:value="form.note"
         /></label>
+        <NCheckbox v-model:checked="advanced">{{ t('rules.advanced') }}</NCheckbox>
+        <label v-if="advanced" class="field">
+          <span>{{ t('rules.advanced_json') }}</span>
+          <NInput
+            v-model:value="advancedJson"
+            type="textarea"
+            :autosize="{ minRows: 6, maxRows: 12 }"
+          />
+          <small class="o-subtle">{{ t('rules.advanced_hint') }}</small>
+        </label>
       </div>
       <template #footer>
         <div class="modal-actions">

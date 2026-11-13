@@ -8,12 +8,13 @@ export function useStatus() {
   const coreRunning = ref(false)
   const coreReachable = ref(false)
   const mode = ref<ConnectionMode>('mixed')
-  const version = ref('0.1.0')
+  const version = ref('0.1.1')
   const serverHost = ref<string | null>(null)
   const loading = ref(false)
   let timer: number | null = null
 
   async function refresh() {
+    if (document.hidden) return
     if (!auth.authenticated) return
     loading.value = true
     try {

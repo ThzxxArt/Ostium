@@ -58,7 +58,9 @@ function openDetail(job: Job) {
 
 onMounted(() => {
   void load()
-  timer = window.setInterval(() => load(true), 3000)
+  timer = window.setInterval(() => {
+    if (!document.hidden) void load(true)
+  }, 3000)
 })
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)
@@ -100,6 +102,7 @@ onBeforeUnmount(() => {
               type="line"
               :percentage="job.progress"
               :show-indicator="false"
+              :aria-label="job.type"
               size="small"
             />
           </div>

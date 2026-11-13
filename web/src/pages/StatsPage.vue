@@ -128,7 +128,7 @@ onMounted(load)
       <OEmptyState v-else compact :title="t('stats.no_data')" :description="t('stats.no_data')" />
     </OSectionCard>
 
-    <OSectionCard :title="t('stats.by_profile')" :icon="Activity">
+    <OSectionCard :title="t('stats.top_destinations')" :icon="Activity">
       <OEmptyState
         v-if="!topDestinations.length"
         compact

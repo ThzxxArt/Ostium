@@ -218,6 +218,7 @@ onMounted(load)
           :value="allowLan"
           :loading="lanBusy"
           :disabled="!lanAvailable"
+          :aria-label="t('network.allow_lan')"
           @update:value="toggleLan"
         />
       </div>

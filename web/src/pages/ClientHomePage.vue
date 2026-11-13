@@ -158,7 +158,9 @@ function connectionDuration(): string {
 
 onMounted(async () => {
   await load()
-  timer = window.setInterval(load, 4000)
+  timer = window.setInterval(() => {
+    if (!document.hidden) void load()
+  }, 4000)
 })
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)

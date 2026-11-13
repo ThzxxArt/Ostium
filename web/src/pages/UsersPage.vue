@@ -10,6 +10,7 @@ import {
   NDropdown,
   NInput,
   NModal,
+  NPagination,
   NProgress,
   NSelect,
   useDialog,
@@ -51,6 +52,8 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const search = ref('')
 const filter = ref('all')
+const page = ref(1)
+const pageSize = 50
 const selected = ref<Set<string>>(new Set())
 const busy = ref<string | null>(null)
 
@@ -67,6 +70,8 @@ const loadingUsage = ref(false)
 const subscriptionOpen = ref(false)
 const subscription = ref<SubscriptionPayload | null>(null)
 const subscriptionUser = ref<User | null>(null)
+const subscriptionRevealed = ref(false)
+const createdPassword = ref<string | null>(null)
 const qrOpen = ref(false)
 const qrValue = ref('')
 
@@ -95,6 +100,11 @@ const filtered = computed(() => {
 
 const allSelected = computed(
   () => filtered.value.length > 0 && filtered.value.every((user) => selected.value.has(user.id)),
+)
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
+const paged = computed(() =>
+  filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize),
 )
 
 const totalUsed = computed(() => users.value.reduce((sum, user) => sum + user.used_bytes, 0))
@@ -171,6 +181,8 @@ async function save() {
       message.success(t('users.created'))
       subscription.value = result.subscription
       subscriptionUser.value = result.user
+      subscriptionRevealed.value = true
+      createdPassword.value = result.password_once
       subscriptionOpen.value = true
     }
     createOpen.value = false
@@ -217,8 +229,21 @@ async function openSubscription(user: User) {
   subscriptionUser.value = user
   subscriptionOpen.value = true
   subscription.value = null
+  subscriptionRevealed.value = false
+  createdPassword.value = null
   try {
     subscription.value = await api.users.subscription(user.id)
+    subscriptionRevealed.value = !subscription.value.reveal_required
+  } catch (err) {
+    message.error((err as Error).message)
+  }
+}
+
+async function revealSubscription() {
+  if (!subscriptionUser.value) return
+  try {
+    subscription.value = await api.users.subscription(subscriptionUser.value.id, true)
+    subscriptionRevealed.value = true
   } catch (err) {
     message.error((err as Error).message)
   }
@@ -297,10 +322,24 @@ function toggleSelectAll() {
   else selected.value = new Set(filtered.value.map((user) => user.id))
 }
 
-async function bulk(action: 'enable' | 'disable' | 'delete') {
+async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
   if (!selected.value.size) return
   try {
     const ids = [...selected.value]
+    if (action === 'export') {
+      const result = await api.users.bulk('export', ids)
+      const blob = new Blob([JSON.stringify(result.exports ?? [], null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'ostium-users-export.json'
+      link.click()
+      URL.revokeObjectURL(url)
+      message.success(t('users.exported'))
+      return
+    }
     if (action === 'delete') {
       await new Promise<void>((resolve, reject) => {
         dialog.error({
@@ -377,7 +416,25 @@ watch(
   },
 )
 
+watch([search, filter, page], () => {
+  const query: Record<string, string> = { ...(route.query as Record<string, string>) }
+  if (search.value.trim()) query.q = search.value.trim()
+  else delete query.q
+  if (filter.value !== 'all') query.filter = filter.value
+  else delete query.filter
+  if (page.value > 1) query.page = String(page.value)
+  else delete query.page
+  void router.replace({ query })
+})
+
+watch(filtered, () => {
+  if (page.value > pageCount.value) page.value = pageCount.value
+})
+
 onMounted(async () => {
+  if (typeof route.query.q === 'string') search.value = route.query.q
+  if (typeof route.query.filter === 'string') filter.value = route.query.filter
+  if (typeof route.query.page === 'string') page.value = Math.max(1, Number(route.query.page) || 1)
   await load()
   if (route.query.create === '1') openCreate()
 })
@@ -437,6 +494,9 @@ onMounted(async () => {
       <NButton v-if="selected.size" size="small" secondary @click="bulk('disable')">{{
         t('users.bulk_disable')
       }}</NButton>
+      <NButton v-if="selected.size" size="small" secondary @click="bulk('export')">{{
+        t('users.bulk_export')
+      }}</NButton>
       <NButton v-if="selected.size" size="small" secondary type="error" @click="bulk('delete')">{{
         t('users.bulk_delete')
       }}</NButton>
@@ -466,7 +526,7 @@ onMounted(async () => {
         <span class="col-actions" />
       </div>
       <div
-        v-for="user in filtered"
+        v-for="user in paged"
         :key="user.id"
         class="table-row"
         :class="{ selected: selected.has(user.id) }"
@@ -496,6 +556,7 @@ onMounted(async () => {
               :percentage="percentOf(user.used_bytes, user.quota_bytes)"
               :show-indicator="false"
               :status="percentOf(user.used_bytes, user.quota_bytes) > 90 ? 'error' : 'default'"
+              :aria-label="user.name"
               size="small"
             />
             <span class="o-micro o-subtle"
@@ -520,6 +581,10 @@ onMounted(async () => {
           </NDropdown>
         </div>
       </div>
+    </div>
+
+    <div v-if="filtered.length > pageSize" class="pagination">
+      <NPagination v-model:page="page" :page-count="pageCount" :page-size="pageSize" />
     </div>
 
     <NModal
@@ -686,23 +751,36 @@ onMounted(async () => {
       <template #header>{{ t('subscriptions.title') }} · {{ subscriptionUser?.name }}</template>
       <div v-if="!subscription" class="loading">…</div>
       <div v-else class="sub-body">
+        <div v-if="createdPassword" class="password-once">
+          <strong>{{ t('users.password_once') }}</strong>
+          <code>{{ createdPassword }}</code>
+          <OCopyButton :value="createdPassword" size="small" />
+        </div>
         <div class="sub-warning">{{ t('subscriptions.token_warning') }}</div>
-        <div class="sub-grid">
-          <div v-for="format in subscription.formats" :key="format.id" class="sub-card">
-            <div>
-              <strong>{{ format.name }}</strong>
-              <span class="o-micro o-subtle">{{ format.id }}</span>
-            </div>
-            <div class="sub-actions">
-              <OCopyButton :value="format.url" size="small" />
-              <NButton size="small" secondary @click="showQr(format.url)">
-                <template #icon><Link2 :size="14" /></template>
-                {{ t('subscriptions.qr') }}
-              </NButton>
+        <div v-if="!subscriptionRevealed" class="sub-locked">
+          <p>{{ t('subscriptions.reveal_hint') }}</p>
+          <NButton type="primary" @click="revealSubscription">
+            {{ t('subscriptions.reveal') }}
+          </NButton>
+        </div>
+        <template v-else>
+          <div class="sub-grid">
+            <div v-for="format in subscription.formats || []" :key="format.id" class="sub-card">
+              <div>
+                <strong>{{ format.name }}</strong>
+                <span class="o-micro o-subtle">{{ format.id }}</span>
+              </div>
+              <div class="sub-actions">
+                <OCopyButton :value="format.url" size="small" />
+                <NButton size="small" secondary @click="showQr(format.url)">
+                  <template #icon><Link2 :size="14" /></template>
+                  {{ t('subscriptions.qr') }}
+                </NButton>
+              </div>
             </div>
           </div>
-        </div>
-        <p class="o-small o-muted">{{ t('subscriptions.scan_hint') }}</p>
+          <p class="o-small o-muted">{{ t('subscriptions.scan_hint') }}</p>
+        </template>
       </div>
     </NModal>
 
@@ -749,6 +827,11 @@ onMounted(async () => {
 }
 .spacer {
   flex: 1;
+}
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 4px;
 }
 .table-card {
   overflow: hidden;
@@ -958,6 +1041,33 @@ onMounted(async () => {
   background: var(--warning-soft);
   color: var(--warning);
   font-size: 11.5px;
+}
+.sub-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding: 22px;
+  border: 1px dashed var(--border);
+  border-radius: 11px;
+  color: var(--text-3);
+  text-align: center;
+}
+.password-once {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  font-size: 11.5px;
+}
+.password-once code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
 }
 .sub-grid {
   display: grid;

@@ -123,13 +123,4 @@ withDefaults(
 .tone-neutral {
   color: var(--text-2);
 }
-.value,
-.hint,
-.label {
-  color: var(--text);
-}
-.label,
-.hint {
-  color: var(--text-2);
-}
 </style>

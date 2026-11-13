@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NSwitch, useMessage } from 'naive-ui'
+import {
+  NButton,
+  NDrawer,
+  NDrawerContent,
+  NInput,
+  NSelect,
+  NSwitch,
+  useDialog,
+  useMessage,
+} from 'naive-ui'
 import { Ban, Cable, Pause, Play, RefreshCw, Search, XCircle } from '@lucide/vue'
 import OPageHeader from '@/components/OPageHeader.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
@@ -11,6 +20,7 @@ import { formatBytes, formatDuration } from '@/utils/format'
 
 const { t } = useI18n()
 const message = useMessage()
+const dialog = useDialog()
 
 const connections = ref<ConnectionEntry[]>([])
 const uploadTotal = ref(0)
@@ -19,18 +29,45 @@ const unavailable = ref(false)
 const loading = ref(true)
 const paused = ref(false)
 const search = ref('')
+const userFilter = ref<string | null>(null)
+const detail = ref<ConnectionEntry | null>(null)
+const detailOpen = ref(false)
 let timer: number | null = null
+let searchTimer: number | null = null
+
+const userOptions = computed(() => {
+  const names = new Set<string>()
+  for (const item of connections.value) {
+    const name = item.metadata?.user
+    if (typeof name === 'string' && name) names.add(name)
+  }
+  return [...names].sort().map((name) => ({ label: name, value: name }))
+})
 
 const filtered = computed(() => {
-  if (!search.value.trim()) return connections.value
+  let items = connections.value
+  if (userFilter.value) {
+    items = items.filter((item) => item.metadata?.user === userFilter.value)
+  }
+  if (!search.value.trim()) return items
   const needle = search.value.toLowerCase()
-  return connections.value.filter((item) => {
+  return items.filter((item) => {
     const meta = item.metadata || {}
     return [meta.user, meta.host, meta.destinationIP, meta.processPath, item.rule]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(needle))
   })
 })
+
+function onSearchInput() {
+  if (searchTimer !== null) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    searchTimer = null
+    void load(true)
+  }, 300)
+}
+
+watch(search, onSearchInput)
 
 async function load(silent = false) {
   if (!silent) loading.value = true
@@ -57,14 +94,27 @@ async function closeConnection(item: ConnectionEntry) {
   }
 }
 
-async function closeAll() {
-  try {
-    await api.stats.closeAll()
-    message.success(t('connections.close_all'))
-    await load(true)
-  } catch (err) {
-    message.error((err as Error).message)
-  }
+function closeAll() {
+  dialog.warning({
+    title: t('connections.close_all'),
+    content: t('connections.close_all_confirm'),
+    positiveText: t('common.confirm'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: async () => {
+      try {
+        await api.stats.closeAll()
+        message.success(t('connections.close_all'))
+        await load(true)
+      } catch (err) {
+        message.error((err as Error).message)
+      }
+    },
+  })
+}
+
+function openDetail(item: ConnectionEntry) {
+  detail.value = item
+  detailOpen.value = true
 }
 
 function togglePause() {
@@ -80,7 +130,7 @@ function togglePause() {
 function startTimer() {
   if (timer !== null) clearInterval(timer)
   timer = window.setInterval(() => {
-    if (!paused.value) void load(true)
+    if (!paused.value && !document.hidden) void load(true)
   }, 3000)
 }
 
@@ -96,6 +146,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)
+  if (searchTimer !== null) window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -113,7 +164,6 @@ onBeforeUnmount(() => {
         </NButton>
       </template>
     </OPageHeader>
-
     <div class="summary">
       <div>
         <span>{{ t('common.total') }}</span><strong>{{ connections.length }}</strong>
@@ -126,7 +176,12 @@ onBeforeUnmount(() => {
       </div>
       <div class="pause">
         <span>{{ paused ? t('connections.paused') : t('common.live') }}</span>
-        <NSwitch :value="paused" size="small" @update:value="togglePause">
+        <NSwitch
+          :value="paused"
+          size="small"
+          :aria-label="paused ? t('connections.paused') : t('common.live')"
+          @update:value="togglePause"
+        >
           <template #checked><Pause :size="11" /></template>
           <template #unchecked><Play :size="11" /></template>
         </NSwitch>
@@ -139,10 +194,17 @@ onBeforeUnmount(() => {
         clearable
         :placeholder="t('common.search')"
         data-search
-        @update:value="load(true)"
+        @update:value="onSearchInput"
       >
         <template #prefix><Search :size="15" /></template>
       </NInput>
+      <NSelect
+        v-model:value="userFilter"
+        :options="userOptions"
+        clearable
+        :placeholder="t('connections.filter_user')"
+        class="user-filter"
+      />
     </div>
 
     <div v-if="unavailable" class="o-card unavailable">
@@ -167,7 +229,7 @@ onBeforeUnmount(() => {
         <span>{{ t('connections.duration') }}</span>
         <span />
       </div>
-      <div v-for="item in filtered" :key="item.id" class="row">
+      <div v-for="item in filtered" :key="item.id" class="row" @click="openDetail(item)">
         <div class="user">
           <span class="avatar">{{
             String(item.metadata?.user || '?')
@@ -199,13 +261,42 @@ onBeforeUnmount(() => {
           <span class="o-subtle">{{ formatBytes(item.download) }}</span>
         </div>
         <div class="duration o-small o-muted">{{ duration(item) }}</div>
-        <div class="actions">
-          <NButton size="tiny" quaternary circle @click="closeConnection(item)">
+        <div class="actions" @click.stop>
+          <NButton
+            size="tiny"
+            quaternary
+            circle
+            :aria-label="t('connections.close')"
+            @click="closeConnection(item)"
+          >
             <template #icon><XCircle :size="15" /></template>
           </NButton>
         </div>
       </div>
     </div>
+
+    <NDrawer v-model:show="detailOpen" :width="440" placement="right">
+      <NDrawerContent v-if="detail" closable :title="t('connections.details')">
+        <div class="detail-list">
+          <div v-for="(value, key) in detail.metadata" :key="key" class="detail-row">
+            <span>{{ key }}</span>
+            <code>{{ String(value ?? '—') }}</code>
+          </div>
+          <div class="detail-row">
+            <span>{{ t('connections.chain') }}</span>
+            <code>{{ (detail.chains || []).join(' → ') || '—' }}</code>
+          </div>
+          <div class="detail-row">
+            <span>{{ t('common.up') }} / {{ t('common.down') }}</span>
+            <code>{{ formatBytes(detail.upload) }} / {{ formatBytes(detail.download) }}</code>
+          </div>
+          <div class="detail-row">
+            <span>{{ t('connections.duration') }}</span>
+            <code>{{ duration(detail) }}</code>
+          </div>
+        </div>
+      </NDrawerContent>
+    </NDrawer>
   </div>
 </template>
 
@@ -240,6 +331,35 @@ onBeforeUnmount(() => {
 }
 .toolbar :deep(.n-input) {
   max-width: 320px;
+}
+.user-filter {
+  width: 180px;
+}
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.detail-row span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+.detail-row code {
+  font-size: 11px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.row {
+  cursor: pointer;
 }
 .unavailable {
   display: flex;

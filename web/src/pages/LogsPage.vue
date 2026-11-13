@@ -25,7 +25,7 @@ const container = ref<HTMLElement | null>(null)
 let timer: number | null = null
 
 const levelOptions = [
-  { label: 'All levels', value: '' },
+  { label: t('logs.all_levels'), value: '' },
   { label: 'Debug', value: 'debug' },
   { label: 'Info', value: 'info' },
   { label: 'Warning', value: 'warning' },
@@ -107,7 +107,7 @@ function togglePause() {
 function startPolling() {
   if (timer !== null) clearInterval(timer)
   timer = window.setInterval(() => {
-    if (!paused.value && source.value === 'core') void load()
+    if (!paused.value && !document.hidden && source.value === 'core') void load()
   }, 2500)
 }
 
@@ -169,7 +169,7 @@ onBeforeUnmount(() => {
       <div class="spacer" />
       <label class="follow">
         <span>{{ t('logs.follow') }}</span>
-        <NSwitch v-model:value="follow" size="small" />
+        <NSwitch v-model:value="follow" size="small" :aria-label="t('logs.follow')" />
       </label>
       <NButton size="small" secondary @click="togglePause">
         <template #icon><component :is="paused ? Play : Pause" :size="14" /></template>

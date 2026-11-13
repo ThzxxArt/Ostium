@@ -64,6 +64,7 @@ async function request<T>(
     method,
     headers,
     credentials: 'same-origin',
+    signal: init?.signal ?? AbortSignal.timeout(30000),
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   })
   const contentType = response.headers.get('content-type') || ''
@@ -73,6 +74,13 @@ async function request<T>(
     ? await response.json().catch(() => ({}))
     : await response.text()
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !path.includes('/auth/login') &&
+      !path.includes('/auth/status')
+    ) {
+      window.dispatchEvent(new CustomEvent('ostium:unauthorized'))
+    }
     if (typeof payload === 'string') {
       throw new ApiError(response.status, { detail: payload, code: 'http_error' })
     }

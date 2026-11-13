@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="icon-btn mobile-menu"
-          aria-label="Open navigation"
+          :aria-label="t('nav.open_menu')"
           @click="toggleNavDrawer"
         >
           <Menu :size="19" />
@@ -329,6 +329,7 @@ onBeforeUnmount(() => {
         </NDropdown>
 
         <button type="button" class="search-button" @click="app.commandOpen = true">
+          <span class="sr-only">{{ t('common.search') }}</span>
           <Search :size="15" :stroke-width="1.8" />
           <span class="search-label">{{ t('common.search') }}</span>
           <kbd><Command :size="10" />K</kbd>
@@ -393,6 +394,7 @@ onBeforeUnmount(() => {
         <NTooltip>
           <template #trigger>
             <button type="button" class="icon-btn lang-btn" @click="app.toggleLanguage()">
+              <span class="sr-only">{{ t('settings.language') }}</span>
               <Languages :size="17" :stroke-width="1.7" />
               <span class="lang-code">{{ locale.startsWith('zh') ? '中' : 'EN' }}</span>
             </button>
@@ -415,6 +417,7 @@ onBeforeUnmount(() => {
       </header>
 
       <main id="main-content" class="content" tabindex="-1">
+        <p class="sr-only" role="status" aria-live="polite">{{ pageTitle }}</p>
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
             <component :is="Component" />
@@ -583,6 +586,7 @@ onBeforeUnmount(() => {
 .sidebar-foot {
   padding: 12px;
   border-top: 1px solid var(--border);
+  min-height: 78px;
 }
 .foot-card {
   display: flex;
@@ -660,6 +664,10 @@ onBeforeUnmount(() => {
   border: 0;
   background: transparent;
   padding: 0;
+  min-width: 118px;
+  width: 150px;
+  display: flex;
+  justify-content: flex-start;
   cursor: pointer;
 }
 .search-button {
@@ -762,6 +770,7 @@ onBeforeUnmount(() => {
 .content {
   flex: 1;
   min-width: 0;
+  min-height: 70vh;
 }
 .app-footer {
   display: flex;
@@ -769,6 +778,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 12px 24px 20px;
+  min-height: 56px;
   color: var(--text-3);
   font-size: 10.5px;
 }

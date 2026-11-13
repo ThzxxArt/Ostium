@@ -48,7 +48,9 @@ watch(
   (open) => {
     if (open) {
       void load()
-      timer = window.setInterval(load, 3000)
+      timer = window.setInterval(() => {
+        if (!document.hidden) void load()
+      }, 3000)
     } else if (timer !== null) {
       clearInterval(timer)
       timer = null
@@ -97,6 +99,7 @@ function icon(status: string) {
               type="line"
               :percentage="job.progress"
               :show-indicator="false"
+              :aria-label="job.type"
               size="small"
             />
             <div class="job-meta">

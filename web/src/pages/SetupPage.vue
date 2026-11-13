@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Cloud,
   Globe2,
   Laptop,
   Server,
@@ -43,7 +42,7 @@ const username = ref('admin')
 const password = ref('')
 const confirm = ref('')
 const domain = ref('')
-const transport = ref<'reality' | 'hysteria2' | 'both'>('reality')
+const transport = ref<'reality' | 'later'>('reality')
 const importText = ref('')
 const clientMode = ref<'mixed' | 'system_proxy' | 'tun'>('system_proxy')
 const accepted = ref(false)
@@ -89,6 +88,7 @@ async function finish() {
       username: username.value.trim(),
       password: password.value,
       domain: domain.value.trim() || undefined,
+      lines: role.value === 'server' ? transport.value : undefined,
     })
     if (role.value === 'client') {
       if (importText.value.trim()) {
@@ -123,18 +123,11 @@ const transportOptions = computed(() => [
     badge: 'Recommended',
   },
   {
-    id: 'hysteria2' as const,
-    title: t('setup.hysteria2'),
-    description: t('setup.hysteria2_desc'),
-    icon: Cloud,
-    badge: 'Certificate',
-  },
-  {
-    id: 'both' as const,
-    title: t('setup.both'),
-    description: t('setup.both_desc'),
+    id: 'later' as const,
+    title: t('setup.configure_later'),
+    description: t('setup.configure_later_desc'),
     icon: Waypoints,
-    badge: 'TCP + UDP',
+    badge: t('setup.later_badge'),
   },
 ])
 </script>
@@ -270,7 +263,7 @@ const transportOptions = computed(() => [
             <span v-if="transport === option.id" class="check"><Check :size="13" /></span>
           </button>
           <p v-if="transport !== 'reality'" class="hint">
-            {{ t('inbounds.requires_cert') }}
+            {{ t('setup.later_hint') }}
           </p>
         </div>
 

@@ -31,6 +31,7 @@ const query = ref('')
 const selected = ref(0)
 const users = ref<User[]>([])
 const loadingUsers = ref(false)
+let usersLoadedAt = 0
 const inputRef = ref<InstanceType<typeof NInput> | null>(null)
 
 interface PaletteItem {
@@ -158,10 +159,11 @@ watch(
       selected.value = 0
       await nextTick()
       inputRef.value?.focus()
-      if (auth.isServer && !users.value.length) {
+      if (auth.isServer && Date.now() - usersLoadedAt > 60_000) {
         loadingUsers.value = true
         try {
           users.value = (await api.users.list()).users
+          usersLoadedAt = Date.now()
         } catch {
           /* users are optional in the palette */
         } finally {

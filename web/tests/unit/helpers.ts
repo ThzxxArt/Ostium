@@ -353,10 +353,13 @@ export const fixtures = {
       domain: 'vpn.example.com',
       acme_email: 'admin@example.com',
       acme_staging: false,
+      public_base_url: 'https://vpn.example.com',
+      block_private_egress: true,
     },
     security: {
       secure_cookies: true,
       trusted_hosts: ['localhost', 'vpn.example.com'],
+      ui_allowlist: ['10.0.0.0/8'],
       api_tokens: [{ id: 'tok-1', name: 'ci', scopes: ['read'], revoked: false }],
     },
     notifications: {
@@ -368,6 +371,7 @@ export const fixtures = {
       update_channel: 'stable',
       audit_retention_days: 90,
       traffic_retention_days: 365,
+      job_retention_days: 7,
       auto_backup: true,
     },
   },
@@ -435,7 +439,13 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-export function mockResponse(method: string, path: string, body: any, options: FetchOptions = {}) {
+export function mockResponse(
+  method: string,
+  path: string,
+  body: any,
+  options: FetchOptions = {},
+  search = '',
+) {
   const mode = options.mode || 'happy'
   const role = options.role || 'server'
   const overrides = options.overrides || {}
@@ -465,6 +475,7 @@ export function mockResponse(method: string, path: string, body: any, options: F
   if (path === '/api/v1/auth/totp/confirm' || path === '/api/v1/auth/totp/disable') {
     return jsonResponse({ ok: true })
   }
+  if (path === '/api/v1/auth/totp/cancel') return jsonResponse({ ok: true })
   if (path === '/api/v1/setup') return jsonResponse({ ok: true, role, username: 'admin' })
 
   if (path === '/api/v1/stats/overview') {
@@ -530,7 +541,18 @@ export function mockResponse(method: string, path: string, body: any, options: F
   if (path.endsWith('/subscription/rotate')) {
     return jsonResponse({ ...clone(fixtures.subscription), token: 'rotated' })
   }
-  if (path.endsWith('/subscription')) return jsonResponse(clone(fixtures.subscription))
+  if (path.endsWith('/subscription')) {
+    if (!search.includes('reveal=true')) {
+      return jsonResponse({
+        user: fixtures.user.name,
+        has_token: true,
+        token_hint: 'sub-to…ken',
+        reveal_required: true,
+        status: 'active',
+      })
+    }
+    return jsonResponse(clone(fixtures.subscription))
+  }
   if (path.endsWith('/reset-usage'))
     return jsonResponse({ user: clone(fixtures.user), applied: true })
   if (path.endsWith('/rotate')) {
@@ -573,7 +595,14 @@ export function mockResponse(method: string, path: string, body: any, options: F
     if (method === 'POST') {
       return jsonResponse({ profile: clone(fixtures.profile), applied: true })
     }
-    return jsonResponse({ profiles: empty ? [] : [clone(fixtures.profile)] })
+    return jsonResponse({
+      profiles: empty ? [] : [clone(fixtures.profile)],
+      active_profile_id: 'profile-1',
+    })
+  }
+  if (path === '/api/v1/profiles/reorder') return jsonResponse({ ok: true })
+  if (path.match(/^\/api\/v1\/profiles\/[^/]+\/activate$/)) {
+    return jsonResponse({ profile: { ...clone(fixtures.profile), active: true }, applied: true })
   }
   if (path.match(/^\/api\/v1\/profiles\/[^/]+\/test$/)) {
     return jsonResponse({
@@ -772,7 +801,7 @@ export function installFetchMock(options: FetchOptions = {}) {
       }
     }
     calls.push({ method, path: url.pathname, search: url.search, body })
-    return mockResponse(method, url.pathname, body, options)
+    return mockResponse(method, url.pathname, body, options, url.search)
   })
   vi.stubGlobal('fetch', fetchMock)
   return { calls, fetchMock }

@@ -53,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     password: string
     domain?: string
     public_ui?: boolean
+    lines?: 'reality' | 'later'
   }) {
     await api.auth.setup(payload)
     await refresh()

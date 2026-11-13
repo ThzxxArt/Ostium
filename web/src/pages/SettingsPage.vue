@@ -61,14 +61,20 @@ const general = ref({
   mixed_port: 7890,
   auto_connect: false,
   auto_reconnect: true,
+  public_base_url: '',
+  acme_email: '',
+  acme_staging: false,
+  block_private_egress: true,
 })
 const notifications = ref({ webhook_url: '', webhook_secret: '', enabled: true })
 const maintenance = ref({
   update_channel: 'stable',
   audit_retention_days: 90,
   traffic_retention_days: 365,
+  job_retention_days: 7,
   auto_backup: false,
 })
+const allowlist = ref('')
 const publicUiDomain = ref('')
 const publicUiEnabled = ref(false)
 
@@ -88,6 +94,7 @@ const restoring = ref<Backup | null>(null)
 const restorePassword = ref('')
 const restoreOpen = ref(false)
 const backupPassword = ref('')
+const backupAck = ref(false)
 const backupOpen = ref(false)
 
 const server = computed(() => auth.isServer)
@@ -101,6 +108,9 @@ const certDomains = computed(() =>
   certificates.value
     .filter((certificate) => certificate.status === 'ready')
     .map((certificate) => ({ label: certificate.domain, value: certificate.domain })),
+)
+const apiTokens = computed<Array<Record<string, unknown>>>(
+  () => settings.value?.security.api_tokens ?? [],
 )
 
 async function load() {
@@ -119,6 +129,10 @@ async function load() {
       mixed_port: data.general.mixed_port,
       auto_connect: data.general.auto_connect,
       auto_reconnect: data.general.auto_reconnect,
+      public_base_url: data.general.public_base_url || '',
+      acme_email: data.general.acme_email || '',
+      acme_staging: data.general.acme_staging,
+      block_private_egress: data.general.block_private_egress,
     }
     notifications.value = {
       webhook_url: data.notifications.webhook_url || '',
@@ -129,8 +143,10 @@ async function load() {
       update_channel: data.maintenance.update_channel,
       audit_retention_days: data.maintenance.audit_retention_days,
       traffic_retention_days: data.maintenance.traffic_retention_days,
+      job_retention_days: data.maintenance.job_retention_days,
       auto_backup: data.maintenance.auto_backup,
     }
+    allowlist.value = (data.security.ui_allowlist || []).join(', ')
     publicUiEnabled.value = data.general.public_ui
     publicUiDomain.value = data.general.domain || ''
   } catch (err) {
@@ -148,6 +164,10 @@ async function saveGeneral() {
       mixed_port: general.value.mixed_port,
       auto_connect: general.value.auto_connect,
       auto_reconnect: general.value.auto_reconnect,
+      public_base_url: general.value.public_base_url || null,
+      acme_email: general.value.acme_email || null,
+      acme_staging: general.value.acme_staging,
+      block_private_egress: general.value.block_private_egress,
     })
     message.success(t('settings.saved'))
     if (result.restart_required) message.warning(t('settings.restart_hint'))
@@ -186,6 +206,23 @@ async function saveMaintenance() {
   saving.value = true
   try {
     await api.settings.update(maintenance.value)
+    message.success(t('settings.saved'))
+    await load()
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveAllowlist() {
+  saving.value = true
+  try {
+    const entries = allowlist.value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    await api.settings.update({ ui_allowlist: entries })
     message.success(t('settings.saved'))
     await load()
   } catch (err) {
@@ -255,6 +292,17 @@ async function confirmTotp() {
   }
 }
 
+async function cancelTotp() {
+  totpModal.value = false
+  totpStart.value = null
+  totpCode.value = ''
+  try {
+    await api.auth.totpCancel()
+  } catch {
+    // The pending secret expires automatically; there is nothing else to do.
+  }
+}
+
 async function disableTotp() {
   const password = window.prompt(t('auth.password')) || ''
   if (!password) return
@@ -302,9 +350,13 @@ function revokeToken(id: string) {
 
 async function createBackup() {
   try {
-    const result = await api.backups.create(backupPassword.value || undefined)
+    const result = await api.backups.create(
+      backupPassword.value || undefined,
+      backupPassword.value ? false : backupAck.value,
+    )
     backupOpen.value = false
     backupPassword.value = ''
+    backupAck.value = false
     app.jobDrawerOpen = true
     message.success(t('jobs.queued') + `: ${result.job_id.slice(0, 8)}`)
     await load()
@@ -456,6 +508,26 @@ onMounted(load)
                   t('settings.auto_reconnect')
                 }}</NCheckbox>
               </label>
+              <label v-if="server" class="field">
+                <span>{{ t('settings.public_base_url') }}</span>
+                <NInput
+                  v-model:value="general.public_base_url"
+                  placeholder="https://vpn.example.com"
+                />
+                <small class="o-subtle">{{ t('settings.public_base_url_hint') }}</small>
+              </label>
+              <label v-if="server" class="field">
+                <span>{{ t('settings.acme_email') }}</span>
+                <NInput v-model:value="general.acme_email" placeholder="admin@example.com" />
+              </label>
+              <label v-if="server" class="field row">
+                <NCheckbox v-model:checked="general.acme_staging">{{
+                  t('settings.acme_staging')
+                }}</NCheckbox>
+                <NCheckbox v-model:checked="general.block_private_egress">{{
+                  t('settings.block_private_egress')
+                }}</NCheckbox>
+              </label>
             </div>
             <template #footer>
               <div class="footer-actions">
@@ -474,7 +546,11 @@ onMounted(load)
                   <strong>{{ t('settings.public_ui') }}</strong>
                   <p class="o-small o-muted">{{ t('settings.public_ui_hint') }}</p>
                 </div>
-                <NSwitch :value="publicUiEnabled" @update:value="togglePublicUi" />
+                <NSwitch
+                  :value="publicUiEnabled"
+                  :aria-label="t('settings.public_ui')"
+                  @update:value="togglePublicUi"
+                />
               </div>
               <label class="field">
                 <span>{{ t('certs.domain') }}</span>
@@ -544,6 +620,27 @@ onMounted(load)
             </div>
           </OSectionCard>
 
+          <OSectionCard :title="t('settings.ip_allowlist')" :icon="ShieldCheck">
+            <label class="field">
+              <span>{{ t('settings.ip_allowlist') }}</span>
+              <NInput
+                v-model:value="allowlist"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 4 }"
+                placeholder="203.0.113.0/24, 2001:db8::/32"
+              />
+              <small class="o-subtle">{{ t('settings.ip_allowlist_hint') }}</small>
+            </label>
+            <template #footer>
+              <div class="footer-actions">
+                <NButton type="primary" :loading="saving" @click="saveAllowlist">
+                  <template #icon><Save :size="15" /></template>
+                  {{ t('common.save') }}
+                </NButton>
+              </div>
+            </template>
+          </OSectionCard>
+
           <OSectionCard :title="t('settings.api_tokens')" :icon="KeyRound">
             <template #actions>
               <NButton size="small" type="primary" @click="tokenOpen = true">
@@ -552,17 +649,13 @@ onMounted(load)
               </NButton>
             </template>
             <OEmptyState
-              v-if="!settings.security.api_tokens.length"
+              v-if="!apiTokens.length"
               compact
               :title="t('settings.api_tokens')"
               :description="t('settings.new_token')"
             />
             <div v-else class="token-list">
-              <div
-                v-for="token in settings.security.api_tokens"
-                :key="String(token.id)"
-                class="token"
-              >
+              <div v-for="token in apiTokens" :key="String(token.id)" class="token">
                 <div>
                   <strong>{{ token.name }}</strong>
                   <span class="o-micro o-subtle"
@@ -599,7 +692,7 @@ onMounted(load)
                   v-model:value="notifications.webhook_secret"
                   type="password"
                   show-password-on="click"
-                  :placeholder="settings.notifications.has_webhook_secret ? '••••••••' : ''"
+                  :placeholder="settings?.notifications.has_webhook_secret ? '••••••••' : ''"
                 />
               </label>
               <NCheckbox v-model:checked="notifications.enabled">{{
@@ -655,6 +748,10 @@ onMounted(load)
                   :min="30"
                   :max="3650"
                 />
+              </label>
+              <label class="field">
+                <span>{{ t('settings.job_retention') }}</span>
+                <NInputNumber v-model:value="maintenance.job_retention_days" :min="1" :max="365" />
               </label>
               <label class="field row">
                 <NCheckbox v-model:checked="maintenance.auto_backup">{{
@@ -785,7 +882,7 @@ onMounted(load)
       </div>
       <template #footer>
         <div class="footer-actions">
-          <NButton secondary @click="totpModal = false">{{ t('common.cancel') }}</NButton>
+          <NButton secondary @click="cancelTotp">{{ t('common.cancel') }}</NButton>
           <NButton type="primary" @click="confirmTotp">{{ t('common.confirm') }}</NButton>
         </div>
       </template>
@@ -798,18 +895,26 @@ onMounted(load)
       :bordered="false"
     >
       <template #header>{{ t('common.create') }}</template>
-      <label class="field"
-        ><span>{{ t('settings.webhook_secret') }}</span
-        ><NInput
-          v-model:value="backupPassword"
-          type="password"
-          show-password-on="click"
-          :placeholder="t('common.optional')"
-      /></label>
+      <div class="form-stack">
+        <p class="warning-text">{{ t('settings.backup_plaintext_warning') }}</p>
+        <label class="field"
+          ><span>{{ t('settings.backup_password') }}</span
+          ><NInput
+            v-model:value="backupPassword"
+            type="password"
+            show-password-on="click"
+            :placeholder="t('common.optional')"
+        /></label>
+        <NCheckbox v-if="!backupPassword" v-model:checked="backupAck">{{
+          t('settings.backup_plaintext_ack')
+        }}</NCheckbox>
+      </div>
       <template #footer>
         <div class="footer-actions">
           <NButton secondary @click="backupOpen = false">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" @click="createBackup">{{ t('common.create') }}</NButton>
+          <NButton type="primary" :disabled="!backupPassword && !backupAck" @click="createBackup">{{
+            t('common.create')
+          }}</NButton>
         </div>
       </template>
     </NModal>

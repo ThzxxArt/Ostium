@@ -56,12 +56,15 @@ export interface Inbound {
   id: string
   kind: 'vless' | 'hysteria2' | 'trojan' | 'shadowsocks'
   enabled: boolean
+  active?: boolean
   listen: string
   port: number
   default_port: number
   params: InboundParams
   certificate: Certificate | null
   requires_certificate: boolean
+  skipped_reason?: string | null
+  port_conflict?: string | null
   updated_at: string | null
 }
 
@@ -85,14 +88,18 @@ export interface SubscriptionFormat {
 }
 
 export interface SubscriptionPayload {
-  token: string
+  token?: string | null
   user: string
   formats: SubscriptionFormat[]
   links: string[]
-  qr_svg: string
+  qr_svg: string | null
   expires_at: string | null
   quota_bytes: number
   used_bytes: number
+  status?: string
+  has_token?: boolean
+  token_hint?: string | null
+  reveal_required?: boolean
 }
 
 export interface Endpoint {
@@ -119,6 +126,7 @@ export interface Profile {
   selected_endpoint: string | null
   subscription_url: string | null
   endpoints: Endpoint[]
+  active?: boolean
   created_at: string
 }
 
@@ -295,10 +303,13 @@ export interface AppSettings {
     domain: string | null
     acme_email: string | null
     acme_staging: boolean
+    public_base_url: string | null
+    block_private_egress: boolean
   }
   security: {
     secure_cookies: boolean
     trusted_hosts: string[]
+    ui_allowlist: string[]
     api_tokens: Array<Record<string, unknown>>
   }
   notifications: { webhook_url: string | null; has_webhook_secret: boolean; enabled: boolean }
@@ -306,6 +317,7 @@ export interface AppSettings {
     update_channel: string
     audit_retention_days: number
     traffic_retention_days: number
+    job_retention_days: number
     auto_backup: boolean
   }
 }
