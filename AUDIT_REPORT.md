@@ -620,9 +620,9 @@ shellcheck + bash -n                                  -> PASS
 
 ### 16.2 已在本环境验证
 
-- 后端：474 常规 + 9 真实 sing-box 集成 = 483 passed / 0 skipped；语句 95.7%、分支 91.5%；覆盖率门禁通过。
+- 后端：498 常规 + 9 真实 sing-box 集成 = 507 passed / 0 skipped；语句 95.6%、分支 91.8%；覆盖率门禁通过。
 - 真实 sing-box 1.14.4：`sing-box check`、SS2022 多用户回环流量、apply 失败保留旧配置。
-- 前端：158 passed；语句 90.7%、分支 85.2%；首屏 JS 191.8 KiB gzip（预算 300 KiB）。
+- 前端：160 passed；语句 90.6%、分支 85.1%；首屏 JS 192.8 KiB gzip（预算 300 KiB）。
 - Playwright：69 passed，含全核心页面 axe、dashboard/users/settings 视觉基线、LCP/CLS 预算。
 - Alembic fresh/旧库/更高版本拒绝、备份恢复迁移、SQLite integrity_check。
 - Linux 安装脚本静态检查（shellcheck/bash -n）、PowerShell 解析（CI 步骤）。
@@ -639,3 +639,37 @@ shellcheck + bash -n                                  -> PASS
 - Windows Authenticode、macOS Developer ID/notarization（无证书）。
 
 这些项目没有被写成“已验证”；发布前必须补证据，否则按 blocker 处理。
+
+---
+
+## 17. v0.1.1 第一轮全量 Review（2026-11-14）
+
+本轮在 v0.1.1 实现基础上做了第二次独立审查，重点检查“测试绿但语义仍错”的路径。
+完整问题台账、根因、修复与回归测试见 `V0.1.1_REVIEW_ROUND1.md`。
+
+### 17.1 结论
+
+- 共修复 34 项：P1 13 项、P2 21 项；P0 0 项。
+- 所有修复均有代码/测试/文档证据；没有删除断言、跳过测试、降低覆盖率或 mock 核心安全路径。
+- 本地可执行门禁全部通过；真实外部平台项仍为 blocker。
+
+### 17.2 重点根因
+
+1. **边界层复用不足**：订阅、规则集、CLI 导入各自实现 HTTP 抓取，只有部分做了 SSRF 校验，
+   且 httpx 自动重定向绕过了初始校验。统一为逐跳校验 + 字节上限的 `fetch_limited()`。
+2. **状态机遗漏“已禁用”分支**：月度配额重置在 `enabled` 判断之后，导致因超额被禁用的用户
+   永远不恢复。周期操作必须覆盖所有用户，再决定是否执行配额逻辑。
+3. **异步生命周期竞态**：统计 flush、WebSocket 会话复验、核心孤儿进程都依赖“只会在空闲时
+   发生”的假设。改为显式锁/时间基准/PID 清理。
+4. **UI 表单与 API 契约脱节**：证书 staging/email、设置清空、通知密钥、规则集错误结果都在
+   前端被丢弃或误报成功。修复以 API 契约为准，并补前端断言。
+5. **“空开关”**：通知、更新通道、自动重连此前只持久化不执行。分别接入 webhook 门控、
+   CLI 更新检查、客户端核心 watchdog。
+
+### 17.3 回归证据
+
+- 新增/加强测试覆盖：SSRF 重定向、规则集/订阅、WebSocket 忙流复验、月度配额恢复、
+  并发 flush、过期证书分配、设置清空、备份 WAL 快照/路径穿越、自动备份可见性、
+  入口端口冲突、同名 Profile tag、孤儿进程清理、限流键清理。
+- 后端、前端、集成、文档、脚本、依赖审计结果见 `V0.1.1_REVIEW_ROUND1.md` 第 4 节。
+- 外部验证矩阵未变化；仍未将 Windows/macOS/Nginx/Docker/ACME/TUN/soak 写成已验证。

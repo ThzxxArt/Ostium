@@ -1,6 +1,6 @@
 # Ostium v0.1.1 implementation status
 
-Updated: 2026-11-13
+Updated: 2026-11-14
 
 Legend: `[x]` implemented and exercised locally, `[~]` implemented but needs
 platform/external validation, `[ ]` not done yet.
@@ -28,8 +28,8 @@ platform/external validation, `[ ]` not done yet.
       release provenance/SBOM scaffolding.
 - [~] Windows/macOS/Docker/Nginx/ACME/TUN/72h/performance/5-user and code signing
       remain external validation; see `MANUAL_TASKS.md`.
-- [x] Local final gates: 474 regular backend tests + 9 real sing-box integration tests,
-      95.7%/91.5% coverage; 158 frontend tests, 90.7%/85.2% coverage;
+- [x] Local final gates: 498 regular backend tests + 9 real sing-box integration tests,
+      95.6%/91.8% coverage; 160 frontend tests, 90.6%/85.1% coverage;
       69 Playwright cases (axe/visual/performance/PWA); ruff/mypy/shellcheck/
       mkdocs/pip-audit/npm audit green.
 

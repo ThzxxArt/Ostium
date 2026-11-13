@@ -62,6 +62,29 @@ SemVer.
 - Documentation, migration guide and security advisory updated for the new
   defaults and residual external validation.
 
+### Review round 1 (2026-11-14)
+
+- Re-validate every redirect hop for subscription and rule-set downloads; direct
+  loopback/link-local/metadata targets are rejected. Manual profile refresh
+  failures now persist `last_refresh_error`.
+- Monthly quota rollover now also re-enables users disabled by last month's
+  quota; concurrent statistic flushes are serialised so stop/tick cannot
+  double-count traffic.
+- WebSocket sessions are revalidated on a timer even while events are flowing;
+  revoked sessions stop reconnecting.
+- Public UI enablement widens a loopback listener explicitly and remembers to
+  restore it on disable; settings can now clear public base URL, ACME email and
+  webhook secret.
+- Certificate upload/self-signed issuance no longer overwrites explicit
+  per-inbound assignments; expired certificates cannot be assigned. Rule-set
+  create normalises names before duplicate checks and enabling an inbound checks
+  TCP port conflicts.
+- Backup restore snapshots through SQLite (WAL-safe) before migration, and
+  archive extraction rejects `./../` traversal. Notification settings now gate
+  webhooks; the update channel is honoured by `ostium update --check`.
+- Localisation and accessibility fixes for login hero, error/empty/QR/chart
+  components, command palette, settings navigation and backup labels.
+
 ## [0.1.0] - 2026-11-13
 
 ### Release

@@ -119,6 +119,8 @@ sudo systemctl restart ostium
 
 UI 默认只监听回环；非回环明文监听需要显式 `allow_insecure_bind`，否则 `ostium serve` 直接拒绝启动。Public UI 仍需 TLS + TOTP。当前版本只支持 HTTP-01。
 
+在 Settings 开启 Public UI 时，如果当前监听地址仍是回环，Ostium 会自动改为 `0.0.0.0` 并在关闭时恢复 `127.0.0.1`；自定义监听地址不会被覆盖。重启后请先从本机确认 `https://域名/healthz`，再关闭 SSH 隧道。
+
 ## 备份
 
 在 Settings 创建加密备份，或：

@@ -14,7 +14,7 @@ Ostium 内置 Let's Encrypt ACME HTTP-01 客户端，用于 Hysteria2、Trojan �
 2. 输入域名，选择 **ACME HTTP-01**。
 3. 默认使用生产目录；测试时勾选 **staging**。
 4. 在 **Jobs** 查看进度。挑战服务器只在订单期间绑定 80，并且只提供一个 key authorization。
-5. 成功后证书保存到 `/var/lib/ostium/certs/<domain>/fullchain.pem` 和 `privkey.pem`（0600），并自动分配给 Hysteria2/Trojan。
+5. 成功后证书保存到 `/var/lib/ostium/certs/<domain>/fullchain.pem` 和 `privkey.pem`（0600），并只自动分配给尚未绑定证书的 Hysteria2/Trojan；已有显式绑定不会被覆盖。
 
 ## 续期
 
