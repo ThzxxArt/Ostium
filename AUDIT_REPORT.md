@@ -442,7 +442,7 @@ shellcheck + bash -n                                  -> PASS
 | 卸载 | `install-online.sh uninstall` 删除程序/链接，保留数据和配置 |
 | 客户端隔离 | 核心/UI 配置分离；`core-run` 在 `runtime/core.token` 生成令牌，`/v1/status` 鉴权 200 |
 | 发布工作流静态检查 | YAML 解析、action tag 存在、PyPI 只暂存 wheel/sdist、权限按 job 收窄 |
-| 干净克隆 | 待本轮最终提交后执行；结果见下方最终回复 |
+| 干净克隆 | `npm ci`、`npm audit` 0、137 前端测试、构建、394 非集成后端测试、wheel 含 SPA 全部通过（基线 `abb67e7`） |
 
 ### 13.4 仍未验证 / 外部阻塞
 
