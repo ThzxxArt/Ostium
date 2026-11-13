@@ -51,7 +51,19 @@ if [[ ! -x "$CORE_DIR/sing-box" ]] || ! "$CORE_DIR/sing-box" version >/dev/null 
   exit 2
 fi
 
+case "$PREFIX" in
+  *[[:space:]\&\#\|\\\"\']*)
+    echo "OSTIUM_PREFIX 不能包含空白、引号、&、#、| 或反斜杠：$PREFIX" >&2
+    exit 2
+    ;;
+esac
 mkdir -p "$PREFIX" "$DATA" "$DATA/logs" "$DATA/core" "$UI_DATA" "$UI_DATA/logs"
+
+render_plist() {
+  local source="$1" target="$2"
+  sed "s#/opt/ostium#$PREFIX#g" "$source" >"$target"
+  chmod 0644 "$target"
+}
 VENV="$PREFIX/venv"
 OLD_VENV=""
 if [[ -d "$VENV" ]]; then
@@ -76,6 +88,18 @@ ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
 install -m 0755 "$CORE_DIR/sing-box" "$PREFIX/sing-box"
 install -m 0755 "$CORE_DIR/sing-box" "$DATA/core/sing-box"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+for doc in LICENSE NOTICE; do
+  if [[ -f "$ROOT_DIR/$doc" ]]; then
+    install -m 0644 "$ROOT_DIR/$doc" "$PREFIX/$doc"
+  fi
+done
+for doc in LICENSE SBOM.txt; do
+  if [[ -f "$CORE_DIR/$doc" ]]; then
+    install -m 0644 "$CORE_DIR/$doc" "$DATA/core/$doc"
+  fi
+done
+true
 
 # Clients do not have an installer-created administrator: the first visit to
 # the UI runs the setup wizard, exactly like the Linux client.  Keep the core
@@ -111,6 +135,7 @@ log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
+core_token_file = "$DATA/runtime/core.token"
 mode = "system_proxy"
 EOF
 fi
@@ -149,6 +174,10 @@ Ostium macOS client installed without launchd.
   Data:  $DATA
   UI data: $UI_DATA
 EOF
+  if [[ "$UI_OWNER" != "root" ]]; then
+    echo
+    echo "请注销并重新登录，让 $UI_OWNER 获得 ostium 组权限后再启动 UI。"
+  fi
   exit 0
 fi
 
@@ -164,12 +193,12 @@ launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || 
 launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
 unload_agent /Library/LaunchAgents/com.ostium.ui.plist
 
-install -m 0644 "$SCRIPT_DIR/com.ostium.core.plist" /Library/LaunchDaemons/
+render_plist "$SCRIPT_DIR/com.ostium.core.plist" /Library/LaunchDaemons/com.ostium.core.plist
 if [[ "$RUN_AS_ROOT" == "true" ]]; then
-  install -m 0644 "$SCRIPT_DIR/com.ostium.ui.root.plist" /Library/LaunchDaemons/com.ostium.ui.plist
+  render_plist "$SCRIPT_DIR/com.ostium.ui.root.plist" /Library/LaunchDaemons/com.ostium.ui.plist
   rm -f /Library/LaunchAgents/com.ostium.ui.plist
 else
-  install -m 0644 "$SCRIPT_DIR/com.ostium.ui.plist" /Library/LaunchAgents/
+  render_plist "$SCRIPT_DIR/com.ostium.ui.plist" /Library/LaunchAgents/com.ostium.ui.plist
   rm -f /Library/LaunchDaemons/com.ostium.ui.plist
 fi
 
@@ -195,3 +224,6 @@ Ostium macOS client installed.
 
 Open the UI to complete the client setup wizard.
 EOF
+if [[ "$RUN_AS_ROOT" != "true" && "$UI_OWNER" != "root" ]]; then
+  echo "首次安装后请注销并重新登录，让 $UI_OWNER 获得 ostium 组权限，否则 UI 无法读取 core token。"
+fi

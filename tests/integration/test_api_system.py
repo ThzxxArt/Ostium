@@ -419,6 +419,7 @@ def test_client_modes_and_connect_disconnect(client_api: TestClient, fake_proxy:
     services.engine.client.stop = stop_ok  # type: ignore[method-assign]
     disconnected = client_api.post("/api/v1/system/disconnect", headers=headers)
     assert disconnected.status_code == 200
+    assert services.settings.tun_enabled is False
 
     async def stop_fail() -> dict:
         raise RuntimeError("stop failed")
@@ -672,7 +673,10 @@ def test_jobs_and_alerts(api_client: TestClient, session_token: str, settings: S
     alerts = api_client.get("/api/v1/alerts").json()["alerts"]
     assert alerts[0]["id"] == "alert-1"
     assert api_client.post("/api/v1/alerts/alert-1/ack", headers=headers).status_code == 200
-    assert api_client.get("/api/v1/alerts").json()["alerts"] == []
+    # Housekeeping can add a host-level alert (for example disk_low) while this
+    # test runs; only the alert created here must disappear after ack.
+    remaining = api_client.get("/api/v1/alerts").json()["alerts"]
+    assert all(item["id"] != "alert-1" for item in remaining)
     assert api_client.get("/api/v1/alerts?include_acknowledged=true").json()["alerts"]
     assert api_client.post("/api/v1/alerts/missing/ack", headers=headers).status_code == 404
 

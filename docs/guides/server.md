@@ -12,7 +12,7 @@
 ## 一键安装（推荐）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 

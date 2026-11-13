@@ -89,6 +89,30 @@ def test_core_apply_role_and_validation(tmp_path: Path) -> None:
         assert invalid.status_code == 422
 
 
+def test_core_reloads_approved_ports_before_apply(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    settings.proxy_ports = [443]
+    settings.save()
+    app = create_core_app(settings)
+    with TestClient(app) as client:
+        captured: dict[str, object] = {}
+
+        async def fake_apply(config, sha256, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs)
+            return _status()
+
+        app.state.supervisor.apply = fake_apply  # type: ignore[method-assign]
+        settings.proxy_ports = [443, 9443]
+        settings.save()
+        response = client.post(
+            "/v1/apply",
+            json={"config": {}, "sha256": "0" * 64, "role": "server"},
+            headers=_headers(settings),
+        )
+        assert response.status_code == 200
+        assert captured["allowed_ports"] == {443, 9443}
+
+
 def test_core_body_limits_and_content_type(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     app = create_core_app(settings)
@@ -201,7 +225,7 @@ def test_core_apply_forwards_allow_lan(tmp_path: Path) -> None:
     supervisor = app.state.supervisor
     captured: list[bool] = []
 
-    async def apply(config, sha256, *, allow_lan=False):  # type: ignore[no-untyped-def]
+    async def apply(config, sha256, *, allow_lan=False, **kwargs):  # type: ignore[no-untyped-def]
         captured.append(allow_lan)
         return _status(False)
 

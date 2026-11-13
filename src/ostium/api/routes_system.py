@@ -211,6 +211,11 @@ async def toggle_proxy(
     try:
         services.settings.save()
     except OSError as exc:
+        if payload.enabled:
+            try:
+                services.proxy.disable()
+            except Exception:
+                pass
         raise ApiError(
             500, f"could not persist the network mode: {exc}", "settings_write_failed"
         ) from exc
@@ -313,7 +318,8 @@ async def set_mode(
     except ValueError as exc:
         raise ApiError(400, "mode must be mixed, system_proxy or tun", "bad_mode") from exc
     if mode is Mode.TUN:
-        return await toggle_tun(TunToggle(enabled=True), request, admin, services, session)
+        result = await toggle_tun(TunToggle(enabled=True), request, admin, services, session)
+        return {"mode": "tun", **result}
     if services.settings.tun_enabled:
         await toggle_tun(TunToggle(enabled=False), request, admin, services, session)
     if mode is Mode.SYSTEM_PROXY:
@@ -371,6 +377,13 @@ async def disconnect(
         status = await services.engine.client.stop()
     except Exception as exc:
         raise ApiError(502, f"could not stop the core: {exc}", "core_error") from exc
+    services.settings.tun_enabled = False
+    if services.settings.mode is Mode.TUN:
+        services.settings.mode = Mode.MIXED
+    try:
+        services.settings.save()
+    except OSError:
+        pass
     await audit(session, actor=admin.username, action="client.disconnect", ip=client_ip(request))
     return {"connected": False, "status": status}
 

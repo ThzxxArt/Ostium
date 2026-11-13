@@ -160,6 +160,32 @@ def test_gnome_proxy_schema_missing_and_errors(
         proxy.enable()
 
 
+def test_gnome_partial_failure_restores_original_state(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    def responder(command: list[str]) -> Result:
+        calls.append(command)
+        if len(command) > 3 and command[1] == "set" and command[3] == "port":
+            return Result(returncode=1, stderr="port write failed")
+        if command[1] == "get":
+            return Result(stdout="'original'")
+        return Result()
+
+    _patch_run(monkeypatch, responder)
+    proxy = GnomeProxy(settings)
+    with pytest.raises(ProxyError, match="port write failed"):
+        proxy.enable(port=7893)
+    assert any(call[-2:] == ["mode", "'original'"] for call in calls)
+    # The restore itself could not complete (the failing key is retried by
+    # disable), so the state must stay dirty.  Marking it clean would hide a
+    # partially applied proxy from the next startup recovery.
+    entry = _read_state(proxy.state_path)[proxy_module.STATE_KEY]
+    assert entry["enabled"] is True
+    assert entry["clean_shutdown"] is False
+
+
 def test_gnome_disable_without_original(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:

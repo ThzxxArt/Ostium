@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -33,6 +34,13 @@ def _run(command: list[str], timeout: float = 15.0) -> subprocess.CompletedProce
         raise ProxyError(f"required command not found: {command[0]}") from exc
     except subprocess.TimeoutExpired as exc:
         raise ProxyError(f"command timed out: {command[0]}") from exc
+
+
+def _require(command: list[str], timeout: float = 15.0) -> subprocess.CompletedProcess[str]:
+    result = _run(command, timeout)
+    if result.returncode != 0:
+        raise ProxyError(result.stderr.strip() or f"command failed: {command[0]}")
+    return result
 
 
 def _read_state(path: Path) -> dict[str, Any]:
@@ -124,18 +132,9 @@ class GnomeProxy(BaseProxy):
             "socks_port": self._get("org.gnome.system.proxy.socks", "port"),
             "ignore_hosts": self._get("org.gnome.system.proxy", "ignore-hosts"),
         }
-        self._set("org.gnome.system.proxy.http", "host", host)
-        self._set("org.gnome.system.proxy.http", "port", str(port))
-        self._set("org.gnome.system.proxy.https", "host", host)
-        self._set("org.gnome.system.proxy.https", "port", str(port))
-        self._set("org.gnome.system.proxy.socks", "host", host)
-        self._set("org.gnome.system.proxy.socks", "port", str(port))
-        self._set(
-            "org.gnome.system.proxy",
-            "ignore-hosts",
-            "['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']",
-        )
-        self._set("org.gnome.system.proxy", "mode", "'manual'")
+        # Persist the recovery state before touching the desktop.  If any
+        # gsettings call fails halfway through, disable() can restore every
+        # original value instead of leaving a half-applied proxy.
         state = _read_state(self.state_path)
         state[STATE_KEY] = {
             "platform": self.platform,
@@ -146,24 +145,61 @@ class GnomeProxy(BaseProxy):
             "clean_shutdown": False,
         }
         _write_state(self.state_path, state)
+        try:
+            self._set("org.gnome.system.proxy.http", "host", host)
+            self._set("org.gnome.system.proxy.http", "port", str(port))
+            self._set("org.gnome.system.proxy.https", "host", host)
+            self._set("org.gnome.system.proxy.https", "port", str(port))
+            self._set("org.gnome.system.proxy.socks", "host", host)
+            self._set("org.gnome.system.proxy.socks", "port", str(port))
+            ignore_hosts = (
+                "['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', "
+                "'172.16.0.0/12', '192.168.0.0/16']"
+            )
+            self._set("org.gnome.system.proxy", "ignore-hosts", ignore_hosts)
+            self._set("org.gnome.system.proxy", "mode", "'manual'")
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.disable()
+            raise
         return self.status()
 
     def disable(self) -> dict[str, Any]:
         state = _read_state(self.state_path)
         entry = state.get(STATE_KEY, {})
         original = entry.get("original") or {}
+        errors: list[str] = []
         if original:
             for key, value in original.items():
                 schema, _, name = key.partition("_")
-                if key == "mode":
-                    self._set("org.gnome.system.proxy", "mode", value)
-                elif key == "ignore_hosts":
-                    self._set("org.gnome.system.proxy", "ignore-hosts", value)
-                else:
-                    self._set(f"org.gnome.system.proxy.{schema}", name, value)
+                try:
+                    if key == "mode":
+                        self._set("org.gnome.system.proxy", "mode", value)
+                    elif key == "ignore_hosts":
+                        self._set("org.gnome.system.proxy", "ignore-hosts", value)
+                    else:
+                        self._set(f"org.gnome.system.proxy.{schema}", name, value)
+                except ProxyError as exc:
+                    errors.append(f"{key}: {exc}")
         else:
-            self._set("org.gnome.system.proxy", "mode", "'none'")
-        entry.update({"enabled": False, "clean_shutdown": True})
+            try:
+                self._set("org.gnome.system.proxy", "mode", "'none'")
+            except ProxyError as exc:
+                errors.append(f"mode: {exc}")
+        if errors:
+            # Keep the dirty flag: one failed key must not hide the keys that
+            # still need restoring on the next startup.
+            entry.update(
+                {
+                    "enabled": True,
+                    "clean_shutdown": False,
+                    "last_error": "; ".join(errors),
+                }
+            )
+            state[STATE_KEY] = entry
+            _write_state(self.state_path, state)
+            raise ProxyError("; ".join(errors))
+        entry.update({"enabled": False, "clean_shutdown": True, "last_error": None})
         state[STATE_KEY] = entry
         _write_state(self.state_path, state)
         return self.status()
@@ -224,12 +260,6 @@ class KdeProxy(BaseProxy):
         port = port or self.settings.mixed_port
         keys = ("ProxyType", "httpProxy", "httpsProxy", "socksProxy", "NoProxyFor")
         original = {key: self._read(key) for key in keys} if self._can_read else {}
-        self._write("ProxyType", "1")
-        self._write("httpProxy", f"http://{host} {port}")
-        self._write("httpsProxy", f"http://{host} {port}")
-        self._write("socksProxy", f"socks://{host} {port}")
-        self._write("NoProxyFor", "localhost,127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16")
-        self._notify()
         state = _read_state(self.state_path)
         state[STATE_KEY] = {
             "platform": self.platform,
@@ -240,22 +270,53 @@ class KdeProxy(BaseProxy):
             "clean_shutdown": False,
         }
         _write_state(self.state_path, state)
+        try:
+            self._write("ProxyType", "1")
+            self._write("httpProxy", f"http://{host} {port}")
+            self._write("httpsProxy", f"http://{host} {port}")
+            self._write("socksProxy", f"socks://{host} {port}")
+            self._write(
+                "NoProxyFor", "localhost,127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+            )
+            self._notify()
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.disable()
+            raise
         return self.status()
 
     def disable(self) -> dict[str, Any]:
         state = _read_state(self.state_path)
         entry = state.get(STATE_KEY, {})
         original = entry.get("original") or {}
+        errors: list[str] = []
         if original:
             for key, value in original.items():
-                if value is None:
-                    self._delete(key)
-                else:
-                    self._write(key, value)
+                try:
+                    if value is None:
+                        self._delete(key)
+                    else:
+                        self._write(key, value)
+                except ProxyError as exc:
+                    errors.append(f"{key}: {exc}")
         else:
-            self._write("ProxyType", "0")
+            try:
+                self._write("ProxyType", "0")
+            except ProxyError as exc:
+                errors.append(f"ProxyType: {exc}")
         self._notify()
-        entry.update({"enabled": False, "clean_shutdown": True})
+        if errors:
+            entry.update(
+                {
+                    "enabled": True,
+                    "clean_shutdown": False,
+                    "last_error": "; ".join(errors),
+                }
+            )
+            state[STATE_KEY] = entry
+            _write_state(self.state_path, state)
+            raise ProxyError("; ".join(errors))
+        entry.update({"enabled": False, "clean_shutdown": True, "last_error": None})
         state[STATE_KEY] = entry
         _write_state(self.state_path, state)
         return self.status()
@@ -281,7 +342,7 @@ class MacProxy(BaseProxy):
         return sys.platform == "darwin" and shutil.which("networksetup") is not None
 
     def _services(self) -> list[str]:
-        result = _run(["networksetup", "-listallnetworkservices"])
+        result = _require(["networksetup", "-listallnetworkservices"])
         services = []
         for line in result.stdout.splitlines():
             line = line.strip()
@@ -315,9 +376,6 @@ class MacProxy(BaseProxy):
                             port_value = 0
                 states[kind] = {"enabled": enabled, "server": server, "port": port_value}
             original[service] = states
-            _run(["networksetup", "-setwebproxy", service, host, str(port)])
-            _run(["networksetup", "-setsecurewebproxy", service, host, str(port)])
-            _run(["networksetup", "-setsocksfirewallproxy", service, host, str(port)])
         state = _read_state(self.state_path)
         state[STATE_KEY] = {
             "platform": self.platform,
@@ -328,11 +386,21 @@ class MacProxy(BaseProxy):
             "clean_shutdown": False,
         }
         _write_state(self.state_path, state)
+        try:
+            for service in original:
+                _require(["networksetup", "-setwebproxy", service, host, str(port)])
+                _require(["networksetup", "-setsecurewebproxy", service, host, str(port)])
+                _require(["networksetup", "-setsocksfirewallproxy", service, host, str(port)])
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.disable()
+            raise
         return self.status()
 
     def disable(self) -> dict[str, Any]:
         state = _read_state(self.state_path)
         entry = state.get(STATE_KEY, {})
+        errors: list[str] = []
         for service, kinds in (entry.get("original") or {}).items():
             for kind, value in kinds.items():
                 flag = {
@@ -345,11 +413,27 @@ class MacProxy(BaseProxy):
                     "secure": "-setsecurewebproxystate",
                     "socks": "-setsocksfirewallproxystate",
                 }[kind]
-                if value.get("enabled") and value.get("server"):
-                    _run(["networksetup", flag, service, value["server"], str(value["port"])])
-                else:
-                    _run(["networksetup", off_flag, service, "off"])
-        entry.update({"enabled": False, "clean_shutdown": True})
+                try:
+                    if value.get("enabled") and value.get("server"):
+                        _require(
+                            ["networksetup", flag, service, value["server"], str(value["port"])]
+                        )
+                    else:
+                        _require(["networksetup", off_flag, service, "off"])
+                except ProxyError as exc:
+                    errors.append(f"{service}/{kind}: {exc}")
+        if errors:
+            entry.update(
+                {
+                    "enabled": True,
+                    "clean_shutdown": False,
+                    "last_error": "; ".join(errors),
+                }
+            )
+            state[STATE_KEY] = entry
+            _write_state(self.state_path, state)
+            raise ProxyError("; ".join(errors))
+        entry.update({"enabled": False, "clean_shutdown": True, "last_error": None})
         state[STATE_KEY] = entry
         _write_state(self.state_path, state)
         return self.status()
@@ -376,32 +460,37 @@ class WindowsProxy(BaseProxy):
                     original[name] = winreg.QueryValueEx(key, name)[0]
                 except FileNotFoundError:
                     original[name] = None
-            winreg.SetValueEx(key, "ProxyEnable", 0, winreg.REG_DWORD, 1)
-            winreg.SetValueEx(key, "ProxyServer", 0, winreg.REG_SZ, f"{host}:{port}")
-            # A PAC URL takes precedence over the manual proxy on Windows.
-            # Remove it while the proxy is active and restore it on disable.
+            state = _read_state(self.state_path)
+            state[STATE_KEY] = {
+                "platform": self.platform,
+                "enabled": True,
+                "host": host,
+                "port": port,
+                "original": original,
+                "clean_shutdown": False,
+            }
+            _write_state(self.state_path, state)
             try:
-                winreg.DeleteValue(key, "AutoConfigURL")
-            except FileNotFoundError:
-                pass
-            winreg.SetValueEx(
-                key,
-                "ProxyOverride",
-                0,
-                winreg.REG_SZ,
-                "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>",
-            )
+                winreg.SetValueEx(key, "ProxyEnable", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "ProxyServer", 0, winreg.REG_SZ, f"{host}:{port}")
+                # A PAC URL takes precedence over the manual proxy on Windows.
+                # Remove it while the proxy is active and restore it on disable.
+                try:
+                    winreg.DeleteValue(key, "AutoConfigURL")
+                except FileNotFoundError:
+                    pass
+                winreg.SetValueEx(
+                    key,
+                    "ProxyOverride",
+                    0,
+                    winreg.REG_SZ,
+                    "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>",
+                )
+            except Exception:
+                with contextlib.suppress(Exception):
+                    self.disable()
+                raise
         _notify_wininet()
-        state = _read_state(self.state_path)
-        state[STATE_KEY] = {
-            "platform": self.platform,
-            "enabled": True,
-            "host": host,
-            "port": port,
-            "original": original,
-            "clean_shutdown": False,
-        }
-        _write_state(self.state_path, state)
         return self.status()
 
     def disable(self) -> dict[str, Any]:

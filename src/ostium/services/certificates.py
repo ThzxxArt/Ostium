@@ -178,7 +178,15 @@ def _covers_domain(certificate: x509.Certificate, domain: str) -> bool:
         return False
     if domain in names or domain in ips:
         return True
-    return any(name.startswith("*.") and domain.endswith(name[1:]) for name in names)
+    for name in names:
+        if not name.startswith("*."):
+            continue
+        suffix = name[1:]
+        # A wildcard covers exactly one label: *.example.com must not accept
+        # a.b.example.com.
+        if domain.endswith(suffix) and "." not in domain[: -len(suffix)]:
+            return True
+    return False
 
 
 async def _persist(

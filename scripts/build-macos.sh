@@ -17,6 +17,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp -R dist/Ostium/* "$APP/Contents/MacOS/"
 cp deploy/launchd/com.ostium.core.plist deploy/launchd/com.ostium.ui.plist "$APP/Contents/Resources/"
+cp LICENSE NOTICE "$APP/Contents/Resources/"
 cat >"$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

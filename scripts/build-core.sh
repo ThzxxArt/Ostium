@@ -73,7 +73,8 @@ for target in "${targets[@]}"; do
     (cd "$SRC_DIR" && go list -m all)
   } >"$dir/SBOM.txt"
   tar -C "$dir" -czf "$dir.tar.gz" "$binary" "LICENSE" "SBOM.txt"
-  sha256sum "$dir.tar.gz" >"$dir.tar.gz.sha256"
+  # Keep the checksum file relative so `sha256sum -c` works after download.
+  (cd "$OUT_DIR" && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
 done
 
 echo "Artifacts in $OUT_DIR"

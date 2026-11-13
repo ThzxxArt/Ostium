@@ -88,7 +88,7 @@ async def _apply_server(services: Services, session: AsyncSession) -> dict[str, 
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
     except EngineError as exc:
-        if exc.code in {"core_unreachable", "engine_unavailable"}:
+        if exc.code in {"core_unavailable", "core_unreachable", "engine_unavailable"}:
             return {"applied": False, "warning": str(exc)}
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
 

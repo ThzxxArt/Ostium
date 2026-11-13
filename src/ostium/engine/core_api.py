@@ -8,7 +8,6 @@ from typing import Any, cast
 import httpx
 
 from ostium.config import Settings
-from ostium.engine.singbox.supervisor import ensure_core_token
 
 
 class CoreApiError(Exception):
@@ -27,7 +26,24 @@ class CoreClient:
         self.timeout = timeout
 
     def _token(self) -> str:
-        return ensure_core_token(self.token_file)
+        # Only the privileged core may create this token.  The UI must never
+        # mint its own: doing so makes the two processes disagree and turns a
+        # startup race into a permanent 401 loop.
+        try:
+            token = self.token_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise CoreApiError(
+                503,
+                f"core token is not available at {self.token_file}: {exc}",
+                "core_unavailable",
+            ) from exc
+        if not token:
+            raise CoreApiError(
+                503,
+                f"core token is empty at {self.token_file}",
+                "core_unavailable",
+            )
+        return token
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token()}", "Accept": "application/json"}

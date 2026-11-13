@@ -68,7 +68,7 @@ Ostium 一键安装器
   --behind-proxy             Nginx/Caddy 反代模式：UI 只监听 127.0.0.1，启用 Secure Cookie
   --ui-host HOST             管理 UI 监听地址（默认 0.0.0.0）
   --ui-port PORT             管理 UI 端口（默认 8443）
-  --public-ui                允许公网访问管理 UI（需先启用 TLS + TOTP）
+  --public-ui                已禁用；请在登录后签发证书、启用 TOTP，再从 Settings 开启
   --no-start                 注册服务但不启动
   --no-verify                跳过 SHA256 校验（仅限本地开发，勿用于生产）
   --purge                    卸载时同时删除数据、配置和用户
@@ -104,6 +104,11 @@ validate_install_path() {
   if [[ -z "$path" || "$path" != /* ]]; then
     die "$label 必须是绝对路径：$path"
   fi
+  case "$path" in
+    *[[:space:]\&\#\|\\\"\']*)
+      die "$label 不能包含空白、引号、&、#、| 或反斜杠：$path"
+      ;;
+  esac
   if command -v realpath >/dev/null 2>&1; then
     normalized="$(realpath -m "$path" 2>/dev/null || printf '%s' "$path")"
   else
@@ -185,7 +190,8 @@ detect_platform() {
     arm64|aarch64) ARCH="arm64" ;;
     *) die "暂不支持架构：$(uname -m)" ;;
   esac
-  if [[ "$OS" == "darwin" && "$ROLE" == "server" ]]; then
+  if [[ "$OS" == "darwin" && "$ROLE" == "server" \
+    && "$ACTION" != "status" && "$ACTION" != "uninstall" ]]; then
     die "macOS 仅支持客户端；服务端请使用 Linux"
   fi
 }
@@ -224,37 +230,78 @@ find_asset() {
   find "$dir" -maxdepth 4 -type f -name "$pattern" -print -quit 2>/dev/null || true
 }
 
+# Return the basename of an entry in SHA256SUMS matching a regex.  The sums
+# file is the only version-aware index: wheel filenames are PEP 440-normalised
+# (for example 0.2.0rc1), so constructing names from the tag is unsafe.
+sums_asset() {
+  local pattern="$1" preferred="$2" value
+  value="$(awk -v preferred="$preferred" -v pattern="$pattern" '
+    {
+      name = $2
+      sub(/^.*\//, "", name)
+      if (name ~ pattern) {
+        if (preferred != "" && index(name, preferred) == 1) { print name; exit }
+        if (fallback == "") { fallback = name }
+      }
+    }
+    END { if (fallback != "") print fallback }
+  ' "$2")"
+  printf '%s' "$value"
+}
+
+# Extract the installer, service units and platform scripts from the signed
+# source distribution.  Release users should never need a Git checkout, and
+# executing an unverified GitHub-generated archive as root is not acceptable.
+extract_source() {
+  local archive="$1" directory
+  mkdir -p "$WORK_DIR/source"
+  tar -xzf "$archive" -C "$WORK_DIR/source" --no-same-owner
+  directory="$(find "$WORK_DIR/source" -maxdepth 2 -type d -name 'ostium_ctl-*' -print -quit)"
+  [[ -n "$directory" && -f "$directory/scripts/install.sh" ]] \
+    || die "源码包中缺少 scripts/install.sh：$archive"
+  printf '%s' "$directory"
+}
+
 download_release() {
   WORK_DIR="$(mktemp -d /tmp/ostium-install.XXXXXX)"
   if [[ -n "$LOCAL_DIR" ]]; then
     [[ -d "$LOCAL_DIR" ]] || die "本地目录不存在：$LOCAL_DIR"
     SOURCE_DIR="$LOCAL_DIR"
+    SUMS="$(find_asset "$LOCAL_DIR" 'SHA256SUMS')"
     WHEEL="$(find_asset "$LOCAL_DIR" "ostium_ctl-${VERSION}-*.whl")"
     [[ -n "$WHEEL" ]] || WHEEL="$(find_asset "$LOCAL_DIR" 'ostium_ctl-*.whl')"
     CORE="$(find_asset "$LOCAL_DIR" "ostium-core-*-${OS}-${ARCH}.tar.gz")"
-    SUMS="$(find_asset "$LOCAL_DIR" 'SHA256SUMS')"
+    SDIST="$(find_asset "$LOCAL_DIR" "ostium_ctl-${VERSION}.tar.gz")"
+    [[ -n "$SDIST" ]] || SDIST="$(find_asset "$LOCAL_DIR" 'ostium_ctl-*.tar.gz')"
     say "使用本地目录：$LOCAL_DIR"
+    if [[ ! -f "$SOURCE_DIR/scripts/install.sh" ]]; then
+      [[ -n "$SDIST" ]] \
+        || die "本地目录需要包含 scripts/install.sh 或 ostium_ctl-*.tar.gz：$LOCAL_DIR"
+      verify_asset "$SDIST" "$SUMS"
+      SOURCE_DIR="$(extract_source "$SDIST")"
+    fi
   else
     local base="https://github.com/ThzxxArt/Ostium/releases/download/v${VERSION}"
-    WHEEL="$WORK_DIR/ostium_ctl-${VERSION}-py3-none-any.whl"
-    CORE="$WORK_DIR/ostium-core-${CORE_VERSION}-${OS}-${ARCH}.tar.gz"
     SUMS="$WORK_DIR/SHA256SUMS"
     say "下载 Ostium v${VERSION}（${OS}/${ARCH}）"
-    fetch_file "${base}/$(basename "$WHEEL")" "$WHEEL"
-    fetch_file "${base}/$(basename "$CORE")" "$CORE"
     fetch_file "${base}/SHA256SUMS" "$SUMS"
-
-    local source_archive="$WORK_DIR/source.tar.gz"
-    say "下载安装器与平台服务文件"
-    fetch_file "https://github.com/ThzxxArt/Ostium/archive/refs/tags/v${VERSION}.tar.gz" "$source_archive"
-    mkdir -p "$WORK_DIR/source"
-    tar -xzf "$source_archive" -C "$WORK_DIR/source" --no-same-owner
-    SOURCE_DIR="$(find "$WORK_DIR/source" -maxdepth 2 -type d -name "Ostium-*" -print -quit)"
-    [[ -n "$SOURCE_DIR" ]] || die "无法解压源码包"
+    local wheel_name sdist_name
+    wheel_name="$(sums_asset '^ostium_ctl-.*\.whl$' "ostium_ctl-${VERSION}-" "$SUMS")"
+    sdist_name="$(sums_asset '^ostium_ctl-.*\.tar\.gz$' "ostium_ctl-${VERSION}" "$SUMS")"
+    [[ -n "$wheel_name" ]] || die "SHA256SUMS 中找不到 wheel"
+    [[ -n "$sdist_name" ]] || die "SHA256SUMS 中找不到 sdist"
+    WHEEL="$WORK_DIR/$wheel_name"
+    SDIST="$WORK_DIR/$sdist_name"
+    CORE="$WORK_DIR/ostium-core-${CORE_VERSION}-${OS}-${ARCH}.tar.gz"
+    fetch_file "${base}/${wheel_name}" "$WHEEL"
+    fetch_file "${base}/${sdist_name}" "$SDIST"
+    fetch_file "${base}/$(basename "$CORE")" "$CORE"
+    verify_asset "$WHEEL" "$SUMS"
+    verify_asset "$SDIST" "$SUMS"
+    SOURCE_DIR="$(extract_source "$SDIST")"
   fi
   [[ -f "$WHEEL" ]] || die "找不到 wheel：$WHEEL"
   [[ -f "$CORE" ]] || die "找不到核心包：$CORE"
-  [[ -f "$SOURCE_DIR/scripts/install.sh" ]] || die "本地目录需要包含源码 scripts/install.sh"
   verify_asset "$WHEEL" "$SUMS"
   verify_asset "$CORE" "$SUMS"
 }
@@ -446,9 +493,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+VERSION="${VERSION#v}"
 [[ "$ROLE" == "server" || "$ROLE" == "client" ]] || die "--role 必须是 server 或 client"
+if [[ -n "$DOMAIN" && ! "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+  die "--domain 不是有效域名：$DOMAIN"
+fi
 if [[ "$BEHIND_PROXY" == "true" && "$PUBLIC_UI" == "true" ]]; then
   die "--behind-proxy 与 --public-ui 互斥：前者由 Nginx 终止 TLS，后者由 Ostium 自己监听 TLS"
+fi
+if [[ "$PUBLIC_UI" == "true" ]]; then
+  die "--public-ui 需要已有证书和 TOTP，不能在安装阶段启用；请先本地安装，登录后在 Settings 中开启"
 fi
 if [[ "$ACTION" == "status" ]]; then
   detect_platform

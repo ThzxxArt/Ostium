@@ -9,7 +9,7 @@
 管理员 PowerShell：
 
 ```powershell
-irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 ```
 
 脚本会下载并静默运行 Windows 安装包，校验 SHA256，然后打印初始管理员密码。
@@ -26,7 +26,7 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1))) -RunAsSystem
+& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1))) -RunAsSystem
 ```
 
 **风险**：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。
@@ -36,7 +36,7 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 ### macOS 14+
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 

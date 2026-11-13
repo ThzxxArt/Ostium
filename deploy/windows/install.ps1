@@ -57,6 +57,7 @@ log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$engineToml"
 core_url = "http://127.0.0.1:8788"
+core_token_file = "$($DataDir.Replace('\', '/'))/runtime/core.token"
 mode = "system_proxy"
 "@
     [IO.File]::WriteAllText($uiConfig, $uiToml)

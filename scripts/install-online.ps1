@@ -41,7 +41,7 @@ function Assert-Admin {
 }
 
 function Resolve-Version {
-    if ($Version -ne "latest") { return $Version }
+    if ($Version -ne "latest") { return $Version.TrimStart("v") }
     $release = Invoke-RestMethod -UseBasicParsing `
         -Uri "https://api.github.com/repos/ThzxxArt/Ostium/releases/latest"
     if (-not $release.tag_name) { throw "无法解析最新版本，请用 -Version 指定。" }

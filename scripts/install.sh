@@ -46,7 +46,7 @@ Ostium 安装器参数：
   --wheel PATH               ostium_ctl-*.whl 路径
   --core PATH                ostium-core-*.tar.gz 路径
   --domain DOMAIN            服务端域名（Reality 可省略）
-  --public-ui                允许公网访问管理 UI（需先启用 TLS + TOTP）
+  --public-ui                已禁用；请在登录后签发证书、启用 TOTP，再从 Settings 开启
   --behind-proxy             Nginx/Caddy 反向代理模式：UI 只监听 127.0.0.1，启用 Secure Cookie
   --ui-host HOST             管理 UI 监听地址（默认 0.0.0.0；--behind-proxy 强制 127.0.0.1）
   --ui-port PORT             管理 UI 端口（默认 8443）
@@ -95,6 +95,10 @@ if [[ "$ROLE" != "server" && "$ROLE" != "client" ]]; then
   echo "--role 必须是 server 或 client" >&2
   exit 2
 fi
+if [[ -n "$DOMAIN" && ! "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+  echo "--domain 不是有效域名：$DOMAIN" >&2
+  exit 2
+fi
 if [[ -z "$WHEEL" || ! -f "$WHEEL" ]]; then
   echo "请提供 --wheel /path/to/ostium_ctl-*.whl" >&2
   exit 2
@@ -131,6 +135,15 @@ validate_install_path() {
     echo "$label 必须是绝对路径：$path" >&2
     exit 2
   fi
+  # The systemd renderer below is intentionally dependency-free.  Reject
+  # characters that would change unit syntax or sed replacements instead of
+  # silently writing a broken service.
+  case "$path" in
+    *[[:space:]\&\#\|\\\"\']*)
+      echo "$label 不能包含空白、引号、&、#、| 或反斜杠：$path" >&2
+      exit 2
+      ;;
+  esac
   if command -v realpath >/dev/null 2>&1; then
     normalized="$(realpath -m "$path" 2>/dev/null || echo "$path")"
   else
@@ -163,6 +176,15 @@ if [[ -n "$DOMAIN" ]]; then
 fi
 TRUSTED_HOSTS_TOML+=']'
 
+# Public UI requires both a certificate and TOTP.  Neither can exist before
+# the first local login, so enabling it during the initial install would make
+# `ostium serve` exit and systemd restart it forever.  It must be a deliberate
+# post-install step from Settings.
+if [[ "$PUBLIC_UI" == "true" && "$UPGRADE" != "true" ]]; then
+  echo "--public-ui 不能在首次安装时启用；请先本地安装，登录并启用 TOTP、签发/上传证书，再在 Settings 中启用 Public UI" >&2
+  exit 2
+fi
+
 systemd_available() {
   command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]
 }
@@ -190,13 +212,26 @@ Group=root
 EOF
 }
 
-install_unit() {
-  local source="$1" target="$2"
+# The shipped units use the default layout so they are readable and
+# reviewable.  Installations may override prefix/data/config paths, so render
+# the final unit rather than copying a unit that points at /opt/ostium.
+render_unit() {
+  local source="$1" target="$2" data_dir="$3" config_dir="$4" temporary
   if [[ ! -f "$source" ]]; then
     echo "缺少 systemd 单元文件：$source" >&2
     exit 1
   fi
-  install -m 0644 "$source" "$SYSTEMD_DIR/$target"
+  install -d -m 0755 "$(dirname "$target")"
+  temporary="$(mktemp "$target.XXXXXX")"
+  sed \
+    -e "s#/opt/ostium#$PREFIX#g" \
+    -e "s#/var/lib/ostium-core#$CLIENT_DATA#g" \
+    -e "s#/var/lib/ostium#$data_dir#g" \
+    -e "s#/etc/ostium/client.toml#$CLIENT_CONFIG#g" \
+    -e "s#/etc/ostium#$config_dir#g" \
+    "$source" >"$temporary"
+  chmod 0644 "$temporary"
+  mv -f "$temporary" "$target"
 }
 
 print_manual_start() {
@@ -261,21 +296,25 @@ fi
 
 if [[ "$ROLE" == "server" ]]; then
   if [[ "$RUN_AS_ROOT" == "true" ]]; then
-    install -d -m 0755 "$DATA" "$DATA/runtime" "$DATA/logs" "$DATA/backups" "$DATA/certs" "$DATA/core" "$CONFIG"
+    install -d -m 0755 "$DATA" "$DATA/runtime" "$DATA/logs" "$DATA/backups" "$DATA/certs" \
+      "$DATA/core" "$DATA/state" "$DATA/rulesets" "$CONFIG"
   else
     id -u ostium >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin ostium
-    install -d -m 0750 -o ostium -g ostium "$DATA" "$DATA/runtime" "$DATA/logs" "$DATA/backups" "$DATA/certs" "$DATA/core"
+    install -d -m 0750 -o ostium -g ostium "$DATA" "$DATA/runtime" "$DATA/logs" \
+      "$DATA/backups" "$DATA/certs" "$DATA/core" "$DATA/state" "$DATA/rulesets"
     install -d -m 0750 -o ostium -g ostium "$CONFIG"
   fi
 else
   if [[ "$RUN_AS_ROOT" == "true" ]]; then
-    install -d -m 0755 "$CLIENT_DATA" "$CLIENT_DATA/runtime" "$CLIENT_DATA/logs" "$CLIENT_DATA/core"
-    install -d -m 0755 "$CLIENT_UI_DATA" "$CLIENT_UI_DATA/logs"
+    install -d -m 0755 "$CLIENT_DATA" "$CLIENT_DATA/runtime" "$CLIENT_DATA/logs" \
+      "$CLIENT_DATA/core" "$CLIENT_DATA/state" "$CLIENT_DATA/rulesets"
+    install -d -m 0755 "$CLIENT_UI_DATA" "$CLIENT_UI_DATA/logs" "$CLIENT_UI_DATA/state"
     install -d -m 0755 "$CONFIG"
   else
     getent group ostium >/dev/null || groupadd --system ostium
     id -u ostium-core >/dev/null 2>&1 || useradd --system --gid ostium --home-dir "$CLIENT_DATA" --shell /usr/sbin/nologin ostium-core
-    install -d -m 0750 -o ostium-core -g ostium "$CLIENT_DATA" "$CLIENT_DATA/runtime" "$CLIENT_DATA/logs" "$CLIENT_DATA/core"
+    install -d -m 0750 -o ostium-core -g ostium "$CLIENT_DATA" "$CLIENT_DATA/runtime" \
+      "$CLIENT_DATA/logs" "$CLIENT_DATA/core" "$CLIENT_DATA/state" "$CLIENT_DATA/rulesets"
     install -d -m 0755 "$CONFIG"
     if [[ -z "${SUDO_USER:-}" ]]; then
       echo "无法确定桌面用户；请通过 sudo 运行，或显式使用 --run-as-root" >&2
@@ -362,8 +401,27 @@ install_core() {
   mv -f "$temporary" "$destination"
 }
 
+install_license() {
+  local target="$1"
+  local source_root
+  source_root="$(cd "$(dirname "$0")/.." && pwd)"
+  install -d -m 0755 "$target/core"
+  for doc in LICENSE NOTICE; do
+    if [[ -f "$source_root/$doc" ]]; then
+      install -m 0644 "$source_root/$doc" "$target/$doc"
+    fi
+  done
+  for doc in LICENSE SBOM.txt; do
+    if [[ -f "$CORE_TMP/$doc" ]]; then
+      install -m 0644 "$CORE_TMP/$doc" "$target/core/$doc"
+    fi
+  done
+  return 0
+}
+
 if [[ "$ROLE" == "server" ]]; then
   install_core "$DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium:ostium")"
+  install_license "$PREFIX"
   if [[ "$UPGRADE" != "true" ]]; then
     cat >"$CONFIG/config.toml" <<EOF
 role = "server"
@@ -392,10 +450,18 @@ EOF
     echo "升级模式需要已有配置：$CONFIG/config.toml" >&2
     exit 1
   fi
+  # `init` runs as root during install, so SQLite/WAL and master.key are
+  # created with root ownership.  The service runs as ostium and must be able
+  # to read the key and write the database.
+  if [[ "$RUN_AS_ROOT" != "true" ]]; then
+    chown -R ostium:ostium "$DATA" "$CONFIG"
+  fi
 
   if [[ "$NO_SERVICE" != "true" ]] && systemd_available; then
-    install_unit "$(dirname "$0")/../deploy/systemd/ostium.service" ostium.service
-    install_unit "$(dirname "$0")/../deploy/systemd/ostium-core.service" ostium-core.service
+    render_unit "$(dirname "$0")/../deploy/systemd/ostium.service" \
+      "$SYSTEMD_DIR/ostium.service" "$DATA" "$CONFIG"
+    render_unit "$(dirname "$0")/../deploy/systemd/ostium-core.service" \
+      "$SYSTEMD_DIR/ostium-core.service" "$DATA" "$CONFIG"
     if [[ "$RUN_AS_ROOT" == "true" ]]; then
       write_root_dropin ostium.service
       write_root_dropin ostium-core.service
@@ -432,6 +498,7 @@ $([[ "$UPGRADE" == "true" ]] && echo "升级完成，数据与管理员密码保
 EOF
 else
   install_core "$CLIENT_DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium-core:ostium")"
+  install_license "$PREFIX"
   if [[ "$UPGRADE" != "true" ]]; then
     cat >"$CLIENT_CONFIG" <<EOF
 role = "client"
@@ -471,6 +538,7 @@ log_level = "info"
 engine_version = "1.14.4-ostium.1"
 engine_path = "$CLIENT_DATA/core/sing-box"
 core_url = "http://127.0.0.1:8788"
+core_token_file = "$CLIENT_DATA/runtime/core.token"
 mode = "system_proxy"
 EOF
     UI_OWNER="${SUDO_USER:-root}"
@@ -480,10 +548,12 @@ EOF
   fi
 
   if [[ "$NO_SERVICE" != "true" ]] && systemd_available; then
-    install_unit "$(dirname "$0")/../deploy/systemd/ostium-core-client.service" ostium-core.service
+    render_unit "$(dirname "$0")/../deploy/systemd/ostium-core-client.service" \
+      "$SYSTEMD_DIR/ostium-core.service" "$CLIENT_DATA" "$CLIENT_DATA"
     if [[ "$RUN_AS_ROOT" == "true" ]]; then
       write_root_dropin ostium-core.service
-      install_unit "$(dirname "$0")/../deploy/systemd/ostium-client-ui.service" ostium.service
+      render_unit "$(dirname "$0")/../deploy/systemd/ostium-client-ui.service" \
+        "$SYSTEMD_DIR/ostium.service" "$UI_DATA" "$UI_DATA"
       systemctl daemon-reload
       systemctl enable ostium-core ostium
       if [[ "$START" == "true" ]]; then
@@ -502,7 +572,8 @@ EOF
       if [[ -n "${SUDO_USER:-}" ]]; then
         USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
         sudo -u "$SUDO_USER" mkdir -p "$USER_HOME/.config/systemd/user"
-        install -m 0644 "$(dirname "$0")/../deploy/systemd/user/ostium.service" "$USER_HOME/.config/systemd/user/ostium.service"
+        render_unit "$(dirname "$0")/../deploy/systemd/user/ostium.service" \
+          "$USER_HOME/.config/systemd/user/ostium.service" "$UI_DATA" "$UI_DATA"
         sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" systemctl --user daemon-reload || true
         sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" systemctl --user enable ostium.service || true
         echo "客户端 UI：注销并重新登录（让 $SUDO_USER 获得 ostium 组），然后运行 systemctl --user start ostium"

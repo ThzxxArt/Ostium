@@ -21,6 +21,8 @@ def _settings(tmp_path: Path) -> Settings:
         dev=True,
     )
     value.paths.ensure()
+    value.core_token_file.parent.mkdir(parents=True, exist_ok=True)
+    value.core_token_file.write_text("test-core-token", encoding="utf-8")
     return value
 
 
@@ -62,6 +64,22 @@ async def test_core_client_methods(tmp_path: Path) -> None:
             return_value=httpx.Response(200, json={"status": "ok"})
         )
         assert await client.health() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_core_client_never_creates_the_privileged_token(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    settings.core_token_file.unlink()
+    client = CoreClient(settings, timeout=1)
+    with pytest.raises(CoreApiError) as missing:
+        await client.status()
+    assert missing.value.code == "core_unavailable"
+    assert not settings.core_token_file.exists()
+
+    settings.core_token_file.write_text("", encoding="utf-8")
+    with pytest.raises(CoreApiError) as empty:
+        await client.status()
+    assert empty.value.code == "core_unavailable"
 
 
 @pytest.mark.asyncio

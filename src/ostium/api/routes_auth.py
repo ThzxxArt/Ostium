@@ -10,7 +10,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ostium import __version__
-from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
+from ostium.api.deps import (
+    Services,
+    client_ip,
+    get_current_admin,
+    get_services,
+    get_session,
+    is_loopback,
+)
 from ostium.api.errors import ApiError
 from ostium.config import Settings
 from ostium.db.models import AdminUser
@@ -318,6 +325,8 @@ async def local_login(
 ) -> Response:
     from fastapi.responses import RedirectResponse
 
+    if not is_loopback(request):
+        raise ApiError(403, "local login links are loopback-only", "loopback_required")
     if not auth_service.verify_local_login_token(services.settings, token):
         raise ApiError(401, "local login link is invalid or expired", "local_login_invalid")
     admin = await auth_service.get_admin(session)

@@ -2,11 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NButton, NSwitch, useDialog, useMessage } from 'naive-ui'
+import { NButton, NInputNumber, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
 import {
   Cable,
   KeyRound,
   LockKeyhole,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   ShieldQuestion,
@@ -31,6 +32,10 @@ const loading = ref(true)
 const busy = ref<string | null>(null)
 const error = ref<string | null>(null)
 const warning = ref<string | null>(null)
+const portTarget = ref<Inbound | null>(null)
+const portValue = ref<number | null>(null)
+const portSaving = ref(false)
+const showPortModal = ref(false)
 
 const meta: Record<
   string,
@@ -41,28 +46,28 @@ const meta: Record<
     description: 'inbounds.reality_desc',
     icon: ShieldCheck,
     accent: 'mint',
-    badge: 'TCP 443',
+    badge: 'TCP',
   },
   hysteria2: {
     title: 'inbounds.hysteria2',
     description: 'inbounds.hysteria2_desc',
     icon: Zap,
     accent: 'blue',
-    badge: 'UDP 443',
+    badge: 'UDP',
   },
   trojan: {
     title: 'inbounds.trojan',
     description: 'inbounds.trojan_desc',
     icon: LockKeyhole,
     accent: 'violet',
-    badge: 'TCP 443',
+    badge: 'TCP',
   },
   shadowsocks: {
     title: 'inbounds.shadowsocks',
     description: 'inbounds.shadowsocks_desc',
     icon: Cable,
     accent: 'amber',
-    badge: '8388',
+    badge: 'TCP',
   },
 }
 
@@ -117,6 +122,29 @@ function confirmRotate(inbound: Inbound) {
   })
 }
 
+function editPort(inbound: Inbound) {
+  portTarget.value = inbound
+  portValue.value = inbound.port
+  showPortModal.value = true
+}
+
+async function savePort() {
+  if (!portTarget.value || !portValue.value) return
+  portSaving.value = true
+  warning.value = null
+  try {
+    const result = await api.inbounds.update(portTarget.value.kind, { port: portValue.value })
+    if (result.warning) warning.value = result.warning
+    message.success(t('inbounds.port_saved'))
+    showPortModal.value = false
+    await load()
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    portSaving.value = false
+  }
+}
+
 function protocolIcon(inbound: Inbound) {
   return meta[inbound.kind]?.icon || Waypoints
 }
@@ -168,7 +196,7 @@ onMounted(load)
             <div>
               <div class="title-row">
                 <h2>{{ t(meta[inbound.kind]?.title || 'inbounds.title') }}</h2>
-                <span class="badge">{{ meta[inbound.kind]?.badge }}</span>
+                <span class="badge">{{ meta[inbound.kind]?.badge }} {{ inbound.port }}</span>
               </div>
               <p class="o-small o-muted">{{ t(meta[inbound.kind]?.description || '') }}</p>
             </div>
@@ -191,7 +219,13 @@ onMounted(load)
         <div class="details">
           <div class="detail">
             <span>{{ t('inbounds.port') }}</span>
-            <strong class="o-mono">{{ inbound.port }}</strong>
+            <div class="port-row">
+              <strong class="o-mono">{{ inbound.port }}</strong>
+              <NButton text size="tiny" @click="editPort(inbound)">
+                <template #icon><Pencil :size="12" /></template>
+                {{ t('inbounds.change_port') }}
+              </NButton>
+            </div>
           </div>
           <div class="detail">
             <span>{{ t('common.status') }}</span>
@@ -275,6 +309,30 @@ onMounted(load)
         </footer>
       </article>
     </div>
+
+    <NModal
+      v-model:show="showPortModal"
+      preset="card"
+      :title="t('inbounds.change_port')"
+      style="max-width: 420px"
+    >
+      <p class="o-small o-muted">{{ t('inbounds.port_hint') }}</p>
+      <NInputNumber
+        v-model:value="portValue"
+        :min="1"
+        :max="65535"
+        :show-button="false"
+        style="width: 100%; margin-top: 12px"
+      />
+      <template #footer>
+        <div class="modal-actions">
+          <NButton secondary @click="showPortModal = false">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" :loading="portSaving" @click="savePort">
+            {{ t('common.save') }}
+          </NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
@@ -290,6 +348,17 @@ onMounted(load)
   color: var(--warning);
   font-size: 12px;
   margin-bottom: 18px;
+}
+.port-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .inbound-grid {
   display: grid;

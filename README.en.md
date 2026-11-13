@@ -35,23 +35,23 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.19%25%20statements%20%C2%B7%2095.48%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-403%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-97.67%25%20statements%20%C2%B7%2094.93%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.34%25%20statements%20%C2%B7%2085.26%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-419%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
 > **Current stable release: v0.1.0.** The easiest install does not require Python:
 >
 > ```bash
-> curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
 >   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
 >
 > Windows client (admin PowerShell):
 >
 > ```powershell
-> irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 > ```
 >
 > Parameters, offline install, root mode and no-service mode:
@@ -73,7 +73,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 403 backend tests, 137 frontend tests and 21 Playwright tests; 98.19% backend statements / 95.48% branches. |
+| 🧪 **Verified** | 419 backend tests, 137 frontend tests and 21 Playwright tests; 97.67% backend statements / 94.93% branches. |
 
 ---
 
@@ -182,21 +182,21 @@ flowchart LR
 Linux server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS client:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows client (admin PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 ```
 
 The installer:
@@ -230,21 +230,38 @@ runit, s6, supervisord or run both commands manually. Full examples:
 
 #### Offline / intranet
 
+Download the same release's assets into one directory, keeping their filenames:
+
+- `install-online.sh`
+- `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium_ctl-0.1.0.tar.gz` (installer, systemd/launchd files)
+- `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (choose the right architecture)
+  and its `.sha256`
+- `SHA256SUMS`
+
 ```bash
+# Verify the assets you downloaded (Windows assets are optional on a server)
+sha256sum -c SHA256SUMS --ignore-missing
+
 sudo bash install-online.sh install \
-  --local-dir /path/to/release \
+  --local-dir . \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` must point to a source checkout (or an extracted source archive of the
-same version) that contains `scripts/install.sh`. A directory containing only
-Release download assets does not include the installer and cannot be used here.
+`--local-dir` accepts both a source checkout and a flat release-asset directory.
+The installer verifies the sdist first, then extracts `scripts/install.sh` and
+`deploy/` from it; it never executes an unverified source archive.
+
+> A fully isolated host also needs a pre-built wheelhouse or an internal PyPI
+> mirror; Python dependencies are not bundled into the release assets.
 
 ### Option 2 — Linux server (offline native package)
 
-Download the release artifacts:
+Download the wheel, sdist, core archive and `SHA256SUMS`, then run the platform
+installer from the extracted sdist:
 
 - `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium_ctl-0.1.0.tar.gz` (contains `scripts/install.sh` and `deploy/`)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
@@ -252,8 +269,9 @@ Download: <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.0>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
+tar -xzf ostium_ctl-0.1.0.tar.gz
 
-sudo ./install.sh --role server \
+sudo ./ostium_ctl-0.1.0/scripts/install.sh --role server \
   --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
@@ -295,8 +313,10 @@ journalctl -u ostium -u ostium-core -f
 
 ### Option 3 — Linux client (offline)
 
+Extract the sdist first, then run:
+
 ```bash
-sudo ./install.sh --role client \
+sudo ./ostium_ctl-0.1.0/scripts/install.sh --role client \
   --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
@@ -329,11 +349,14 @@ You can also run the PowerShell installer from the installation directory:
 
 ### Option 5 — macOS client (one-click online / offline source)
 
-Use the one-click online installer from Option 1. For offline installs, keep `install-macos.sh`,
-the wheel and `ostium-core-*-darwin-*.tar.gz` in one directory, then run:
+Use the one-click online installer from Option 1. For offline installs, extract the sdist
+and point it at the wheel and core archive:
 
 ```bash
-sudo ./install-macos.sh client
+tar -xzf ostium_ctl-0.1.0.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.0-py3-none-any.whl" \
+  OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
+  ./ostium_ctl-0.1.0/deploy/launchd/install-macos.sh client
 ```
 
 The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` LaunchAgent,
@@ -385,7 +408,10 @@ Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 sudo python3.13 -m venv /opt/ostium/venv
 sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
-sudo /opt/ostium/venv/bin/ostium serve
+sudo /opt/ostium/venv/bin/ostium core install \
+  --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
+sudo /opt/ostium/venv/bin/ostium serve      # terminal 1: control plane + SPA
+sudo /opt/ostium/venv/bin/ostium core-run   # terminal 2: proxy core
 ```
 
 Upgrade:
@@ -631,8 +657,9 @@ sudo ostium core install --url https://.../ostium-core-....tar.gz --sha256 <hash
 sudo ostium core update
 ```
 
-The supervisor runs `sing-box check` before switching. On failure the previous binary and
-configuration remain active.
+Core install/update replaces the binary; the next apply/restart runs `sing-box check` and
+rolls the configuration back on failure. Back up the old binary and verify the new one with
+`ostium core version` before upgrading.
 
 ### Rollback
 
@@ -799,10 +826,10 @@ npx playwright test
 
 Current results:
 
-- Backend: **403 passed / 0 skipped** (397 regular tests + 6 live-engine integration tests),
-  **98.19%** statements / **95.48%** branches.
-- Frontend: **137 passed**, **91.38%** statements / **85.27%** branches /
-  **89.04%** functions / **92.13%** lines.
+- Backend: **419 passed / 0 skipped** (413 regular tests + 6 live-engine integration tests),
+  **97.67%** statements / **94.93%** branches.
+- Frontend: **137 passed**, **91.34%** statements / **85.26%** branches /
+  **89.06%** functions / **92.14%** lines.
 - Playwright: **21 passed**, covering 1440/1024/390, dark/light visual baselines,
   PWA service-worker registration and an axe login check.
 - `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev

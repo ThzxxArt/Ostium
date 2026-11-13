@@ -24,7 +24,10 @@ jobs:
       - run: uv run ruff check src tests scripts
       - run: uv run ruff format --check src tests scripts
       - run: uv run mypy src/ostium
-      - run: uv run pytest -m "not integration" -q
+      - run: >-
+          uv run pytest -m "not integration" --cov=ostium --cov-report=xml
+          --cov-report=json:coverage.json --cov-report=term
+      - run: uv run python scripts/coverage_gate.py coverage.json
       - name: Audit Python dependencies
         run: |
           uv export --no-hashes --no-emit-project --all-groups -o /tmp/requirements.txt
@@ -62,6 +65,20 @@ jobs:
       - run: uv build
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
+      - name: Smoke-test the wheel
+        run: |
+          uv venv /tmp/ostium-wheel
+          uv pip install --python /tmp/ostium-wheel/bin/python dist/*.whl
+          /tmp/ostium-wheel/bin/ostium version
+          /tmp/ostium-wheel/bin/python - <<'PY'
+          from pathlib import Path
+
+          import ostium
+
+          asset = Path(ostium.__file__).parent / "web" / "dist" / "index.html"
+          assert asset.is_file(), asset
+          print("wheel SPA:", asset)
+          PY
       - uses: actions/upload-artifact@v7
         with:
           name: wheel
@@ -129,6 +146,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/thzxxart/ostium
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@v7
         with:
           context: .
@@ -136,9 +161,8 @@ jobs:
           push: true
           build-args: |
             OSTIUM_VERSION=${{ github.ref_name }}
-          tags: |
-            ghcr.io/thzxxart/ostium:${{ github.ref_name }}
-            ghcr.io/thzxxart/ostium:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   publish:
     needs: [verify, wheel, core, windows, docker]
@@ -174,32 +198,54 @@ jobs:
           mkdir -p dist/pypi
           find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) \
             -exec cp {} dist/pypi/ \;
-          test -n "$(find dist/pypi -maxdepth 1 -type f -print -quit)"
+          test -n "$(find dist/pypi -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "$(find dist/pypi -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          if find dist/pypi -maxdepth 1 -type f ! -name '*.whl' ! -name '*.tar.gz' \
+            | grep -q .; then
+            echo "unexpected file in dist/pypi" >&2
+            exit 1
+          fi
+      - name: Stage flat release assets
+        run: |
+          mkdir -p dist/release
+          cp dist/*.whl dist/*.tar.gz dist/release/
+          cp scripts/install-online.sh scripts/install-online.ps1 dist/release/
+          cp dist/core/*.tar.gz dist/core/*.sha256 dist/release/
+          cp dist/core-manifest.json dist/release/
+          cp dist/windows/*-setup.exe dist/release/
+      - name: Verify core checksums
+        run: cd dist/release && sha256sum -c ./*.sha256
       - name: Checksums
         run: |
-          cd dist
-          sha256sum $(find . -type f ! -name SHA256SUMS ! -name '*.sig' ! -path './pypi/*' | sort) > SHA256SUMS
+          cd dist/release
+          rm -f SHA256SUMS
+          # GitHub Release exposes every asset by basename.  Checksums must use
+          # the same flat names, or `sha256sum -c` fails after download.
+          sha256sum * > SHA256SUMS
+          sha256sum -c SHA256SUMS
       - uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/core/*.tar.gz
-            dist/core/*.sha256
-            dist/core-manifest.json
-            dist/windows/*-setup.exe
-            dist/SHA256SUMS
+            dist/release/*.whl
+            dist/release/*.tar.gz
+            dist/release/install-online.sh
+            dist/release/install-online.ps1
+            dist/release/*.sha256
+            dist/release/core-manifest.json
+            dist/release/*-setup.exe
+            dist/release/SHA256SUMS
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/pypi
       - uses: softprops/action-gh-release@v3
         with:
           files: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/core/*.tar.gz
-            dist/core/*.sha256
-            dist/core-manifest.json
-            dist/windows/*-setup.exe
-            dist/SHA256SUMS
+            dist/release/*.whl
+            dist/release/*.tar.gz
+            dist/release/install-online.sh
+            dist/release/install-online.ps1
+            dist/release/*.sha256
+            dist/release/core-manifest.json
+            dist/release/*-setup.exe
+            dist/release/SHA256SUMS
           generate_release_notes: true

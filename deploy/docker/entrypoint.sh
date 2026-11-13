@@ -18,8 +18,17 @@ fi
 
 ostium core-run &
 CORE_PID=$!
-trap 'kill -TERM "$CORE_PID" 2>/dev/null || true; wait "$CORE_PID" 2>/dev/null || true' INT TERM
 ostium serve &
 UI_PID=$!
-trap 'kill -TERM "$UI_PID" "$CORE_PID" 2>/dev/null || true; wait "$UI_PID" "$CORE_PID" 2>/dev/null || true' INT TERM
-wait "$UI_PID" "$CORE_PID"
+trap 'kill -TERM "$UI_PID" "$CORE_PID" 2>/dev/null || true' INT TERM
+
+# `wait pid1 pid2` only returns after both children exit.  A crashed core
+# would therefore leave a half-dead container running until the UI also died.
+# Exit as soon as either child is gone so Docker's restart policy can act.
+while kill -0 "$UI_PID" 2>/dev/null && kill -0 "$CORE_PID" 2>/dev/null; do
+  sleep 2
+done
+kill -TERM "$UI_PID" "$CORE_PID" 2>/dev/null || true
+wait "$UI_PID" 2>/dev/null || true
+wait "$CORE_PID" 2>/dev/null || true
+exit 1

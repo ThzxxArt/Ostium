@@ -270,6 +270,13 @@ def test_inbound_management(api_client: TestClient, session_token: str) -> None:
     same_port = api_client.patch("/api/v1/inbounds/vless", json={"port": 443}, headers=headers)
     assert same_port.status_code == 200
 
+    moved = api_client.patch("/api/v1/inbounds/vless", json={"port": 9443}, headers=headers)
+    assert moved.status_code == 200
+    assert moved.json()["inbound"]["port"] == 9443
+    assert 9443 in api_client.app.state.services.settings.proxy_ports
+    moved_back = api_client.patch("/api/v1/inbounds/vless", json={"port": 443}, headers=headers)
+    assert moved_back.status_code == 200
+
     no_cert = api_client.patch(
         "/api/v1/inbounds/hysteria2", json={"enabled": True}, headers=headers
     )

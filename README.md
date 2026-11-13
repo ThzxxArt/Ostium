@@ -35,23 +35,23 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-98.19%25%20statements%20%C2%B7%2095.48%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.38%25%20statements%20%C2%B7%2085.27%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-403%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-97.67%25%20statements%20%C2%B7%2094.93%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-91.34%25%20statements%20%C2%B7%2085.26%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-419%20backend%20%C2%B7%20137%20frontend%20%C2%B7%2021%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!TIP]
 > **当前稳定版本：v0.1.0。** 最省事的安装方式不需要预装 Python：
 >
 > ```bash
-> curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
 >   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
 >
 > Windows 客户端（管理员 PowerShell）：
 >
 > ```powershell
-> irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 > ```
 >
 > 详细参数、离线安装、root 模式和 no-service 模式见[一键安装指南](docs/guides/install.md)。
@@ -71,7 +71,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / PyInstaller / Inno Setup 构建与安装脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 403 个后端测试、137 个前端测试、21 个 Playwright 测试；后端 98.19% 语句 / 95.48% 分支。 |
+| 🧪 **可验证** | 419 个后端测试、137 个前端测试、21 个 Playwright 测试；后端 97.67% 语句 / 94.93% 分支。 |
 
 ---
 
@@ -176,21 +176,21 @@ flowchart LR
 Linux 服务端：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS 客户端：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows 客户端（管理员 PowerShell）：
 
 ```powershell
-irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 ```
 
 安装器会：
@@ -219,19 +219,36 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-se
 
 #### 离线 / 内网安装
 
+把同一版本的 Release 资产下载到同一目录（保持文件名不变）：
+
+- `install-online.sh`
+- `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium_ctl-0.1.0.tar.gz`（安装脚本、systemd/launchd 文件）
+- `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（按架构选择）及其 `.sha256`
+- `SHA256SUMS`
+
 ```bash
+# 只校验当前目录实际下载的资产（例如服务端不必下载 Windows 安装包）
+sha256sum -c SHA256SUMS --ignore-missing
+
 sudo bash install-online.sh install \
-  --local-dir /path/to/release \
+  --local-dir . \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 必须是包含 `scripts/install.sh` 的源码 checkout（或解压后的同版本源码包）。只包含 Release 下载资产的目录不包含安装脚本，不能用于 `--local-dir`。
+`--local-dir` 同时支持源码 checkout 和扁平 Release 资产目录；安装器会先校验 sdist，
+再从 sdist 中取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
+
+> 完全隔离的环境还需要预建 wheelhouse 或可访问的内网 PyPI 镜像；wheel 的 Python
+> 依赖不会打进 Release 资产。
 
 ### 方式二：Linux 服务器（离线原生安装包）
 
-从 GitHub Release 下载三个文件：
+从 GitHub Release 下载 wheel、sdist、核心包和 `SHA256SUMS`，解压 sdist 后直接运行
+其中的平台安装器：
 
 - `ostium_ctl-0.1.0-py3-none-any.whl`
+- `ostium_ctl-0.1.0.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
@@ -239,8 +256,9 @@ sudo bash install-online.sh install \
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
+tar -xzf ostium_ctl-0.1.0.tar.gz
 
-sudo ./install.sh --role server \
+sudo ./ostium_ctl-0.1.0/scripts/install.sh --role server \
   --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
@@ -282,8 +300,10 @@ journalctl -u ostium -u ostium-core -f
 
 ### 方式三：Linux 客户端（离线）
 
+同样先解压 sdist，再运行：
+
 ```bash
-sudo ./install.sh --role client \
+sudo ./ostium_ctl-0.1.0/scripts/install.sh --role client \
   --wheel ./ostium_ctl-0.1.0-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
@@ -312,10 +332,13 @@ systemctl --user enable --now ostium
 
 ### 方式五：macOS 客户端（一键在线 / 离线源码）
 
-推荐直接用方式一的一键在线安装。离线时，将 `install-macos.sh`、wheel 和 `ostium-core-*-darwin-*.tar.gz` 放在同一目录，然后：
+推荐直接用方式一的一键在线安装。离线时解压 sdist，并用环境变量指向 wheel 与核心包：
 
 ```bash
-sudo ./install-macos.sh client
+tar -xzf ostium_ctl-0.1.0.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.0-py3-none-any.whl" \
+  OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
+  ./ostium_ctl-0.1.0/deploy/launchd/install-macos.sh client
 ```
 
 安装器会注册 `com.ostium.core` LaunchDaemon 和 `com.ostium.ui` LaunchAgent，并链接 `ostium` 命令。未签名/未公证构建会触发 Gatekeeper，请先校验校验和。
@@ -364,7 +387,10 @@ uv tool install "ostium-ctl==0.1.0"
 sudo python3.13 -m venv /opt/ostium/venv
 sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.0"
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
-sudo /opt/ostium/venv/bin/ostium serve
+sudo /opt/ostium/venv/bin/ostium core install \
+  --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
+sudo /opt/ostium/venv/bin/ostium serve      # 终端 1：控制面 + SPA
+sudo /opt/ostium/venv/bin/ostium core-run   # 终端 2：核心服务
 ```
 
 升级：
@@ -601,7 +627,8 @@ sudo ostium core install --url https://.../ostium-core-....tar.gz --sha256 <hash
 sudo ostium core update
 ```
 
-核心升级会先执行 `sing-box check`；失败时保留旧二进制和旧配置，不会把半成品推给生产。
+核心安装/更新只替换二进制；下一次 apply/重启会执行 `sing-box check`，失败时配置会回滚。
+升级前请备份旧二进制，并用 `ostium core version` 确认新二进制可执行。
 
 ### 回滚
 
@@ -763,8 +790,8 @@ npx playwright test
 
 当前结果：
 
-- 后端：**403 passed / 0 skipped**（397 个常规测试 + 6 个真实核心集成测试），语句 **98.19%**、分支 **95.48%**；
-- 前端：**137 passed**，语句 **91.38%**、分支 **85.27%**、函数 **89.04%**、行 **92.13%**；
+- 后端：**419 passed / 0 skipped**（413 个常规测试 + 6 个真实核心集成测试），语句 **97.67%**、分支 **94.93%**；
+- 前端：**137 passed**，语句 **91.34%**、分支 **85.26%**、函数 **89.06%**、行 **92.14%**；
 - Playwright：**21 passed**，覆盖 1440/1024/390 三档、深浅色视觉基线、PWA service worker 和 axe 登录页检查；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

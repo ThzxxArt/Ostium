@@ -7,7 +7,7 @@ Ostium 提供**在线一键安装器**：不需要预装 Python，也不需要�
 ## Linux 服务端
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
@@ -22,7 +22,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 ## Linux 客户端
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/instal
 ## macOS 客户端
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -42,7 +42,7 @@ macOS 只支持客户端；服务端请用 Linux。
 以**管理员 PowerShell**运行：
 
 ```powershell
-irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1 | iex
 ```
 
 脚本会下载并静默运行 Windows 安装包、校验 SHA256，然后打印初始管理员密码。默认：
@@ -54,7 +54,7 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 需要连 UI 也以 SYSTEM 运行时：
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1))) -RunAsSystem
+& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.ps1))) -RunAsSystem
 ```
 
 **风险**：默认 UI 以当前用户运行，只有核心服务是 LocalSystem。`-RunAsSystem` 会取消这层隔离，UI/浏览器漏洞可能直接获得 SYSTEM 权限；只建议在隔离测试机使用。
@@ -67,9 +67,11 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 4. 用 `uv` 安装托管 Python 3.13 到 `/opt/ostium/python`，**不碰系统 Python**。
 5. 从 GitHub Release 下载：
    - `ostium_ctl-<version>-py3-none-any.whl`
+   - `ostium_ctl-<version>.tar.gz`（sdist，内含安装脚本与 `deploy/`）
    - `ostium-core-1.14.4-ostium.1-<os>-<arch>.tar.gz`
    - `SHA256SUMS`
-6. 校验通过后调用仓库内的 `scripts/install.sh` 或 `deploy/launchd/install-macos.sh`。
+6. 校验通过后从 sdist 中取出 `scripts/install.sh` 或 `deploy/launchd/install-macos.sh` 并调用；
+   不会执行未校验的源码包。
 7. 服务端创建服务用户、安装核心、初始化数据库、注册 systemd/launchd 并启动，打印一次性管理员密码。
 8. 客户端不预置管理员密码；首次打开 UI 时完成客户端设置向导。
 
@@ -87,9 +89,9 @@ irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-onlin
 | `--behind-proxy` | Nginx/Caddy 反代：UI 只监听 127.0.0.1，启用 Secure Cookie |
 | `--ui-host HOST` | 管理 UI 监听地址（默认 0.0.0.0） |
 | `--ui-port PORT` | 管理 UI 端口（默认 8443） |
-| `--public-ui` | 允许公网管理 UI（必须先 TLS + TOTP） |
+| `--public-ui` | 已禁用；公网 UI 必须在登录后签发证书、启用 TOTP，再从 Settings 开启 |
 | `--no-start` | 注册服务但不启动 |
-| `--local-dir DIR` | 离线安装：包含 `scripts/install.sh` 的源码 checkout 或解压后的源码包 |
+| `--local-dir DIR` | 离线安装：源码 checkout，或包含 wheel/sdist/core/`SHA256SUMS` 的扁平 Release 资产目录 |
 | `--no-verify` | 跳过 SHA256（仅限本地开发） |
 
 ## 没有 Python 也能装
@@ -152,26 +154,34 @@ sudo OSTIUM_ROLE=server OSTIUM_CONFIG_FILE=/etc/ostium/config.toml \
 
 ## 离线 / 内网安装
 
-准备一个目录，包含：
+准备一个扁平目录，包含同一版本的 Release 资产：
 
 ```text
 release/
+├── install-online.sh
 ├── ostium_ctl-0.1.0-py3-none-any.whl
+├── ostium_ctl-0.1.0.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
-├── SHA256SUMS
-├── scripts/install.sh
-└── deploy/...
+├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz.sha256
+├── core-manifest.json
+└── SHA256SUMS
 ```
 
 然后：
 
 ```bash
+sha256sum -c SHA256SUMS --ignore-missing
+
 sudo bash install-online.sh install \
-  --local-dir /path/to/release \
+  --local-dir . \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 必须指向包含 `scripts/install.sh` 的源码 checkout 或解压后的源码包；只有 Release 下载资产的目录不含安装脚本，不能直接使用。
+`--local-dir` 同时支持源码 checkout 和扁平 Release 资产目录。安装器会先校验 sdist，
+再从 sdist 中取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
+
+> 完全隔离的环境还需要预建 wheelhouse 或可访问的内网 PyPI 镜像；wheel 的 Python
+> 依赖不会打进 Release 资产。
 
 ## 升级
 

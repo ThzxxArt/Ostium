@@ -108,7 +108,12 @@ class CoreSupervisor:
             self._write_state()
 
     async def apply(
-        self, config: dict[str, Any], expected_sha256: str, *, allow_lan: bool = False
+        self,
+        config: dict[str, Any],
+        expected_sha256: str,
+        *,
+        allow_lan: bool = False,
+        allowed_ports: set[int] | None = None,
     ) -> SupervisorStatus:
         if not self.engine.is_file():
             raise EngineUnavailable(
@@ -119,10 +124,12 @@ class CoreSupervisor:
             raise EngineCheckFailed(
                 "configuration digest does not match the payload", "digest_mismatch"
             )
+        if allowed_ports is None:
+            allowed_ports = set(self.settings.proxy_ports)
         validate_config(
             config,
             role=self.settings.role,
-            allowed_ports=set(self.settings.proxy_ports),
+            allowed_ports=allowed_ports,
             allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
             tun_interface=self.settings.tun_interface,
             allow_lan=allow_lan,

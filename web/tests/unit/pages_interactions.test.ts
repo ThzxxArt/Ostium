@@ -118,6 +118,8 @@ describe('page interactions', () => {
     await clickSelector('.n-switch')
     await clickByText('Rotate Reality keys')
     await clickByText('Confirm')
+    await clickByText('Change port')
+    await clickLastByText('Save')
     await clickByText('Certificates')
     await clickAllButtons(1)
     expect(inbounds.wrapper.html()).toBeTruthy()

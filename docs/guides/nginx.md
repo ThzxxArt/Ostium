@@ -38,7 +38,7 @@ Ostium 和 Nginx 装在同一台服务器时，先分清三类流量：
 使用一键安装器的反向代理模式：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh \
   | sudo bash -s -- install --role server \
       --domain admin.example.com \
       --behind-proxy
@@ -223,7 +223,7 @@ sudo journalctl -u ostium -n 50
 
 技术上可以用 Nginx `stream` + `ssl_preread` 按 SNI 分流：管理域名进 Nginx HTTPS，Reality 的伪装 SNI 进 Ostium。但它有两个代价：
 
-1. Ostium 的订阅按入口监听端口生成客户端端口；Nginx 占 443 后 Reality 只能监听 9443，订阅会写 9443，除非你手动改客户端配置或给 Ostium 增加“对外端口”字段。
+1. Ostium 的订阅按入口监听端口生成客户端端口；Nginx 占 443 后 Reality 监听 9443，订阅会写 9443（Inbounds 改端口后需重新复制订阅）。
 2. Reality/Trojan/Hysteria2 的 TLS/QUIC 行为需要仔细测试，升级 Nginx 或改 SNI 都可能破坏连接。
 
 因此 v0.1.0 的推荐答案是：**Nginx 用 443 做管理 UI，代理协议用 9443/tcp 和 443/udp 直连**。这比 SNI 分流简单、稳定，也更容易排查。

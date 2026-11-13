@@ -42,7 +42,9 @@ Ostium 不做静默自动更新。UI 只提供下载链接，不自动执行。
 
 ## 核心升级
 
-核心版本固定在 manifest 中。`ostium core install` 会校验 SHA256，然后 supervisor 对当前配置执行 `sing-box check`，通过后才切换。失败时保留旧二进制和旧配置。
+核心版本固定在 manifest 中。`ostium core install` 会校验 SHA256 并替换二进制；下一次
+apply/重启时 supervisor 才对当前配置执行 `sing-box check`，失败时回滚配置。升级前请备份
+旧二进制，并用 `ostium core version` 确认新二进制可执行。
 
 ```bash
 sudo ostium core install --binary ./sing-box

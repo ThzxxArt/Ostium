@@ -41,12 +41,36 @@ SemVer.
   install and service-manager guides; English README remains available.
 - Documentation for deployment, client, TUN, ACME, subscriptions, API, CLI,
   backups, upgrades, troubleshooting and the design system.
-- Comprehensive audit and coverage suite: 403 backend tests, 137 frontend tests
+- Comprehensive audit and coverage suite: 419 backend tests, 137 frontend tests
   and 21 Playwright tests, with per-module coverage gates and six committed
   dark/light visual baselines.
 
 ### Fixed
 
+- Release installers now install from a flat release-asset directory, verify the
+  sdist, and never execute an unverified GitHub source archive.
+- systemd state/ruleset directories live under the data directory, so
+  `ProtectHome`/`ProtectSystem` no longer prevent services from starting.
+- Default non-root server installs chown the SQLite database and master key to
+  the service user after initialisation.
+- Public admin UI cannot be enabled during first install, and `serve` refuses to
+  start without TOTP plus an unexpired certificate.
+- Inbound ports are editable; `proxy_ports` is persisted and the core reloads
+  the whitelist before every apply, enabling Nginx 443 + Reality 9443.
+- Core tokens are only created by the privileged core; the UI never mints its
+  own token and reports `core_unavailable` instead.
+- `SHA256SUMS` and all release assets use flat basenames, matching GitHub
+  Release downloads; core `.sha256` files are download-friendly.
+- System proxy enable/disable now records recovery state before touching the
+  desktop and rolls back per-key on partial failure.
+- `ostium core install --url` requires SHA-256 and accepts a `.tar.gz` core
+  archive; downloaded core checks no longer install unverified bytes.
+- Local login links are loopback-only; config saves are atomic and persist
+  `state_dir`/`core_token_file`.
+- macOS uninstall is no longer blocked by the server-role check, custom prefix
+  plists are rendered correctly, and the UI documents the required re-login.
+- Release bundles include LICENSE/NOTICE and the core SBOM; Windows/macOS
+  bundles no longer omit license files.
 - Local one-time login tokens no longer fail intermittently when the binary
   signature contains a `.` byte.
 - Failed login counters and audit entries are persisted before the error

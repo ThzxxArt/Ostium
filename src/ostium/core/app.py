@@ -125,7 +125,18 @@ def create_core_app(settings: Settings) -> FastAPI:
             raise ConfigRejected(
                 "configuration role does not match this core service", "role_mismatch"
             )
-        result = await supervisor.apply(request.config, request.sha256, allow_lan=request.allow_lan)
+        current = settings
+        if settings.config_file.is_file():
+            try:
+                current = Settings.load(config_file=settings.config_file)
+            except Exception:
+                current = settings
+        result = await supervisor.apply(
+            request.config,
+            request.sha256,
+            allow_lan=request.allow_lan,
+            allowed_ports=set(current.proxy_ports),
+        )
         return _status_payload(result, settings)
 
     @app.post("/v1/reload", dependencies=[Depends(require_token)])

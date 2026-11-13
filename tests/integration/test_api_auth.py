@@ -312,6 +312,19 @@ def test_expired_and_revoked_sessions(api_client: TestClient, settings: Settings
     assert api_client.get("/api/v1/auth/me").status_code == 401
 
 
+def test_local_login_is_loopback_only(
+    api_client: TestClient, settings: Settings, monkeypatch
+) -> None:
+    from ostium.services.auth import make_local_login_token
+
+    setup_admin(api_client)
+    token = make_local_login_token(settings)
+    monkeypatch.setattr("ostium.api.routes_auth.is_loopback", lambda _request: False)
+    response = api_client.get(f"/api/v1/auth/local-login?token={token}", follow_redirects=False)
+    assert response.status_code == 403
+    assert response.json()["code"] == "loopback_required"
+
+
 def test_local_login_missing_admin(api_client: TestClient, settings: Settings) -> None:
     from ostium.services.auth import make_local_login_token
 

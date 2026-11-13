@@ -195,7 +195,7 @@ def test_load_environment_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     for key, item in env.items():
         monkeypatch.setenv(key, item)
     monkeypatch.setattr(
-        Path, "is_file", lambda self: self == Path("/var/lib/ostium-core/core.token")
+        Path, "is_file", lambda self: self == Path("/var/lib/ostium-core/runtime/core.token")
     )
 
     loaded = Settings.load()
@@ -215,7 +215,7 @@ def test_load_environment_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert loaded.tun_interface == "tun9"
     assert loaded.proxy_ports == [443, 8443, 8388]
     assert loaded.dev is True
-    assert loaded.core_token_file == Path("/var/lib/ostium-core/core.token")
+    assert loaded.core_token_file == Path("/var/lib/ostium-core/runtime/core.token")
 
 
 def test_load_defaults_for_missing_file_and_empty_engine(
@@ -252,6 +252,19 @@ def test_load_client_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert loaded.core_token_file == tmp_path / "data" / "runtime" / "core.token"
 
 
+def test_default_state_dir_is_inside_data_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OSTIUM_CONFIG_FILE", str(tmp_path / "missing.toml"))
+    monkeypatch.setenv("OSTIUM_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("OSTIUM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.delenv("OSTIUM_STATE_DIR", raising=False)
+    monkeypatch.setenv("OSTIUM_ROLE", "server")
+    monkeypatch.setattr(Path, "is_file", lambda self: False)
+    loaded = Settings.load()
+    assert loaded.state_dir == tmp_path / "data" / "state"
+
+
 def test_default_directories_for_root_server(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -261,6 +274,14 @@ def test_default_directories_for_root_server(
     assert _default_data_dir(Role.SERVER) == Path("/var/lib/ostium")
     assert _default_config_dir(Role.SERVER) == Path("/etc/ostium")
     assert _default_data_dir(Role.CLIENT) != Path("/var/lib/ostium")
+
+
+def test_non_root_server_reads_etc_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OSTIUM_CONFIG_DIR", raising=False)
+    monkeypatch.setattr(config_module.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(Path, "is_file", lambda self: self == Path("/etc/ostium/config.toml"))
+    monkeypatch.setattr(config_module.os, "access", lambda _path, _mode: True)
+    assert _default_config_dir(Role.SERVER) == Path("/etc/ostium")
 
 
 def test_default_directory_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

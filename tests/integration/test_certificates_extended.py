@@ -99,6 +99,14 @@ def test_import_manual_variants(settings: Settings) -> None:
             await session.commit()
             assert wildcard.domain == "www.example.com"
             assert wildcard.status == "ready"
+            with pytest.raises(cert_service.CertificateError):
+                await cert_service.import_manual(
+                    session,
+                    settings,
+                    domain="a.b.example.com",
+                    cert_pem=cert_pem,
+                    key_pem=key_pem,
+                )
 
             ip_cert, ip_key = _bundle(
                 "127.0.0.1", san=[x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]

@@ -12,7 +12,7 @@ import sys
 import tarfile
 import webbrowser
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import httpx
 import typer
@@ -67,7 +67,7 @@ def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
 
-def _fail(message: str, code: int = 1) -> None:
+def _fail(message: str, code: int = 1) -> NoReturn:
     err_console.print(f"[red]error:[/red] {message}")
     raise typer.Exit(code)
 
@@ -150,6 +150,8 @@ def init(
         )
     if data_dir:
         settings.data_dir = data_dir
+        if "OSTIUM_STATE_DIR" not in os.environ:
+            settings.state_dir = data_dir / "state"
     if config_dir:
         settings.config_dir = config_dir
         settings.config_path = config_dir / "config.toml"
@@ -252,21 +254,56 @@ def serve(
 
         from ostium.db.models import Certificate
 
+        async def _public_ui_totp_ready() -> bool:
+            from ostium.services.auth import get_admin
+
+            engine, factory, _store = await _database(settings)
+            try:
+                async with factory() as session:
+                    admin = await get_admin(session)
+                return bool(admin is not None and admin.totp_secret_enc)
+            finally:
+                await engine.dispose()
+
+        if not _run(_public_ui_totp_ready()):
+            err_console.print(
+                "[yellow]public UI is enabled but TOTP is not configured; "
+                "refusing to expose the admin UI[/yellow]"
+            )
+            raise typer.Exit(code=6)
+
         async def _find_cert() -> tuple[str, str] | None:
             from ostium.services.settings import get_setting
+            from ostium.util.time import as_utc, utcnow
 
             engine, factory, _store = await _database(settings)
             try:
                 async with factory() as session:
                     server_info = await get_setting(session, "server", {})
                     domain = server_info.get("domain") if isinstance(server_info, dict) else None
-                    query = select(Certificate).where(Certificate.status == "ready")
+                    query = select(Certificate).where(
+                        Certificate.status == "ready",
+                        Certificate.expires_at.is_not(None),
+                    )
                     if domain:
                         query = query.where(Certificate.domain == domain)
                     else:
                         query = query.order_by(Certificate.expires_at.desc())
-                    cert = (await session.execute(query)).scalars().first()
-                return (cert.cert_path, cert.key_path) if cert else None
+                    certs = (await session.execute(query)).scalars().all()
+                now = utcnow()
+                cert = next(
+                    (
+                        item
+                        for item in certs
+                        if item.expires_at is not None and as_utc(item.expires_at) > now
+                    ),
+                    None,
+                )
+                if cert is None:
+                    return None
+                if not (Path(cert.cert_path).is_file() and Path(cert.key_path).is_file()):
+                    return None
+                return (cert.cert_path, cert.key_path)
             finally:
                 await engine.dispose()
 
@@ -1119,7 +1156,12 @@ def core_install(
             platform.system(), platform.system().lower()
         )
         machine = platform.machine().lower()
-        arch = "arm64" if machine in {"aarch64", "arm64"} else "amd64"
+        if machine in {"aarch64", "arm64"}:
+            arch = "arm64"
+        elif machine in {"x86_64", "amd64"}:
+            arch = "amd64"
+        else:
+            _fail(f"unsupported CPU architecture: {machine}", 6)
         candidates = [
             item
             for item in data.get("artifacts", [])
@@ -1130,9 +1172,10 @@ def core_install(
         if not candidates:
             _fail(f"no core artifact for {os_name}/{arch} in the manifest", 6)
         artifact = sorted(candidates, key=lambda item: str(item.get("version")))[-1]
-        response = httpx.get(
-            str(artifact["url"]), timeout=180, follow_redirects=True, trust_env=False
-        )
+        artifact_url = str(artifact["url"])
+        if not artifact_url.startswith("https://"):
+            _fail("core manifest artifact URL must use HTTPS", 6)
+        response = httpx.get(artifact_url, timeout=180, follow_redirects=True, trust_env=False)
         response.raise_for_status()
         digest = hashlib.sha256(response.content).hexdigest()
         if digest != artifact["sha256"]:
@@ -1159,11 +1202,35 @@ def core_install(
     elif binary:
         shutil.copy2(binary, target)
     elif url:
+        if not url.startswith("https://"):
+            _fail("--url must use HTTPS; download the file and use --binary for HTTP mirrors", 2)
+        if not sha256:
+            _fail("--sha256 is required when downloading a core with --url", 2)
         response = httpx.get(url, timeout=120, follow_redirects=True, trust_env=False)
         response.raise_for_status()
-        if sha256 and hashlib.sha256(response.content).hexdigest() != sha256:
+        if hashlib.sha256(response.content).hexdigest() != sha256:
             _fail("SHA256 mismatch; refusing to install", 6)
-        target.write_bytes(response.content)
+        if url.split("?", 1)[0].endswith((".tar.gz", ".tgz")):
+            import io
+
+            with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
+                member = next(
+                    (
+                        item
+                        for item in archive.getmembers()
+                        if Path(item.name).name in {"sing-box", "sing-box.exe"}
+                    ),
+                    None,
+                )
+                if member is None:
+                    _fail("core archive does not contain sing-box", 6)
+                assert member is not None
+                member.name = Path(member.name).name
+                with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
+                    archive.extract(member, Path(temp), filter="data")
+                    target.write_bytes((Path(temp) / member.name).read_bytes())
+        else:
+            target.write_bytes(response.content)
     else:
         _fail("provide --binary, --url or --manifest", 2)
     if os.name == "posix":

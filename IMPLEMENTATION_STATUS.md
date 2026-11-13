@@ -1,6 +1,6 @@
 # Ostium v0.1.0 implementation status
 
-Updated: 2026-11-12
+Updated: 2026-11-13
 
 Legend: `[x]` implemented and exercised locally, `[~]` implemented but needs
 platform/external validation, `[ ]` not done yet.
@@ -99,17 +99,17 @@ platform/external validation, `[ ]` not done yet.
 
 ## Test status
 
-- `ruff check` / `ruff format --check`: pass (136 files).
+- `ruff check` / `ruff format --check`: pass (137 files).
 - `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 403 passed, 0 skipped, 0 failed, including real sing-box config
+- `pytest`: 419 passed, 0 skipped, 0 failed, including real sing-box config
   checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
   client → Reality → collector traffic test, certificates, jobs, auth, backups,
   stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 98.19%, branches 95.48%; every module ≥85% and
+- Backend coverage: statements 97.67%, branches 94.93%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 91.38%, branches 85.27%, functions 89.04%,
-  lines 92.13% (Vitest v8, thresholds 85).
+- Frontend coverage: statements 91.34%, branches 85.26%, functions 89.06%,
+  lines 92.14% (Vitest v8, thresholds 85).
 - Playwright: 21 passed on desktop 1440, tablet 1024 and mobile 390; login,
   dashboard, command palette, PWA service worker, axe smoke,
   no-horizontal-scroll and six dark/light visual baselines pass.

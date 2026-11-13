@@ -105,14 +105,26 @@ async def update_inbound(
     params = inbound_params(inbound, services.store)
     changes = payload.model_dump(exclude_unset=True)
     if "port" in changes and changes["port"] is not None:
-        expected = DEFAULT_PORTS[kind]
-        if changes["port"] != expected:
+        port = int(changes["port"])
+        # Hysteria2 is QUIC/UDP, so it may share a port number with the
+        # TCP-only core API/admin UI listeners (for example 8443/udp).
+        if kind != "hysteria2" and port in {8788, 8443, int(services.settings.port)}:
             raise ApiError(
                 400,
-                f"{kind} must listen on port {expected} in v0.1.0",
-                "port_locked",
+                f"port {port} is reserved by the core API or the admin UI",
+                "port_reserved",
             )
-        inbound.port = changes["port"]
+        inbound.port = port
+        if port not in services.settings.proxy_ports:
+            services.settings.proxy_ports = sorted({*services.settings.proxy_ports, port})
+            try:
+                services.settings.save()
+            except OSError as exc:
+                raise ApiError(
+                    500,
+                    f"could not persist the approved proxy port: {exc}",
+                    "settings_write_failed",
+                ) from exc
     if "enabled" in changes and changes["enabled"] is not None:
         enabled = bool(changes["enabled"])
         if enabled and kind in {"hysteria2", "trojan"}:
@@ -237,6 +249,6 @@ async def _apply_server(services: Services, session: AsyncSession) -> dict[str, 
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
     except EngineError as exc:
-        if exc.code in {"core_unreachable", "engine_unavailable"}:
+        if exc.code in {"core_unavailable", "core_unreachable", "engine_unavailable"}:
             return {"applied": False, "warning": str(exc)}
         raise ApiError(exc.status_code, str(exc), exc.code) from exc

@@ -15,7 +15,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from platformdirs import user_config_path, user_data_path, user_state_path
+from platformdirs import user_config_path, user_data_path
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -43,8 +43,10 @@ def _default_config_dir(role: Role) -> Path:
     override = os.environ.get("OSTIUM_CONFIG_DIR")
     if override:
         return Path(override).expanduser()
-    if role is Role.SERVER and os.name == "posix" and os.geteuid() == 0:
-        return Path("/etc/ostium")
+    if role is Role.SERVER and os.name == "posix":
+        server_config = Path("/etc/ostium/config.toml")
+        if os.geteuid() == 0 or (server_config.is_file() and os.access(server_config, os.R_OK)):
+            return Path("/etc/ostium")
     return Path(user_config_path("ostium", appauthor=False))
 
 
@@ -200,6 +202,8 @@ class Settings(BaseModel):
             "public_ui": self.public_ui,
             "data_dir": str(self.data_dir),
             "config_dir": str(self.config_dir),
+            "state_dir": str(self.state_dir),
+            "core_token_file": str(self.core_token_file),
             "log_level": self.log_level,
             "core_url": self.core_url,
             "engine_path": str(self.engine_path) if self.engine_path else None,
@@ -220,9 +224,20 @@ class Settings(BaseModel):
             "dev": self.dev,
         }
         payload = {key: value for key, value in payload.items() if value is not None}
-        tomli_w.dump(payload, target.open("wb"))
-        if os.name == "posix":
-            target.chmod(0o600)
+        # The core rereads this file on every apply.  Write atomically so it
+        # can never observe a half-written TOML document.
+        import tempfile
+
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                tomli_w.dump(payload, handle)
+            if os.name == "posix":
+                temporary.chmod(0o600)
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
         return target
 
     @classmethod
@@ -243,17 +258,23 @@ class Settings(BaseModel):
         config_dir = Path(
             os.environ.get("OSTIUM_CONFIG_DIR", raw.get("config_dir", _default_config_dir(role)))
         ).expanduser()
+        # Keep mutable state inside the service data directory.  A home-based
+        # default breaks systemd units that use ProtectHome/ProtectSystem and
+        # silently points root-mode services at /root.
         state_dir = Path(
             os.environ.get(
                 "OSTIUM_STATE_DIR",
-                raw.get("state_dir", user_state_path("ostium", appauthor=False)),
+                raw.get("state_dir", data_dir / "state"),
             )
         ).expanduser()
         default_host = "0.0.0.0" if role is Role.SERVER else "127.0.0.1"
         default_port = 8443 if role is Role.SERVER else 8787
         default_token = data_dir / "runtime" / "core.token"
-        if role is Role.CLIENT and Path("/var/lib/ostium-core/core.token").is_file():
-            default_token = Path("/var/lib/ostium-core/core.token")
+        if role is Role.CLIENT and (
+            Path("/var/lib/ostium-core").is_dir()
+            or Path("/var/lib/ostium-core/runtime/core.token").is_file()
+        ):
+            default_token = Path("/var/lib/ostium-core/runtime/core.token")
         base = {
             "role": role,
             "host": raw.get("host", default_host),

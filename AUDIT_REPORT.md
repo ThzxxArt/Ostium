@@ -2,8 +2,8 @@
 
 日期：2026-11-13
 
-审计对象：`/mnt/d/CodeWorkspace/Ostium`（第三轮，基线 `e1d9bc2`）
-结论：**第三轮发现的 P0/P1 代码缺陷已修复；自动化测试、覆盖率、静态检查、前端构建、E2E、隔离安装与升级回滚均通过。真实 Release、Windows/macOS 实机、Nginx `nginx -t`、TUN/系统代理实机、ACME 与 72h soak 仍未验证，发布状态列为 blocker。§12 的数字与证据是第二轮历史记录；第三轮最新结果以本节、§13 和文末证据为准。**
+审计对象：`/mnt/d/CodeWorkspace/Ostium`（第四轮，基线 `e0d4c4a`）
+结论：**第四轮发现的 P0/P1 代码缺陷已修复；自动化测试、覆盖率、静态检查、前端构建、E2E、隔离安装与升级回滚均通过。真实 Release、Windows/macOS 实机、Nginx `nginx -t`、TUN/系统代理实机、ACME 与 72h soak 仍未验证，发布状态列为 blocker。§12/§13 是前几轮历史记录；第四轮最新结果以本节、§14 和文末证据为准。**
 
 ---
 
@@ -11,17 +11,17 @@
 
 | 项目 | 基线 | 最终 | 门禁 |
 |---|---|---|---|
-| 后端语句覆盖率 | 66.81% | **98.19%** | ≥85% PASS |
-| 后端分支覆盖率 | 39.46% | **95.48%** | ≥85% PASS |
-| `api/` 覆盖 | — | 语句 97.47% / 分支 96.62% | ≥90% PASS |
-| `core/` 覆盖 | — | 语句 98.48% / 分支 91.67% | ≥90% PASS |
-| `services/` 覆盖 | — | 语句 98.03% / 分支 94.08% | ≥90% PASS |
-| `engine/` 覆盖 | — | 语句 99.23% / 分支 97.29% | ≥90% PASS |
-| 前端 statements | 0.92% | **91.38%** | ≥85% PASS |
-| 前端 branches | 1.62% | **85.27%** | ≥85% PASS |
-| 前端 functions | 0.56% | **89.04%** | ≥85% PASS |
-| 前端 lines | 0.83% | **92.13%** | ≥85% PASS |
-| 后端测试 | 69 | **403 passed / 0 skipped** | — |
+| 后端语句覆盖率 | 66.81% | **97.67%** | ≥85% PASS |
+| 后端分支覆盖率 | 39.46% | **94.93%** | ≥85% PASS |
+| `api/` 覆盖 | — | 语句 96.75% / 分支 95.81% | ≥90% PASS |
+| `core/` 覆盖 | — | 语句 97.10% / 分支 92.31% | ≥90% PASS |
+| `services/` 覆盖 | — | 语句 98.04% / 分支 94.16% | ≥90% PASS |
+| `engine/` 覆盖 | — | 语句 99.24% / 分支 96.95% | ≥90% PASS |
+| 前端 statements | 0.92% | **91.34%** | ≥85% PASS |
+| 前端 branches | 1.62% | **85.26%** | ≥85% PASS |
+| 前端 functions | 0.56% | **89.06%** | ≥85% PASS |
+| 前端 lines | 0.83% | **92.14%** | ≥85% PASS |
+| 后端测试 | 69 | **419 passed / 0 skipped** | — |
 | 前端测试 | 5 | **137 passed** | — |
 | Playwright | 12 passed / 3 skipped | **21 passed / 0 skipped** | — |
 
@@ -50,14 +50,14 @@
 | 门禁 | 命令 | 结果 |
 |---|---|---|
 | Python lint | `uv run ruff check src tests scripts` | PASS |
-| Python format | `uv run ruff format --check src tests scripts` | PASS（136 files） |
+| Python format | `uv run ruff format --check src tests scripts` | PASS（137 files） |
 | Python types | `uv run mypy src/ostium` | PASS（69 files） |
-| Backend tests | `uv run pytest -q` | 403 passed, 0 skipped |
-| Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS |
+| Backend tests | `uv run pytest -q` | 419 passed, 0 skipped |
+| Backend coverage | `uv run pytest --cov=ostium --cov-branch ...` + `scripts/coverage_gate.py` | PASS（97.67 / 94.93） |
 | Frontend lint | `npm run lint` | PASS |
 | Frontend types | `npm run typecheck` | PASS |
 | Frontend unit tests | `npm run test` | 137 passed |
-| Frontend coverage | `npm run test:coverage` | 91.38 / 85.27 / 89.04 / 92.13 |
+| Frontend coverage | `npm run test:coverage` | 91.34 / 85.26 / 89.06 / 92.14 |
 | Frontend build | `npm run build` | PASS |
 | Frontend format | `npm run format:check` | PASS |
 | E2E/a11y/visual | `npx playwright test` | 21 passed |
@@ -474,3 +474,90 @@ shellcheck + bash -n                                  -> PASS
 
 **代码层面达到 release candidate：第三轮 P0/P1 已修复，自动化与隔离安装/升级证据通过。**
 **但不能宣布“已发布”或把 README 的 Release/PyPI/GHCR 链接当成有效：没有真实 tag/Release/发布，且 Windows/macOS/Nginx/Docker/ACME/TUN/性能仍属外部验证。**
+
+---
+
+## 14. 第四轮发布前最终审计（2026-11-13）
+
+### 14.1 基线与方法
+
+- 基线：`e0d4c4a`，干净工作树；无 tag、GitHub Release、PyPI/GHCR/Docker 发布。
+- 环境：Python 3.13.5、Node 24.19.0、npm 12.0.2、uv 0.11.14；Linux/WSL2。
+- 本轮不信任前几轮结论，重新执行源码测试、构建 wheel/sdist、扁平 Release 目录模拟、
+  隔离安装/升级、篡改校验、前端 E2E 与文档构建。
+- 未创建 tag、未 push、未发布任何制品。
+
+### 14.2 第四轮新发现并根治的问题
+
+| ID | 级别 | 问题 | 根因 | 修复与回归证据 |
+|---|---|---|---|---|
+| R4-01 | P0 | `install-online.sh --local-dir` 无法从 Release 资产目录安装；在线模式执行未校验的 GitHub 源码包 | 离线模式假定存在 `scripts/install.sh`；在线模式直接解压 tag archive | 校验 sdist 后从 sdist 提取安装器；新增 `extract_source`、`sums_asset`；Release 目录实测安装成功；`test_offline_installer_can_use_release_assets` |
+| R4-02 | P0 | systemd 服务无法启动：状态目录默认在 `~/.local/state`，被 `ProtectHome`/`ProtectSystem=strict` 阻止；root 模式落到 `/root` | 状态目录使用 platformdirs，默认不在 data_dir | 默认改为 `data_dir/state`；systemd 增加 `state`/`rulesets` 可写路径；安装器创建目录；`test_default_state_dir_is_inside_data_dir` |
+| R4-03 | P0 | 默认非 root 服务端安装后数据库/master.key 归 root，`ostium` 服务无法读写 | 安装器以 root 执行 `init`，未回收文件属主 | 初始化后 `chown -R ostium:ostium "$DATA" "$CONFIG"`；`test_server_init_files_are_owned_by_service_user` |
+| R4-04 | P0 | `--public-ui` 在首次安装即可启用，既无证书也无 TOTP；`serve` 直接退出并被 systemd 循环拉起 | 安装参数绕过 Settings 的 TOTP/证书门禁 | 首次安装拒绝 `--public-ui`；`serve` 同时要求 TOTP 和未过期可用证书；CLI 测试覆盖 |
+| R4-05 | P0 | Release `SHA256SUMS` 使用 `./core/...` 等嵌套路径，GitHub Release 资产是扁平文件名，下载后无法校验 | 在嵌套 `dist` 直接生成 checksum | 新增 `dist/release` 扁平暂存目录，按 basename 生成并自校验；`test_release_publishes_every_checksummed_asset` |
+| R4-06 | P0 | Inbounds 端口被锁死默认值，UI 也不能改；Nginx 占用 443 时 Reality/Trojan 无法迁到 9443 | API 硬编码 `port_locked`；前端只展示端口；core 启动时缓存 `proxy_ports` | API 允许 1–65535（保留 UI/core API 端口，Hysteria2 UDP 可复用）；自动扩展并持久化 `proxy_ports`；core 每次 apply 重读配置白名单；Inbounds 页新增“修改端口”；API/前端回归测试 |
+| R4-07 | P0 | UI 在 core token 不存在时自行生成 token，导致 UI/core 永久 401 或权限错误 | `CoreClient._token()` 调用 `ensure_core_token` | UI 只读 token，缺失时返回 `core_unavailable`；仅特权 core 创建；`test_core_client_never_creates_the_privileged_token` |
+| R4-08 | P1 | `serve` 使用已过期的 `status=ready` 证书，公网 UI 启动后 TLS 失败 | 启动查询只过滤 status | 过滤过期时间并检查证书文件存在；`test_serve_uses_only_unexpired_ready_certificates` |
+| R4-09 | P1 | 系统代理启用中途失败会留下半改状态且无法恢复 | 先改系统、后写状态；KDE/Windows 删除/恢复不完整 | 四个平台改为先写恢复状态、失败自动回滚；单键失败继续恢复其余键并保持 dirty；代理扩展测试 |
+| R4-10 | P1 | `ostium core install --url` 允许无校验下载，且把 `.tar.gz` 原样写成核心二进制 | 未强制 `--sha256`；未识别归档 | 强制 `--sha256`；支持 tar.gz 中提取 `sing-box`；测试覆盖 |
+| R4-11 | P1 | `local-login` 链接可被非 loopback 请求使用 | 未校验来源地址 | 仅允许 loopback；`test_local_login_is_loopback_only` |
+| R4-12 | P1 | `Settings.save()` 非原子且不持久化 `state_dir`/`core_token_file`；并发读可能看到半写 TOML | 直接写目标文件，字段遗漏 | 临时文件 + `Path.replace` 原子写；持久化两个路径字段；配置/核心测试 |
+| R4-13 | P1 | 非 root CLI 找不到 `/etc/ostium/config.toml`，README 的 `sudo -u ostium ostium backup` 实际不可用 | 非 root 服务端默认用户配置目录 | 可读 `/etc/ostium/config.toml` 时优先使用；`test_non_root_server_reads_etc_config` |
+| R4-14 | P1 | macOS 卸载被“仅支持客户端”角色检查误杀；自定义 prefix 的 plist 仍指向 `/opt/ostium` | 状态/卸载也执行服务端角色检查；plist 静态安装 | 仅 install/upgrade 校验角色；plist 安装时渲染 prefix；macOS 重新登录提示 |
+| R4-15 | P1 | core 归档 `.sha256` 写入绝对路径，下载后 `sha256sum -c` 不可用 | 使用绝对 `$dir.tar.gz` | 在输出目录用 basename 生成；Release 增加 core checksum 校验；`test_core_checksum_file_is_download_friendly` |
+| R4-16 | P1 | Windows/macOS/Linux 安装包缺少 LICENSE/NOTICE/核心 SBOM | 只复制二进制 | 安装器、Windows 构建、macOS 构建补齐许可证与 SBOM；`test_release_bundles_include_license_and_sbom` |
+| R4-17 | P2 | macOS wildcard 证书校验接受多级子域 | `endswith` 未限制一级 | 只允许一级 wildcard；证书扩展测试 |
+| R4-18 | P2 | Docker entrypoint 在 core 崩溃后仍保持半死容器 | `wait` 等待两个子进程 | 任一子进程退出即结束容器，交给 restart policy |
+| R4-19 | P2 | Release 脚本未上传安装器/sdist、Docker 只打 `v0.1.0` 而 compose 使用 `0.1.0` | 发布资产与镜像标签不完整 | 暂存并上传 `install-online.sh/.ps1`、sdist；metadata-action 同时生成 `v0.1.0`/`0.1.0`/`latest`（预发布不打 latest） |
+| R4-20 | P2 | CI/Release 没有 wheel 冒烟；Release verify 没有覆盖率门禁 | 只构建不安装 | 新增 wheel 安装 + `ostium version` + SPA 检查；Release verify 增加 coverage gate |
+
+### 14.3 第四轮证据
+
+| 检查 | 结果 |
+|---|---|
+| 后端非集成测试 | **413 passed / 0 skipped**；覆盖率 **97.67% statements / 94.93% branches**；`coverage_gate.py` PASS |
+| 后端真实核心集成测试 | **6 passed**（真实 sing-box + 定制 v2ray core） |
+| 前端 | **137 passed**；91.34 / 85.26 / 89.06 / 92.14；lint/typecheck/format/build PASS |
+| Playwright | **21 passed**（桌面/平板/移动、深浅色基线、PWA、axe） |
+| 依赖审计 | 全依赖组 `pip-audit --strict` 0 漏洞；`npm audit` 0；`npm ls` exit 0 |
+| `ruff` / `mypy` | PASS（69 source files） |
+| Shell | `bash -n`、`shellcheck` PASS；4 个 PowerShell 脚本解析 PASS |
+| 文档 | `mkdocs build --strict` PASS；README/docs 内部链接 PASS |
+| Release 候选 | wheel/sdist 0.1.0 构建成功；wheel 含 SPA/manifest/sw.js；sdist 含 `web/dist`、`scripts/`、`deploy/` |
+| 扁平 Release 目录 | 本地产物 + core + 安装器 + manifest + `SHA256SUMS`；`sha256sum -c` 全部 OK |
+| 离线一键安装 | `install-online.sh --local-dir` 服务端安装成功；`ostium version`、配置、DB、master.key、state 目录正常 |
+| 升级 | 好 wheel 保留数据/管理员，`ostium`/`pip` 可执行；坏 wheel 退出 1 且旧 venv 仍可执行 |
+| 篡改校验 | 修改 wheel 一字节后安装被 SHA256 拒绝 |
+| 客户端 | 配置分离；core 生成 `runtime/core.token`；UI 只读 token；`/healthz`/`/readyz` 正常 |
+| 发布工作流静态检查 | `verify` 门禁、扁平 checksum、PyPI 暂存、Docker 双版本标签、action tag 存在 |
+
+### 14.4 平台验证矩阵
+
+| 平台/路径 | 状态 | 说明 |
+|---|---|---|
+| Linux 隔离安装/升级/卸载 | PASS（隔离目录、`unshare -r`） | 服务端/客户端 `--run-as-root --no-service`、扁平 Release 目录 |
+| Linux 默认非 root systemd | **未实机** | 无真实 systemd 会话；属主修复为静态断言 + 代码路径 |
+| Windows 安装/服务/TUN/PAC | **未实机** | 仅 PowerShell 解析、静态检查；需 Windows runner/实机 |
+| macOS launchd/token/卸载 | **未实机** | 仅 shellcheck/静态检查；需 macOS 实机 |
+| Nginx `nginx -t` / 反代 | **未执行** | 本机无 nginx/公网域名 |
+| Docker 多架构构建/运行 | **未执行** | 本机无 Docker |
+| ACME staging/production | **未执行** | 无公网域名和 80 端口 |
+| TUN/Allow LAN 真实数据面 | **未执行** | 无 `/dev/net/tun`/真实 LAN 设备 |
+| 72h soak / 性能 / 5 用户 | **未执行** | 仅 nightly 100 次配置校验，不等价 |
+| 真实 Release/PyPI/GHCR | **未执行** | 未获授权创建 tag/发布 |
+
+### 14.5 结论（第四轮）
+
+**代码层面：达到 release candidate；第四轮发现的 P0/P1 已修复，自动化、构建、隔离安装/升级和前端 E2E 证据通过。**
+
+**发布层面：NO-GO。** 最小阻塞：
+
+1. 未创建 `v0.1.0` tag，Release/PyPI/GHCR 链接仍 404；需明确授权发布。
+2. Windows 实机/runner 未验证安装、服务、TUN/Wintun、PAC 恢复。
+3. macOS 实机未验证 launchd、组权限、token、卸载、Gatekeeper。
+4. Nginx/Docker/ACME/TUN/72h soak 未执行，至少需要一项真实环境验收或明确接受 external blocker。
+5. 安装包未签名，SmartScreen/Gatekeeper 会拦截。
+6. 默认非 root systemd 安装尚未在真实 systemd 主机跑通。
+
+因此不能把 README 的“当前稳定版本”与发布链接视为已验证事实；需要完成上述验收并发布后才能给出 GO。

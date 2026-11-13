@@ -291,9 +291,9 @@ def test_core_commands(tmp_path: Path, monkeypatch) -> None:
         )
         assert (
             runner.invoke(app, ["core", "install", "--url", "https://example.com/core"]).exit_code
-            == 0
+            == 2
         )
-        assert target.read_bytes() == b"url binary"
+        assert target.read_text() == "new binary"
 
         import hashlib
 
@@ -312,6 +312,32 @@ def test_core_commands(tmp_path: Path, monkeypatch) -> None:
             ).exit_code
             == 0
         )
+        assert target.read_bytes() == b"url binary"
+
+        archive_buffer = io.BytesIO()
+        with tarfile.open(fileobj=archive_buffer, mode="w:gz") as archive:
+            info = tarfile.TarInfo("sing-box")
+            info.size = len(b"archive binary")
+            archive.addfile(info, io.BytesIO(b"archive binary"))
+        archive_bytes = archive_buffer.getvalue()
+        respx.get("https://example.com/core.tar.gz").mock(
+            return_value=httpx.Response(200, content=archive_bytes)
+        )
+        assert (
+            runner.invoke(
+                app,
+                [
+                    "core",
+                    "install",
+                    "--url",
+                    "https://example.com/core.tar.gz",
+                    "--sha256",
+                    hashlib.sha256(archive_bytes).hexdigest(),
+                ],
+            ).exit_code
+            == 0
+        )
+        assert target.read_bytes() == b"archive binary"
 
     with respx.mock:
         respx.get("https://example.com/core").mock(return_value=httpx.Response(200, content=b"x"))
@@ -497,6 +523,76 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
     settings.save()
     refused = runner.invoke(app, ["serve"])
     assert refused.exit_code == 6
+
+
+def test_serve_uses_only_unexpired_ready_certificates(tmp_path: Path, monkeypatch) -> None:
+    import asyncio
+    from datetime import timedelta
+
+    from ostium.db.models import Certificate
+    from ostium.db.session import create_engine, create_session_factory
+    from ostium.util.time import utcnow
+
+    runner = _init(tmp_path, monkeypatch)
+    settings = Settings.load()
+    settings.public_ui = True
+    settings.save()
+    cert_path = tmp_path / "cert.pem"
+    key_path = tmp_path / "key.pem"
+    cert_path.write_text("cert")
+    key_path.write_text("key")
+
+    async def enable_totp() -> None:
+        from ostium.services.auth import get_admin
+
+        engine = create_engine(settings.paths.db_path)
+        factory = create_session_factory(engine)
+        try:
+            async with factory() as session:
+                admin = await get_admin(session)
+                assert admin is not None
+                admin.totp_secret_enc = "configured"
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    async def add_certificate(expires_at) -> None:  # type: ignore[no-untyped-def]
+        engine = create_engine(settings.paths.db_path)
+        factory = create_session_factory(engine)
+        try:
+            async with factory() as session:
+                from sqlalchemy import delete
+
+                await session.execute(delete(Certificate))
+                session.add(
+                    Certificate(
+                        domain="vpn.example.com",
+                        cert_path=str(cert_path),
+                        key_path=str(key_path),
+                        expires_at=expires_at,
+                        status="ready",
+                    )
+                )
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    recorded: dict[str, object] = {}
+
+    def fake_run(_app, **kwargs):  # type: ignore[no-untyped-def]
+        recorded.update(kwargs)
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+    asyncio.run(enable_totp())
+    asyncio.run(add_certificate(utcnow() + timedelta(days=30)))
+    served = runner.invoke(app, ["serve"])
+    assert served.exit_code == 0, served.output
+    assert recorded["ssl_certfile"] == str(cert_path)
+    assert recorded["ssl_keyfile"] == str(key_path)
+
+    asyncio.run(add_certificate(utcnow() - timedelta(days=1)))
+    expired = runner.invoke(app, ["serve"])
+    assert expired.exit_code == 6
 
 
 def test_core_run_delegates(tmp_path: Path, monkeypatch) -> None:
