@@ -654,6 +654,17 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        账户密钥轮换
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         常见错误
       
     </span>
@@ -1023,6 +1034,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1202,9 +1269,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1218,7 +1303,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1308,6 +1465,17 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        账户密钥轮换
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         常见错误
       
     </span>
@@ -1349,10 +1517,13 @@
 <li>输入域名，选择 <strong>ACME HTTP-01</strong>。</li>
 <li>默认使用生产目录；测试时勾选 <strong>staging</strong>。</li>
 <li>在 <strong>Jobs</strong> 查看进度。挑战服务器只在订单期间绑定 80，并且只提供一个 key authorization。</li>
-<li>成功后证书保存到 <code>/var/lib/ostium/certs/&lt;domain&gt;/fullchain.pem</code> 和 <code>privkey.pem</code>（0600），并自动分配给 Hysteria2/Trojan。</li>
+<li>成功后证书保存到 <code>/var/lib/ostium/certs/&lt;domain&gt;/fullchain.pem</code> 和 <code>privkey.pem</code>（0600），并只自动分配给尚未绑定证书的 Hysteria2/Trojan；已有显式绑定不会被覆盖。</li>
 </ol>
 <h2 id="_3">续期<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p>Ostium 每天检查一次，剩余不足 30 天时自动续期。续期失败会产生告警，并保留旧证书。</p>
+<p>Ostium 每 6 小时检查一次，剩余不足 30 天时自动续期。续期失败会记录日志并创建
+<code>certificate_renewal_failed</code> 告警，同时保留旧证书；证书进入 14 天窗口后还会生成到期告警。</p>
+<p>签发任务支持 per-issue <code>staging</code> 与 <code>email</code> 覆盖；全局 ACME 邮箱/staging 在 Settings 中配置。
+证书必须在线路页绑定到具体 inbound，不存在“任意 ready 证书兜底”。</p>
 <p>UI 和核心是两个服务，所以 UI TLS 变更后需要重启 <code>ostium.service</code>；隧道不会中断。</p>
 <h2 id="_4">手动上传与自签<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1360,10 +1531,20 @@
 <li><strong>Self-signed</strong> 适合 Hysteria2 pinning/本地测试。公网 UI 不建议使用自签证书，客户端必须信任或 pin。</li>
 </ul>
 <h2 id="_5">边界<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
-<p>v0.1.0 只支持 HTTP-01。DNS-01 和 TLS-ALPN-01 明确不在范围内（不接 DNS 服务商 API，也避免与 443 的 Reality 监听冲突）。</p>
-<h2 id="_6">常见错误<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>当前版本只支持 HTTP-01。DNS-01 和 TLS-ALPN-01 明确不在范围内（不接 DNS 服务商 API，也避免与 443 的 Reality 监听冲突）。</p>
+<h2 id="_6">账户密钥轮换<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>ACME 账户私钥加密保存在数据目录 <code>acme/account.key.enc</code>。轮换步骤：</p>
+<ol>
+<li>备份数据目录；</li>
+<li>停止 <code>ostium.service</code>；</li>
+<li>删除 <code>acme/account.key.enc</code>（下次签发会生成新账户密钥并重新注册）；</li>
+<li>启动服务并签发一次 staging 证书验证账户可用；</li>
+<li>再执行生产签发。</li>
+</ol>
+<p>轮换账户密钥不会使已签发证书失效，但旧账户将无法再用于续期。</p>
+<h2 id="_7">常见错误<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
-<li>80 端口被 nginx/caddy 占用：临时停掉，或让 ACME 使用其他方式（v0.1.0 不支持）。</li>
+<li>80 端口被 nginx/caddy 占用：临时停掉，或让 ACME 使用其他方式（当前版本不支持）。</li>
 <li>域名解析未生效：用 <code>dig</code>/<code>nslookup</code> 确认 A/AAAA。</li>
 <li>云安全组未放行 80：同时检查本机防火墙和云防火墙。</li>
 <li>证书域名不匹配：确认申请域名和实际访问域名一致。</li>

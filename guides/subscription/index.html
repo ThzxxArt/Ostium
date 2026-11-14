@@ -635,6 +635,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理端 API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1001,6 +1012,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1180,9 +1247,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1196,7 +1281,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1232,6 +1389,17 @@
     <span class="md-ellipsis">
       
         格式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理端 API
       
     </span>
   </a>
@@ -1292,7 +1460,10 @@
 
 
 <h1 id="_1">订阅<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>每个启用的用户都可以有一个订阅 token。token 是机密：拿到 URL 的人就能使用该用户的凭据。</p>
+<p>每个启用的用户都可以有一个订阅 token。token 是机密：拿到 URL 的人就能使用该用户的凭据。
+订阅 URL 的基地址按以下顺序解析：Settings 的 <code>public_base_url</code> → <code>--domain</code>/server domain
+派生的 <code>https://&lt;domain&gt;</code> → <code>http://127.0.0.1:&lt;port&gt;</code>。不会使用请求的 <code>Host</code> 头，因此
+SSH 隧道访问也能生成客户端可用的公网 URL。</p>
 <h2 id="_2">格式<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1325,7 +1496,11 @@
 </tr>
 </tbody>
 </table>
-<p>响应头包含 <code>Cache-Control: no-store</code>、<code>Referrer-Policy: no-referrer</code>，并限制每 IP 每分钟 60 次。禁用、到期或超配额的用户返回 403；未知 token 返回 404。</p>
+<p>响应头包含 <code>Cache-Control: no-store</code>、<code>Referrer-Policy: no-referrer</code>，并限制每 IP 每分钟 60 次。禁用、到期或超配额的用户返回 403；未知 token 返回 404；未知 <code>format</code> 返回 400。</p>
+<h2 id="api">管理端 API<a class="headerlink" href="#api" title="Permanent link">&para;</a></h2>
+<p><code>GET /api/v1/users/{id}/subscription</code> 默认只返回 <code>token_hint</code> 和 <code>reveal_required=true</code>。
+需要完整 token/URL/二维码时使用 <code>?reveal=true</code>，该操作会写入审计日志。创建用户和轮换
+token 时仍一次性返回完整 token。</p>
 <h2 id="_3">导入<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>在 Ostium 中：<strong>Profiles → Import</strong>，粘贴 URL、分享链接、JSON，或扫描二维码图片。订阅型配置每天刷新一次；刷新失败时保留上一次成功副本。</p>
 <p>第三方客户端：导出 Base64 或 Clash 格式。URL 中包含标准 VLESS/Hysteria2/Trojan/SS2022 参数。</p>

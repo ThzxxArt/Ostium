@@ -1012,6 +1012,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../troubleshooting/" class="md-nav__link">
         
   
@@ -1191,9 +1247,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1207,7 +1281,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1326,7 +1472,7 @@
 <h2 id="_3">创建备份<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w"> </span>ostium<span class="w"> </span>backup<span class="w"> </span>create<span class="w"> </span>--password<span class="w"> </span><span class="s1">'a long passphrase'</span>
 </code></pre></div>
-<p>或在 <strong>Settings → Maintenance → Backups</strong> 创建。加密文件扩展名为 <code>.ostb</code>；明文归档为 <code>.tar.gz</code>。请把备份存到异地。</p>
+<p>或在 <strong>Settings → Maintenance → Backups</strong> 创建。加密文件扩展名为 <code>.ostb</code>；明文归档为 <code>.tar.gz</code>。API/UI 创建明文备份需要显式确认，因为归档包含 <code>master.key</code>。请把备份存到异地。</p>
 <p>root 模式下：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>ostium<span class="w"> </span>backup<span class="w"> </span>create<span class="w"> </span>--password<span class="w"> </span><span class="s1">'a long passphrase'</span>
 </code></pre></div>
@@ -1337,7 +1483,8 @@
 sudo<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w"> </span>ostium<span class="w"> </span>backup<span class="w"> </span>restore<span class="w"> </span>./ostium-backup-....ostb<span class="w"> </span>--password<span class="w"> </span><span class="s1">'...'</span>
 sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>ostium-core<span class="w"> </span>ostium
 </code></pre></div>
-<p>恢复会校验 manifest 和归档路径，替换数据库与主密钥，下次启动执行迁移。<strong>请定期演练恢复</strong>，不要只在出事时才第一次测试。</p>
+<p>恢复会校验归档/角色、SQLite <code>integrity_check</code>，替换数据库与主密钥，然后执行 Alembic 迁移；
+迁移失败会恢复旧数据库并保留 pending 文件。<strong>请定期演练恢复</strong>，不要只在出事时才第一次测试。</p>
 <h2 id="_5">保留策略<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <ul>
 <li>审计日志默认 90 天</li>

@@ -920,6 +920,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1099,9 +1155,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1115,7 +1189,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1159,7 +1305,8 @@
 
 
 <h1 id="api">API 参考<a class="headerlink" href="#api" title="Permanent link">&para;</a></h1>
-<p>基础路径：<code>/api/v1</code>。OpenAPI 在 <code>/api/docs</code>（生产环境仅管理员）和 <code>/api/openapi.json</code>。</p>
+<p>基础路径：<code>/api/v1</code>。OpenAPI 在 <code>/api/docs</code>（需管理员会话）和 <code>/api/openapi.json</code>（同样需管理员）。
+匿名访问返回 401。</p>
 <p>认证方式：</p>
 <ul>
 <li>浏览器：HttpOnly 会话 Cookie</li>
@@ -1197,11 +1344,11 @@
 </tr>
 <tr>
 <td>Subscriptions</td>
-<td><code>GET /users/{id}/subscription</code>、<code>POST /users/{id}/subscription/rotate</code>、<code>GET /subscriptions</code>、公开 <code>GET /sub/{token}?format=...</code></td>
+<td><code>GET /users/{id}/subscription?reveal=true</code>、<code>POST /users/{id}/subscription/rotate</code>、<code>GET /subscriptions</code>、公开 <code>GET /sub/{token}?format=...</code></td>
 </tr>
 <tr>
 <td>Profiles</td>
-<td><code>GET/POST /profiles</code>、<code>PATCH/DELETE /profiles/{id}</code>、<code>POST /profiles/{id}/refresh</code>、<code>GET /profiles/{id}/export</code>、<code>GET /profiles/{id}/test</code></td>
+<td><code>GET/POST /profiles</code>、<code>PATCH/DELETE /profiles/{id}</code>、<code>POST /profiles/reorder</code>、<code>POST /profiles/{id}/activate</code>、<code>POST /profiles/{id}/refresh</code>、<code>GET /profiles/{id}/export</code>、<code>GET /profiles/{id}/test</code></td>
 </tr>
 <tr>
 <td>Rules</td>
@@ -1250,6 +1397,8 @@
 </tbody>
 </table>
 <p>长任务返回 <code>202</code> 和 <code>job_id</code>。轮询 <code>/jobs/{id}</code>，或监听 <code>/events</code>：<code>job.created</code>、<code>job.updated</code>、<code>engine.applied</code>、<code>alert.created</code>、<code>stats.tick</code>、<code>quota.exceeded</code>。</p>
+<p><code>GET /users/{id}/subscription</code> 默认只返回 <code>reveal_required</code>/<code>token_hint</code>；完整 token、URL 和
+二维码需 <code>?reveal=true</code>，并写审计。未知订阅格式返回 400；禁用/到期/超配额返回 403。</p>
 <p>公开订阅端点是独立限速的，永远不接受管理员会话。</p>
 
 

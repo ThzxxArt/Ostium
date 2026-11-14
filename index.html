@@ -329,10 +329,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v010" class="md-nav__link">
+  <a href="#v011" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.1.0 范围
+        v0.1.1 范围
       
     </span>
   </a>
@@ -977,6 +977,62 @@
   
   
     <li class="md-nav__item">
+      <a href="operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1156,9 +1212,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1172,7 +1246,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1215,10 +1361,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v010" class="md-nav__link">
+  <a href="#v011" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.1.0 范围
+        v0.1.1 范围
       
     </span>
   </a>
@@ -1266,18 +1412,20 @@
 <li><a href="reference/api/">API 参考</a></li>
 <li><a href="design-system/">设计系统</a></li>
 <li><a href="security/threat-model/">安全模型</a></li>
+<li><a href="security/advisory-2026-11-default-bind/">安全公告：默认管理面绑定</a></li>
 </ul>
-<h2 id="v010">v0.1.0 范围<a class="headerlink" href="#v010" title="Permanent link">&para;</a></h2>
+<h2 id="v011">v0.1.1 范围<a class="headerlink" href="#v011" title="Permanent link">&para;</a></h2>
 <p>锁定范围见 <a href="https://github.com/ThzxxArt/Ostium/blob/main/PLAN.md"><code>PLAN.md</code></a>：</p>
 <ul>
 <li>服务端：Reality、Hysteria2、Trojan、Shadowsocks 2022</li>
 <li>每用户配额、到期禁用、流量统计</li>
-<li>ACME HTTP-01、手动证书、自签证书</li>
-<li>四种订阅格式、分享链接、二维码</li>
+<li>ACME HTTP-01、手动证书、自签证书、按 inbound 分配证书</li>
+<li>四种订阅格式、分享链接、二维码、public base URL</li>
 <li>客户端：混合代理、系统代理、TUN、URLTest、多订阅</li>
-<li>完整 Web UI、CLI、Docker、安装器、测试与发布门禁</li>
+<li>完整 Web UI、CLI、Docker、Windows setup、macOS DMG、DEB/AppImage、测试与发布门禁</li>
+<li>默认管理面只监听回环；出口 ACL、SS2022 多用户、TOTP pending、IP allowlist、自动备份与保留策略</li>
 </ul>
-<p>v0.1.0 <strong>不包含</strong>：NaiveProxy、独立 kill switch、原生手机 App、多节点编排、RBAC、DNS-01/TLS-ALPN-01、静默自动更新。</p>
+<p>当前版本 <strong>不包含</strong>：NaiveProxy、独立 kill switch、原生手机 App、多节点编排、RBAC、DNS-01/TLS-ALPN-01、静默自动更新。</p>
 
 
 

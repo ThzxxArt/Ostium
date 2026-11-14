@@ -910,6 +910,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1224,9 +1280,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1240,7 +1314,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1471,7 +1617,7 @@
 <h2 id="_6">布局<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>侧边栏 248px（可折叠 76px），顶栏 64px，内容最大 1600px。断点：≥1440、1024–1439、768–1023、&lt;768、&lt;480。手机上侧边栏变抽屉，底部导航保留四个主要入口。</p>
 <h2 id="_7">验证<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
-<p>Playwright 视觉基线覆盖 1440/1024/390 的深色和浅色；axe 检查 serious/critical；首屏 JS &lt; 300 KB gzip；LCP &lt; 2.5s；INP &lt; 200ms；CLS &lt; 0.05。可用性脚本见 <code>docs/ux.md</code>。</p>
+<p>Playwright 视觉基线覆盖 1440/1024/390 的深色和浅色；axe 检查 serious/critical；首屏 JS &lt; 300 KB gzip；LCP &lt; 2.5s 与 CLS &lt; 0.05 自动测量。INP &lt; 200ms 是人工交互走查目标，当前 Playwright 未自动采集 INP。可用性脚本见 <code>docs/ux.md</code>。</p>
 
 
 

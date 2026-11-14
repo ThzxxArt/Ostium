@@ -990,6 +990,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1169,9 +1225,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1185,7 +1259,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1314,6 +1460,10 @@
 </tbody>
 </table>
 <p>数据：<code>/var/lib/ostium</code>。配置：<code>/etc/ostium/config.toml</code>。证书：<code>/var/lib/ostium/certs/&lt;domain&gt;/</code>。备份：<code>/var/lib/ostium/backups/</code>。</p>
+<p>管理 UI 默认只监听 <code>127.0.0.1:8443</code>。非回环明文监听必须显式
+<code>allow_insecure_bind = true</code>；公网部署优先使用 Nginx TLS 或 Public UI，并在 Settings
+中配置 <code>ui_allowlist</code>（CIDR）。allowlist 只保护管理 UI/API 与静态资源；<code>/sub/*</code>、
+<code>/healthz</code>、<code>/readyz</code> 按设计豁免，便于客户端订阅和探活。Docker 必须由宿主机防火墙限制 8443。</p>
 <h2 id="_3">客户端<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1372,7 +1522,7 @@
 <tr>
 <td>Windows</td>
 <td><code>%ProgramData%\Ostium</code>（UI）</td>
-<td><code>%ProgramData%\Ostium</code></td>
+<td><code>%ProgramData%\OstiumCore</code>（仅 SYSTEM/Administrators 可写）</td>
 </tr>
 <tr>
 <td>macOS</td>

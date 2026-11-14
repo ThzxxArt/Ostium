@@ -920,6 +920,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1099,9 +1155,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1115,7 +1189,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1159,7 +1305,8 @@
 
 
 <h1 id="cli">CLI 参考<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h1>
-<p>所有命令在适用时支持 <code>--json</code>。退出码：<code>0</code> 成功，<code>1</code> 一般错误，<code>2</code> 用法错误，<code>3</code> 未初始化，<code>4</code> 服务不可用，<code>5</code> 权限不足，<code>6</code> 核心错误。</p>
+<p>所有命令在适用时支持 <code>--json</code>。退出码：<code>0</code> 成功，<code>1</code> 一般错误，<code>2</code> 用法错误，<code>3</code> 配置保存但未应用（可用全局 <code>--allow-degraded</code> 降级为 0），<code>4</code> 服务不可用，<code>5</code> 权限不足，<code>6</code> 核心/绑定错误。</p>
+<p>全局选项 <code>--allow-degraded</code>：配置应用失败时仍返回 0；默认失败返回 3。也可用环境变量 <code>OSTIUM_ALLOW_DEGRADED=1</code>。</p>
 <table>
 <thead>
 <tr>
@@ -1170,11 +1317,11 @@
 <tbody>
 <tr>
 <td><code>ostium init --role server\|client</code></td>
-<td>初始化数据/配置、管理员和默认入口；支持 <code>--host</code> / <code>--port</code> 指定 UI 监听</td>
+<td>初始化数据/配置、管理员和默认入口；服务端默认 <code>127.0.0.1</code>，非回环明文需 <code>--allow-insecure-bind</code></td>
 </tr>
 <tr>
-<td><code>ostium serve</code></td>
-<td>运行控制面 / SPA</td>
+<td><code>ostium serve [--host HOST] [--allow-insecure-bind]</code></td>
+<td>运行控制面 / SPA；非回环明文未 opt-in 时退出码 6</td>
 </tr>
 <tr>
 <td><code>ostium core-run</code></td>
@@ -1194,7 +1341,7 @@
 </tr>
 <tr>
 <td><code>ostium doctor [--json] [--fix]</code></td>
-<td>本地诊断</td>
+<td>本地诊断；<code>--fix</code> 修复目录/权限/缺失配置</td>
 </tr>
 <tr>
 <td><code>ostium logs [-f] [--source ostium\|core]</code></td>
@@ -1206,7 +1353,7 @@
 </tr>
 <tr>
 <td><code>ostium proxy on\|off\|status</code></td>
-<td>操作系统代理</td>
+<td>操作系统代理；<code>on</code> 会先 apply 客户端配置</td>
 </tr>
 <tr>
 <td><code>ostium tun on\|off\|status</code></td>
@@ -1214,11 +1361,11 @@
 </tr>
 <tr>
 <td><code>ostium update [--check]</code></td>
-<td>检查更新（安装始终显式）</td>
+<td><code>--check</code> 查询 GitHub 最新 Release 并比较 SemVer；安装始终显式</td>
 </tr>
 <tr>
 <td><code>ostium diagnostics export</code></td>
-<td>导出脱敏诊断包</td>
+<td>导出脱敏诊断包（doctor/配置摘要/日志尾部）</td>
 </tr>
 <tr>
 <td><code>ostium user list\|add\|show\|disable\|enable\|rotate\|remove</code></td>
@@ -1230,7 +1377,7 @@
 </tr>
 <tr>
 <td><code>ostium user subscription &lt;name&gt; [--rotate]</code></td>
-<td>打印订阅 URL</td>
+<td>打印订阅 URL；使用 <code>public_base_url</code> 或 <code>--domain</code> 派生的公网地址</td>
 </tr>
 <tr>
 <td><code>ostium user export &lt;name&gt; --output profile.json</code></td>

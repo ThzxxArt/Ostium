@@ -14,7 +14,7 @@
         <link rel="prev" href="../backup/">
       
       
-        <link rel="next" href="../troubleshooting/">
+        <link rel="next" href="../upgrade-0.1.0-to-0.1.1/">
       
       
         
@@ -1012,6 +1012,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../troubleshooting/" class="md-nav__link">
         
   
@@ -1191,9 +1247,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1207,7 +1281,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1323,7 +1469,9 @@
 <li>停止控制面；核心尽量保持运行。</li>
 <li>替换 <code>/opt/ostium/venv</code> 和核心二进制。</li>
 <li>保留数据库、<code>master.key</code>、配置、证书、用户和订阅。</li>
-<li>重启服务。</li>
+<li>启动并做健康检查；控制面健康检查失败会自动回滚旧 venv，核心启动失败会回滚旧核心。</li>
+<li>0.1.0 的 <code>host = "0.0.0.0"</code> 明文配置会收敛到 <code>127.0.0.1</code>；需要保留公网明文绑定时使用
+   <code>--allow-insecure-bind</code> 并配置防火墙。</li>
 </ol>
 <p>指定版本：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.1.1
@@ -1340,11 +1488,12 @@
 </ol>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w"> </span>ostium<span class="w"> </span>backup<span class="w"> </span>create<span class="w"> </span>--password<span class="w"> </span><span class="s1">'...'</span>
 sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>ostium
-sudo<span class="w"> </span>/opt/ostium/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>./ostium_ctl-0.1.0-py3-none-any.whl
+sudo<span class="w"> </span>/opt/ostium/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>./ostium_ctl-0.1.1-py3-none-any.whl
 sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>ostium
 curl<span class="w"> </span>-fsS<span class="w"> </span>http://127.0.0.1:8443/readyz
 </code></pre></div>
-<p>Ostium 不做静默自动更新。UI 只提供下载链接，不自动执行。</p>
+<p>Ostium 不做静默自动更新，UI 不提供下载/执行按钮；请使用 CLI <code>ostium update --check</code>
+查询版本，再按本页命令手动校验并安装。</p>
 <h2 id="_4">核心升级<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p>核心版本固定在 manifest 中。<code>ostium core install</code> 会校验 SHA256 并替换二进制；下一次
 apply/重启时 supervisor 才对当前配置执行 <code>sing-box check</code>，失败时回滚配置。升级前请备份
@@ -1355,7 +1504,8 @@ sudo<span class="w"> </span>ostium<span class="w"> </span>core<span class="w"> <
 sudo<span class="w"> </span>ostium<span class="w"> </span>core<span class="w"> </span>update
 </code></pre></div>
 <h2 id="_5">数据库<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
-<p>v0.1.0 的 SQLite 迁移是前向的。release notes 会标记不可回滚的迁移；升级前必须备份。Alembic 用 <code>alembic_version</code> 记录版本。</p>
+<p>数据库迁移在启动时由 Alembic <code>upgrade head</code> 执行；<code>alembic_version</code> 高于当前代码版本时
+Ostium 会拒绝启动。release notes 会标记不可回滚的迁移；升级前必须备份。</p>
 <p>回滚步骤：</p>
 <ol>
 <li>停 <code>ostium.service</code>。</li>

@@ -1112,6 +1112,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1291,9 +1347,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1307,7 +1381,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1518,9 +1664,9 @@
 <h2 id="_2">一键安装（推荐）<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <h3 id="windows-10-22h2-11-x64">Windows 10 22H2+ / 11 x64<a class="headerlink" href="#windows-10-22h2-11-x64" title="Permanent link">&para;</a></h3>
 <p>管理员 PowerShell：</p>
-<div class="highlight"><pre><span></span><code><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">0</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
+<div class="highlight"><pre><span></span><code><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">1</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
 </code></pre></div>
-<p>脚本会下载并静默运行 Windows 安装包，校验 SHA256，然后打印初始管理员密码。</p>
+<p>脚本会下载并静默运行 Windows 安装包并校验 SHA256；不会创建或打印管理员密码，首次打开 UI 时完成设置向导。</p>
 <p>默认安装：</p>
 <ul>
 <li>程序在 <code>%ProgramFiles%\Ostium</code>；</li>
@@ -1528,15 +1674,16 @@
 <li>核心二进制在 <code>%ProgramFiles%\Ostium\core</code>，服务配置在 <code>%ProgramFiles%\Ostium\service\core.toml</code>（普通用户不可写）；</li>
 <li>Web UI 在当前用户登录时启动；</li>
 <li>UI 数据在 <code>%ProgramData%\Ostium</code>；</li>
-<li>初始密码由在线安装器打印；离线 setup 保存在 <code>%ProgramData%\Ostium\initial-password.txt</code>，首次登录后请删除。</li>
+<li>核心数据、token 与 last-good 配置在 <code>%ProgramData%\OstiumCore</code>（仅 SYSTEM/Administrators 可写）；</li>
+<li>安装器不再生成或保存明文密码。</li>
 </ul>
 <p>需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：</p>
-<div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">0</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
+<div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="n">v0</span><span class="p">.</span><span class="n">1</span><span class="p">.</span><span class="n">1</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
 </code></pre></div>
 <p><strong>风险</strong>：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。</p>
 <p>未签名构建会触发 SmartScreen。请先校验 SHA256，确认来源可信后再选择“仍要运行”。</p>
 <h3 id="macos-14">macOS 14+<a class="headerlink" href="#macos-14" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>client
 </code></pre></div>
 <p>默认安装核心 LaunchDaemon 和当前用户 UI LaunchAgent。首次打开 <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a> 时完成客户端设置向导（客户端不预置管理员密码）。root 模式：</p>
@@ -1554,13 +1701,13 @@
 </code></pre></div>
 <p>不创建用户，核心和 UI 都是系统级 <code>ostium.service</code> / <code>ostium-core.service</code>。</p>
 <h2 id="_3">离线安装<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p>Windows：运行 <code>Ostium-0.1.0-windows-x64-setup.exe</code>。</p>
+<p>Windows：运行 <code>Ostium-0.1.1-windows-x64-setup.exe</code>。</p>
 <p>macOS：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>./install-macos.sh<span class="w"> </span>client
 </code></pre></div>
 <p>Linux：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>./install.sh<span class="w"> </span>--role<span class="w"> </span>client<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--wheel<span class="w"> </span>./ostium_ctl-0.1.0-py3-none-any.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--wheel<span class="w"> </span>./ostium_ctl-0.1.1-py3-none-any.whl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--core<span class="w"> </span>./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 </code></pre></div>
 <h2 id="_4">第一次连接<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
@@ -1583,7 +1730,7 @@
 <p>注意：</p>
 <ul>
 <li>混合代理<strong>没有认证</strong>，开启后同一网络内任何人都可能使用；只建议在可信家庭/实验室网络开启。</li>
-<li>该功能适用于混合代理/系统代理模式；v0.1.0 不包含“TUN 局域网网关”。</li>
+<li>该功能适用于混合代理/系统代理模式；当前版本不包含“TUN 局域网网关”。</li>
 <li>如果开启了系统代理，系统代理本身仍指向 <code>127.0.0.1:7890</code>；局域网设备需要手动填写本机 IP。</li>
 <li>关闭开关后，sing-box 会重新监听 <code>127.0.0.1</code>，局域网设备立即断开。</li>
 </ul>
@@ -1610,13 +1757,15 @@
 <tr>
 <td>TUN</td>
 <td>全机 TCP/UDP/DNS</td>
-<td>需要管理员/root；v0.1.0 无独立 kill switch</td>
+<td>需要管理员/root；当前版本无独立 kill switch</td>
 </tr>
 </tbody>
 </table>
 <p>系统代理和 TUN 互斥；切换时会清理旧代理、路由和虚拟网卡。</p>
 <h2 id="_6">更新<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
-<p>Ostium 不做静默自动更新。使用 <strong>Settings → Check for updates</strong>，下载签名版本，校验后安装。UI 升级时核心继续运行；核心升级会短暂中断隧道。</p>
+<p>Ostium 不做静默自动更新，UI 也没有下载/安装按钮。使用 CLI
+<code>ostium update --check</code> 查询新版本，再按下方命令手动下载、校验和安装。UI 升级时核心继续
+运行；核心升级会短暂中断隧道。</p>
 <p>一键升级：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>upgrade
 </code></pre></div>

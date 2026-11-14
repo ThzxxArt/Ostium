@@ -1095,6 +1095,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1274,9 +1330,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1290,7 +1364,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1568,7 +1714,7 @@
 <h2 id="ostium-ui">第一步：让 Ostium UI 只监听回环<a class="headerlink" href="#ostium-ui" title="Permanent link">&para;</a></h2>
 <h3 id="_2">新安装<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <p>使用一键安装器的反向代理模式：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>admin.example.com<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--behind-proxy
@@ -1759,7 +1905,7 @@ sudo<span class="w"> </span>journalctl<span class="w"> </span>-u<span class="w">
 <li>Ostium 的订阅按入口监听端口生成客户端端口；Nginx 占 443 后 Reality 监听 9443，订阅会写 9443（Inbounds 改端口后需重新复制订阅）。</li>
 <li>Reality/Trojan/Hysteria2 的 TLS/QUIC 行为需要仔细测试，升级 Nginx 或改 SNI 都可能破坏连接。</li>
 </ol>
-<p>因此 v0.1.0 的推荐答案是：<strong>Nginx 用 443 做管理 UI，代理协议用 9443/tcp 和 443/udp 直连</strong>。这比 SNI 分流简单、稳定，也更容易排查。</p>
+<p>因此当前版本的推荐答案是：<strong>Nginx 用 443 做管理 UI，代理协议用 9443/tcp 和 443/udp 直连</strong>。这比 SNI 分流简单、稳定，也更容易排查。</p>
 
 
 

@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../upgrade/">
+        <link rel="prev" href="../release-checklist/">
       
       
         <link rel="next" href="../../design-system/">
@@ -907,6 +907,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1235,9 +1291,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1251,7 +1325,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1436,7 +1582,7 @@
 <li>TUN 需要核心以 root/SYSTEM 运行，或具备 <code>CAP_NET_ADMIN</code>。</li>
 <li>另一个 VPN 可能占用了网卡或路由表。</li>
 <li>关闭再开启 TUN；核心崩溃后重启核心清理路由。</li>
-<li>v0.1.0 没有独立 kill switch。</li>
+<li>当前版本没有独立 kill switch。</li>
 </ul>
 <h2 id="acme">ACME 失败<a class="headerlink" href="#acme" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1446,7 +1592,7 @@
 <li>回退到手动上传证书。</li>
 </ul>
 <h2 id="_4">重载后统计不对<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<p>sing-box 计数器在 SIGHUP 后重置。Ostium 会检测下降并开启新 epoch 继续累计；最多丢失一个 5 秒采样。配额不是计费级精度。</p>
+<p>sing-box 计数器在核心子进程重启后重置。Ostium 会检测下降并开启新 epoch 继续累计；最多丢失一个 5 秒采样。配额不是计费级精度。</p>
 <h2 id="_5">恢复<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>UI 不可用时，CLI 和数据库仍在：</p>
 <div class="highlight"><pre><span></span><code>ostium<span class="w"> </span>doctor<span class="w"> </span>--json

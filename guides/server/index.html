@@ -614,7 +614,7 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        备份
+        分流规则
       
     </span>
   </a>
@@ -625,7 +625,7 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        日常运维
+        备份
       
     </span>
   </a>
@@ -634,6 +634,17 @@
       
         <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        日常运维
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         安全底线
@@ -1089,6 +1100,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1268,9 +1335,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1284,7 +1369,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1418,7 +1575,7 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        备份
+        分流规则
       
     </span>
   </a>
@@ -1429,7 +1586,7 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        日常运维
+        备份
       
     </span>
   </a>
@@ -1438,6 +1595,17 @@
       
         <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        日常运维
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         安全底线
@@ -1479,7 +1647,7 @@
 <p>默认安装会创建无特权 <code>ostium</code> 用户。若使用 <code>--run-as-root</code>，控制面也会以 root 运行，隔离降级；详见<a href="../service-manager/">服务管理</a>。</p>
 </blockquote>
 <h2 id="_2">一键安装（推荐）<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.0/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com
 </code></pre></div>
 <p>脚本会自动下载 uv、托管 Python 3.13、wheel、sing-box 核心和校验文件，然后注册 systemd。无需预装 Python。</p>
@@ -1490,14 +1658,14 @@
 <h2 id="_3">离线安装<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>从 GitHub Release 下载：</p>
 <ul>
-<li><code>ostium_ctl-0.1.0-py3-none-any.whl</code></li>
+<li><code>ostium_ctl-0.1.1-py3-none-any.whl</code></li>
 <li><code>ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz</code>（arm64 选对应架构）</li>
 <li><code>SHA256SUMS</code></li>
 <li>源码包或包含 <code>scripts/</code>、<code>deploy/</code> 的目录</li>
 </ul>
 <div class="highlight"><pre><span></span><code>sha256sum<span class="w"> </span>-c<span class="w"> </span>SHA256SUMS<span class="w"> </span>--ignore-missing
 sudo<span class="w"> </span>./install.sh<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--wheel<span class="w"> </span>./ostium_ctl-0.1.0-py3-none-any.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--wheel<span class="w"> </span>./ostium_ctl-0.1.1-py3-none-any.whl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--core<span class="w"> </span>./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--domain<span class="w"> </span>vpn.example.com
 </code></pre></div>
@@ -1548,21 +1716,25 @@ journalctl<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w
 <li>在 Settings 打开 <strong>Public admin UI</strong>。</li>
 <li>重启 <code>ostium.service</code>。</li>
 </ol>
-<p>UI 会拒绝在纯 HTTP 下公网服务。v0.1.0 只支持 HTTP-01。</p>
-<h2 id="_6">备份<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>UI 默认只监听回环；非回环明文监听需要显式 <code>allow_insecure_bind</code>，否则 <code>ostium serve</code> 直接拒绝启动。Public UI 仍需 TLS + TOTP。当前版本只支持 HTTP-01。</p>
+<p>在 Settings 开启 Public UI 时，如果当前监听地址仍是回环，Ostium 会自动改为 <code>0.0.0.0</code> 并在关闭时恢复 <code>127.0.0.1</code>；自定义监听地址不会被覆盖。重启后请先从本机确认 <code>https://域名/healthz</code>，再关闭 SSH 隧道。</p>
+<h2 id="_6">分流规则<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>服务端 <strong>Routing</strong> 页会把规则保存在本地数据库，但 v0.1.1 不会把自定义规则通过订阅分发给客户端；客户端会在应用的
+Routing 页使用同一套规则编辑器，并立即应用到自己的核心。需要统一分流时，请在每个客户端导入/配置对应规则。</p>
+<h2 id="_7">备份<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>在 Settings 创建加密备份，或：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w"> </span>ostium<span class="w"> </span>backup<span class="w"> </span>create<span class="w"> </span>--password<span class="w"> </span><span class="s1">'a long passphrase'</span>
 </code></pre></div>
 <p>文件在 <code>/var/lib/ostium/backups</code>。请存到异地。恢复需要停止两个服务，或从 UI staging 后重启。</p>
 <p>root 模式下把 <code>sudo -u ostium</code> 换成 <code>sudo</code>。</p>
-<h2 id="_7">日常运维<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<h2 id="_8">日常运维<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>ostium<span class="w"> </span>doctor
 ostium<span class="w"> </span>logs<span class="w"> </span>--source<span class="w"> </span>core<span class="w"> </span>-f
 ostium<span class="w"> </span>diagnostics<span class="w"> </span><span class="nb">export</span>
 ostium<span class="w"> </span>core<span class="w"> </span>version
 ostium<span class="w"> </span>update<span class="w"> </span>--check
 </code></pre></div>
-<h2 id="_8">安全底线<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_9">安全底线<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>默认不要用 root 跑控制面；如使用 <code>--run-as-root</code>，明确接受风险。</li>
 <li>没有 TLS + TOTP 不要把管理 UI 暴露公网。</li>

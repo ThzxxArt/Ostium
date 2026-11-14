@@ -14,6 +14,8 @@
         <link rel="prev" href="../../adr/0001-typescript-6/">
       
       
+        <link rel="next" href="../advisory-2026-11-default-bind/">
+      
       
         
       
@@ -23,7 +25,7 @@
     
     
       
-        <title>安全 - Ostium 文档</title>
+        <title>威胁模型 - Ostium 文档</title>
       
     
     
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              安全
+              威胁模型
             
           </span>
         </div>
@@ -908,6 +910,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1089,6 +1147,60 @@
   
   
   
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安全
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -1104,7 +1216,7 @@
   <span class="md-ellipsis">
     
   
-    安全
+    威胁模型
   
 
     
@@ -1122,7 +1234,7 @@
   <span class="md-ellipsis">
     
   
-    安全
+    威胁模型
   
 
     
@@ -1205,6 +1317,42 @@
     </ul>
   
 </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -1356,13 +1504,16 @@
 </table>
 <h2 id="_3">控制措施<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <ul>
-<li>单管理员、Argon2id、可选 TOTP（公网 UI 强制）、恢复码、会话空闲/绝对过期、登录限速。</li>
+<li>单管理员、Argon2id、可选 TOTP（公网 UI 强制）、恢复码、会话空闲/绝对过期、登录限速；TOTP 未确认前不激活。</li>
 <li>CSRF double-submit Cookie、Origin 校验、TrustedHost/DNS rebinding 防护、CSP、HTTPS 时 HSTS、<code>frame-ancestors 'none'</code>。</li>
+<li>管理 UI 默认只监听回环；非回环明文必须显式 <code>allow_insecure_bind</code>，否则拒绝启动；支持 CIDR allowlist。</li>
+<li><code>/api/docs</code> 与 <code>/api/openapi.json</code> 仅管理员可访问；本地登录 token 一次性。</li>
 <li>核心 API 只监听回环，常量时间比较 Bearer，2 MiB 请求体上限，严格 JSON，角色白名单，端口/路径校验和 <code>sing-box check</code>。</li>
-<li>AES-256-GCM 字段加密 + AAD；<code>master.key</code> 0600；备份使用 scrypt + AES-256-GCM。</li>
+<li>AES-256-GCM 字段加密 + AAD；<code>master.key</code> 0600；手动明文备份需显式确认；自动备份是明文且包含 <code>master.key</code>，文档已强警告。</li>
 <li>日志脱敏 UUID、token、密码、私钥、代理 URI 和 Authorization 头。</li>
 <li>订阅 token 哈希查找 + 加密恢复；公开响应设置 <code>no-referrer</code>、<code>no-store</code>。</li>
-<li>服务端默认阻止云元数据、回环、link-local、私有网段和 SMTP 25。</li>
+<li>服务端默认阻止云元数据、回环、link-local、CGNAT、私有网段和 SMTP 25；即使关闭私有网段阻断，25 仍拒绝。</li>
+<li>Webhook 禁止 loopback/link-local/metadata/私有地址；订阅刷新允许 LAN，但禁止 loopback/link-local/metadata。</li>
 </ul>
 <h2 id="root">运行身份与 root 模式<a class="headerlink" href="#root" title="Permanent link">&para;</a></h2>
 <p>默认安装把控制面和 root 隔开：</p>
@@ -1378,8 +1529,11 @@
 <li>Reality/uTLS/Hysteria2 可能被指纹识别或封锁；没有永久隐身保证。</li>
 <li>TUN 的 <code>strict_route</code> 不是独立 kill switch。</li>
 <li>控制面停止时配额执行暂停。</li>
-<li>核心重载会造成短暂断连和采样误差。</li>
+<li>核心应用配置会重启子进程，造成短暂断连和采样误差。</li>
 <li>同用户的本地恶意软件可以控制 VPN，但默认模式不应获得 root shell。</li>
+<li>出站订阅/规则集/Webhook 的 DNS rebinding 仍存在“校验解析地址、连接时再次解析”的
+  TOCTOU 残余风险；已逐跳校验重定向并阻断私网/链路本地/metadata 字面与解析结果，
+  但无法在标准 HTTP 客户端层完全消除。</li>
 <li>开启 Allow LAN 后，混合代理对局域网可见且没有认证；必须用防火墙限制来源，只建议在可信网络使用。</li>
 <li>未签名 Windows/macOS 构建降低 MITM 抵抗力；请校验 SHA256 或自行构建。</li>
 <li>上游 sing-box/依赖 0-day 需要及时更新。</li>

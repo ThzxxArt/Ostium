@@ -1023,6 +1023,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1202,9 +1258,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1218,7 +1292,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1388,7 +1534,7 @@
 <p>系统代理和 TUN 互斥。启用 TUN 会先关闭系统代理。如果 TUN 启动失败，Ostium 会报错，<strong>不会</strong>静默回退到系统代理，避免让你误以为已经全机接管。</p>
 <p>关闭 TUN 会重载仅混合代理的配置，让 sing-box 清理路由和网卡。如果核心被强杀，操作系统可能自动清理路由；崩溃后请用 <strong>Diagnostics</strong> 检查。</p>
 <h2 id="kill-switch">Kill switch 边界<a class="headerlink" href="#kill-switch" title="Permanent link">&para;</a></h2>
-<p><code>strict_route</code> 能减少 TUN 运行时的常见泄漏，但 Ostium v0.1.0 <strong>不提供独立防火墙 kill switch</strong>。核心退出后，直连可能恢复。UI 会明确提示，这是 v0.1.0 的边界，不是“以后再做”的功能。</p>
+<p><code>strict_route</code> 能减少 TUN 运行时的常见泄漏，但 Ostium 当前版本 <strong>不提供独立防火墙 kill switch</strong>。核心退出后，直连可能恢复。UI 会明确提示，这是当前版本的边界，不是“以后再做”的功能。</p>
 <h2 id="dns">DNS<a class="headerlink" href="#dns" title="Permanent link">&para;</a></h2>
 <p>TUN 模式下 DNS 查询由核心接管：智能分流会让国内域名走本地解析器，其他流量走代理上的远程 DoH。混合代理/系统代理模式下，应用自己解析 DNS；UI 会提示“未接管 DNS”。</p>
 <h2 id="_4">故障排查<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>

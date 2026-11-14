@@ -1034,6 +1034,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.0-to-0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0 → 0.1.1 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/release-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布清单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/troubleshooting/" class="md-nav__link">
         
   
@@ -1213,9 +1269,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../security/threat-model/" class="md-nav__link">
+    
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
   
   
   <span class="md-ellipsis">
@@ -1229,7 +1303,79 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    安全
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    威胁模型
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/advisory-2026-11-default-bind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    公告：默认管理面绑定
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1382,7 +1528,7 @@
 <li>按角色策略校验端口、路径和入口；</li>
 <li>写入 <code>last-good.json</code>；</li>
 <li>执行 <code>sing-box check</code>；</li>
-<li>原子替换运行时配置，并通过 SIGHUP 重载（Windows 为重启）；</li>
+<li>原子替换运行时配置，然后重启子进程并验证存活；失败回滚上一版（SIGHUP 无法证明新配置已生效，因此不再使用）；</li>
 <li>不执行 shell，不连接数据库。</li>
 </ul>
 <h2 id="_2">数据流<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
@@ -1391,7 +1537,9 @@
           → 服务端 sing-box → 直连出口
 </code></pre></div>
 <p>控制面把生成的 JSON 推给核心 API。核心事务式应用：校验或启动失败时保留上一版配置。统计每 5 秒从 sing-box 的 V2Ray gRPC API 读取，每分钟写入 SQLite。</p>
-<p>配额和到期由控制面执行。<strong>控制面停止时，核心继续服务现有配置，但配额执行会暂停</strong>——这是 v0.1.0 的明确限制。</p>
+<p>服务端路由默认拒绝 RFC1918、CGNAT、link-local、云 metadata 和 SMTP 25 出口；
+<code>block_private_egress = false</code> 时仍拒绝 25。</p>
+<p>配额和到期由控制面执行。<strong>控制面停止时，核心继续服务现有配置，但配额执行会暂停</strong>——这是当前版本的明确限制。</p>
 <h2 id="_3">端口<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
