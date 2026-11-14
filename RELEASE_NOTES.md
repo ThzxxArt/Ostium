@@ -25,8 +25,10 @@ new proxy protocol or redesign the UI.
   regex syntax is rejected before sing-box sees it.
 - Outbound HTTP fetches pin the validated DNS address, closing the
   rebinding window for subscriptions, rule sets and webhooks.
-- The release workflow builds all artifacts, creates a draft release, verifies
-  its checksums, publishes PyPI last, and only then promotes GHCR tags.
+- The release workflow builds all artifacts, creates and verifies a draft
+  release, publishes PyPI only after that verification, then promotes GHCR tags
+  and makes the draft public. A failure after PyPI keeps the draft for retry and
+  is recovered by yanking the PyPI version or shipping a patch.
 
 ## Security and upgrade notes
 

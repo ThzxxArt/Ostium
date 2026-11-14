@@ -82,8 +82,10 @@ before tagging; otherwise those jobs will not start.
    missing-key and corruption rejection.
 3. **Platform evidence**: record only what was actually executed; unexecuted
    items stay blockers.
-4. **Atomic publication**: draft release verified first, PyPI last, GHCR
-   version/latest tags promoted only after PyPI succeeds.
+4. **Publication ordering**: draft release verified first, PyPI published only
+   after that verification, then GHCR version/latest tags promoted and the draft
+   made public. PyPI is the first irreversible public step; a later failure keeps
+   the draft for retry and requires a yank/patch if it cannot be completed.
 
 ## Rollback
 
