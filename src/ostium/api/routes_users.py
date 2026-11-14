@@ -190,8 +190,8 @@ async def update_user(
         user.quota_bytes = changes["quota_bytes"]
     if "quota_cycle" in changes and changes["quota_cycle"] is not None:
         user.quota_cycle = changes["quota_cycle"]
-    if "note" in changes and changes["note"] is not None:
-        user.note = changes["note"][:500]
+    if "note" in changes:
+        user.note = (changes["note"] or "")[:500]
     await session.flush()
     applied = await _apply_server(services, session)
     await audit(

@@ -79,6 +79,10 @@ else:  # pragma: no cover - exercised on Windows
             os.environ["OSTIUM_ROLE"] = "client"
             os.environ["OSTIUM_DATA_DIR"] = str(data_dir)
             os.environ["OSTIUM_CONFIG_FILE"] = str(config_file)
+            # The service manager starts us in System32.  Never let sing-box
+            # resolve relative files (cache.db, rule sets) against a protected
+            # system directory.
+            os.chdir(data_dir)
             settings = Settings.load()
             app = create_core_app(settings)
             config = uvicorn.Config(

@@ -40,6 +40,7 @@ class Endpoint(BaseModel):
     port: int = Field(ge=1, le=65535)
     uuid: str | None = None
     password: str | None = None
+    obfs_password: str | None = None
     flow: str = "xtls-rprx-vision"
     method: str = "2022-blake3-aes-128-gcm"
     tls: TLSConfig = Field(default_factory=TLSConfig)
@@ -85,6 +86,8 @@ class Endpoint(BaseModel):
                     "tls": self._tls_block(),
                 }
             )
+            if self.protocol is Protocol.HYSTERIA2 and self.obfs_password:
+                base["obfs"] = {"type": "salamander", "password": self.obfs_password}
         else:
             base.update(
                 {
@@ -143,6 +146,9 @@ class Endpoint(BaseModel):
                 "sni": self.tls.server_name,
                 "skip-cert-verify": self.tls.insecure,
             }
+            if self.obfs_password:
+                proxy["obfs"] = "salamander"
+                proxy["obfs-password"] = self.obfs_password
             if self.tls.certificate_pin_sha256:
                 proxy["fingerprint"] = self.tls.certificate_pin_sha256
             return proxy
@@ -187,6 +193,9 @@ class Endpoint(BaseModel):
                 "sni": self.tls.server_name or "",
                 "insecure": "1" if self.tls.insecure else "0",
             }
+            if self.obfs_password:
+                query["obfs"] = "salamander"
+                query["obfs-password"] = self.obfs_password
             if self.tls.certificate_pin_sha256:
                 query["pinSHA256"] = self.tls.certificate_pin_sha256
             return (
@@ -198,7 +207,10 @@ class Endpoint(BaseModel):
                 "security": "tls",
                 "sni": self.tls.server_name or "",
                 "type": "tcp",
+                "allowInsecure": "1" if self.tls.insecure else "0",
             }
+            if self.tls.certificate_pin_sha256:
+                query["pinSHA256"] = self.tls.certificate_pin_sha256
             return (
                 f"trojan://{quote(self.password or '')}@{_host(self.server)}:"
                 f"{self.port}?{_query(query)}#{fragment}"
@@ -233,6 +245,7 @@ class Endpoint(BaseModel):
                 ),
             )
         if scheme in {"hysteria2", "hy2"}:
+            obfs = query.get("obfs")
             return cls(
                 tag=tag or _slug(name),
                 protocol=Protocol.HYSTERIA2,
@@ -240,6 +253,7 @@ class Endpoint(BaseModel):
                 server=host,
                 port=port,
                 password=unquote(parsed.username or ""),
+                obfs_password=query.get("obfs-password") if obfs == "salamander" else None,
                 tls=TLSConfig(
                     server_name=query.get("sni") or query.get("peer"),
                     insecure=query.get("insecure") in {"1", "true"},
@@ -257,6 +271,7 @@ class Endpoint(BaseModel):
                 tls=TLSConfig(
                     server_name=query.get("sni") or query.get("peer"),
                     insecure=query.get("allowInsecure") in {"1", "true"},
+                    certificate_pin_sha256=query.get("pinSHA256"),
                 ),
             )
         if scheme == "ss":

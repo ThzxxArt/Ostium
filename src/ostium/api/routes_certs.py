@@ -74,6 +74,20 @@ async def issue_certificate(
         domain = cert_service.validate_domain(domain)
     except cert_service.CertificateError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
+    if payload.method == "acme":
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(domain)
+        except ValueError:
+            pass
+        else:
+            raise ApiError(
+                400,
+                "ACME HTTP-01 requires a DNS name; use a self-signed or uploaded "
+                "certificate for an IP address",
+                "ip_certificate_requires_manual",
+            )
     if payload.method == "self-signed":
         try:
             certificate = await cert_service.create_self_signed(

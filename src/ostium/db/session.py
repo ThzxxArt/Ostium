@@ -105,7 +105,19 @@ def _has_tables(db_path: Path) -> bool:
 
 def _check_version(db_path: Path) -> None:
     version = _read_version(db_path)
-    if version is not None and version > SCHEMA_HEAD:
+    if version is None:
+        return
+    # Revisions are opaque hashes, not sortable numbers.  Treat any revision
+    # that is not part of this build's migration graph as incompatible instead
+    # of guessing from a lexicographic comparison.
+    try:
+        from alembic.script import ScriptDirectory
+
+        script = ScriptDirectory.from_config(_alembic_config(db_path))
+        known = {revision.revision for revision in script.walk_revisions()}
+    except Exception as exc:  # pragma: no cover - bundling errors are fatal
+        raise DatabaseVersionError(f"could not inspect bundled database migrations: {exc}") from exc
+    if version not in known:
         raise DatabaseVersionError(
             f"database schema revision {version} is newer than this Ostium build "
             f"({SCHEMA_HEAD}); upgrade Ostium or restore a compatible backup"

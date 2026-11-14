@@ -33,6 +33,33 @@ MAX_BODY_BYTES = 2 * 1024 * 1024
 logger = logging.getLogger(__name__)
 
 
+class _BodyTooLarge(Exception):
+    pass
+
+
+async def _read_body_limited(request: Request, limit: int) -> bytes:
+    """Stream a request body without buffering more than ``limit`` bytes."""
+
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            declared = int(length)
+        except ValueError as exc:
+            raise ValueError("invalid Content-Length") from exc
+        if declared < 0:
+            raise ValueError("invalid Content-Length")
+        if declared > limit:
+            raise _BodyTooLarge
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > limit:
+            raise _BodyTooLarge
+    data = bytes(body)
+    request._body = data
+    return data
+
+
 class ApplyRequest(BaseModel):
     config: dict[str, Any]
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -66,17 +93,12 @@ def create_core_app(settings: Settings) -> FastAPI:
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Any]]) -> Any:
         if request.method in {"POST", "PUT", "PATCH"}:
-            length = request.headers.get("content-length")
-            if length is not None:
-                try:
-                    declared = int(length)
-                except ValueError:
-                    return _problem(400, "invalid Content-Length", "invalid_request")
-                if declared > MAX_BODY_BYTES:
-                    return _problem(413, "request body too large", "body_too_large")
-            body = await request.body()
-            if len(body) > MAX_BODY_BYTES:
+            try:
+                body = await _read_body_limited(request, MAX_BODY_BYTES)
+            except _BodyTooLarge:
                 return _problem(413, "request body too large", "body_too_large")
+            except ValueError:
+                return _problem(400, "invalid Content-Length", "invalid_request")
             content_type = request.headers.get("content-type", "")
             if body and not content_type.startswith("application/json"):
                 return _problem(

@@ -3,17 +3,27 @@ set -eu
 
 DATA_DIR="${OSTIUM_DATA_DIR:-/var/lib/ostium}"
 if [ ! -f "$DATA_DIR/ostium.db" ]; then
-  PASSWORD="${OSTIUM_ADMIN_PASSWORD:-$(python - <<'PY'
+  GENERATED=0
+  if [ -n "${OSTIUM_ADMIN_PASSWORD:-}" ]; then
+    PASSWORD="$OSTIUM_ADMIN_PASSWORD"
+  else
+    GENERATED=1
+    PASSWORD="$(python - <<'PY'
 import secrets, string
 alphabet = string.ascii_letters + string.digits
 print(''.join(secrets.choice(alphabet) for _ in range(24)))
 PY
-)}"
+)"
+  fi
   ostium init --role server --no-input --password "$PASSWORD" ${OSTIUM_DOMAIN:+--domain "$OSTIUM_DOMAIN"}
-  echo "=============================================================="
-  echo " Ostium initial administrator password: $PASSWORD"
-  echo " Open http://<server>:${OSTIUM_PORT:-8443} and sign in."
-  echo "=============================================================="
+  if [ "$GENERATED" = "1" ]; then
+    echo "=============================================================="
+    echo " Ostium initial administrator password: $PASSWORD"
+    echo " Open http://<server>:${OSTIUM_PORT:-8443} and sign in."
+    echo "=============================================================="
+  else
+    echo "Ostium initialised with the administrator password from OSTIUM_ADMIN_PASSWORD."
+  fi
 fi
 
 ostium core-run &

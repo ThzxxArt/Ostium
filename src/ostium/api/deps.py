@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ostium.config import Settings
@@ -83,7 +83,7 @@ async def get_session(services: Services = Depends(get_services)) -> AsyncIterat
         await session.close()
 
 
-def client_ip(request: Request) -> str:
+def client_ip(request: Request | WebSocket) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded and request.client and request.client.host in {"127.0.0.1", "::1"}:
         # Only the hop added by our own reverse proxy is trusted.  Taking the

@@ -31,7 +31,40 @@ from ostium.services.stats import StatsCollector
 from ostium.services.users import ensure_inbounds
 
 CSRF_COOKIE = "ostium_csrf"
+# Hard ceiling for JSON API requests.  It must be enforced while streaming:
+# reading an unbounded chunked body first would let an unauthenticated client
+# exhaust control-plane memory before CSRF/authentication runs.
+MAX_API_BODY_BYTES = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
+
+
+async def _read_body_limited(request: Request, limit: int) -> bytes:
+    """Read a request body without ever buffering more than ``limit`` bytes."""
+
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            declared = int(length)
+        except ValueError as exc:
+            raise ValueError("invalid Content-Length") from exc
+        if declared < 0:
+            raise ValueError("invalid Content-Length")
+        if declared > limit:
+            raise BodyTooLarge
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > limit:
+            raise BodyTooLarge
+    data = bytes(body)
+    # Starlette caches ``_body``; populate it so downstream parsers do not try
+    # to consume the already-drained receive channel.
+    request._body = data
+    return data
+
+
+class BodyTooLarge(Exception):
+    """The request body exceeded the configured streaming limit."""
 
 
 def build_app(settings: Settings | None = None) -> FastAPI:
@@ -187,20 +220,15 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith(
             "/api/"
         ):
-            length = request.headers.get("content-length")
-            if length is not None:
-                try:
-                    too_large = int(length) > 20 * 1024 * 1024
-                except ValueError:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"detail": "invalid Content-Length", "code": "invalid_request"},
-                    )
-                if too_large:
-                    return JSONResponse(status_code=413, content={"detail": "body too large"})
-            body = await request.body()
-            if len(body) > 20 * 1024 * 1024:
+            try:
+                await _read_body_limited(request, MAX_API_BODY_BYTES)
+            except BodyTooLarge:
                 return JSONResponse(status_code=413, content={"detail": "body too large"})
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "invalid Content-Length", "code": "invalid_request"},
+                )
             if request.url.path not in {
                 "/api/v1/auth/login",
             } and not request.headers.get("authorization"):

@@ -91,9 +91,18 @@ def create_backup(
             archive.addfile(info, io.BytesIO(manifest_bytes))
         raw = buffer.getvalue()
     payload = encrypt_blob(raw, password) if password else raw
-    target.write_bytes(payload)
-    if os.name == "posix":
-        target.chmod(0o600)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{filename}.", dir=target.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if os.name == "posix":
+            temporary.chmod(0o600)
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
     digest = hashlib.sha256(payload).hexdigest()
     return {
         "filename": filename,
@@ -153,10 +162,13 @@ def restore_backup(
                 _safe_extract(archive, staging)
         except (tarfile.TarError, OSError) as exc:
             raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
-        manifest_path = staging / "manifest.json"
-        if not manifest_path.is_file():
+        manifest = staging / "manifest.json"
+        if not manifest.is_file():
             raise BackupError("backup is missing its manifest", "invalid_archive")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        try:
+            manifest = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise BackupError("backup manifest is not valid JSON", "invalid_archive") from exc
         if manifest.get("format") != "ostium-backup":
             raise BackupError("not an Ostium backup", "invalid_archive")
         if not (staging / "ostium.db").is_file():
@@ -204,27 +216,64 @@ def restore_backup(
                 "migration_failed",
             ) from exc
 
-        if include_master_key and (staging / "master.key").is_file():
-            shutil.copy2(staging / "master.key", paths.master_key_path)
-            if os.name == "posix":
-                paths.master_key_path.chmod(0o600)
-        if (staging / "config.toml").is_file():
-            settings.config_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(staging / "config.toml", settings.config_file)
-        certs = staging / "certs"
-        if certs.is_dir():
-            for item in certs.rglob("*"):
-                if item.is_file():
-                    relative = item.relative_to(certs)
-                    destination = (paths.certs_dir / relative).resolve()
-                    try:
-                        destination.relative_to(paths.certs_dir.resolve())
-                    except ValueError as exc:
-                        raise BackupError(
-                            "backup contains an unsafe certificate path", "invalid_archive"
-                        ) from exc
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(item, destination)
+        previous_files: dict[Path, bytes | None] = {}
+
+        def remember(path: Path) -> None:
+            if path in previous_files:
+                return
+            try:
+                previous_files[path] = path.read_bytes() if path.is_file() else None
+            except OSError:
+                previous_files[path] = None
+
+        def rollback_files() -> None:
+            for path, content in previous_files.items():
+                try:
+                    if content is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(content)
+                except OSError:
+                    continue
+
+        try:
+            if include_master_key and (staging / "master.key").is_file():
+                remember(paths.master_key_path)
+                shutil.copy2(staging / "master.key", paths.master_key_path)
+                if os.name == "posix":
+                    paths.master_key_path.chmod(0o600)
+            if (staging / "config.toml").is_file():
+                remember(settings.config_file)
+                settings.config_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(staging / "config.toml", settings.config_file)
+            certs = staging / "certs"
+            if certs.is_dir():
+                for item in certs.rglob("*"):
+                    if item.is_file():
+                        relative = item.relative_to(certs)
+                        destination = (paths.certs_dir / relative).resolve()
+                        try:
+                            destination.relative_to(paths.certs_dir.resolve())
+                        except ValueError as exc:
+                            raise BackupError(
+                                "backup contains an unsafe certificate path", "invalid_archive"
+                            ) from exc
+                        remember(destination)
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(item, destination)
+        except Exception as exc:
+            rollback_files()
+            if previous_db.is_file():
+                shutil.copy2(previous_db, db_target)
+            for leftover in (wal, shm):
+                leftover.unlink(missing_ok=True)
+            if isinstance(exc, BackupError):
+                raise
+            raise BackupError(
+                f"restore failed while replacing files: {exc}; previous state restored",
+                "restore_failed",
+            ) from exc
         return {
             "restored": True,
             "app_version": manifest.get("app_version"),

@@ -327,6 +327,7 @@ async def endpoints_for_user(
                     server=server_host,
                     port=inbound.port,
                     password=password,
+                    obfs_password=params.get("obfs_password"),
                     tls=TLSConfig(
                         server_name=cert.domain,
                         insecure=False,

@@ -73,8 +73,34 @@ class StatsCollector:
 
     async def start(self) -> None:
         if self._task is None:
+            await self._load_epochs()
             self._task = asyncio.create_task(self._run(), name="ostium-stats")
             await self.bus.publish("stats.started", {})
+
+    async def _load_epochs(self) -> None:
+        """Continue epoch numbering after a process restart.
+
+        Epoch ids only live in memory otherwise, so a restart would reset every
+        counter to 1 and create duplicate history rows on the next monthly
+        rollover.
+        """
+
+        from sqlalchemy import func
+
+        try:
+            async with self.session_factory() as session:
+                rows = (
+                    await session.execute(
+                        select(StatsEpoch.user_id, func.max(StatsEpoch.epoch)).group_by(
+                            StatsEpoch.user_id
+                        )
+                    )
+                ).all()
+            for user_id, epoch in rows:
+                if epoch is not None:
+                    self._epochs[str(user_id)] = int(epoch)
+        except Exception as exc:  # a fresh/legacy database must not block stats
+            self.bus.log("warning", "could not restore statistics epochs", error=str(exc))
 
     async def stop(self) -> None:
         # Persist traffic sampled since the last flush before cancelling the
@@ -241,7 +267,6 @@ class StatsCollector:
 
         to_disable: list[str] = []
         reactivated: list[str] = []
-        changed = False
         first_enforce = self._first_enforce
         self._first_enforce = False
         now = utcnow()
@@ -259,7 +284,6 @@ class StatsCollector:
                 quota_disabled = not user.enabled and user.disabled_reason == "quota_exceeded"
                 user.used_bytes = 0
                 user.cycle_started_at = now
-                changed = True
                 self._alerted.pop(user.id, None)
                 self._epochs[user.id] += 1
                 await session.execute(
@@ -289,7 +313,6 @@ class StatsCollector:
                     user.enabled = False
                     user.disabled_reason = "expired"
                     to_disable.append(user.name)
-                    changed = True
                     continue
                 if user.quota_bytes > 0:
                     ratio = effective / user.quota_bytes
@@ -314,9 +337,9 @@ class StatsCollector:
                         user.enabled = False
                         user.disabled_reason = "quota_exceeded"
                         to_disable.append(user.name)
-                        changed = True
-            if changed:
-                await session.commit()
+            # Commit unconditionally: threshold alerts are also writes and
+            # used to be rolled back when no user state changed.
+            await session.commit()
         if to_disable:
             self._pending_disable.update(to_disable)
             self.bus.log("warning", "users disabled by policy", users=", ".join(to_disable))

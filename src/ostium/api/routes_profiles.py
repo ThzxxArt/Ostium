@@ -205,6 +205,11 @@ async def update_profile(
         profile.name = changes["name"]
     if "enabled" in changes and changes["enabled"] is not None:
         profile.enabled = changes["enabled"]
+        if not profile.enabled:
+            from ostium.services.settings import get_setting, set_setting
+
+            if await get_setting(session, "active_profile_id") == profile.id:
+                await set_setting(session, "active_profile_id", None)
     if "selected_endpoint" in changes:
         profile.selected_endpoint = changes["selected_endpoint"]
     if "sort_order" in changes and changes["sort_order"] is not None:
@@ -238,6 +243,7 @@ async def reorder_profiles(
     for index, profile_id in enumerate(payload.ids):
         by_id[profile_id].sort_order = index * 10
     await session.flush()
+    applied = await _apply_client(services, session)
     await audit(
         session,
         actor=admin.username,
@@ -245,7 +251,7 @@ async def reorder_profiles(
         ip=client_ip(request),
         detail={"count": len(payload.ids)},
     )
-    return {"ok": True}
+    return {"ok": True, **applied}
 
 
 @router.post("/profiles/{profile_id}/activate")

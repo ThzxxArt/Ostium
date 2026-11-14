@@ -112,8 +112,8 @@ async def info(
         "tun": {
             "enabled": services.settings.tun_enabled,
             "interface": services.settings.tun_interface,
-            "mtu": 1500,
-            "stack": "gvisor",
+            "mtu": services.settings.tun_mtu,
+            "stack": services.settings.tun_stack,
         },
     }
 
@@ -502,11 +502,18 @@ async def preflight_reality(
     port: int = 443,
     _: AdminUser = Depends(get_current_admin),
 ) -> dict[str, Any]:
-    from ostium.services.netguard import UnsafeUrlError, validate_target_host
+    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
 
+    if not 1 <= port <= 65535:
+        return {"ok": False, "host": host, "message": "port must be between 1 and 65535"}
+    url_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
     try:
-        validate_target_host(host, allow_private=False)
-    except UnsafeUrlError as exc:
+        # Resolve the hostname too: validating only literal addresses would
+        # let a public hostname pivot this probe to loopback/metadata.
+        await asyncio.to_thread(
+            validate_remote_url, f"https://{url_host}:{port}", allow_private=False
+        )
+    except (UnsafeUrlError, ValueError) as exc:
         return {"ok": False, "host": host, "message": str(exc)}
 
     def probe() -> dict[str, Any]:

@@ -40,7 +40,9 @@ class RuleTest(BaseModel):
     domain: str | None = None
     ip: str | None = None
     port: int | None = None
+    source_port: int | None = None
     network: Literal["tcp", "udp"] | None = None
+    protocol: str | None = None
     process_name: str | None = None
 
 
@@ -245,7 +247,9 @@ async def test_rule(
             "domain": payload.domain,
             "ip": payload.ip,
             "port": payload.port,
+            "source_port": payload.source_port,
             "network": payload.network,
+            "protocol": payload.protocol,
             "process_name": payload.process_name,
         },
     )

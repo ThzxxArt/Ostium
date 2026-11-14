@@ -124,7 +124,9 @@ def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
     domain = str(target.get("domain") or "").lower()
     ip = target.get("ip")
     port = target.get("port")
+    source_port = target.get("source_port")
     network = target.get("network")
+    protocol = target.get("protocol")
     process = target.get("process_name")
     if values := match.get("domain"):
         if domain not in [str(item).lower() for item in values]:
@@ -151,10 +153,13 @@ def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
         if port is None or int(port) not in [int(item) for item in values]:
             return False
     if values := match.get("source_port"):
-        if port is None or int(port) not in [int(item) for item in values]:
+        if source_port is None or int(source_port) not in [int(item) for item in values]:
             return False
     if values := match.get("network"):
         if network is None or str(network) not in [str(item) for item in values]:
+            return False
+    if values := match.get("protocol"):
+        if protocol is None or str(protocol).lower() not in [str(item).lower() for item in values]:
             return False
     if values := match.get("process_name"):
         if process is None or str(process) not in [str(item) for item in values]:
@@ -203,9 +208,24 @@ async def update_rule_set(
             headers=headers,
         )
         if fetched.status_code == 304:
-            rule_set.updated_at = utcnow()
-            await session.flush()
-            return {"updated": False, "reason": "not_modified"}
+            if target.is_file():
+                rule_set.updated_at = utcnow()
+                await session.flush()
+                return {"updated": False, "reason": "not_modified"}
+            # A stale ETag with a missing local file would leave the core
+            # pointing at a non-existent rule set.  Re-fetch unconditionally.
+            headers.pop("If-None-Match", None)
+            fetched = await fetch_limited(
+                rule_set.url,
+                allow_private=False,
+                max_bytes=MAX_RULE_SET_BYTES,
+                timeout=30.0,
+                headers=headers,
+            )
+            if fetched.status_code == 304:
+                raise RuleValidationError(
+                    "rule set server returned 304 for an unconditional refresh"
+                )
         if fetched.status_code >= 400:
             raise RuleValidationError(f"rule set download failed: HTTP {fetched.status_code}")
         payload = fetched.content

@@ -210,6 +210,10 @@ class ClientConfigSpec:
     ipv6: bool = True
     dns_remote: str = "https://1.1.1.1/dns-query"
     dns_local: str = "223.5.5.5"
+    # Absolute path for sing-box's cache file.  Without it sing-box writes
+    # ``cache.db`` into its working directory, which is read-only for the
+    # packaged systemd/launchd clients (and polluted for manual runs).
+    cache_path: str | None = None
 
 
 def build_server_config(
@@ -424,7 +428,11 @@ def build_client_config(
                 "external_controller": spec.clash_listen,
                 "secret": spec.clash_secret or "ostium-local",
             },
-            "cache_file": {"enabled": True, "store_fakeip": True},
+            "cache_file": {
+                "enabled": True,
+                "store_fakeip": True,
+                **({"path": spec.cache_path} if spec.cache_path else {}),
+            },
         },
     }
     return config
@@ -471,15 +479,17 @@ def _rule_sets(spec: ClientConfigSpec) -> list[dict[str, Any]]:
     defined: dict[str, dict[str, Any]] = {}
     for entry in spec.rule_sets:
         tag = str(entry.get("tag") or entry.get("name") or "custom")
+        # Only locally verified rule sets may reach sing-box.  A remote URL
+        # here would make the privileged core fetch an operator-supplied URL
+        # outside our SSRF/DNS policy, and would require network access on
+        # every start.  ``POST /rule-sets/{id}/update`` downloads and
+        # validates content into ``path`` first.
         if entry.get("path"):
-            defined[tag] = {"type": "local", "tag": tag, "format": "binary", "path": entry["path"]}
-        elif entry.get("url"):
             defined[tag] = {
-                "type": "remote",
+                "type": "local",
                 "tag": tag,
                 "format": entry.get("format", "binary"),
-                "url": entry["url"],
-                "update_interval": entry.get("update_interval", "7d"),
+                "path": entry["path"],
             }
     return list(defined.values())
 

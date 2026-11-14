@@ -272,17 +272,22 @@ def init(
                 if role_value is Role.SERVER:
                     await ensure_inbounds(session, store)
                 await set_setting(session, "initialized", True)
-                await set_setting(
-                    session,
-                    "server",
-                    {
-                        "domain": domain,
-                        "public_host": domain,
-                        "public_ui": settings.public_ui,
-                    },
-                )
-                if domain:
-                    await set_setting(session, "public_base_url", f"https://{domain}")
+                from ostium.services.settings import get_setting
+
+                previous_server = await get_setting(session, "server", {})
+                if not isinstance(previous_server, dict):
+                    previous_server = {}
+                effective_domain = domain or previous_server.get("domain")
+                server_info = {
+                    "domain": effective_domain,
+                    "public_host": effective_domain,
+                    "public_ui": settings.public_ui
+                    if domain
+                    else bool(previous_server.get("public_ui", settings.public_ui)),
+                }
+                await set_setting(session, "server", server_info)
+                if effective_domain:
+                    await set_setting(session, "public_base_url", f"https://{effective_domain}")
                 await session.commit()
                 if generated:
                     console.print(
@@ -1461,11 +1466,17 @@ def core_install(
     if manifest:
         try:
             if manifest.startswith(("http://", "https://")):
+                if not manifest.startswith("https://"):
+                    _fail("core manifest URLs must use HTTPS", 6)
                 response = httpx.get(manifest, timeout=30, follow_redirects=True, trust_env=False)
+                if response.url.scheme != "https":
+                    _fail("core manifest redirect must stay on HTTPS", 6)
                 response.raise_for_status()
                 data = response.json()
             else:
                 data = json.loads(Path(manifest).read_text(encoding="utf-8"))
+        except typer.Exit:
+            raise
         except Exception as exc:
             _fail(f"could not read core manifest: {exc}", 6)
         os_name = {"Linux": "linux", "Darwin": "darwin", "Windows": "windows"}.get(

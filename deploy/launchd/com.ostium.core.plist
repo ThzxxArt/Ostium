@@ -20,6 +20,8 @@
     <key>OSTIUM_SHARED_DATA</key>
     <string>1</string>
   </dict>
+  <key>WorkingDirectory</key>
+  <string>/Library/Application Support/Ostium</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>

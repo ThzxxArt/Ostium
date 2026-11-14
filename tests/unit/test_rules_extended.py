@@ -23,7 +23,9 @@ def test_all_match_types_and_failures() -> None:
         "domain": "www.example.com",
         "ip": "10.1.2.3",
         "port": 443,
+        "source_port": 443,
         "network": "tcp",
+        "protocol": "tls",
         "process_name": "curl",
     }
     assert matches({"domain": ["www.example.com"]}, target) is True
@@ -44,9 +46,13 @@ def test_all_match_types_and_failures() -> None:
     assert matches({"port": [443]}, {"domain": "x"}) is False
     assert matches({"source_port": [443]}, target) is True
     assert matches({"source_port": [1]}, target) is False
+    assert matches({"source_port": [443]}, {"port": 443}) is False
     assert matches({"network": ["tcp"]}, target) is True
     assert matches({"network": ["udp"]}, target) is False
     assert matches({"network": ["tcp"]}, {"domain": "x"}) is False
+    assert matches({"protocol": ["tls"]}, target) is True
+    assert matches({"protocol": ["http"]}, target) is False
+    assert matches({"protocol": ["tls"]}, {"domain": "x"}) is False
     assert matches({"process_name": ["curl"]}, target) is True
     assert matches({"process_name": ["wget"]}, target) is False
     assert matches({"process_name": ["curl"]}, {"domain": "x"}) is False
@@ -84,6 +90,9 @@ def test_rule_set_update_and_serialization(tmp_path: Path) -> None:
             rule_set = RuleSet(name="ads", url="https://example.com/ads.srs", format="binary")
             session.add(rule_set)
             await session.commit()
+            cached = settings.paths.rulesets_dir / f"{rule_set.id}.srs"
+            cached.write_bytes(b"cached")
+            rule_set.path = str(cached)
 
             with respx.mock:
                 respx.get("https://example.com/ads.srs").mock(return_value=httpx.Response(304))

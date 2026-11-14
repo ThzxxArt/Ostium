@@ -161,6 +161,8 @@ async def update_inbound(
     inbound = await _get_inbound(session, kind)
     params = inbound_params(inbound, services.store)
     changes = payload.model_dump(exclude_unset=True)
+    original_proxy_ports = list(services.settings.proxy_ports)
+    new_proxy_port: int | None = None
     if "port" in changes and changes["port"] is not None:
         port = int(changes["port"])
         # Hysteria2 is QUIC/UDP, so it may share a port number with TCP
@@ -194,15 +196,8 @@ async def update_inbound(
                 )
         inbound.port = port
         if port not in services.settings.proxy_ports:
-            services.settings.proxy_ports = sorted({*services.settings.proxy_ports, port})
-            try:
-                services.settings.save()
-            except OSError as exc:
-                raise ApiError(
-                    500,
-                    f"could not persist the approved proxy port: {exc}",
-                    "settings_write_failed",
-                ) from exc
+            # Applied below, after every remaining validation has passed.
+            new_proxy_port = port
     if "enabled" in changes and changes["enabled"] is not None:
         enabled = bool(changes["enabled"])
         if enabled:
@@ -241,6 +236,12 @@ async def update_inbound(
                         "port_conflict",
                     )
         if enabled and kind in {"hysteria2", "trojan"}:
+            if "certificate_id" in changes and changes["certificate_id"] is None:
+                raise ApiError(
+                    409,
+                    f"{kind} requires a TLS certificate; clear the binding only while disabled",
+                    "certificate_required",
+                )
             certificate = await _resolve_certificate(
                 session, inbound, changes.get("certificate_id")
             )
@@ -252,13 +253,17 @@ async def update_inbound(
                 )
             inbound.certificate_id = certificate.id
         inbound.enabled = enabled
-    if changes.get("certificate_id"):
+    if "certificate_id" in changes and changes["certificate_id"] is not None:
         if kind not in {"hysteria2", "trojan"}:
             raise ApiError(400, "only TLS inbounds accept a certificate", "bad_request")
         certificate = await _resolve_certificate(session, inbound, changes["certificate_id"])
         if certificate is None:
             raise ApiError(404, "certificate not found", "not_found")
         inbound.certificate_id = certificate.id
+    elif "certificate_id" in changes and changes["certificate_id"] is None:
+        if kind not in {"hysteria2", "trojan"}:
+            raise ApiError(400, "only TLS inbounds accept a certificate", "bad_request")
+        inbound.certificate_id = None
     if kind == "vless":
         if payload.reality_server_name:
             params["server_name"] = payload.reality_server_name
@@ -273,7 +278,29 @@ async def update_inbound(
             json.dumps(params), table="inbounds", record_id=inbound.id, field="params"
         )
     await session.flush()
-    applied = await _apply_server(services, session)
+    if new_proxy_port is not None:
+        services.settings.proxy_ports = sorted({*services.settings.proxy_ports, new_proxy_port})
+    ports_changed = services.settings.proxy_ports != original_proxy_ports
+    if ports_changed:
+        try:
+            services.settings.save()
+        except OSError as exc:
+            services.settings.proxy_ports = original_proxy_ports
+            raise ApiError(
+                500,
+                f"could not persist the approved proxy port: {exc}",
+                "settings_write_failed",
+            ) from exc
+    try:
+        applied = await _apply_server(services, session)
+    except Exception:
+        if ports_changed:
+            services.settings.proxy_ports = original_proxy_ports
+            try:
+                services.settings.save()
+            except OSError:
+                pass
+        raise
     await audit(
         session,
         actor=admin.username,

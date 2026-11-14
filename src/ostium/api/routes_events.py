@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ostium import __version__
-from ostium.api.deps import Services
+from ostium.api.deps import Services, client_ip
 from ostium.services.auth import resolve_session
 from ostium.util.time import iso, utcnow
 
@@ -17,6 +17,22 @@ router = APIRouter()
 
 PING_INTERVAL_SECONDS = 25
 AUTH_REVALIDATE_SECONDS = 50
+
+
+def _ip_allowed(raw: str, networks: list[str]) -> bool:
+    import ipaddress
+
+    try:
+        address = ipaddress.ip_address(raw)
+    except ValueError:
+        return False
+    for entry in networks:
+        try:
+            if address in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _origin_matches(origin: str, host: str) -> bool:
@@ -36,6 +52,12 @@ async def events(websocket: WebSocket) -> None:
     # consoles instead of relying on SameSite cookies alone.
     if origin and not _origin_matches(origin, host):
         await websocket.close(code=4403, reason="origin rejected")
+        return
+    if services.settings.ui_allowlist and not _ip_allowed(
+        client_ip(websocket),
+        services.settings.ui_allowlist,
+    ):
+        await websocket.close(code=4403, reason="client address is not allowlisted")
         return
     token = websocket.cookies.get("ostium_session")
     if not token:

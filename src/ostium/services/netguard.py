@@ -67,12 +67,19 @@ def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
     """
 
     value = url.strip()
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise UnsafeUrlError(f"invalid URL: {exc}") from exc
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise UnsafeUrlError("URL must be an absolute http(s) URL")
     if parsed.username or parsed.password:
         raise UnsafeUrlError("URL must not embed credentials")
     host = parsed.hostname.strip("[]")
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError as exc:
+        raise UnsafeUrlError(f"invalid port in URL: {exc}") from exc
     try:
         literal = ipaddress.ip_address(host)
     except ValueError:
@@ -83,7 +90,6 @@ def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
         return value
     if host.lower() in {"localhost", "localhost.localdomain"} or host.lower().endswith(".local"):
         raise UnsafeUrlError("local hostnames are not allowed")
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except socket.gaierror as exc:

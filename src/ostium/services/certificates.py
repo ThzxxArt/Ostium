@@ -6,6 +6,7 @@ import datetime as dt
 import ipaddress
 import os
 import re
+import secrets
 from pathlib import Path
 from typing import Any, cast
 
@@ -235,10 +236,14 @@ async def _persist(
 ) -> Certificate:
     directory = _cert_dir(settings, domain)
     directory.mkdir(parents=True, exist_ok=True)
-    cert_path = directory / "fullchain.pem"
-    key_path = directory / "privkey.pem"
-    cert_path.write_text(cert_pem, encoding="utf-8")
+    # Never overwrite the files referenced by the current ready certificate.
+    # A crash or short write during renewal must leave the old TLS material
+    # untouched until the database switches to the complete new generation.
+    generation = secrets.token_hex(8)
+    cert_path = directory / f"fullchain-{generation}.pem"
+    key_path = directory / f"privkey-{generation}.pem"
     key_path.write_text(key_pem, encoding="utf-8")
+    cert_path.write_text(cert_pem, encoding="utf-8")
     for path, mode in ((cert_path, 0o644), (key_path, 0o600)):
         if os.name == "posix":
             path.chmod(mode)
@@ -356,12 +361,22 @@ async def delete_certificate(session: AsyncSession, certificate: Certificate) ->
     paths = [Path(certificate.cert_path), Path(certificate.key_path)]
     await session.delete(certificate)
     await session.flush()
+    parents: set[Path] = set()
     for path in paths:
+        parents.add(path.parent)
         try:
             path.unlink(missing_ok=True)
         except OSError:
             continue
-        parent = path.parent
+    # Remove older certificate generations left behind by renewals, but never
+    # touch unrelated files.
+    for parent in sorted(parents):
+        for pattern in ("fullchain-*.pem", "privkey-*.pem"):
+            for candidate in parent.glob(pattern):
+                try:
+                    candidate.unlink()
+                except OSError:
+                    pass
         try:
             parent.rmdir()
         except OSError:

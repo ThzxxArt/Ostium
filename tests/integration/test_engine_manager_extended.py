@@ -46,6 +46,12 @@ async def _setup(settings: Settings):
     return engine, factory, store, manager
 
 
+def _downloaded_rule_set(settings: Settings) -> Path:
+    path = settings.paths.rulesets_dir / "downloaded.srs"
+    path.write_bytes(b"rules")
+    return path
+
+
 def test_server_spec_certificates_and_protocols(tmp_path: Path) -> None:
     async def _run() -> None:
         settings = _settings(tmp_path)
@@ -159,7 +165,11 @@ def test_client_spec_selection_rules_and_errors(tmp_path: Path) -> None:
             )
             session.add(
                 RuleSet(
-                    name="ads", url="https://example.com/ads.srs", format="binary", enabled=True
+                    name="ads",
+                    url="https://example.com/ads.srs",
+                    format="binary",
+                    enabled=True,
+                    path=str(_downloaded_rule_set(settings)),
                 )
             )
             session.add(

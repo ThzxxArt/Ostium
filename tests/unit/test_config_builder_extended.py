@@ -212,6 +212,7 @@ def test_client_custom_rules_and_rule_sets() -> None:
             ],
             rule_sets=[
                 {"name": "local", "path": "/tmp/local.srs"},
+                {"tag": "source", "path": "/tmp/source.json", "format": "source"},
                 {"tag": "remote", "url": "https://example.com/x.srs", "format": "source"},
                 {"url": ""},
             ],
@@ -225,7 +226,10 @@ def test_client_custom_rules_and_rule_sets() -> None:
     assert all("ignored" not in rule for rule in rules)
     sets = {item["tag"]: item for item in config["route"]["rule_set"]}
     assert sets["local"]["type"] == "local"
-    assert sets["remote"]["format"] == "source"
+    assert sets["local"]["format"] == "binary"
+    assert sets["source"]["format"] == "source"
+    assert "remote" not in sets
+    assert all(item["type"] == "local" for item in sets.values())
     assert "url" not in sets["local"]
 
 

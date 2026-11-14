@@ -147,6 +147,9 @@ def _from_clash(text: str) -> list[Endpoint]:
                     server=server,
                     port=port,
                     password=proxy.get("password"),
+                    obfs_password=proxy.get("obfs-password")
+                    if proxy.get("obfs") == "salamander"
+                    else None,
                     tls=TLSConfig(
                         server_name=proxy.get("sni") or proxy.get("servername"),
                         insecure=bool(proxy.get("skip-cert-verify")),
@@ -219,6 +222,7 @@ def _from_singbox_outbounds(outbounds: list[Any]) -> list[Endpoint]:
                 )
             )
         elif kind == "hysteria2":
+            obfs = outbound.get("obfs") or {}
             endpoints.append(
                 Endpoint(
                     tag=_tag(name, index),
@@ -227,6 +231,9 @@ def _from_singbox_outbounds(outbounds: list[Any]) -> list[Endpoint]:
                     server=server,
                     port=port,
                     password=outbound.get("password"),
+                    obfs_password=obfs.get("password")
+                    if isinstance(obfs, dict) and obfs.get("type") == "salamander"
+                    else None,
                     tls=TLSConfig(
                         server_name=tls.get("server_name"),
                         insecure=bool(tls.get("insecure")),

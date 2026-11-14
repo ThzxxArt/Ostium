@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=simple
 User=ostium-core
 Group=ostium
+WorkingDirectory=/var/lib/ostium-core
 Environment=OSTIUM_ROLE=client
 Environment=OSTIUM_CONFIG_FILE=/etc/ostium/client.toml
 Environment=OSTIUM_DATA_DIR=/var/lib/ostium-core

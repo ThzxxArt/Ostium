@@ -242,6 +242,19 @@ class EngineManager:
             .scalars()
             .all()
         )
+        downloaded = {ruleset.name: ruleset.path for ruleset in rule_sets if ruleset.path}
+        for rule in rules:
+            references = (rule.match_json or {}).get("rule_set", [])
+            if isinstance(references, str):
+                references = [references]
+            missing = [name for name in references if name not in downloaded]
+            if missing:
+                raise EngineError(
+                    "download the referenced rule set(s) before applying: "
+                    + ", ".join(str(name) for name in missing),
+                    "rule_set_not_downloaded",
+                    400,
+                )
         effective_mode = mode or self.settings.mode.value
         effective_tun = self.settings.tun_enabled if tun_enabled is None else tun_enabled
         stored_routing = await get_setting(session, "routing_mode", "smart")
@@ -271,6 +284,7 @@ class EngineManager:
             clash_secret=self._clash_secret(),
             log_level=self.settings.log_level,
             ipv6=True,
+            cache_path=str(self.settings.paths.data_dir / "cache.db"),
         )
 
     def _clash_secret(self) -> str:
