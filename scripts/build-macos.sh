@@ -50,7 +50,15 @@ Full removal: sudo OSTIUM_PURGE=true ./install-macos.sh uninstall
 This build is $( [[ -n "$IDENTITY" ]] && echo "signed with $IDENTITY" || echo "UNSIGNED" ).
 EOF
 
-DMG="dist/Ostium-${VERSION}-macos-$(uname -m).dmg"
+# The DMG contains the core archive's architecture, not the build host's.
+# macos-13 is Intel but packages a darwin-arm64 core on the release runner.
+CORE_ARCH=""
+case "$CORE_TARBALL" in
+  *-darwin-arm64.tar.gz) CORE_ARCH="arm64" ;;
+  *-darwin-amd64.tar.gz) CORE_ARCH="amd64" ;;
+esac
+DMG_ARCH="${OSTIUM_MACOS_ARCH:-${CORE_ARCH:-$(uname -m)}}"
+DMG="dist/Ostium-${VERSION}-macos-${DMG_ARCH}.dmg"
 hdiutil create -volname "Ostium" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 if [[ -n "$IDENTITY" ]]; then
   codesign --force --timestamp --sign "$IDENTITY" "$DMG"

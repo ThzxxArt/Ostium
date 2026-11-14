@@ -67,6 +67,15 @@ def test_release_notes_are_not_generated_from_an_empty_template() -> None:
     assert (ROOT / "RELEASE_NOTES.md").is_file()
 
 
+def test_release_macos_uses_an_available_runner_and_names_the_core_arch() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "runs-on: macos-13" in workflow
+    script = (ROOT / "scripts" / "build-macos.sh").read_text(encoding="utf-8")
+    assert "OSTIUM_MACOS_ARCH" in script
+    assert '*-darwin-arm64.tar.gz) CORE_ARCH="arm64"' in script
+    assert "${CORE_ARCH:-$(uname -m)}" in script
+
+
 def test_release_windows_wintun_is_checked_and_located() -> None:
     windows = _release()["jobs"]["windows"]
     prepare = next(
