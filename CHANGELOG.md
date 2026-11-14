@@ -49,6 +49,26 @@ SemVer.
 - Inbound port conflicts return 409; skipped inbounds show their reason.
 - Setup no longer offers unreachable Hysteria2/both without a certificate.
 
+### Review round 2
+
+- Client core uses an absolute `cache.db` path and writable working directories
+  for systemd/launchd/Windows; the packaged client no longer fails at startup on
+  a read-only root filesystem.
+- API and core reject oversized chunked request bodies while streaming, before
+  authentication/CSRF.
+- Rule sets must be downloaded and verified locally before they can reach
+  sing-box; remote rule-set URLs are no longer handed to the privileged core.
+- `core install --manifest` rejects plaintext HTTP manifests.
+- Settings, Public UI and inbound port changes publish only after validation and
+  persist atomically; quota threshold alerts are committed; WebSocket honors the
+  UI IP allowlist.
+- Certificate renewals write a new generation and switch the database last;
+  backup restore rolls back database, master key, config and certificates
+  together.
+- Hysteria2 obfs parameters, Trojan URI pins/`allowInsecure`, rule-set `format`,
+  rule `protocol`/`source_port` and TUN MTU/stack now round-trip consistently
+  across UI, subscriptions and core configuration.
+
 ### Delivery
 
 - Release builds Windows setup, macOS DMG, Linux DEB/AppImage (amd64/arm64),

@@ -673,3 +673,32 @@ shellcheck + bash -n                                  -> PASS
   入口端口冲突、同名 Profile tag、孤儿进程清理、限流键清理。
 - 后端、前端、集成、文档、脚本、依赖审计结果见 `V0.1.1_REVIEW_ROUND1.md` 第 4 节。
 - 外部验证矩阵未变化；仍未将 Windows/macOS/Nginx/Docker/ACME/TUN/soak 写成已验证。
+
+---
+
+## 18. v0.1.1 第二轮全量 Review（2026-11-14）
+
+本轮独立回归 R1-01～R1-34，并对当前仓库做第二轮代码、逻辑、稳定、链路、安全、视觉、测试、文档与发布审查。完整台账见 `V0.1.1_REVIEW_ROUND2.md`。
+
+### 18.1 结论
+
+- R1 回归：**34/34 通过**，未发现第一轮修复被回退。
+- 新增并修复 **31 项**：P1 9 项、P2 22 项、P0 0 项。
+- 本地可执行门禁全部通过；外部平台项仍为 blocker。
+
+### 18.2 重点根因
+
+1. **运行环境假设**：sing-box `cache_file` 依赖 CWD，打包的 Linux/macOS 客户端核心在只读工作目录下真实启动失败。改为绝对路径并固定三平台工作目录。
+2. **认证前资源消耗**：控制面在 CSRF/认证前完整读取分块请求体。改为流式限额，超限立即 413。
+3. **安全边界被旁路**：规则集以远端 URL 直接交给特权核心抓取，绕过统一 SSRF helper；改为只允许本地已校验文件。
+4. **状态发布非原子**：设置补丁、Public UI 开关、inbound 端口白名单在完整校验前修改共享状态/持久化；改为校验后发布与失败回滚。
+5. **可见性缺口**：配额 80/90% 告警只 flush 不 commit；WebSocket 未执行 IP allowlist；证书续期原地覆盖 TLS 文件。均已修复并补回归。
+
+### 18.3 回归证据
+
+- 后端：**523 passed / 0 skipped**；语句 **95.26%**、分支 **91.51%**；覆盖率门禁通过。
+- 真实 sing-box 集成：**10 passed / 0 skipped**，含只读 CWD 客户端核心启动。
+- 前端：**160 passed**；90.59/85.06/88.39/91.75。
+- Playwright：**69 passed**；首屏 192.8 KiB gzip。
+- `ruff`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict`/`pip-audit`/`npm audit` 全绿。
+- 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak 写成已验证。
