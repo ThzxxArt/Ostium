@@ -49,9 +49,13 @@ const activeProfile = computed(
     null,
 )
 const endpoints = computed(() => activeProfile.value?.endpoints || [])
-const selectedEndpoint = computed(
-  () => activeProfile.value?.selected_endpoint || endpoints.value[0]?.tag || null,
-)
+const selectedEndpoint = computed(() => {
+  const chosen = activeProfile.value?.selected_endpoint
+  if (chosen) return chosen
+  // With multiple endpoints the generated selector uses URLTest ("auto");
+  // claiming endpoint #1 is selected would misrepresent the running config.
+  return endpoints.value.length === 1 ? endpoints.value[0]?.tag || null : null
+})
 const connected = computed(() => Boolean((info.value?.core as Record<string, unknown>)?.running))
 const state = computed(() => (connected.value ? 'connected' : 'disconnected'))
 const mode = computed(() => info.value?.mode || 'mixed')
@@ -153,8 +157,8 @@ async function selectProfile(id: string) {
     }
     selectedProfileId.value = id
     const profile = profiles.value.find((item) => item.id === id)
-    if (profile) {
-      await selectEndpoint(profile.selected_endpoint || profile.endpoints[0]?.tag || '')
+    if (profile?.selected_endpoint) {
+      await selectEndpoint(profile.selected_endpoint)
     }
   } catch (err) {
     message.error((err as Error).message)
@@ -163,12 +167,13 @@ async function selectProfile(id: string) {
   }
 }
 
-async function selectEndpoint(tag: string) {
+async function selectEndpoint(tag: string | null) {
   const profile = activeProfile.value
-  if (!profile || !tag) return
+  if (!profile) return
+  const selected = tag || null
   try {
-    await api.profiles.update(profile.id, { selected_endpoint: tag })
-    profile.selected_endpoint = tag
+    await api.profiles.update(profile.id, { selected_endpoint: selected })
+    profile.selected_endpoint = selected
     if (connected.value) await api.system.connect()
     message.success(t('profiles.selected'))
     await load()
@@ -290,6 +295,8 @@ onBeforeUnmount(() => {
             <NSelect
               :value="selectedEndpoint"
               :options="endpointOptions"
+              :placeholder="t('home.auto_select')"
+              clearable
               size="small"
               @update:value="selectEndpoint"
             />
@@ -298,10 +305,12 @@ onBeforeUnmount(() => {
             <Waypoints :size="16" />
             <div>
               <strong>{{
-                endpoints.find((endpoint) => endpoint.tag === selectedEndpoint)?.name ||
-                t('common.none')
+                selectedEndpoint
+                  ? endpoints.find((endpoint) => endpoint.tag === selectedEndpoint)?.name ||
+                    t('common.none')
+                  : t('home.auto_select')
               }}</strong>
-              <span class="o-micro o-subtle">{{
+              <span v-if="selectedEndpoint" class="o-micro o-subtle">{{
                 endpoints.find((endpoint) => endpoint.tag === selectedEndpoint)?.protocol
               }}</span>
             </div>

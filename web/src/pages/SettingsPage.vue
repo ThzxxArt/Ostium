@@ -112,8 +112,8 @@ const certDomains = computed(() =>
     .filter((certificate) => certificate.status === 'ready')
     .map((certificate) => ({ label: certificate.domain, value: certificate.domain })),
 )
-const apiTokens = computed<Array<Record<string, unknown>>>(
-  () => settings.value?.security.api_tokens ?? [],
+const apiTokens = computed<Array<Record<string, unknown>>>(() =>
+  (settings.value?.security.api_tokens ?? []).filter((token) => !token.revoked),
 )
 
 async function load() {
@@ -373,7 +373,7 @@ async function createBackup() {
     backupPassword.value = ''
     backupAck.value = false
     app.jobDrawerOpen = true
-    message.success(t('jobs.queued') + `: ${result.job_id.slice(0, 8)}`)
+    message.success(t('common.queued') + `: ${result.job_id.slice(0, 8)}`)
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -815,7 +815,13 @@ onMounted(load)
                 <NButton size="tiny" secondary @click="restore(backup)">{{
                   t('common.apply')
                 }}</NButton>
-                <NButton size="tiny" quaternary type="error" @click="removeBackup(backup)">
+                <NButton
+                  size="tiny"
+                  quaternary
+                  type="error"
+                  :aria-label="t('common.delete')"
+                  @click="removeBackup(backup)"
+                >
                   <template #icon><Trash2 :size="13" /></template>
                 </NButton>
               </div>

@@ -80,6 +80,25 @@ describe('auth page interactions', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('imports a subscription URL through the URL field during client setup', async () => {
+    const { calls } = installFetchMock({ role: 'client', mode: 'empty' })
+    const { wrapper } = await mountPage(SetupPage, {}, (pinia) => {
+      const auth = useAuthStore(pinia)
+      auth.status = status('client')
+      auth.ready = true
+    })
+    await settle()
+    const state = (wrapper.findComponent(SetupPage).vm as any).$.setupState
+    state.password = 'verysecret123'
+    state.confirm = 'verysecret123'
+    state.importText = 'https://vpn.example.com/sub/token'
+    await state.finish()
+    await settle()
+    const created = calls.find((call) => call.path === '/api/v1/profiles' && call.method === 'POST')
+    expect(created?.body?.url).toBe('https://vpn.example.com/sub/token')
+    expect(created?.body?.text).toBeUndefined()
+  })
+
   it('logs in and shows validation errors', async () => {
     const { calls } = installFetchMock()
     const { wrapper } = await mountPage(LoginPage)

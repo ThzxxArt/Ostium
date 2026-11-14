@@ -58,13 +58,29 @@ const refreshing = ref(false)
 const error = ref<string | null>(null)
 let timer: number | null = null
 
-const activeInbounds = computed(() => inbounds.value.filter((item) => item.enabled).length)
+const activeInbounds = computed(() => inbounds.value.filter((item) => item.active).length)
+const onlineUsers = computed(() =>
+  (overview.value?.online_users ?? []).filter((user) => user.online),
+)
 const running = computed(() => overview.value?.engine.running ?? false)
 const uptime = computed(() => {
   const start = overview.value?.engine.started_at
   if (!start) return '—'
   return formatDuration((Date.now() - new Date(start).getTime()) / 1000)
 })
+function certificateStatus(cert: Certificate): string {
+  if (cert.status !== 'ready') return cert.status
+  const days = cert.days_remaining ?? 0
+  return days < 0 ? 'expired' : days < 14 ? 'warning' : 'ready'
+}
+
+function certificateLabel(cert: Certificate): string {
+  if (cert.status === 'pending' || cert.status === 'error') {
+    return t(`status.${cert.status}`)
+  }
+  return t('certs.days_left', { days: cert.days_remaining ?? 0 })
+}
+
 const EVENT_KEYS: Record<string, string> = {
   'engine.applied': 'dashboard.event_applied',
   'job.created': 'dashboard.event_job_created',
@@ -266,14 +282,8 @@ function eventLabel(type: string): string {
                   <span class="o-micro o-subtle">{{ cert.source }}</span>
                 </div>
                 <OStatusPill
-                  :status="
-                    (cert.days_remaining ?? 0) < 0
-                      ? 'expired'
-                      : (cert.days_remaining ?? 99) < 14
-                        ? 'warning'
-                        : 'ready'
-                  "
-                  :label="t('certs.days_left', { days: cert.days_remaining ?? 0 })"
+                  :status="certificateStatus(cert)"
+                  :label="certificateLabel(cert)"
                   size="sm"
                 />
               </div>
@@ -330,11 +340,11 @@ function eventLabel(type: string): string {
         </OSectionCard>
 
         <OSectionCard :title="t('dashboard.online_now')" :icon="Users">
-          <div v-if="!overview?.online_users.length" class="mini-empty">
+          <div v-if="!onlineUsers.length" class="mini-empty">
             {{ t('dashboard.no_online') }}
           </div>
           <ul v-else class="online-list">
-            <li v-for="user in overview.online_users.slice(0, 7)" :key="user.id">
+            <li v-for="user in onlineUsers.slice(0, 7)" :key="user.id">
               <span class="avatar">{{ user.name.slice(0, 1).toUpperCase() }}</span>
               <div class="user-copy">
                 <strong>{{ user.name }}</strong>

@@ -129,6 +129,16 @@ describe('store and utility branches', () => {
     store.disconnect()
   })
 
+  it('formats calendar-only days without a timezone shift', () => {
+    const original = process.env.TZ
+    process.env.TZ = 'America/New_York'
+    try {
+      expect(formatDay('2026-01-01', 'en-US')).toBe('Jan 1')
+    } finally {
+      process.env.TZ = original
+    }
+  })
+
   it('formats edge-case dates and statuses', () => {
     expect(formatDate(null)).toBe('—')
     expect(formatDate('not-a-date')).toBe('—')

@@ -34,6 +34,7 @@ const testDomain = ref('')
 const testResult = ref<Record<string, unknown> | null>(null)
 const testing = ref(false)
 
+const originalMatch = ref<Record<string, unknown>>({})
 const form = ref({
   action: 'proxy' as 'proxy' | 'direct' | 'block',
   type: 'domain_suffix' as
@@ -101,6 +102,7 @@ async function setPreset(id: string) {
 
 function openAdd() {
   editing.value = null
+  originalMatch.value = {}
   form.value = { action: 'proxy', type: 'domain_suffix', values: '', note: '' }
   ruleOpen.value = true
 }
@@ -108,6 +110,7 @@ function openAdd() {
 function openEdit(rule: Rule) {
   editing.value = rule
   const match = rule.match || {}
+  originalMatch.value = { ...match }
   const type = (Object.keys(match)[0] || 'domain_suffix') as typeof form.value.type
   const raw = match[type]
   form.value = {
@@ -129,7 +132,12 @@ async function saveRule() {
     return
   }
   const numeric = form.value.type === 'port' || form.value.type === 'source_port'
-  const match = { [form.value.type]: numeric ? values.map(Number) : values }
+  // This page only edits one condition at a time.  Preserve any other
+  // conditions from the existing rule so an edit cannot silently drop them.
+  const preserved = Object.fromEntries(
+    Object.entries(originalMatch.value).filter(([key]) => key !== form.value.type),
+  )
+  const match = { ...preserved, [form.value.type]: numeric ? values.map(Number) : values }
   try {
     const result = editing.value
       ? await api.rules.update(editing.value.id, {

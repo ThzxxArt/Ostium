@@ -71,6 +71,7 @@ export default {
     yes: 'Yes',
     no: 'No',
     optional: 'Optional',
+    role: 'Role',
     advanced: 'Advanced',
     learn_more: 'Learn more',
     view_all: 'View all',
@@ -353,6 +354,8 @@ export default {
     bulk_enable: 'Enable',
     bulk_disable: 'Disable',
     bulk_delete: 'Delete',
+    bulk_delete_confirm:
+      'Delete {count} selected user(s)? Their subscription links will stop working.',
     bulk_export: 'Export',
     exported: 'Selected user profiles exported',
     selected: '{count} selected',

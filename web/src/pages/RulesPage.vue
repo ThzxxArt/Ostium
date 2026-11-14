@@ -110,7 +110,8 @@ function openAdd() {
 function openEdit(rule: Rule) {
   editing.value = rule
   const match = rule.match || {}
-  const type = (Object.keys(match)[0] || 'domain_suffix') as typeof form.value.type
+  const keys = Object.keys(match)
+  const type = (keys[0] || 'domain_suffix') as typeof form.value.type
   const raw = match[type]
   form.value = {
     action: rule.action,
@@ -119,7 +120,10 @@ function openEdit(rule: Rule) {
     note: rule.note,
   }
   advancedJson.value = JSON.stringify(match, null, 2)
-  advanced.value = false
+  // A rule with several match keys cannot be represented by the single
+  // condition form.  Open the advanced editor so saving does not silently
+  // drop every condition except the first.
+  advanced.value = keys.length > 1
   ruleOpen.value = true
 }
 

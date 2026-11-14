@@ -152,6 +152,50 @@ describe('v0.1.1 page branches', () => {
     expect(state.advancedJson).toContain('domain_suffix')
   })
 
+  it('does not drop additional match conditions when editing a rule', async () => {
+    installFetchMock()
+    const rules = await mountPage(RulesPage)
+    await settle()
+    const rulesState = stateOf(rules.wrapper, RulesPage)
+    const update = vi.spyOn(api.rules, 'update').mockResolvedValue({
+      rule: fixtures.rule,
+      applied: true,
+    })
+    rulesState.openEdit(fixtures.rule)
+    expect(rulesState.advanced).toBe(true)
+    await rulesState.saveRule()
+    expect(update).toHaveBeenCalledWith(
+      'rule-1',
+      expect.objectContaining({
+        match: expect.objectContaining({
+          domain_suffix: ['.cn'],
+          ip_cidr: ['10.0.0.0/8'],
+        }),
+      }),
+    )
+
+    installFetchMock({ role: 'client' })
+    const routing = await mountPage(RoutingPage)
+    await settle()
+    const routingState = stateOf(routing.wrapper, RoutingPage)
+    const routingUpdate = vi.spyOn(api.rules, 'update').mockResolvedValue({
+      rule: fixtures.rule,
+      applied: true,
+    })
+    routingState.openEdit(fixtures.rule)
+    routingState.form.values = 'example.org'
+    await routingState.saveRule()
+    expect(routingUpdate).toHaveBeenCalledWith(
+      'rule-1',
+      expect.objectContaining({
+        match: expect.objectContaining({
+          domain_suffix: ['example.org'],
+          ip_cidr: ['10.0.0.0/8'],
+        }),
+      }),
+    )
+  })
+
   it('applies routing presets and manages routing rules', async () => {
     installFetchMock()
     const { wrapper } = await mountPage(RoutingPage)
@@ -184,6 +228,40 @@ describe('v0.1.1 page branches', () => {
     await settle()
     state.remove(fixtures.profile)
     expect(wrapper.html()).toBeTruthy()
+  })
+
+  it('does not list revoked API tokens as active', async () => {
+    installFetchMock({
+      overrides: {
+        '/api/v1/settings': {
+          ...fixtures.settings,
+          security: {
+            ...fixtures.settings.security,
+            api_tokens: [
+              { id: 'tok-1', name: 'ci', scopes: ['read'], revoked: false },
+              { id: 'tok-2', name: 'retired', scopes: ['read'], revoked: true },
+            ],
+          },
+        },
+      },
+    })
+    const { wrapper } = await mountPage(SettingsPage)
+    await settle()
+    const state = stateOf(wrapper, SettingsPage)
+    expect(state.apiTokens).toHaveLength(1)
+    expect(state.apiTokens[0].name).toBe('ci')
+  })
+
+  it('clears hidden user selections when the filter changes', async () => {
+    installFetchMock()
+    const { wrapper } = await mountPage(UsersPage)
+    await settle()
+    const state = stateOf(wrapper, UsersPage)
+    state.toggleSelect('user-1')
+    expect(state.selected.size).toBe(1)
+    state.filter = 'disabled'
+    await settle()
+    expect(state.selected.size).toBe(0)
   })
 
   it('opens user subscriptions, reveals them and paginates', async () => {

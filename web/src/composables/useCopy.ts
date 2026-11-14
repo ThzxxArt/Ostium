@@ -1,12 +1,15 @@
 import { useMessage } from 'naive-ui'
+import { i18n } from '@/locales'
 
 export function useCopy() {
   const message = useMessage()
 
   async function copy(value: string): Promise<boolean> {
+    const copied = () => message.success(i18n.global.t('common.copied'))
+    const failed = () => message.error(i18n.global.t('common.copy_failed'))
     try {
       await navigator.clipboard.writeText(value)
-      message.success('Copied')
+      copied()
       return true
     } catch {
       try {
@@ -18,11 +21,11 @@ export function useCopy() {
         area.select()
         const ok = document.execCommand('copy')
         document.body.removeChild(area)
-        if (ok) message.success('Copied')
-        else message.error('Copy failed; select the text manually')
+        if (ok) copied()
+        else failed()
         return ok
       } catch {
-        message.error('Copy failed; select the text manually')
+        failed()
         return false
       }
     }

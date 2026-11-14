@@ -333,7 +333,9 @@ onMounted(load)
             :class="{
               active:
                 profile.selected_endpoint === endpoint.tag ||
-                (!profile.selected_endpoint && profile.endpoints[0]?.tag === endpoint.tag),
+                (!profile.selected_endpoint &&
+                  profile.endpoints.length === 1 &&
+                  profile.endpoints[0]?.tag === endpoint.tag),
             }"
             @click="selectEndpoint(profile, endpoint.tag)"
           >
@@ -341,7 +343,9 @@ onMounted(load)
               <Check
                 v-if="
                   profile.selected_endpoint === endpoint.tag ||
-                  (!profile.selected_endpoint && profile.endpoints[0]?.tag === endpoint.tag)
+                  (!profile.selected_endpoint &&
+                    profile.endpoints.length === 1 &&
+                    profile.endpoints[0]?.tag === endpoint.tag)
                 "
                 :size="11"
               />
@@ -399,7 +403,13 @@ onMounted(load)
               <template #icon><RefreshCw :size="13" /></template>
               {{ t('profiles.refresh') }}
             </NButton>
-            <NButton size="tiny" quaternary type="error" @click="remove(profile)">
+            <NButton
+              size="tiny"
+              quaternary
+              type="error"
+              :aria-label="t('common.delete')"
+              @click="remove(profile)"
+            >
               <template #icon><Trash2 :size="13" /></template>
             </NButton>
           </div>

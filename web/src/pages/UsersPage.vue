@@ -114,6 +114,8 @@ async function load() {
   loading.value = true
   try {
     users.value = (await api.users.list()).users
+    const visible = new Set(users.value.map((user) => user.id))
+    selected.value = new Set([...selected.value].filter((id) => visible.has(id)))
     error.value = null
   } catch (err) {
     error.value = (err as Error).message
@@ -352,7 +354,7 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
       const confirmed = await new Promise<boolean>((resolve, reject) => {
         dialog.error({
           title: t('common.delete'),
-          content: t('common.delete_confirm'),
+          content: t('users.bulk_delete_confirm', { count: ids.length }),
           positiveText: t('common.delete'),
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
@@ -429,6 +431,9 @@ watch(
 )
 
 watch([search, filter, page], () => {
+  // Never carry a hidden selection across a filter/search/page change; a
+  // bulk action must only affect users the operator can currently see.
+  selected.value = new Set()
   const query: Record<string, string> = { ...(route.query as Record<string, string>) }
   if (search.value.trim()) query.q = search.value.trim()
   else delete query.q
@@ -449,6 +454,11 @@ onMounted(async () => {
   if (typeof route.query.page === 'string') page.value = Math.max(1, Number(route.query.page) || 1)
   await load()
   if (route.query.create === '1') openCreate()
+  if (typeof route.query.focus === 'string') {
+    const user = users.value.find((item) => item.id === route.query.focus)
+    if (user) await openDetail(user)
+    void router.replace({ query: { ...route.query, focus: undefined } })
+  }
 })
 </script>
 
@@ -587,7 +597,13 @@ onMounted(async () => {
             trigger="click"
             @select="(key: string) => onRowAction(user, key)"
           >
-            <NButton size="tiny" quaternary circle :loading="busy === user.id">
+            <NButton
+              size="tiny"
+              quaternary
+              circle
+              :loading="busy === user.id"
+              :aria-label="t('common.actions')"
+            >
               <template #icon><Ellipsis :size="16" /></template>
             </NButton>
           </NDropdown>

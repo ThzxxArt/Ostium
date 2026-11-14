@@ -93,9 +93,18 @@ async function finish() {
       lines: role.value === 'server' ? transport.value : undefined,
     })
     if (role.value === 'client') {
-      if (importText.value.trim()) {
+      const importValue = importText.value.trim()
+      if (importValue) {
         try {
-          await api.profiles.create({ name: 'Imported', text: importText.value.trim() })
+          // The wizard accepts both a subscription URL and pasted links/JSON.
+          // Sending a URL through the text parser makes Endpoint.from_uri()
+          // reject the https:// scheme and silently leaves the client without
+          // a profile.
+          if (/^https?:\/\//i.test(importValue)) {
+            await api.profiles.create({ name: 'Imported', url: importValue })
+          } else {
+            await api.profiles.create({ name: 'Imported', text: importValue })
+          }
         } catch (err) {
           message.warning((err as Error).message)
         }

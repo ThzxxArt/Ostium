@@ -85,6 +85,25 @@ describe('client pages', () => {
     expect(activate).toHaveBeenCalledWith('profile-2')
   })
 
+  it('ClientHomePage shows auto-select instead of pinning the first endpoint', async () => {
+    const profile = { ...fixtures.profile, selected_endpoint: null }
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/profiles': { profiles: [profile], active_profile_id: profile.id },
+      },
+    })
+    const update = vi.spyOn(api.profiles, 'update')
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    const state = stateOf(wrapper, ClientHomePage)
+    expect(state.selectedEndpoint).toBeNull()
+    await state.selectProfile(profile.id)
+    await settle()
+    expect(update).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Auto-select fastest')
+  })
+
   it('ClientHomePage displays the configured mixed port', async () => {
     installFetchMock({
       role: 'client',

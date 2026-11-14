@@ -371,7 +371,9 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .table {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .head,
 .row {
@@ -380,6 +382,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 0 16px;
   align-items: center;
+  min-width: 760px;
 }
 .head {
   height: 42px;
@@ -468,6 +471,7 @@ onBeforeUnmount(() => {
   }
   .row {
     grid-template-columns: 1fr auto;
+    min-width: 0;
     padding: 12px;
     gap: 6px;
   }

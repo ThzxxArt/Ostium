@@ -40,8 +40,17 @@ export function formatDate(value: string | null | undefined, locale = 'zh-CN'): 
 }
 
 export function formatDay(value: string, locale = 'zh-CN'): string {
-  const date = new Date(value)
-  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(date)
+  // Traffic buckets are calendar dates without a timezone.  Parsing a bare
+  // YYYY-MM-DD as UTC midnight and formatting it in a western timezone shifts
+  // every label one day back; keep date-only values fixed to UTC and format
+  // them in UTC as well.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  const date = dateOnly ? new Date(`${value}T00:00:00Z`) : new Date(value)
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    ...(dateOnly ? { timeZone: 'UTC' } : {}),
+  }).format(date)
 }
 
 export function relativeTime(value: string | null | undefined, locale = 'zh-CN'): string {
