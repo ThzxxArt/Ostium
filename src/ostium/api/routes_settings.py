@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +31,7 @@ class SettingsPatch(BaseModel):
     auto_connect: bool | None = None
     auto_reconnect: bool | None = None
     webhook_url: str | None = None
-    webhook_secret: str | None = None
+    webhook_secret: str | None = Field(default=None, max_length=512)
     update_channel: str | None = None
     audit_retention_days: int | None = Field(default=None, ge=7, le=3650)
     traffic_retention_days: int | None = Field(default=None, ge=30, le=3650)
@@ -68,12 +68,19 @@ class TokenRequest(BaseModel):
     scopes: list[TokenScope] = Field(default_factory=_default_scopes, min_length=1, max_length=8)
     expires_at: datetime | None = None
 
+    @field_validator("expires_at")
+    @classmethod
+    def _aware_expiry(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError("expires_at must include a timezone offset")
+        return value
+
 
 @router.get("/settings")
 async def read_settings(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     stored = await all_settings(session)
     server_info = stored.get("server", {}) if isinstance(stored.get("server"), dict) else {}
@@ -125,7 +132,7 @@ async def update_settings(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     changes = payload.model_dump(exclude_unset=True)
     # Apply the patch to a copy.  The live Settings object is shared by the
@@ -245,13 +252,36 @@ async def update_settings(
             await set_setting(session, key, changes[key])
     if "webhook_secret" in changes:
         raw_secret = changes["webhook_secret"]
-        await set_setting(session, "webhook_secret", str(raw_secret) if raw_secret else None)
+        if raw_secret:
+            # Keep the secret out of the settings JSON.  The value is bound to
+            # this table/field with AEAD, so copying it to another row or
+            # database will not decrypt.
+            encrypted_secret = services.store.encrypt(
+                str(raw_secret),
+                table="settings",
+                record_id="webhook_secret",
+                field="secret",
+            )
+            await set_setting(session, "webhook_secret", encrypted_secret)
+        else:
+            await set_setting(session, "webhook_secret", None)
     try:
         candidate.save()
     except OSError as exc:
         raise ApiError(500, f"could not persist settings: {exc}", "settings_write_failed") from exc
-    # Publish the validated values only after the configuration file is
-    # durable; every shared component keeps using the same Settings object.
+    try:
+        # Commit before applying or publishing to the shared Settings object.
+        # A failed commit must not leave the UI/core using values that will
+        # disappear on the next restart.
+        await session.commit()
+    except Exception as exc:
+        try:
+            original.save()
+        except OSError:
+            pass
+        raise ApiError(500, f"could not persist settings: {exc}", "settings_write_failed") from exc
+    # Publish the validated values only after the configuration file and
+    # database are durable; every shared component keeps the same object.
     for field_name in type(services.settings).model_fields:
         setattr(services.settings, field_name, getattr(candidate, field_name))
     await audit(
@@ -296,12 +326,13 @@ async def public_ui(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     server_info = await get_setting(session, "server", {})
     if not isinstance(server_info, dict):
         server_info = {}
     candidate = services.settings.model_copy(deep=True)
+    original = services.settings.model_copy(deep=True)
     if payload.enabled:
         if not admin.totp_secret_enc:
             raise ApiError(
@@ -332,6 +363,11 @@ async def public_ui(
                 "certificate_required",
             )
         candidate.public_ui = True
+        # Remember the pre-Public-UI cookie policy so disabling the listener
+        # does not silently downgrade a reverse-proxy deployment that had
+        # secure_cookies=true for its own HTTPS termination.
+        if "public_ui_previous_secure_cookies" not in server_info:
+            server_info["public_ui_previous_secure_cookies"] = services.settings.secure_cookies
         candidate.secure_cookies = True
         candidate.trusted_hosts = list({*candidate.trusted_hosts, payload.domain})
         from ostium.config import is_loopback_host
@@ -359,7 +395,7 @@ async def public_ui(
             )
     else:
         candidate.public_ui = False
-        candidate.secure_cookies = False
+        candidate.secure_cookies = bool(server_info.pop("public_ui_previous_secure_cookies", False))
         auto_host = bool(server_info.pop("public_ui_auto_host", False))
         if auto_host and candidate.host == "0.0.0.0":
             candidate.host = "127.0.0.1"
@@ -368,6 +404,14 @@ async def public_ui(
     try:
         candidate.save()
     except OSError as exc:
+        raise ApiError(500, f"could not persist settings: {exc}", "settings_write_failed") from exc
+    try:
+        await session.commit()
+    except Exception as exc:
+        try:
+            original.save()
+        except OSError:
+            pass
         raise ApiError(500, f"could not persist settings: {exc}", "settings_write_failed") from exc
     for field_name in type(services.settings).model_fields:
         setattr(services.settings, field_name, getattr(candidate, field_name))
@@ -388,7 +432,7 @@ async def public_ui(
 @router.get("/api-tokens")
 async def list_tokens(
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     return {"tokens": await _list_tokens(session)}
 
@@ -398,10 +442,19 @@ async def create_token(
     payload: TokenRequest,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     from ostium.services.auth import create_api_token
 
+    if not {"read", "write"}.intersection(payload.scopes):
+        # Narrow scopes are additive restrictions on top of the legacy read
+        # scope.  Without read/write the token could not authenticate at all,
+        # which used to fail later with a confusing 401.
+        raise ApiError(
+            422,
+            "narrow scopes must be combined with the legacy read or write scope",
+            "invalid_scopes",
+        )
     token, row = await create_api_token(
         session, name=payload.name, scopes=payload.scopes, expires_at=payload.expires_at
     )
@@ -426,7 +479,7 @@ async def revoke_token(
     token_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     row = await session.get(ApiToken, token_id)
     if row is None:

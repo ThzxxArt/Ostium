@@ -106,6 +106,12 @@ onMounted(async () => {
       </template>
     </OPageHeader>
 
+    <div v-if="error" class="o-card warning-banner" role="alert">
+      <strong>{{ t('common.load_failed') }}</strong>
+      <span class="o-small o-muted">{{ error }}</span>
+      <NButton size="tiny" secondary @click="load">{{ t('common.retry') }}</NButton>
+    </div>
+
     <div class="o-grid o-grid-4">
       <OStatCard
         :label="t('system.cpu')"
@@ -334,6 +340,17 @@ onMounted(async () => {
   color: var(--text-3);
   font-size: 10px;
   margin-top: 2px;
+}
+.warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.warning-banner .o-small {
+  flex: 1;
 }
 @media (max-width: 1000px) {
   .split {

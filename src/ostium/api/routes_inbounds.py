@@ -142,7 +142,7 @@ def _conflict_map(rows: list[Inbound]) -> dict[str, str]:
 async def list_inbounds(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (await session.execute(select(Inbound).order_by(Inbound.kind))).scalars().all()
     certs = {cert.id: cert for cert in (await session.execute(select(Certificate))).scalars().all()}
@@ -173,7 +173,7 @@ async def update_inbound(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if kind not in KINDS:
         raise ApiError(404, f"unknown inbound {kind!r}", "not_found")
@@ -364,7 +364,7 @@ async def rotate_reality_keys(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if kind != "vless":
         raise ApiError(400, "only Reality uses X25519 keys", "bad_request")
@@ -388,7 +388,21 @@ async def rotate_reality_keys(
         target=kind,
         ip=client_ip(request),
     )
-    return {"params": params, **applied}
+    # The private key is a server credential.  Rotating it only needs to expose
+    # the public half and short id to the UI; returning the whole params object
+    # leaked the Reality private key into browser memory and API responses.
+    public_params = {
+        key: params.get(key)
+        for key in (
+            "public_key",
+            "short_id",
+            "server_name",
+            "handshake_server",
+            "handshake_port",
+        )
+    }
+    public_params["has_private_key"] = bool(params.get("private_key"))
+    return {"params": public_params, **applied}
 
 
 async def _resolve_certificate(

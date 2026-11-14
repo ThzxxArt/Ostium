@@ -20,7 +20,7 @@ def test_live_version_sources_match_version_file() -> None:
         "web/package.json": f'"version": "{VERSION}"',
         "web/package-lock.json": f'"version": "{VERSION}"',
         "Dockerfile": f"ARG OSTIUM_VERSION={VERSION}",
-        "deploy/docker/docker-compose.yml": f"ostium:{VERSION}",
+        "deploy/docker/docker-compose.yml": "ostium:latest",
         "scripts/build-windows.ps1": f'[string]$Version = "{VERSION}"',
         "scripts/build-sbom.py": f'app_version = "{VERSION}"',
     }

@@ -10,7 +10,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
+from ostium.api.deps import (
+    Services,
+    client_ip,
+    get_current_admin,
+    get_services,
+    get_session,
+    require_scope,
+)
 from ostium.api.errors import ApiError
 from ostium.config import Role
 from ostium.db.models import AdminUser, Profile
@@ -84,8 +91,9 @@ async def _apply_client(services: Services, session: AsyncSession) -> dict[str, 
 @router.get("/profiles")
 async def list_profiles(
     _: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profiles = (
@@ -110,7 +118,7 @@ async def add_profile(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     text = payload.text
@@ -179,7 +187,7 @@ async def import_profile(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     return await add_profile(
         ProfileCreate(name=payload.name or "Imported", text=payload.text, url=payload.url),
@@ -197,7 +205,7 @@ async def update_profile(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
@@ -248,7 +256,7 @@ async def reorder_profiles(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profiles = (await session.execute(select(Profile))).scalars().all()
@@ -275,7 +283,7 @@ async def activate_profile(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
@@ -303,7 +311,7 @@ async def delete_profile(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
@@ -327,7 +335,7 @@ async def refresh(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
@@ -364,8 +372,9 @@ async def export_profile(
     profile_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
@@ -394,7 +403,7 @@ async def test_profile(
     profile_id: str,
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)

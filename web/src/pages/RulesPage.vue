@@ -99,29 +99,46 @@ async function load() {
   }
 }
 
+const multiCondition = ref(false)
+const originalMatch = ref<Record<string, unknown>>({})
+const originalType = ref('')
+
 const advancedLocked = computed(() => {
   if (!advanced.value) return false
+  if (multiCondition.value) return true
   try {
     const parsed = JSON.parse(advancedJson.value)
     return Boolean(parsed) && typeof parsed === 'object' && Object.keys(parsed).length > 1
   } catch {
-    return false
+    // Invalid JSON is not a reason to unlock the simple editor: doing so made
+    // it possible to discard every condition except the first after a typo.
+    return true
   }
 })
 
 function openAdd() {
   editing.value = null
+  originalMatch.value = {}
+  originalType.value = ''
+  multiCondition.value = false
   form.value = { action: 'proxy', type: 'domain_suffix', values: '', note: '' }
   advanced.value = false
   advancedJson.value = '{}'
   ruleOpen.value = true
 }
 
+function onTypeChange(value: string) {
+  if (value !== form.value.type) form.value.values = ''
+}
+
 function openEdit(rule: Rule) {
   editing.value = rule
   const match = rule.match || {}
+  originalMatch.value = { ...match }
   const keys = Object.keys(match)
   const type = (keys[0] || 'domain_suffix') as typeof form.value.type
+  originalType.value = type
+  multiCondition.value = keys.length > 1
   const raw = match[type]
   form.value = {
     action: rule.action,
@@ -155,7 +172,16 @@ async function saveRule() {
       .filter(Boolean)
     if (!values.length) return
     const numeric = form.value.type === 'port' || form.value.type === 'source_port'
+    // Preserve conditions the simple editor does not represent.  This page
+    // edits one condition at a time; changing its type must not silently drop
+    // unrelated CIDR/port/rule_set conditions from an existing rule.
+    const preserved = Object.fromEntries(
+      Object.entries(originalMatch.value).filter(
+        ([key]) => key !== form.value.type && key !== originalType.value,
+      ),
+    )
     match = {
+      ...preserved,
       [form.value.type]: numeric ? values.map(Number) : values,
     }
   }
@@ -442,7 +468,7 @@ onMounted(load)
         /></label>
         <label class="field"
           ><span>{{ t('rules.match') }}</span
-          ><NSelect v-model:value="form.type" :options="typeOptions"
+          ><NSelect v-model:value="form.type" :options="typeOptions" @update:value="onTypeChange"
         /></label>
         <label class="field"
           ><span>{{ t('rules.match') }}</span

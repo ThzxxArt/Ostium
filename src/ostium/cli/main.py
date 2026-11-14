@@ -351,7 +351,13 @@ def init(
                 }
                 await set_setting(session, "server", server_info)
                 if effective_domain:
-                    await set_setting(session, "public_base_url", f"https://{effective_domain}")
+                    from ostium.services.public_url import base_url_for_domain
+
+                    await set_setting(
+                        session,
+                        "public_base_url",
+                        base_url_for_domain(settings, str(effective_domain)),
+                    )
                 await session.commit()
                 if generated:
                     console.print(
@@ -425,6 +431,7 @@ def _serve_with_cert_reload(
     ssl_keyfile: str | None,
     *,
     reload: bool,
+    recovery: tuple[str, bool, bool] | None = None,
 ) -> None:
     """Run uvicorn and rebuild its TLS context when the Public UI cert changes."""
 
@@ -491,6 +498,16 @@ def _serve_with_cert_reload(
         found = _run(_public_ui_certificate(settings))
         if found is not None:
             ssl_certfile, ssl_keyfile = found
+            if recovery is not None:
+                # The recovery console intentionally ran on plaintext loopback.
+                # Once a usable certificate exists, restore the operator's
+                # original public listener and cookie policy as well as the TLS
+                # context; otherwise the process would stay unreachable on
+                # 127.0.0.1 until a manual restart.
+                settings.host, settings.public_ui, settings.secure_cookies = recovery
+                err_console.print(
+                    "[green]certificate recovered; public UI listener restored[/green]"
+                )
         err_console.print("[green]certificate changed; TLS listener reloaded[/green]")
 
 
@@ -543,6 +560,7 @@ def serve(
             f"[yellow]warning: staged backup restore failed and was kept for retry: {exc}[/yellow]"
         )
     ssl_certfile = ssl_keyfile = None
+    recovery: tuple[str, bool, bool] | None = None
     if settings.public_ui:
         from ostium.services.auth import get_admin
 
@@ -571,12 +589,13 @@ def serve(
                 "Starting a loopback-only recovery console on "
                 f"http://127.0.0.1:{settings.port}."
             )
+            recovery = (settings.host, True, settings.secure_cookies) if totp_ready else None
             settings.host = "127.0.0.1"
             settings.public_ui = False
             settings.secure_cookies = False
         else:
             ssl_certfile, ssl_keyfile = found
-    _serve_with_cert_reload(settings, ssl_certfile, ssl_keyfile, reload=reload)
+    _serve_with_cert_reload(settings, ssl_certfile, ssl_keyfile, reload=reload, recovery=recovery)
 
 
 @app.command("core-run")
@@ -659,22 +678,28 @@ def logs(
         _fail("no log file found", 4)
     if not path.is_file():
         _fail(f"log file not found: {path}", 4)
-    content = path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
-    console.print("\n".join(content))
-    if follow:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            handle.seek(0, os.SEEK_END)
-            try:
-                while True:
-                    line = handle.readline()
-                    if line:
-                        console.print(line, end="")
-                    else:
-                        import time
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        # Read a bounded tail from the same handle, then continue from EOF.
+        # The old code read the tail, reopened the file and seeked to EOF,
+        # losing every line written in between.
+        handle.seek(max(0, size - 256 * 1024))
+        content = handle.read().splitlines()[-lines:]
+        console.print("\n".join(content), markup=False, highlight=False)
+        if not follow:
+            return
+        try:
+            while True:
+                line = handle.readline()
+                if line:
+                    console.print(line, end="", markup=False, highlight=False)
+                else:
+                    import time
 
-                        time.sleep(0.5)
-            except KeyboardInterrupt:
-                return
+                    time.sleep(0.5)
+        except KeyboardInterrupt:
+            return
 
 
 @app.command()
@@ -1091,8 +1116,6 @@ def user_add(
 ) -> None:
     """Add a proxy user and print the subscription token once."""
 
-    from datetime import datetime
-
     settings = _load_settings()
 
     async def _add() -> dict[str, Any]:
@@ -1108,7 +1131,7 @@ def user_add(
                     name=name,
                     quota_bytes=_parse_bytes(quota) if quota else 0,
                     quota_cycle=cycle,
-                    expires_at=datetime.fromisoformat(expires) if expires else None,
+                    expires_at=_parse_expiry(expires) if expires else None,
                     note=note,
                 )
                 await _audit(
@@ -1360,7 +1383,9 @@ def user_export(
     from sqlalchemy import select
 
     from ostium.db.models import ProxyUser
-    from ostium.services.subscriptions import render_subscription
+    from ostium.domain.endpoints import ProfileDocument
+    from ostium.services.users import endpoints_for_user, server_hostname
+    from ostium.util.time import iso, utcnow
 
     settings = _load_settings()
 
@@ -1372,9 +1397,21 @@ def user_export(
             ).scalar_one_or_none()
             if user is None:
                 _fail("user not found", 1)
-            content, _ = await render_subscription(
-                session, store, user, "ostium", settings=settings
+            # An administrator exporting a profile is not the same as a client
+            # downloading an active subscription: a disabled/expired user still
+            # needs a config artifact for migration or recovery.
+            endpoints = await endpoints_for_user(
+                session,
+                store,
+                user,
+                server_host=await server_hostname(session),
+                settings=settings,
             )
+            await _audit(session, "user.exported", user.name, endpoints=len(endpoints))
+            await session.commit()
+            content = ProfileDocument(
+                name=user.name, endpoints=endpoints, generated_at=iso(utcnow())
+            ).to_json()
         await engine.dispose()
         return content
 
@@ -1617,7 +1654,12 @@ def core_version() -> None:
         _fail(f"core binary not found at {binary}", 6)
     import subprocess
 
-    result = subprocess.run([str(binary), "version"], capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(
+            [str(binary), "version"], capture_output=True, text=True, timeout=15, check=False
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        _fail(f"core version check failed: {exc}", 6)
     console.print(result.stdout or result.stderr)
 
 
@@ -1641,11 +1683,23 @@ def core_install(
     target.parent.mkdir(parents=True, exist_ok=True)
     previous = target.read_bytes() if target.is_file() else None
 
+    def _atomic_install(data: bytes) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if os.name == "posix":
+                temporary.chmod(0o755)
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def _restore_previous() -> None:
         if previous is not None:
-            target.write_bytes(previous)
-            if os.name == "posix":
-                target.chmod(0o755)
+            _atomic_install(previous)
         else:
             target.unlink(missing_ok=True)
 
@@ -1693,13 +1747,20 @@ def core_install(
                 return Version("0")
 
         artifact = max(candidates, key=_version_key)
-        artifact_url = str(artifact["url"])
+        artifact_url = str(artifact.get("url") or "")
+        expected_sha = str(artifact.get("sha256") or "")
         if not artifact_url.startswith("https://"):
             _fail("core manifest artifact URL must use HTTPS", 6)
+        if len(expected_sha) != 64 or any(
+            ch not in "0123456789abcdef" for ch in expected_sha.lower()
+        ):
+            _fail("core manifest artifact has no valid SHA-256", 6)
         response = httpx.get(artifact_url, timeout=180, follow_redirects=True, trust_env=False)
         response.raise_for_status()
+        if len(response.content) > 512 * 1024 * 1024:
+            _fail("core artifact is larger than the 512 MiB safety limit", 6)
         digest = hashlib.sha256(response.content).hexdigest()
-        if digest != artifact["sha256"]:
+        if digest != expected_sha.lower():
             _fail("SHA256 mismatch; refusing to install", 6)
         attestation = artifact.get("attestation") or artifact.get("attestation_sha256")
         if isinstance(attestation, dict):
@@ -1714,27 +1775,32 @@ def core_install(
                 proof.raise_for_status()
                 if hashlib.sha256(proof.content).hexdigest() != expected_attestation:
                     _fail("attestation digest mismatch; refusing to install", 6)
-        with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
-            archive_path = Path(temp) / "core.tar.gz"
-            archive_path.write_bytes(response.content)
-            with tarfile.open(archive_path, "r:gz") as archive:
-                member = next(
-                    (
-                        item
-                        for item in archive.getmembers()
-                        if Path(item.name).name in {"sing-box", "sing-box.exe"}
-                    ),
-                    None,
-                )
-                if member is None:
-                    _fail("manifest archive does not contain sing-box", 6)
-                assert member is not None
-                member.name = Path(member.name).name
-                extracted = Path(temp) / member.name
-                archive.extract(member, Path(temp), filter="data")
-            shutil.copy2(extracted, target)
+        try:
+            with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
+                archive_path = Path(temp) / "core.tar.gz"
+                archive_path.write_bytes(response.content)
+                with tarfile.open(archive_path, "r:gz") as archive:
+                    member = next(
+                        (
+                            item
+                            for item in archive.getmembers()
+                            if Path(item.name).name in {"sing-box", "sing-box.exe"}
+                        ),
+                        None,
+                    )
+                    if member is None:
+                        _fail("manifest archive does not contain sing-box", 6)
+                    assert member is not None
+                    member.name = Path(member.name).name
+                    extracted = Path(temp) / member.name
+                    archive.extract(member, Path(temp), filter="data")
+                _atomic_install(extracted.read_bytes())
+        except typer.Exit:
+            raise
+        except (tarfile.TarError, OSError) as exc:
+            _fail(f"core archive is invalid: {exc}", 6)
     elif binary:
-        shutil.copy2(binary, target)
+        _atomic_install(Path(binary).read_bytes())
     elif url:
         if not url.startswith("https://"):
             _fail("--url must use HTTPS; download the file and use --binary for HTTP mirrors", 2)
@@ -1747,24 +1813,29 @@ def core_install(
         if url.split("?", 1)[0].endswith((".tar.gz", ".tgz")):
             import io
 
-            with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
-                member = next(
-                    (
-                        item
-                        for item in archive.getmembers()
-                        if Path(item.name).name in {"sing-box", "sing-box.exe"}
-                    ),
-                    None,
-                )
-                if member is None:
-                    _fail("core archive does not contain sing-box", 6)
-                assert member is not None
-                member.name = Path(member.name).name
-                with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
-                    archive.extract(member, Path(temp), filter="data")
-                    target.write_bytes((Path(temp) / member.name).read_bytes())
+            try:
+                with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
+                    member = next(
+                        (
+                            item
+                            for item in archive.getmembers()
+                            if Path(item.name).name in {"sing-box", "sing-box.exe"}
+                        ),
+                        None,
+                    )
+                    if member is None:
+                        _fail("core archive does not contain sing-box", 6)
+                    assert member is not None
+                    member.name = Path(member.name).name
+                    with tempfile.TemporaryDirectory(prefix="ostium-core-") as temp:
+                        archive.extract(member, Path(temp), filter="data")
+                        _atomic_install((Path(temp) / member.name).read_bytes())
+            except typer.Exit:
+                raise
+            except (tarfile.TarError, OSError) as exc:
+                _fail(f"core archive is invalid: {exc}", 6)
         else:
-            target.write_bytes(response.content)
+            _atomic_install(response.content)
     else:
         _fail("provide --binary, --url or --manifest", 2)
     if os.name == "posix":
@@ -1807,6 +1878,11 @@ def core_update(
 def backup_create(
     password: str | None = typer.Option(None, "--password", help="Encrypt with this password"),
     output: Path | None = typer.Option(None, "--output"),
+    acknowledge_plaintext: bool = typer.Option(
+        False,
+        "--acknowledge-plaintext",
+        help="Allow an unencrypted backup containing master.key and all credentials",
+    ),
 ) -> None:
     """Create a backup."""
 
@@ -1814,12 +1890,13 @@ def backup_create(
 
     if password and len(password) < 8:
         _fail("backup password must be at least 8 characters", 2)
-    settings = _load_settings()
-    if not password:
-        err_console.print(
-            "[yellow]warning: an unencrypted backup contains master.key and the full "
-            "database; store it on encrypted media or pass --password.[/yellow]"
+    if not password and not acknowledge_plaintext:
+        _fail(
+            "an unencrypted backup contains master.key and every credential; "
+            "pass --password, or --acknowledge-plaintext after reading the warning",
+            2,
         )
+    settings = _load_settings()
     result = create_backup(settings, password=password, target=output)
 
     async def _record() -> None:
@@ -1933,7 +2010,7 @@ def cert_issue(domain: str, self_signed: bool = typer.Option(False, "--self-sign
             # the TLS inbounds that have none, so issuing it actually makes the
             # service usable instead of leaving an unassigned database row.
             cert.auto_renew = False
-            await use_for_unbound(session, cert)
+            await use_for_unbound(session, cert, settings=settings)
             await _audit(session, "certificate.self_signed", cert.domain)
             await session.commit()
             result = {
@@ -2011,15 +2088,27 @@ def service_uninstall() -> None:
     console.print("systemd units removed (data is preserved)")
 
 
+def _parse_expiry(value: str) -> Any:
+    from datetime import datetime
+
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        _fail("--expires must be an ISO-8601 date/time", 2)
+    if parsed.tzinfo is None:
+        _fail("--expires must include a timezone offset, for example 2026-12-31T23:59:59+08:00", 2)
+    return parsed
+
+
 def _parse_bytes(value: str) -> int:
     import re
 
     text = value.strip().upper()
-    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([KMGT]?)", text)
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([KMGTB]?)", text)
     if match is None:
-        _fail("size must be a positive number with an optional K/M/G/T suffix", 2)
+        _fail("size must be a positive number with an optional K/M/G/T/B suffix", 2)
     number, unit = match.groups()
-    units = {"": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
+    units = {"": 1, "B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
     result = int(float(number) * units[unit])
     if result <= 0:
         _fail("size must be greater than zero", 2)

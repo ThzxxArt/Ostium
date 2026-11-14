@@ -98,11 +98,18 @@ const recentEvents = computed(() =>
     .reverse(),
 )
 
+const partialError = ref('')
+let loadRequest = 0
+
 async function load(silent = false) {
+  const request = ++loadRequest
   if (!silent) loading.value = true
   refreshing.value = true
   try {
-    const [stats, series, alertData, inboundData, certData, systemInfo] = await Promise.all([
+    // Widgets are independent.  One failing certificate/alert request must not
+    // blank traffic and engine state, and a slower poll must not overwrite a
+    // newer one.
+    const results = await Promise.allSettled([
       api.stats.overview(),
       api.stats.traffic(7),
       api.alerts.list(),
@@ -110,18 +117,33 @@ async function load(silent = false) {
       api.certificates.list(),
       api.system.info(),
     ])
-    overview.value = stats
-    traffic.value = series.series
-    alerts.value = alertData.alerts
-    inbounds.value = inboundData.inbounds
-    certificates.value = certData.certificates
-    info.value = systemInfo
-    error.value = null
-  } catch (err) {
-    if (!silent) error.value = (err as Error).message
+    if (request !== loadRequest) return
+    const failures: string[] = []
+    const [stats, series, alertData, inboundData, certData, systemInfo] = results
+    if (stats.status === 'fulfilled') overview.value = stats.value
+    else failures.push((stats.reason as Error).message)
+    if (series.status === 'fulfilled') traffic.value = series.value.series
+    else failures.push((series.reason as Error).message)
+    if (alertData.status === 'fulfilled') alerts.value = alertData.value.alerts
+    else failures.push((alertData.reason as Error).message)
+    if (inboundData.status === 'fulfilled') inbounds.value = inboundData.value.inbounds
+    else failures.push((inboundData.reason as Error).message)
+    if (certData.status === 'fulfilled') certificates.value = certData.value.certificates
+    else failures.push((certData.reason as Error).message)
+    if (systemInfo.status === 'fulfilled') info.value = systemInfo.value
+    else failures.push((systemInfo.reason as Error).message)
+    if (failures.length) {
+      partialError.value = failures[0]
+      if (!overview.value) error.value = failures[0]
+    } else {
+      partialError.value = ''
+      error.value = null
+    }
   } finally {
-    loading.value = false
-    refreshing.value = false
+    if (request === loadRequest) {
+      loading.value = false
+      refreshing.value = false
+    }
   }
 }
 
@@ -159,6 +181,11 @@ function eventLabel(type: string): string {
     <OErrorState v-if="error && !overview" :message="error" @retry="load()" />
 
     <div v-else class="o-stack">
+      <div v-if="partialError" class="o-card warning-banner" role="alert">
+        <strong>{{ t('common.load_failed') }}</strong>
+        <span class="o-small o-muted">{{ partialError }}</span>
+        <NButton size="tiny" secondary @click="load()">{{ t('common.retry') }}</NButton>
+      </div>
       <section class="pulse-grid">
         <article class="pulse o-card">
           <div class="pulse-copy">
@@ -740,6 +767,17 @@ h2 {
   .pulse-visual {
     display: none;
   }
+}
+.warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.warning-banner .o-small {
+  flex: 1;
 }
 @media (max-width: 767px) {
   .pulse {

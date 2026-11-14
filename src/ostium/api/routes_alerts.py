@@ -19,7 +19,7 @@ router = APIRouter(tags=["alerts"])
 async def alerts(
     include_acknowledged: bool = Query(default=False),
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = await list_alerts(session, include_acknowledged=include_acknowledged)
     return {"alerts": [serialize_alert(row) for row in rows]}
@@ -30,7 +30,7 @@ async def acknowledge_alert(
     alert_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     if not await acknowledge(session, alert_id):
         raise ApiError(404, "alert not found", "not_found")

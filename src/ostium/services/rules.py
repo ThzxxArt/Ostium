@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -32,10 +33,14 @@ RULE_MATCH_KEYS = {
 RULE_SET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 MAX_RULE_SET_BYTES = 32 * 1024 * 1024
 MAX_REGEX_LENGTH = 200
+BINARY_RULE_SET_MAGIC = b"SRS"
 # Go RE2 (used by sing-box) has no lookaround, backreferences, atomic groups
 # or Python named groups.  Accepting them here produced configs that passed the
 # UI test but failed `sing-box check`.
-RE2_FORBIDDEN = re.compile(r"\(\?(?:[=!]|<[=!]|>|#|P<|P=|'|\{|[a-zA-Z]*-[a-zA-Z]*:)|\\[1-9]|\\k<")
+RE2_FORBIDDEN = re.compile(
+    r"\(\?(?:[=!]|<[=!]|>|#|P<|P=|'|\{|\(|[a-zA-Z]*-[a-zA-Z]*:)"
+    r"|\\[1-9]|\\k<|\\Z|\\G|[*+?}]\+"
+)
 
 
 class RuleValidationError(ValueError):
@@ -270,6 +275,7 @@ async def update_rule_set(
         if fetched.status_code >= 400:
             raise RuleValidationError(f"rule set download failed: HTTP {fetched.status_code}")
         payload = fetched.content
+        _validate_rule_set_payload(payload, rule_set.format)
         digest = hashlib.sha256(payload).hexdigest()
         # A deterministic temp name lets two concurrent update requests
         # interleave partial writes before the final replace.  Use a unique
@@ -303,6 +309,35 @@ async def update_rule_set(
         rule_set.last_error = str(exc)[:500]
         await session.flush()
         return {"updated": False, "error": str(exc)}
+
+
+def _validate_rule_set_payload(payload: bytes, fmt: str | None) -> None:
+    """Reject an HTML error page or the wrong rule-set encoding.
+
+    A 200 response is not proof that the body is a rule set.  Writing an HTML
+    page to ``.srs`` made the next ``sing-box check`` fail while the previous
+    last-good still referenced the same path.
+    """
+
+    stripped = payload.lstrip()[:512].lower()
+    if stripped.startswith((b"<!doctype html", b"<html", b"<head", b"<body")):
+        raise RuleValidationError("rule set download returned an HTML page, not a rule set")
+    effective = (fmt or "binary").lower()
+    if effective in {"binary", "srs", ""}:
+        if not payload.startswith(BINARY_RULE_SET_MAGIC):
+            raise RuleValidationError(
+                "rule set download is not a sing-box binary rule set (missing SRS header)"
+            )
+        return
+    if effective == "source":
+        try:
+            document = json.loads(payload)
+        except (ValueError, RecursionError) as exc:
+            raise RuleValidationError("source rule set is not valid JSON") from exc
+        if not isinstance(document, dict) or not isinstance(document.get("rules"), list):
+            raise RuleValidationError("source rule set must contain a rules array")
+        return
+    raise RuleValidationError(f"unsupported rule set format: {fmt}")
 
 
 def serialize_rule_set(rule_set: RuleSet) -> dict[str, Any]:

@@ -8,7 +8,7 @@ export function useStatus() {
   const coreRunning = ref(false)
   const coreReachable = ref(false)
   const mode = ref<ConnectionMode>('mixed')
-  const version = ref('0.1.1')
+  const version = ref('')
   const serverHost = ref<string | null>(null)
   const loading = ref(false)
   let timer: number | null = null
@@ -51,5 +51,5 @@ export function useStatus() {
 
   onBeforeUnmount(stop)
 
-  return { coreRunning, coreReachable, mode, version, serverHost, loading, refresh }
+  return { coreRunning, coreReachable, mode, version, serverHost, loading, refresh, start, stop }
 }

@@ -616,4 +616,55 @@ describe('v0.1.1 page branches', () => {
     expect(routing.wrapper.html()).toBeTruthy()
     expect(settingsPage.wrapper.html()).toBeTruthy()
   })
+
+  it('does not drop multi-condition rules or unlock invalid advanced JSON', async () => {
+    installFetchMock()
+    const { wrapper } = await mountPage(RulesPage)
+    await settle()
+    const state = stateOf(wrapper, RulesPage)
+    const rule = {
+      ...fixtures.rule,
+      id: 'multi-condition',
+      match: { domain_suffix: ['.cn'], ip_cidr: ['10.0.0.0/8'] },
+    }
+    state.openEdit(rule)
+    expect(state.advanced).toBe(true)
+    expect(state.advancedLocked).toBe(true)
+    state.advancedJson = '{not-json'
+    // A typo in the advanced editor must keep the simple form locked; otherwise
+    // saving silently reduces the rule to one condition.
+    expect(state.advancedLocked).toBe(true)
+
+    state.advanced = false
+    state.form.type = 'port'
+    state.form.values = '443, 8443'
+    const update = vi.spyOn(api.rules, 'update').mockResolvedValueOnce({
+      rule,
+      applied: true,
+    })
+    await state.saveRule()
+    await settle()
+    const payload = update.mock.calls[0][1] as any
+    expect(payload.match).toMatchObject({
+      ip_cidr: ['10.0.0.0/8'],
+      port: [443, 8443],
+    })
+  })
+
+  it('does not mark a profile active when the core did not apply it', async () => {
+    installFetchMock()
+    const { wrapper } = await mountPage(ProfilesPage)
+    await settle()
+    const state = stateOf(wrapper, ProfilesPage)
+    state.activeProfileId = 'another-profile'
+    const profile = { ...fixtures.profile, id: 'not-applied' }
+    vi.spyOn(api.profiles, 'activate').mockResolvedValueOnce({
+      profile,
+      applied: false,
+      warning: 'core unavailable',
+    })
+    await state.activate(profile)
+    await settle()
+    expect(state.activeProfileId).not.toBe(profile.id)
+  })
 })

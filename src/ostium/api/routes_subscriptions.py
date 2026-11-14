@@ -21,7 +21,7 @@ async def subscription(
     request: Request,
     fmt: str = Query(default="ostium", alias="format"),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> Response:
     ip = client_ip(request)
     if not LIMITER.allow(f"sub:{ip}", 60, 60.0):

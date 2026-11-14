@@ -283,13 +283,14 @@ def test_path_validation(tmp_path: Path) -> None:
         _validate(broken, Role.SERVER, tmp_path)
 
 
-def test_path_depth_limit_returns_without_error(tmp_path: Path) -> None:
+def test_path_depth_limit_is_rejected(tmp_path: Path) -> None:
     from ostium.engine.singbox.validate import _validate_paths
 
     payload: dict[str, Any] = {"leaf": "/etc/passwd"}
     for _ in range(45):
         payload = {"child": payload}
-    _validate_paths(payload, [tmp_path])
+    with pytest.raises(ConfigRejected, match="nesting is too deep"):
+        _validate_paths(payload, [tmp_path])
 
 
 @pytest.mark.parametrize(

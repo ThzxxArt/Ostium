@@ -379,6 +379,7 @@ class CoreSupervisor:
                     "rollback target predates the current security policy; "
                     "waiting for the control plane to apply a new configuration"
                 )
+                self._running_config_sha = None
                 await self._terminate()
                 self._append_log("supervisor", self._last_error)
                 return
@@ -386,9 +387,14 @@ class CoreSupervisor:
             await self._spawn()
             self._append_log("supervisor", "rollback to previous configuration")
         except Exception as exc:
+            self._running_config_sha = None
             self._last_error = f"rollback failed: {exc}"
             self._append_log("supervisor", self._last_error)
-        self._running_config_sha = config_digest(json.loads(previous))
+            return
+        try:
+            self._running_config_sha = config_digest(json.loads(previous))
+        except (TypeError, ValueError):
+            self._running_config_sha = None
 
     async def _reload_running(self) -> None:
         assert self._process is not None

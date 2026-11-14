@@ -55,16 +55,24 @@ async function load() {
   }
 }
 
+let subscriptionRequest = 0
+
 async function loadSubscription(id: string, reveal = false) {
+  const request = ++subscriptionRequest
   loadingSub.value = true
   try {
-    subscription.value = await api.users.subscription(id, reveal)
-    revealed.value = reveal || !subscription.value.reveal_required
+    const result = await api.users.subscription(id, reveal)
+    // A slow response for user A must not overwrite the token shown for user B.
+    if (request !== subscriptionRequest) return
+    subscription.value = result
+    revealed.value = reveal || !result.reveal_required
   } catch (err) {
-    subscription.value = null
-    message.error((err as Error).message)
+    if (request === subscriptionRequest) {
+      subscription.value = null
+      message.error((err as Error).message)
+    }
   } finally {
-    loadingSub.value = false
+    if (request === subscriptionRequest) loadingSub.value = false
   }
 }
 
@@ -75,6 +83,8 @@ async function revealSubscription() {
 
 async function selectUser(user: User) {
   selectedId.value = user.id
+  subscription.value = null
+  revealed.value = false
   await loadSubscription(user.id)
 }
 

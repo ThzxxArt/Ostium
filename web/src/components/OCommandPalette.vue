@@ -114,8 +114,11 @@ const allItems = computed<PaletteItem[]>(() => {
       keywords: 'logout sign out',
       icon: LogOut,
       action: async () => {
-        await auth.logout()
-        await router.push('/login')
+        try {
+          await auth.logout()
+        } finally {
+          await router.push('/login')
+        }
       },
     },
   ]

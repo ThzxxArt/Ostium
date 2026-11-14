@@ -14,6 +14,30 @@ from ostium.services.events import EventBus
 from ostium.util.redact import redact, redact_mapping
 from ostium.util.time import iso, utcnow
 
+# Set by the application after the SecretStore is available.  Keeping this in
+# the service module avoids threading a store through every create_alert call
+# site while still allowing webhook secrets to be encrypted at rest.
+_SECRET_DECRYPTER: Any = None
+
+
+def set_webhook_secret_decrypter(decrypter: Any) -> None:
+    global _SECRET_DECRYPTER
+    _SECRET_DECRYPTER = decrypter
+
+
+async def _webhook_secret(session: AsyncSession) -> str:
+    from ostium.services.settings import get_setting
+
+    value = await get_setting(session, "webhook_secret", "")
+    if not isinstance(value, str) or not value:
+        return ""
+    if not value.startswith("v1."):
+        # Backward compatibility for secrets written before 0.1.2.
+        return value
+    if _SECRET_DECRYPTER is None:
+        raise ValueError("webhook secret is encrypted but no decrypter is configured")
+    return str(_SECRET_DECRYPTER(value))
+
 
 async def audit(
     session: AsyncSession,
@@ -112,7 +136,11 @@ async def create_alert(
     webhook_url = await get_setting(session, "webhook_url")
     notifications_enabled = bool(await get_setting(session, "notifications_enabled", True))
     if webhook_url and notifications_enabled:
-        secret = await get_setting(session, "webhook_secret", "")
+        try:
+            secret = await _webhook_secret(session)
+        except Exception as exc:
+            bus.log("error", "webhook secret could not be decrypted", error=str(exc))
+            secret = ""
         payload = {"type": "alert", "level": level, "code": code, "message": alert.message}
 
         async def _deliver() -> None:
@@ -156,25 +184,20 @@ async def send_webhook(url: str, payload: dict[str, Any], secret: str = "") -> b
     import hmac
     import json
 
-    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+    from ostium.services.netguard import UnsafeUrlError, post_limited
 
-    try:
-        url = validate_remote_url(url, allow_private=False)
-    except UnsafeUrlError:
-        return False
     body = json.dumps(payload, ensure_ascii=False).encode()
     headers = {"Content-Type": "application/json", "User-Agent": "Ostium/0.1"}
     if secret:
         headers["X-Ostium-Signature"] = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
-                response = await client.post(url, content=body, headers=headers)
-            if response.status_code < 300:
+            status = await post_limited(url, content=body, headers=headers, timeout=10.0)
+            if status < 300:
                 return True
-            if response.status_code < 500:
+            if status < 500:
                 return False
-        except httpx.HTTPError:
+        except (httpx.HTTPError, UnsafeUrlError, ValueError):
             pass
         if attempt < 2:
             await asyncio.sleep(2**attempt)

@@ -110,7 +110,7 @@ class TrafficDaily(Base):
     user_id: Mapped[str] = mapped_column(
         ForeignKey("proxy_users.id", ondelete="CASCADE"), index=True
     )
-    day: Mapped[date] = mapped_column(Date, nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     uplink: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     downlink: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -161,7 +161,7 @@ class RuleSet(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     url: Mapped[str] = mapped_column(String(1000), nullable=False)
-    format: Mapped[str] = mapped_column(String(16), default="srs", nullable=False)
+    format: Mapped[str] = mapped_column(String(16), default="binary", nullable=False)
     path: Mapped[str | None] = mapped_column(String(500))
     etag: Mapped[str | None] = mapped_column(String(255))
     sha256: Mapped[str | None] = mapped_column(String(64))

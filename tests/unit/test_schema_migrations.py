@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from pathlib import Path
 
@@ -8,7 +9,6 @@ from sqlalchemy import text
 
 from ostium.db import session as session_module
 from ostium.db.session import (
-    INITIAL_REVISION,
     SCHEMA_HEAD,
     DatabaseVersionError,
     check_database_integrity,
@@ -47,13 +47,111 @@ async def test_existing_010_database_upgrades_in_place(tmp_path: Path) -> None:
         await create_schema(engine)
     finally:
         await engine.dispose()
-    # A 0.1.0 database is already stamped with the initial revision.
+    # A 0.1.0 database is already stamped with the initial revision and must
+    # be upgraded to the current head (traffic-day index and rule-set format).
     migrate_database(db)
     with sqlite3.connect(db) as connection:
         assert (
             connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-            == INITIAL_REVISION
+            == SCHEMA_HEAD
         )
+        indexes = {row[1] for row in connection.execute("PRAGMA index_list('traffic_user_daily')")}
+        assert "ix_traffic_user_daily_day" in indexes
+
+
+def test_schema_helper_error_branches(tmp_path: Path, monkeypatch) -> None:
+    from ostium.db import session as session_module
+
+    corrupt = tmp_path / "corrupt.db"
+    corrupt.write_bytes(b"not sqlite")
+    assert session_module._has_tables(corrupt) is False
+    assert session_module._read_version(corrupt) is None
+    assert session_module.database_requires_master_key(tmp_path / "absent.db") is False
+
+    with pytest.raises(RuntimeError, match="does not exist"):
+        session_module.check_database_integrity(tmp_path / "absent.db")
+    with pytest.raises(sqlite3.DatabaseError):
+        session_module.check_database_integrity(corrupt)
+
+    # Tables but no Alembic metadata must be rejected, not "re-initialised".
+    legacy = tmp_path / "legacy-no-version.db"
+    with sqlite3.connect(legacy) as connection:
+        connection.execute("CREATE TABLE admin_users (id TEXT PRIMARY KEY)")
+
+    async def _reject() -> None:
+        engine = create_engine(legacy)
+        try:
+            with pytest.raises(session_module.DatabaseVersionError):
+                await create_schema(engine)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_reject())
+
+    # A failed migration restores the pre-migration snapshot.
+    good = tmp_path / "good.db"
+
+    async def _create() -> None:
+        engine = create_engine(good)
+        try:
+            await create_schema(engine)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_create())
+
+    def boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("migration boom")
+
+    monkeypatch.setattr(session_module.command, "upgrade", boom)
+    with pytest.raises(RuntimeError, match="migration boom"):
+        session_module.migrate_database(good)
+    # No snapshot exists for a brand-new path; the failure must still propagate
+    # without trying to replace a nonexistent database.
+    with pytest.raises(RuntimeError, match="migration boom"):
+        session_module.migrate_database(tmp_path / "new-migration.db")
+    assert not good.with_suffix(".pre-migrate.db").exists()
+    assert session_module._read_version(good) == session_module.SCHEMA_HEAD
+
+    def chmod_fail(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("chmod denied")
+
+    monkeypatch.setattr(session_module.Path, "chmod", chmod_fail)
+    session_module.tighten_permissions(good)
+    session_module.tighten_permissions(tmp_path / "missing-file")
+
+    # Encrypted settings alone are enough to require the original key.
+    encrypted_settings = tmp_path / "settings.db"
+    with sqlite3.connect(encrypted_settings) as connection:
+        connection.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value_json TEXT)")
+        connection.execute("INSERT INTO settings VALUES ('webhook_secret', '\"v1.ciphertext\"')")
+    assert session_module.database_requires_master_key(encrypted_settings) is True
+
+    async def _commit_scope() -> None:
+        engine = create_engine(tmp_path / "commit-scope.db")
+        try:
+            await create_schema(engine)
+            factory = create_session_factory(engine)
+            async with session_module.session_scope(factory) as session:
+                await session.execute(text("SELECT 1"))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_commit_scope())
+
+    async def _rollback() -> None:
+        engine = create_engine(tmp_path / "scope.db")
+        try:
+            await create_schema(engine)
+            factory = create_session_factory(engine)
+            with pytest.raises(RuntimeError):
+                async with session_module.session_scope(factory) as session:
+                    assert session is not None
+                    raise RuntimeError("rollback me")
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_rollback())
 
 
 async def test_newer_schema_is_rejected(tmp_path: Path) -> None:

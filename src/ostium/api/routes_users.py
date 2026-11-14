@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,12 +43,23 @@ from ostium.util.time import iso, utcnow
 router = APIRouter(tags=["users"])
 
 
+def _require_aware_datetime(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        raise ValueError("timestamps must include a timezone offset (for example Z or +08:00)")
+    return value
+
+
 class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     expires_at: datetime | None = None
     quota_bytes: int = Field(default=0, ge=0)
     quota_cycle: Literal["total", "monthly"] = "total"
     note: str = Field(default="", max_length=500)
+
+    @field_validator("expires_at")
+    @classmethod
+    def _validate_expiry(cls, value: datetime | None) -> datetime | None:
+        return _require_aware_datetime(value)
 
 
 class UserPatch(BaseModel):
@@ -57,6 +68,11 @@ class UserPatch(BaseModel):
     quota_bytes: int | None = Field(default=None, ge=0)
     quota_cycle: Literal["total", "monthly"] | None = None
     note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("expires_at")
+    @classmethod
+    def _validate_expiry(cls, value: datetime | None) -> datetime | None:
+        return _require_aware_datetime(value)
 
 
 class RotateRequest(BaseModel):
@@ -107,8 +123,9 @@ async def _apply_server(services: Services, session: AsyncSession) -> dict[str, 
 @router.get("/users")
 async def list_users(
     _: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("user:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     users = (
         (await session.execute(select(ProxyUser).order_by(ProxyUser.created_at))).scalars().all()
@@ -126,7 +143,7 @@ async def add_user(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     try:
         user, password, token = await create_user(
@@ -140,6 +157,19 @@ async def add_user(
         )
     except UserError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
+    # Build the one-time response before committing/applying.  If subscription
+    # generation fails (for example because a certificate file disappeared),
+    # the request rolls back and the administrator can retry; previously the
+    # user was committed and the only copy of the password was lost behind a
+    # 500 response.
+    data = await subscription_payload(
+        session,
+        services.store,
+        user,
+        base_url=await _public_base_url(session, services),
+        token=token,
+        settings=services.settings,
+    )
     applied = await _apply_server(services, session)
     await audit(
         session,
@@ -148,14 +178,6 @@ async def add_user(
         target=user.name,
         ip=client_ip(request),
         detail={"quota_bytes": user.quota_bytes, "quota_cycle": user.quota_cycle},
-    )
-    data = await subscription_payload(
-        session,
-        services.store,
-        user,
-        base_url=await _public_base_url(session, services),
-        token=token,
-        settings=services.settings,
     )
     return {
         "user": serialize_user(user),
@@ -169,8 +191,9 @@ async def add_user(
 async def get_user(
     user_id: str,
     _: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("user:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     online = user.name in _online_names(services)
@@ -185,7 +208,7 @@ async def update_user(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     changes = payload.model_dump(exclude_unset=True)
@@ -220,7 +243,7 @@ async def delete_user(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     name = user.name
@@ -240,7 +263,7 @@ async def rotate_user(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     await rotate_credentials(session, services.store, user)
@@ -272,7 +295,7 @@ async def reset_user_usage(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     await reset_usage(session, user, stats=services.stats)
@@ -293,7 +316,7 @@ async def user_usage(
     days: int = 30,
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     series = await usage_series(session, days=max(1, min(days, 365)), user_id=user.id)
@@ -312,7 +335,7 @@ async def get_subscription(
     admin: AdminUser = Depends(get_current_admin),
     _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     token = decrypt_subscription_token(user, services.store)
@@ -352,7 +375,7 @@ async def rotate_user_subscription(
     admin: AdminUser = Depends(get_current_admin),
     _scope: None = Depends(require_scope("subscription:write")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     token = await rotate_subscription(session, services.store, user)
@@ -381,7 +404,7 @@ async def export_user(
     admin: AdminUser = Depends(get_current_admin),
     _scope: None = Depends(require_scope("user:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     endpoints = await endpoints_for_user(
@@ -405,7 +428,7 @@ async def bulk_users(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     users = (
         (await session.execute(select(ProxyUser).where(ProxyUser.id.in_(payload.ids))))
@@ -464,8 +487,9 @@ async def bulk_users(
 @router.get("/subscriptions")
 async def subscriptions_overview(
     _: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     users = (
         (await session.execute(select(ProxyUser).order_by(ProxyUser.created_at))).scalars().all()

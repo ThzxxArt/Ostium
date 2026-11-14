@@ -41,6 +41,12 @@ class _Pending:
 
 QuotaCallback = Callable[[list[str]], Awaitable[None]]
 
+# A short stats outage is normal during a core reload.  Only a sustained
+# outage means quota enforcement can no longer observe new traffic, so raise a
+# critical alert after this many seconds instead of silently logging a warning
+# forever.
+STATS_UNAVAILABLE_ALERT_SECONDS = 300.0
+
 
 class StatsCollector:
     def __init__(
@@ -74,6 +80,8 @@ class StatsCollector:
         self._epochs: dict[str, int] = defaultdict(int)
         self._epoch_pending: dict[str, int] = {}
         self._first_enforce = True
+        self._stats_down_since: float | None = None
+        self._stats_alerted = False
 
     async def start(self) -> None:
         if self._task is None:
@@ -139,7 +147,24 @@ class StatsCollector:
                 continue
 
     async def tick(self) -> None:
-        counts = await self.client.query_users()
+        try:
+            counts = await self.client.query_users()
+        except StatsUnavailable as exc:
+            await self._record_stats_unavailable(exc)
+        else:
+            self._record_stats_available()
+            await self._ingest_counts(counts)
+        # Enforcement must not depend on the statistics RPC succeeding.  Core
+        # expiry/quota filtering already works from the database, but a user
+        # whose row still says "enabled" also needs the disable decision and
+        # enforcement policy persisted so a core restart cannot resurrect them.
+        self._tick += 1
+        if self._tick % 12 == 0:
+            await self.flush()
+        if self._tick % 6 == 0:
+            await self.enforce_quotas()
+
+    async def _ingest_counts(self, counts: dict[str, tuple[int, int]]) -> None:
         now = time.monotonic()
         elapsed = max(0.001, now - getattr(self, "_last_tick", now))
         self._last_tick = now
@@ -186,11 +211,46 @@ class StatsCollector:
 
                 seen = datetime.fromisoformat(usage.last_seen)
                 usage.online = (utcnow() - seen).total_seconds() < 60
-        self._tick += 1
-        if self._tick % 12 == 0:
-            await self.flush()
-        if self._tick % 6 == 0:
-            await self.enforce_quotas()
+
+    async def _record_stats_unavailable(self, exc: StatsUnavailable) -> None:
+        message = str(exc)
+        if self._last_error != message:
+            self._last_error = message
+            self.bus.log("warning", "V2Ray statistics unavailable", error=message)
+        now = time.monotonic()
+        if self._stats_down_since is None:
+            self._stats_down_since = now
+        if self._stats_alerted or now - self._stats_down_since < STATS_UNAVAILABLE_ALERT_SECONDS:
+            return
+        self._stats_alerted = True
+        try:
+            from ostium.services.audit import create_alert
+
+            async with self.session_factory() as session:
+                await create_alert(
+                    session,
+                    self.bus,
+                    level="critical",
+                    code="stats_unavailable",
+                    message=(
+                        "V2Ray statistics have been unavailable for more than "
+                        f"{int(STATS_UNAVAILABLE_ALERT_SECONDS)} seconds; quota "
+                        "accounting and enforcement cannot observe new traffic"
+                    ),
+                    dedupe_key="v2ray-stats",
+                )
+                await session.commit()
+        except Exception as alert_exc:  # keep the collector alive
+            self.bus.log(
+                "error", "could not record the statistics outage alert", error=str(alert_exc)
+            )
+
+    def _record_stats_available(self) -> None:
+        if self._stats_down_since is not None:
+            self.bus.log("info", "V2Ray statistics recovered")
+        self._stats_down_since = None
+        self._stats_alerted = False
+        self._last_error = None
 
     async def flush(self) -> None:
         # ``stop()`` flushes explicitly while the periodic tick may already be

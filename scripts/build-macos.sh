@@ -62,7 +62,7 @@ DMG="dist/Ostium-${VERSION}-macos-${DMG_ARCH}.dmg"
 hdiutil create -volname "Ostium" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 if [[ -n "$IDENTITY" ]]; then
   codesign --force --timestamp --sign "$IDENTITY" "$DMG"
-  codesign --verify --verbose=2 "$DMG" || true
+  codesign --verify --verbose=2 "$DMG"
 else
   echo "warning: OSTIUM_CODESIGN_IDENTITY is not set; the DMG is unsigned" >&2
 fi

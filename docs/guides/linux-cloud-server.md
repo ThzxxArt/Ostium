@@ -133,11 +133,11 @@ https://vpn.example.com
 仅在隔离测试环境、且明确接受风险时，可以临时这样做：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.2 \
+      --version latest \
       --ui-host 0.0.0.0 \
       --allow-insecure-bind
 ```
@@ -269,21 +269,21 @@ timedatectl status
 这是推荐组合：安装器以 root 运行，服务以无特权 `ostium` 用户运行。
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.2
+      --version latest
 ```
 
 ### 4.2 普通 sudo 用户 + 默认非 root 运行
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.2
+      --version latest
 ```
 
 安装器会：
@@ -314,11 +314,11 @@ sudo ss -lntup | grep -E ':(8443|443|9443|8388)\b'
 ### 4.3 root 运行模式（可选，不推荐生产）
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.2 \
+      --version latest \
       --run-as-root
 ```
 
@@ -342,11 +342,11 @@ root 模式取消控制面与 root 的隔离，只建议单用户测试机、临
 安装文件但不注册 systemd：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.2 \
+      --version latest \
       --no-service
 ```
 
@@ -1027,15 +1027,15 @@ sudo -u ostium env \
 systemd：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- upgrade
 ```
 
 指定版本：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
-  | sudo bash -s -- upgrade --version 0.1.2
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
+  | sudo bash -s -- upgrade --version latest
 ```
 
 root 模式安装器会自动识别 drop-in 并保持 root；如果没识别，显式加 `--run-as-root`。
@@ -1044,7 +1044,7 @@ root 模式安装器会自动识别 drop-in 并保持 root；如果没识别，�
 
 ```bash
 sudo supervisorctl stop ostium ostium-core
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- upgrade --no-service
 sudo supervisorctl start ostium-core ostium
 ```
@@ -1054,14 +1054,14 @@ sudo supervisorctl start ostium-core ostium
 保留数据：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- uninstall
 ```
 
 同时删除数据/配置/证书（不可恢复）：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- uninstall --purge
 ```
 
@@ -1136,8 +1136,8 @@ sudo sysctl --system
 ```bash
 # 1. DNS 灰云，证书路径确认
 # 2. 安装（root 登录去掉 sudo）
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
-  | sudo bash -s -- install --role server --domain vpn.example.com --version 0.1.2
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
+  | sudo bash -s -- install --role server --domain vpn.example.com --version latest
 
 # 3. SSH 隧道登录
 ssh -N -L 8443:127.0.0.1:8443 root@SERVER_IP

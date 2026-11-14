@@ -35,14 +35,16 @@ def test_update_rule_set_atomic(tmp_path: Path) -> None:
             with respx.mock:
                 respx.get("https://example.com/test.srs").mock(
                     return_value=httpx.Response(
-                        200, content=b"binary-rules", headers={"etag": '"abc"'}
+                        200,
+                        content=b"SRS\x01binary-rules",
+                        headers={"etag": '"abc"'},
                     )
                 )
                 result = await update_rule_set(session, settings, rule_set)
                 await session.commit()
             assert result["updated"] is True
             assert rule_set.path is not None
-            assert resolve_path(settings, rule_set.path).read_bytes() == b"binary-rules"
+            assert resolve_path(settings, rule_set.path).read_bytes() == b"SRS\x01binary-rules"
             assert rule_set.etag == '"abc"'
         await engine.dispose()
 

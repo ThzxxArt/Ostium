@@ -384,7 +384,11 @@ def test_rollback_and_reload_branches(tmp_path: Path, monkeypatch) -> None:
         settings = _settings(tmp_path)
         supervisor = CoreSupervisor(settings)
         previous = json.dumps(_server_config()).encode()
+        previous_meta = json.dumps(
+            {"policy_version": CONFIG_POLICY_VERSION, "allow_lan": False}
+        ).encode()
         supervisor.last_good.write_bytes(previous)
+        supervisor.paths.last_good_meta_path.write_bytes(previous_meta)
         process = FakeProcess()
         supervisor._process = process  # type: ignore[assignment]
 
@@ -396,7 +400,7 @@ def test_rollback_and_reload_branches(tmp_path: Path, monkeypatch) -> None:
 
         monkeypatch.setattr(supervisor_module.asyncio, "sleep", no_sleep)
         monkeypatch.setattr(supervisor, "_spawn", fake_spawn)
-        await supervisor._rollback(previous, None)
+        await supervisor._rollback(previous, previous_meta)
         assert "rollback to previous configuration" in supervisor.read_logs(10)
         assert supervisor._process is not process
 
@@ -436,6 +440,127 @@ def test_rollback_and_reload_branches(tmp_path: Path, monkeypatch) -> None:
 
         supervisor.log_path = BrokenPath()  # type: ignore[assignment]
         supervisor._rotate_logs()
+
+    asyncio.run(_run())
+
+
+def test_start_with_current_policy_and_apply_default_ports(tmp_path: Path, monkeypatch) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        Path(settings.engine_path).write_text("engine", encoding="utf-8")  # type: ignore[arg-type]
+        supervisor = CoreSupervisor(settings)
+        supervisor.last_good.write_text(json.dumps(_server_config()), encoding="utf-8")
+        supervisor.paths.last_good_meta_path.write_text(
+            json.dumps({"policy_version": CONFIG_POLICY_VERSION, "allow_lan": False}),
+            encoding="utf-8",
+        )
+
+        async def spawn() -> None:
+            supervisor._process = FakeProcess()
+
+        async def check(path: Path) -> None:
+            return None
+
+        monkeypatch.setattr(supervisor, "_spawn", spawn)
+        monkeypatch.setattr(supervisor, "_check", check)
+        await supervisor.start()
+        assert supervisor.status().running is True
+
+        config = _server_config()
+        await supervisor.apply(config, config_digest(config))
+        assert supervisor._running_config_sha == config_digest(config)
+
+    asyncio.run(_run())
+
+
+def test_client_start_skips_the_server_policy_gate(tmp_path: Path, monkeypatch) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        settings.role = Role.CLIENT
+        supervisor = CoreSupervisor(settings)
+        supervisor.last_good.write_text(json.dumps(_server_config()), encoding="utf-8")
+        supervisor.paths.last_good_meta_path.unlink(missing_ok=True)
+
+        async def spawn() -> None:
+            supervisor._process = FakeProcess()
+
+        monkeypatch.setattr(supervisor, "_spawn", spawn)
+        assert supervisor._read_meta() == {}
+        await supervisor.start()
+        # The role gate is skipped for clients; this fixture's server-shaped
+        # config is then rejected by the client validator, which is expected.
+        status = supervisor.status()
+        assert status.running is False
+        assert "last-good config rejected" in (status.last_error or "")
+
+    asyncio.run(_run())
+
+
+def test_log_limit_ignores_small_files(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    supervisor = CoreSupervisor(settings)
+    settings.paths.logs_dir.mkdir(parents=True, exist_ok=True)
+    supervisor.log_path.write_text("small", encoding="utf-8")
+    assert supervisor.enforce_log_limit() is False
+
+
+def test_rollback_without_previous_stops_and_clears_state(tmp_path: Path, monkeypatch) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        supervisor = CoreSupervisor(settings)
+        supervisor.last_good.write_text(json.dumps(_server_config()), encoding="utf-8")
+        supervisor.paths.last_good_meta_path.write_text("{}", encoding="utf-8")
+        terminated: list[bool] = []
+
+        async def terminate() -> None:
+            terminated.append(True)
+            supervisor._process = None
+
+        spawned: list[bool] = []
+
+        async def spawn() -> None:
+            spawned.append(True)
+
+        monkeypatch.setattr(supervisor, "_terminate", terminate)
+        monkeypatch.setattr(supervisor, "_spawn", spawn)
+        await supervisor._rollback(None, None)
+        assert terminated == [True]
+        assert spawned == []
+        assert not supervisor.last_good.exists()
+        assert not supervisor.paths.last_good_meta_path.exists()
+
+    asyncio.run(_run())
+
+
+@pytest.mark.parametrize("meta", [None, b"{not-json", b'{"policy_version": 1}'])
+def test_rollback_to_an_old_policy_keeps_the_core_down(
+    tmp_path: Path, monkeypatch, meta: bytes | None
+) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        supervisor = CoreSupervisor(settings)
+        previous = json.dumps(_server_config()).encode()
+        supervisor.last_good.write_bytes(previous)
+        if meta is not None:
+            supervisor.paths.last_good_meta_path.write_bytes(meta)
+        spawned: list[bool] = []
+        terminated: list[bool] = []
+
+        async def spawn() -> None:
+            spawned.append(True)
+
+        async def terminate() -> None:
+            terminated.append(True)
+
+        monkeypatch.setattr(supervisor, "_spawn", spawn)
+        monkeypatch.setattr(supervisor, "_terminate", terminate)
+        await supervisor._rollback(previous, meta)
+        assert terminated == [True]
+        assert spawned == []
+        assert "predates the current security policy" in (supervisor.status().last_error or "")
+        assert supervisor._running_config_sha is None
+        # The bytes stay for diagnosis; a later control-plane apply replaces them.
+        assert supervisor.last_good.read_bytes() == previous
 
     asyncio.run(_run())
 

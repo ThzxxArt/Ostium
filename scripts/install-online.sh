@@ -75,7 +75,7 @@ Ostium 一键安装器
   --public-ui                已禁用；请在登录后签发证书、启用 TOTP，再从 Settings 开启
   --no-start                 注册服务但不启动
   --no-verify                跳过 SHA256 校验（仅限本地开发，勿用于生产）
-  --purge                    卸载时同时删除数据、配置和用户
+  --purge                    卸载时同时删除数据、配置和程序（服务账号保留）
   -h, --help                 显示帮助
 
 示例：

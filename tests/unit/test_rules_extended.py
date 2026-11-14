@@ -104,7 +104,9 @@ def test_rule_set_update_and_serialization(tmp_path: Path) -> None:
             rule_set.etag = '"v1"'
             with respx.mock:
                 route = respx.get("https://example.com/ads.srs").mock(
-                    return_value=httpx.Response(200, content=b"rules", headers={"etag": '"v2"'})
+                    return_value=httpx.Response(
+                        200, content=b"SRS\x01rules", headers={"etag": '"v2"'}
+                    )
                 )
                 result = await update_rule_set(session, settings, rule_set)
             assert result["updated"] is True

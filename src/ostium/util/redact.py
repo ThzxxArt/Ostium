@@ -13,6 +13,7 @@ _TOKEN_RE = re.compile(
 )
 _AUTH_HEADER_RE = re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+")
 _SS_URI_RE = re.compile(r"ss://[^\s]+")
+_SUB_PATH_RE = re.compile(r"(/sub/)[A-Za-z0-9._~-]{8,}")
 _VLESS_URI_RE = re.compile(r"(?:vless|trojan|hysteria2|hy2)://[^\s]+")
 _PEM_RE = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL
@@ -29,25 +30,37 @@ def redact(value: str, *, redact_ids: bool = True) -> str:
     result = _TOKEN_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]", result)
     result = _SS_URI_RE.sub("ss://[REDACTED]", result)
     result = _VLESS_URI_RE.sub("vless://[REDACTED]", result)
+    result = _SUB_PATH_RE.sub(r"\1[REDACTED]", result)
     if redact_ids:
         result = _UUID_RE.sub("[REDACTED-UUID]", result)
     return result
 
 
+SENSITIVE_KEY_PARTS = (
+    "token",
+    "password",
+    "secret",
+    "authorization",
+    "private_key",
+    "privatekey",
+    "cookie",
+    "uuid",
+    "credential",
+)
+
+
+def _sensitive_key(key: str) -> bool:
+    lowered = key.lower().replace("-", "_")
+    # Exact matching missed webhook_secret, ss_password, reality_private_key
+    # and similar composite keys, so diagnostics could include their values.
+    return any(part in lowered for part in SENSITIVE_KEY_PARTS)
+
+
 def redact_mapping(data: dict[str, object]) -> dict[str, object]:
-    sensitive = {
-        "token",
-        "password",
-        "secret",
-        "authorization",
-        "private_key",
-        "cookie",
-        "subscription_token",
-        "uuid",
-    }
+    sensitive = set(SENSITIVE_KEY_PARTS)
     out: dict[str, object] = {}
     for key, value in data.items():
-        if key.lower() in sensitive:
+        if _sensitive_key(key):
             out[key] = "[REDACTED]"
         elif isinstance(value, str):
             out[key] = redact(value)

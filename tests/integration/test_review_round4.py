@@ -196,7 +196,7 @@ def test_deleting_rule_set_removes_its_downloaded_file(
     rule_set_id = created.json()["rule_set"]["id"]
     with respx.mock:
         respx.get("https://example.com/cleanup.srs").mock(
-            return_value=httpx.Response(200, content=b"rules")
+            return_value=httpx.Response(200, content=b"SRS\x01rules")
         )
         updated = api_client.post(
             f"/api/v1/rule-sets/{rule_set_id}/update", headers=_headers(session_token)

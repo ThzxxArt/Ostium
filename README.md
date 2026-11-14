@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-630%20backend%20%C2%B7%20176%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-661%20backend%20%C2%B7%20192%20frontend-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -80,7 +80,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 630 个后端测试（620 个常规 + 10 个真实 sing-box 集成）、176 个前端测试、69 个 Playwright 用例；后端覆盖率以 CI 报告为准。 |
+| 🧪 **可验证** | 661 个后端测试（651 个常规 + 10 个真实 sing-box 集成）、192 个前端测试；Playwright 用例留待发布前重跑（见发布状态）。 |
 
 ---
 
@@ -185,21 +185,21 @@ flowchart LR
 Linux 服务端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS 客户端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows 客户端（管理员 PowerShell）：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1 | iex
 ```
 
 安装器会：
@@ -262,7 +262,7 @@ sudo bash install-online.sh install \
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
-下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.2>
+下载入口：<https://github.com/ThzxxArt/Ostium/releases>（0.1.2 发布前请选择 v0.1.1；发布后选择 v0.1.2）
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -387,7 +387,10 @@ docker run -d --name ostium --network host \
   ostium:0.1.2
 ```
 
-> Docker 使用 host 网络，以便绑定 443/80；请自行配置防火墙、TLS 和持久化备份。
+> Docker 使用 host 网络，以便绑定 443/80；管理 UI 默认仍只监听 `127.0.0.1`。
+> 远程管理请用 SSH 隧道或宿主机 Nginx/Caddy 反代。确需明文公网监听时，显式设置
+> `OSTIUM_HOST=0.0.0.0`、`OSTIUM_ALLOW_INSECURE_BIND=true` 并限制 8443 防火墙。
+> 请自行配置 TLS 和持久化备份。
 
 ### 方式七：PyPI / uv / pipx（服务端、CLI 与开发环境）
 
@@ -399,14 +402,14 @@ uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
 # 或指定版本
-uv tool install "ostium-ctl==0.1.2"
+uv tool install ostium-ctl    # 0.1.2 发布后可 pin "ostium-ctl==0.1.2"
 ```
 
 服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.2"
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # 0.1.2 发布后可 pin ==0.1.2
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -419,7 +422,7 @@ sudo /opt/ostium/venv/bin/ostium core-run   # 终端 2：核心服务
 ```bash
 uv tool upgrade ostium-ctl
 # 或
-sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.2"
+sudo /opt/ostium/venv/bin/pip install --upgrade ostium-ctl
 ```
 
 > PyPI 版本包含完整 SPA 静态资源。生产环境仍建议使用原生安装包：它会创建非 root 的
@@ -618,7 +621,7 @@ sudo systemctl start ostium-core ostium
 ```bash
 sudo bash install-online.sh upgrade
 # 指定版本
-sudo bash install-online.sh upgrade --version 0.1.2
+# 固定版本（0.1.2 发布后可用）：sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 升级会保留数据库、`master.key`、配置、证书、用户和订阅，只替换 venv 与核心二进制；如果原来是 root 模式，会自动保持。
@@ -673,7 +676,7 @@ Windows/macOS 安装器原位覆盖，数据与订阅保留；Linux 重新执行
 
 ```bash
 sudo bash install-online.sh uninstall
-# 连数据、配置和用户一起删除
+# 连数据、配置和程序一起删除（服务账号保留）
 sudo bash install-online.sh uninstall --purge
 ```
 
@@ -812,9 +815,9 @@ npx playwright test
 
 当前结果：
 
-- 后端：**620 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；覆盖率以 CI 报告为准；
-- 前端：**174 passed**，语句 **90.69%**、分支 **85.07%**、函数 **88.34%**、行 **92.00%**；
-- Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe（serious/critical=0）、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
+- 后端：**651 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；语句 **94.07%**、分支 **90.38%**；
+- 前端：**192 passed**，语句 **90.69%**、分支 **85.13%**、函数 **88.08%**、行 **92.17%**；
+- Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。
 

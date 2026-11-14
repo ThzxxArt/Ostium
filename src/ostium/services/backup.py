@@ -20,7 +20,7 @@ from typing import Any
 
 from ostium import __version__
 from ostium.config import Settings
-from ostium.util.security import CryptoError, decrypt_blob, encrypt_blob
+from ostium.util.security import CryptoError, decrypt_blob
 from ostium.util.time import iso, utcnow
 
 BACKUP_PREFIX = "ostium-backup-"
@@ -74,6 +74,13 @@ def create_backup(
         _sqlite_backup(paths.db_path, db_copy)
         members: list[tuple[str, Path]] = [("ostium.db", db_copy)]
         master_key_included = bool(include_master_key and paths.master_key_path.is_file())
+        if not master_key_included and _database_requires_master_key(paths.db_path):
+            raise BackupError(
+                "the database contains encrypted fields but master.key is missing "
+                "or excluded; this backup could never be restored",
+                "missing_master_key",
+                409,
+            )
         if master_key_included:
             members.append(("master.key", paths.master_key_path))
         if settings.config_file.is_file():
@@ -103,8 +110,8 @@ def create_backup(
             "directories": list(BACKUP_DIRECTORIES),
             "checksums": checksums,
         }
-        buffer = io.BytesIO()
-        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        tar_path = temp_path / "backup.tar.gz"
+        with tarfile.open(tar_path, mode="w:gz") as archive:
             for arcname, source in members:
                 archive.add(source, arcname=arcname)
             manifest_bytes = json.dumps(manifest, indent=2).encode()
@@ -112,25 +119,39 @@ def create_backup(
             info.size = len(manifest_bytes)
             info.mode = 0o600
             archive.addfile(info, io.BytesIO(manifest_bytes))
-        raw = buffer.getvalue()
-    payload = encrypt_blob(raw, password) if password else raw
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{filename}.", dir=target.parent)
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if os.name == "posix":
-            temporary.chmod(0o600)
-        temporary.replace(target)
-    finally:
-        temporary.unlink(missing_ok=True)
-    digest = hashlib.sha256(payload).hexdigest()
+        if tar_path.stat().st_size > MAX_BACKUP_FILE_BYTES:
+            raise BackupError("backup archive exceeds the size limit", "backup_too_large", 413)
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{filename}.", dir=target.parent)
+        temporary = Path(temporary_name)
+        try:
+            # Copy/encrypt in bounded chunks.  The previous implementation
+            # built the entire tar in memory and optionally encrypted it in
+            # place, so a multi-GiB data directory could exhaust the control
+            # plane.  Keep the temporary output inside this temp-dir scope so
+            # the tar source still exists while it is copied.
+            if password:
+                from ostium.util.security import encrypt_stream
+
+                with tar_path.open("rb") as source_handle, os.fdopen(descriptor, "wb") as output:
+                    encrypt_stream(source_handle, output, password)
+                    output.flush()
+                    os.fsync(output.fileno())
+            else:
+                with tar_path.open("rb") as source_handle, os.fdopen(descriptor, "wb") as output:
+                    shutil.copyfileobj(source_handle, output, length=1024 * 1024)
+                    output.flush()
+                    os.fsync(output.fileno())
+            if os.name == "posix":
+                temporary.chmod(0o600)
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        digest = _sha256_file(target)
+        size = target.stat().st_size
     return {
         "filename": filename,
         "path": str(target),
-        "size": len(payload),
+        "size": size,
         "sha256": digest,
         "encrypted": encrypted,
         "automatic": automatic,
@@ -225,10 +246,18 @@ def _verify_checksums(staging: Path, manifest: dict[str, Any]) -> None:
 
 
 def _portable_suffix(stored: str, directory_name: str) -> str:
-    """Map an old absolute path to ``<dir>/<relative...>``."""
+    """Map an old absolute path to ``<dir>/<relative...>``.
+
+    ``..`` components are rejected instead of being carried into the restored
+    database.  ``resolve_path`` also enforces the data-dir boundary, but a
+    restore should fail loudly rather than silently mark every malicious
+    certificate as missing.
+    """
 
     normalized = stored.replace("\\", "/")
-    parts = [part for part in normalized.split("/") if part]
+    parts = [part for part in normalized.split("/") if part and part != "."]
+    if ".." in parts:
+        raise BackupError("backup contains a path traversal reference", "invalid_archive")
     if directory_name in parts:
         index = len(parts) - 1 - parts[::-1].index(directory_name)
         return "/".join(parts[index:])
@@ -257,10 +286,28 @@ def _rewrite_portable_paths(db_path: Path, paths: Any) -> None:
                 for certificate_id, cert_path, key_path in rows:
                     new_cert = _portable_suffix(str(cert_path), "certs")
                     new_key = _portable_suffix(str(key_path), "certs")
-                    connection.execute(
-                        "UPDATE certificates SET cert_path = ?, key_path = ? WHERE id = ?",
-                        (new_cert, new_key, certificate_id),
-                    )
+                    cert_file = paths.data_dir / new_cert
+                    key_file = paths.data_dir / new_key
+                    if cert_file.is_file() and key_file.is_file():
+                        connection.execute(
+                            "UPDATE certificates SET cert_path = ?, key_path = ? WHERE id = ?",
+                            (new_cert, new_key, certificate_id),
+                        )
+                    else:
+                        # Do not leave a "ready" certificate that points at
+                        # files the archive did not contain; the manager would
+                        # silently skip the TLS inbound and the UI would claim
+                        # it is usable until an apply fails.
+                        connection.execute(
+                            "UPDATE certificates SET cert_path = ?, key_path = ?, "
+                            "status = 'error', last_error = ? WHERE id = ?",
+                            (
+                                new_cert,
+                                new_key,
+                                "certificate files were missing from the restored backup",
+                                certificate_id,
+                            ),
+                        )
             if "rule_sets" in tables:
                 rows = connection.execute(
                     "SELECT id, path FROM rule_sets WHERE path IS NOT NULL"
@@ -297,6 +344,41 @@ def _clear_runtime_configuration(paths: Any) -> None:
         pass
 
 
+def _prepare_archive(backup_path: Path, password: str | None, workdir: Path) -> Path:
+    """Return a plaintext tar path, streaming-decrypting OSTB2 when needed."""
+
+    from ostium.util.security import BACKUP_V2_MAGIC, decrypt_stream
+
+    with backup_path.open("rb") as probe:
+        magic = probe.read(len(BACKUP_V2_MAGIC))
+    if magic == BACKUP_V2_MAGIC:
+        if not password:
+            raise BackupError(
+                "this backup is encrypted; a password is required", "password_required"
+            )
+        target = workdir / "backup.tar.gz"
+        try:
+            with backup_path.open("rb") as source_handle, target.open("wb") as output:
+                decrypt_stream(source_handle, output, password)
+        except CryptoError as exc:
+            raise BackupError(str(exc), "invalid_password", 400) from exc
+        return target
+    if magic[:5] == b"OSTB1":
+        if not password:
+            raise BackupError(
+                "this backup is encrypted; a password is required", "password_required"
+            )
+        raw = backup_path.read_bytes()
+        try:
+            plain = decrypt_blob(raw, password)
+        except CryptoError as exc:
+            raise BackupError(str(exc), "invalid_password", 400) from exc
+        target = workdir / "backup.tar.gz"
+        target.write_bytes(plain)
+        return target
+    return backup_path
+
+
 def restore_backup(
     settings: Settings,
     backup_path: Path,
@@ -308,20 +390,11 @@ def restore_backup(
         raise BackupError("backup file not found", "not_found", 404)
     if backup_path.stat().st_size > MAX_BACKUP_FILE_BYTES:
         raise BackupError("backup file is too large to restore", "backup_too_large", 413)
-    raw = backup_path.read_bytes()
-    if raw.startswith(b"OSTB1"):
-        if not password:
-            raise BackupError(
-                "this backup is encrypted; a password is required", "password_required"
-            )
-        try:
-            raw = decrypt_blob(raw, password)
-        except CryptoError as exc:
-            raise BackupError(str(exc), "invalid_password", 400) from exc
     with tempfile.TemporaryDirectory(prefix="ostium-restore-") as temp:
         staging = Path(temp)
+        archive_path = _prepare_archive(backup_path, password, staging)
         try:
-            with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
+            with tarfile.open(archive_path, mode="r:gz") as archive:
                 _safe_extract(archive, staging)
         except (tarfile.TarError, OSError) as exc:
             raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
@@ -548,30 +621,22 @@ def stage_restore(
         raise BackupError("backup file not found", "not_found", 404)
     if backup_path.stat().st_size > MAX_BACKUP_FILE_BYTES:
         raise BackupError("backup file is too large to restore", "backup_too_large", 413)
-    raw = backup_path.read_bytes()
-    encrypted = raw.startswith(b"OSTB1")
+    with backup_path.open("rb") as probe:
+        magic = probe.read(5)
+    encrypted = magic in {b"OSTB2", b"OSTB1"}
     if encrypted and not password:
         raise BackupError("this backup is encrypted; a password is required", "password_required")
-    if encrypted and password:
-        try:
-            decrypt_blob(raw, password)
-        except CryptoError as exc:
-            raise BackupError(str(exc), "invalid_password", 400) from exc
     # Validate the complete archive, checksums, database and key pairing now,
     # while the service is still running, so a bad backup is rejected instead
-    # of breaking the next startup.
-    import io as _io
-
+    # of breaking the next startup.  OSTB2 is decrypted into a temp file rather
+    # than into control-plane memory.
     from ostium.db.session import check_database_integrity
 
-    blob = raw
-    if encrypted:
-        assert password is not None
-        blob = decrypt_blob(raw, password)
     with tempfile.TemporaryDirectory(prefix="ostium-stage-") as temp:
         staging = Path(temp)
+        archive_path = _prepare_archive(backup_path, password, staging)
         try:
-            with tarfile.open(name=None, fileobj=_io.BytesIO(blob), mode="r:gz") as archive:
+            with tarfile.open(archive_path, mode="r:gz") as archive:
                 _safe_extract(archive, staging)
         except (tarfile.TarError, OSError) as exc:
             raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
@@ -613,7 +678,10 @@ def stage_restore(
     paths = settings.paths
     payload_path = paths.backups_dir / "restore-pending.bin"
     metadata_path = paths.backups_dir / "restore-pending.json"
-    payload_path.write_bytes(raw)
+    with backup_path.open("rb") as source_handle, payload_path.open("wb") as output:
+        shutil.copyfileobj(source_handle, output, length=1024 * 1024)
+        output.flush()
+        os.fsync(output.fileno())
     metadata_path.write_text(
         json.dumps(
             {

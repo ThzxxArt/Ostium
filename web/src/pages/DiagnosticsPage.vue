@@ -16,6 +16,7 @@ const router = useRouter()
 const checks = ref<DoctorCheck[]>([])
 const running = ref(false)
 const ran = ref(false)
+const error = ref('')
 
 const issues = computed(() => checks.value.filter((check) => check.status !== 'pass').length)
 
@@ -24,8 +25,13 @@ async function run() {
   try {
     checks.value = (await api.system.doctor()).checks
     ran.value = true
-  } catch {
+    error.value = ''
+  } catch (err) {
     checks.value = []
+    // A failed run is not "all checks passed"; reset the success summary and
+    // surface the reason.
+    ran.value = false
+    error.value = (err as Error).message
   } finally {
     running.value = false
   }
@@ -56,16 +62,18 @@ onMounted(run)
       <div>
         <h2>
           {{
-            running
-              ? t('diagnostics.running')
-              : !ran
-                ? t('diagnostics.title')
-                : issues
-                  ? t('diagnostics.issues', { count: issues })
-                  : t('diagnostics.all_pass')
+            error
+              ? t('common.load_failed')
+              : running
+                ? t('diagnostics.running')
+                : !ran
+                  ? t('diagnostics.title')
+                  : issues
+                    ? t('diagnostics.issues', { count: issues })
+                    : t('diagnostics.all_pass')
           }}
         </h2>
-        <p class="o-small o-muted">{{ t('diagnostics.fix_hint') }}</p>
+        <p class="o-small o-muted">{{ error || t('diagnostics.fix_hint') }}</p>
       </div>
       <div class="summary-actions">
         <NButton secondary size="small" @click="router.push('/network')">{{

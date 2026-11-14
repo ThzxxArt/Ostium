@@ -109,6 +109,10 @@ function openAdd() {
   ruleOpen.value = true
 }
 
+function onTypeChange(value: string) {
+  if (value !== form.value.type) form.value.values = ''
+}
+
 function openEdit(rule: Rule) {
   editing.value = rule
   const match = rule.match || {}
@@ -324,7 +328,7 @@ onMounted(load)
         </label>
         <label class="field">
           <span>{{ t('rules.match') }}</span>
-          <NSelect v-model:value="form.type" :options="typeOptions" />
+          <NSelect v-model:value="form.type" :options="typeOptions" @update:value="onTypeChange" />
         </label>
         <label class="field">
           <span>{{ t('rules.match') }}</span>

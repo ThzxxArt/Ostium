@@ -19,7 +19,7 @@ async def audit_log(
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = await list_audit(session, limit=limit, offset=offset)
     return {"entries": [serialize_audit(row) for row in rows], "limit": limit, "offset": offset}

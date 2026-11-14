@@ -22,7 +22,7 @@ from ostium.db.base import Base
 
 INITIAL_REVISION = "8c9f85297917"
 # Keep this in sync with the newest file under ``alembic/versions``.
-SCHEMA_HEAD = INITIAL_REVISION
+SCHEMA_HEAD = "d41f7a2c9b30"
 
 
 class DatabaseVersionError(RuntimeError):
@@ -103,6 +103,56 @@ def _has_tables(db_path: Path) -> bool:
         return False
 
 
+ENCRYPTED_FIELD_PROBES = (
+    ("admin_users", "totp_secret_enc"),
+    ("proxy_users", "password_enc"),
+    ("proxy_users", "ss_password_enc"),
+    ("proxy_users", "subscription_token_enc"),
+    ("profiles", "config_enc"),
+    ("profiles", "subscription_url_enc"),
+    ("inbounds", "params_enc"),
+)
+
+
+def database_requires_master_key(path: Path) -> bool:
+    """Return True when an existing database contains fields encrypted at rest.
+
+    ``master.key`` is written when the first encrypted field is created.  If the
+    key disappears while ciphertext remains, generating a replacement key would
+    make every password, TOTP secret, subscription token and inbound credential
+    permanently unreadable.  Startup must fail closed instead.
+    """
+
+    if not path.is_file():
+        return False
+    try:
+        with sqlite3.connect(path) as connection:
+            tables = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            for table, column in ENCRYPTED_FIELD_PROBES:
+                if table not in tables:
+                    continue
+                row = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE {column} IS NOT NULL AND {column} != '' LIMIT 1"  # noqa: S608
+                ).fetchone()
+                if row is not None:
+                    return True
+            if "settings" in tables:
+                row = connection.execute(
+                    "SELECT 1 FROM settings WHERE value_json LIKE '%\"v1.%' LIMIT 1"
+                ).fetchone()
+                if row is not None:
+                    return True
+    except sqlite3.DatabaseError:
+        # An unreadable database is not a reason to create a fresh key.
+        return True
+    return False
+
+
 def _check_version(db_path: Path) -> None:
     version = _read_version(db_path)
     if version is None:
@@ -155,6 +205,11 @@ def migrate_database(db_path: Path) -> None:
                         leftover.unlink(missing_ok=True)
                     snapshot.replace(db_path)
                 raise
+            else:
+                # The snapshot is a full copy of the encrypted database.  Keep
+                # it only on failure; leaving it behind doubles disk usage and
+                # retains an extra copy of every credential indefinitely.
+                snapshot.unlink(missing_ok=True)
     except Timeout as exc:
         raise RuntimeError(f"another Ostium process is migrating {db_path}; try again") from exc
 
@@ -170,6 +225,11 @@ def _snapshot_database(source: Path, destination: Path) -> None:
     finally:
         dst.close()
         src.close()
+    if os.name == "posix":
+        try:
+            destination.chmod(0o600)
+        except OSError:
+            pass
 
 
 async def create_schema(engine: AsyncEngine) -> None:

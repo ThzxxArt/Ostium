@@ -296,6 +296,11 @@ def test_client_proxy_and_tun_toggles(client_api: TestClient, fake_proxy: FakePr
     headers = _headers(token)
     services = client_api.app.state.services
 
+    async def core_running() -> dict[str, object]:
+        return {"running": True}
+
+    services.engine.client.status = core_running  # type: ignore[method-assign]
+
     enabled = client_api.post("/api/v1/system/proxy", json={"enabled": True}, headers=headers)
     assert enabled.status_code == 200
     assert fake_proxy.enabled is True
@@ -363,6 +368,23 @@ def test_client_proxy_and_tun_toggles(client_api: TestClient, fake_proxy: FakePr
     assert failed_untun.json()["code"] == "tun_failed"
 
 
+def test_system_proxy_requires_a_running_core(
+    client_api: TestClient, fake_proxy: FakeProxy
+) -> None:
+    token = setup_admin(client_api, role="client")
+    headers = _headers(token)
+    services = client_api.app.state.services
+
+    async def core_stopped() -> dict[str, object]:
+        return {"running": False}
+
+    services.engine.client.status = core_stopped  # type: ignore[method-assign]
+    response = client_api.post("/api/v1/system/proxy", json={"enabled": True}, headers=headers)
+    assert response.status_code == 409
+    assert response.json()["code"] == "core_not_running"
+    assert fake_proxy.enabled is False
+
+
 def test_client_modes_and_connect_disconnect(client_api: TestClient, fake_proxy: FakeProxy) -> None:
     token = setup_admin(client_api, role="client")
     headers = _headers(token)
@@ -375,6 +397,11 @@ def test_client_modes_and_connect_disconnect(client_api: TestClient, fake_proxy:
         return {"status": {"revision": "r1"}}
 
     services.engine.apply_client = applied  # type: ignore[method-assign]
+
+    async def core_running() -> dict[str, object]:
+        return {"running": True}
+
+    services.engine.client.status = core_running  # type: ignore[method-assign]
 
     tun = client_api.post("/api/v1/system/mode", json={"mode": "tun"}, headers=headers)
     assert tun.status_code == 200

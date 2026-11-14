@@ -16,6 +16,7 @@ const { copy } = useCopy()
 
 const info = ref<SystemInfo | null>(null)
 const loading = ref(true)
+const error = ref('')
 const busy = ref<string | null>(null)
 const lanBusy = ref(false)
 
@@ -64,7 +65,9 @@ async function load() {
   loading.value = true
   try {
     info.value = await api.system.info()
+    error.value = ''
   } catch (err) {
+    error.value = (err as Error).message
     message.error((err as Error).message)
   } finally {
     loading.value = false
@@ -119,6 +122,12 @@ onMounted(load)
       </template>
     </OPageHeader>
 
+    <div v-if="error" class="o-card warning-banner" role="alert">
+      <strong>{{ t('common.load_failed') }}</strong>
+      <span class="o-small o-muted">{{ error }}</span>
+      <NButton size="tiny" secondary @click="load">{{ t('common.retry') }}</NButton>
+    </div>
+
     <div class="mode-grid">
       <article
         v-for="item in modes"
@@ -171,23 +180,14 @@ onMounted(load)
           </div>
           <div>
             <span>{{ t('network.tun_interface') }}</span><strong class="o-mono">{{
-              tun?.interface || 'ostium0'
+              tun?.interface || '—'
             }}</strong>
           </div>
           <div>
-            <span>{{ t('network.mtu') }}</span><strong>{{ tun?.mtu || 1500 }}</strong>
+            <span>{{ t('network.mtu') }}</span><strong>{{ tun?.mtu ?? '—' }}</strong>
           </div>
           <div>
-            <span>{{ t('network.stack') }}</span><strong>{{ tun?.stack || 'gvisor' }}</strong>
-          </div>
-          <div>
-            <span>{{ t('network.ipv6') }}</span><strong>{{ t('common.yes') }}</strong>
-          </div>
-          <div>
-            <span>{{ t('network.strict_route') }}</span><strong>{{ t('common.yes') }}</strong>
-          </div>
-          <div>
-            <span>{{ t('network.dns_hijack') }}</span><strong>{{ t('common.yes') }}</strong>
+            <span>{{ t('network.stack') }}</span><strong>{{ tun?.stack || '—' }}</strong>
           </div>
           <div>
             <span>{{ t('common.status') }}</span><strong>{{
@@ -397,6 +397,17 @@ p {
   font-size: 10.5px;
   line-height: 1.55;
   margin-top: 2px;
+}
+.warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.warning-banner .o-small {
+  flex: 1;
 }
 @media (max-width: 1000px) {
   .mode-grid,

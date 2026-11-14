@@ -269,6 +269,7 @@ export default {
     no_online: 'No users online right now',
     alerts: 'Alerts',
     no_alerts: 'Nothing needs attention.',
+    alerts_unavailable: 'Alerts are temporarily unavailable; the count is unknown.',
     quick_actions: 'Quick actions',
     add_user: 'Add user',
     view_subscriptions: 'Subscriptions',

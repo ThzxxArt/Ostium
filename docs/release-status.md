@@ -26,15 +26,25 @@ before the status update. Replacing them would rewrite published artifacts;
 
 ### Verified locally
 
-- Backend unit and in-process integration tests.
-- Real sing-box integration tests with the pinned `1.14.4-ostium.1` core.
-- Frontend typecheck, lint, unit tests and production build.
+- Backend unit and in-process integration tests: 651 passed / 10 deselected;
+  94.07% statements / 90.38% branches; `coverage_gate.py` passes.
+- Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
+- Frontend typecheck, lint, unit tests, production build and formatting: 192
+  passed; 90.69/85.13/88.08/92.17.
 - `0.1.1 -> 0.1.2` upgrade script: user, password material, subscription
   token, database, backup and `master.key` survive; a 0.1.1 backup restores.
-- Cross-directory backup restore, missing-master-key rejection, checksum
-  rejection and v1 backup import.
-- Rule/RE2 validation, rule-set-only tester semantics and DNS pinning tests.
-- Release workflow ordering tests: draft release first, PyPI last.
+- Cross-directory backup restore (v2 streaming), missing-master-key rejection,
+  checksum/tamper/truncation rejection and v1 backup import.
+- Rule/RE2 validation, rule-set format validation, rule-set-only tester
+  semantics and DNS pinning tests.
+- First full review round: 40 findings closed, including commit-before-response,
+  stats-outage quota enforcement, certificate path traversal, webhook secret
+  encryption, Public UI recovery and release-workflow/Docker defaults. See
+  `V0.1.2_REVIEW_ROUND1.md`.
+- Release workflow ordering tests: draft release first, PyPI before GHCR/draft
+  publication.
+- Playwright/axe/visual regression: 69 passed after the review changes
+  (1440/1024/390, dark/light, core-page axe, LCP/CLS and PWA checks).
 
 ### Not verified in this workspace
 
@@ -50,6 +60,8 @@ These items require external hardware, accounts, runners or time. They are
 - Real TUN, Allow LAN, DNS leak, 72-hour soak, iperf3 performance and
   5-user usability measurements.
 - Windows Authenticode and Apple Developer ID signing certificates.
+- Separation of the control-plane and core service users (currently both use
+  `ostium`; tracked as a 0.2.0 architecture item).
 
 ### Signing status
 

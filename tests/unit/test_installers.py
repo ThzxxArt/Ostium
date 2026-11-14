@@ -199,7 +199,8 @@ def test_release_workflow_publishes_all_platform_assets_immutably() -> None:
     # Assets are collected on a draft release first; only after PyPI succeeds is
     # the draft made public.  Replacing files on a draft is safe.
     assert "draft: true" in workflow
-    assert "overwrite_files: true" in workflow
+    assert "overwrite_files: false" in workflow
+    assert "overwrite_files: true" not in workflow
     assert "gh release edit" in workflow and "--draft=false" in workflow
     assert "macos-dmg" in workflow
     assert "linux-packages" in workflow

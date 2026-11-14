@@ -87,6 +87,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         await create_schema(engine)
         factory = create_session_factory(engine)
         store = SecretStore.from_data_dir(settings.data_dir)
+        from ostium.services.audit import set_webhook_secret_decrypter
+
+        set_webhook_secret_decrypter(
+            lambda value: store.decrypt(
+                value, table="settings", record_id="webhook_secret", field="secret"
+            )
+        )
         bus = EventBus()
         await recover_jobs(factory)
         jobs = JobManager(factory, bus)
@@ -124,6 +131,15 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         app.state.services = services
         app.state.db_engine = engine
         ensure_cli_token(settings)
+        if settings.role is not Role.SERVER:
+            from ostium.services.settings import get_setting
+
+            async with factory() as paused_session:
+                services.client_paused = bool(
+                    await get_setting(paused_session, "client_paused", False)
+                )
+            if services.client_paused:
+                bus.log("info", "client auto-connect disabled after an explicit disconnect")
         if settings.role is Role.SERVER:
             async with factory() as session:
                 with contextlib.suppress(Exception):
@@ -139,7 +155,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 bus.log("info", "server configuration reconciled at startup")
             except Exception as exc:
                 bus.log("warning", "startup configuration reconcile failed", error=str(exc))
-        elif settings.auto_connect:
+        elif settings.auto_connect and not getattr(services, "client_paused", False):
             try:
                 async with factory() as session:
                     await engine_manager.apply_client(
@@ -765,7 +781,11 @@ async def _profile_refresh(
 async def _watchdog_tick(services: Services) -> None:
     """Restart a client core that disappeared after it had a good config."""
 
-    if not services.settings.auto_reconnect or services.watchdog_suspended:
+    if (
+        not services.settings.auto_reconnect
+        or services.watchdog_suspended
+        or services.client_paused
+    ):
         return
     if not services.settings.paths.last_good_path.is_file():
         return

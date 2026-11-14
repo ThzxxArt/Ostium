@@ -15,6 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
   let inFlight: Promise<void> | null = null
 
   const initialized = computed(() => status.value?.initialized === true)
+  const hasAdmin = computed(() => status.value?.has_admin === true)
   const authenticated = computed(() => status.value?.authenticated ?? false)
   const role = computed(() => status.value?.role ?? 'server')
   const isServer = computed(() => role.value === 'server')
@@ -126,6 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     statusState,
     initialized,
+    hasAdmin,
     authenticated,
     role,
     isServer,

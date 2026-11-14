@@ -204,6 +204,36 @@ def test_public_ui_enable_and_disable(api_client: TestClient, settings: Settings
     assert settings.host == "127.0.0.1"
 
 
+def test_public_ui_disable_restores_a_previous_secure_cookie_policy(
+    api_client: TestClient, settings: Settings
+) -> None:
+    token = setup_admin(api_client)
+    headers = _headers(token)
+    _enable_totp(api_client, headers)
+    headers = _headers(csrf(api_client))
+    api_client.post(
+        "/api/v1/certificates/issue",
+        json={"domain": "ui.example.com", "method": "self-signed"},
+        headers=headers,
+    )
+    # Simulate an operator that already terminates HTTPS in Nginx and enabled
+    # secure cookies before turning on the Public UI.
+    settings.secure_cookies = True
+    settings.save()
+
+    enabled = api_client.post(
+        "/api/v1/settings/public-ui",
+        json={"enabled": True, "domain": "ui.example.com"},
+        headers=headers,
+    )
+    assert enabled.status_code == 200, enabled.text
+    disabled = api_client.post(
+        "/api/v1/settings/public-ui", json={"enabled": False}, headers=headers
+    )
+    assert disabled.status_code == 200, disabled.text
+    assert settings.secure_cookies is True
+
+
 def test_public_ui_disable_handles_non_dict_setting(api_client: TestClient, monkeypatch) -> None:
     token = setup_admin(api_client)
     headers = _headers(token)

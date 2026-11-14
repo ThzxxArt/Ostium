@@ -173,7 +173,10 @@ function parseBytes(value: string): number {
     G: 1024 ** 3,
     T: 1024 ** 4,
   }
-  return Math.round(amount * (factor[unit] || 1))
+  const result = Math.round(amount * (factor[unit] || 1))
+  // JSON numbers beyond this limit silently round, which would change a user's
+  // quota without any visible warning.
+  return Number.isSafeInteger(result) ? result : Number.NaN
 }
 
 async function save() {
@@ -230,20 +233,22 @@ async function toggleUser(user: User, enabled: boolean) {
 async function openDetail(user: User) {
   const request = ++detailRequest
   activeUser.value = user
+  usageSeries.value = []
   drawerOpen.value = true
   loadingUsage.value = true
   try {
-    const [detail, usage] = await Promise.all([
+    // The detail and usage endpoints are independent: a usage failure must not
+    // hide the user, and it must never leave the previous user's chart under
+    // the new name.
+    const [detail, usage] = await Promise.allSettled([
       api.users.get(user.id),
       api.users.usage(user.id, 30),
     ])
-    // A slower response for a previously-clicked user must not overwrite the
-    // drawer that is now showing someone else.
     if (request !== detailRequest) return
-    activeUser.value = detail.user
-    usageSeries.value = usage.series
-  } catch (err) {
-    if (request === detailRequest) message.error((err as Error).message)
+    if (detail.status === 'fulfilled') activeUser.value = detail.value.user
+    usageSeries.value = usage.status === 'fulfilled' ? usage.value.series : []
+    if (detail.status === 'rejected') message.error((detail.reason as Error).message)
+    else if (usage.status === 'rejected') message.error((usage.reason as Error).message)
   } finally {
     if (request === detailRequest) loadingUsage.value = false
   }
@@ -818,10 +823,7 @@ onMounted(async () => {
       <div v-if="subscriptionLoading" class="loading">…</div>
       <div v-else-if="subscriptionError" class="sub-locked">
         <p class="error" role="alert">{{ subscriptionError }}</p>
-        <NButton
-          type="primary"
-          @click="subscriptionUser && openSubscription(subscriptionUser)"
-        >
+        <NButton type="primary" @click="subscriptionUser && openSubscription(subscriptionUser)">
           {{ t('retry') }}
         </NButton>
       </div>

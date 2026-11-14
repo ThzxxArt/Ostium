@@ -21,7 +21,7 @@ describe('router guards', () => {
 
   it('redirects uninitialised installs to setup and setup away when signed in', async () => {
     const auth = useAuthStore()
-    auth.status = { ...base, initialized: false }
+    auth.status = { ...base, initialized: false, has_admin: false }
     auth.ready = true
     await router.push('/users')
     expect(router.currentRoute.value.name).toBe('setup')
@@ -33,6 +33,16 @@ describe('router guards', () => {
 
     await router.push('/login')
     expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('keeps login reachable when an admin exists without an initialized marker', async () => {
+    const auth = useAuthStore()
+    auth.status = { ...base, initialized: false, has_admin: true }
+    auth.ready = true
+    await router.push('/users')
+    expect(router.currentRoute.value.name).toBe('login')
+    await router.push('/setup')
+    expect(router.currentRoute.value.name).toBe('login')
   })
 
   it('enforces authentication and roles', async () => {

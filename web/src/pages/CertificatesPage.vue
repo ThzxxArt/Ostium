@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NInput, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
 import {
@@ -85,6 +85,14 @@ async function issue() {
     busy.value = null
   }
 }
+
+watch(uploadOpen, (open) => {
+  if (!open) {
+    // Cancel, X, ESC and mask clicks must all drop the private key from
+    // reactive memory and the DOM, not only a successful upload.
+    uploadForm.value = { domain: '', cert_pem: '', key_pem: '', auto_renew: false }
+  }
+})
 
 async function upload() {
   if (!uploadForm.value.domain.trim() || !uploadForm.value.cert_pem || !uploadForm.value.key_pem) {

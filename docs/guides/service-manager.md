@@ -263,7 +263,7 @@ no-service 安装也适用；升级只替换 venv/核心，不碰你的 init 脚
 
 ```bash
 sudo bash install-online.sh uninstall
-# 或彻底删除数据和用户
+# 或彻底删除数据和程序（服务账号保留）
 sudo bash install-online.sh uninstall --purge
 ```
 

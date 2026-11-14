@@ -243,6 +243,14 @@ async def _persist(
     # Never overwrite the files referenced by the current ready certificate.
     # A crash or short write during renewal must leave the old TLS material
     # untouched until the database switches to the complete new generation.
+    # Record which exact domain owns this directory.  Sanitizing a domain can
+    # map two different inputs (for example an IPv6 address and a hostname with
+    # underscores) to the same directory; a blind generation cleanup would then
+    # delete the other certificate's private key.
+    marker = directory / ".ostium-domain"
+    marker.write_text(domain, encoding="utf-8")
+    if os.name == "posix":
+        marker.chmod(0o600)
     generation = secrets.token_hex(8)
     cert_path = directory / f"fullchain-{generation}.pem"
     key_path = directory / f"privkey-{generation}.pem"
@@ -283,7 +291,11 @@ async def list_certificates(session: AsyncSession) -> list[Certificate]:
 
 
 async def use_for_inbounds(
-    session: AsyncSession, certificate: Certificate, *, kinds: list[str] | None = None
+    session: AsyncSession,
+    certificate: Certificate,
+    *,
+    kinds: list[str] | None = None,
+    settings: Settings | None = None,
 ) -> None:
     allowed = {"hysteria2", "trojan"}
     targets = kinds or sorted(allowed)
@@ -292,7 +304,7 @@ async def use_for_inbounds(
         raise CertificateError(
             f"certificate assignment is not supported for: {sorted(unknown)}", "bad_request"
         )
-    if not certificate_is_ready(certificate):
+    if not certificate_is_ready(certificate, settings):
         raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
     inbounds = (
         (await session.execute(select(Inbound).where(Inbound.kind.in_(targets)))).scalars().all()
@@ -303,7 +315,11 @@ async def use_for_inbounds(
 
 
 async def use_for_unbound(
-    session: AsyncSession, certificate: Certificate, *, kinds: list[str] | None = None
+    session: AsyncSession,
+    certificate: Certificate,
+    *,
+    kinds: list[str] | None = None,
+    settings: Settings | None = None,
 ) -> None:
     """Assign a certificate only to TLS inbounds that have none yet."""
 
@@ -314,7 +330,7 @@ async def use_for_unbound(
         raise CertificateError(
             f"certificate assignment is not supported for: {sorted(unknown)}", "bad_request"
         )
-    if not certificate_is_ready(certificate):
+    if not certificate_is_ready(certificate, settings):
         raise CertificateError("only a ready certificate can be assigned", "certificate_not_ready")
     inbounds = (
         (
@@ -395,14 +411,15 @@ async def delete_certificate(
         paths = [path for path in (cert_path, key_path) if path is not None]
     else:
         paths = [Path(certificate.cert_path), Path(certificate.key_path)]
+    domain = certificate.domain
     await session.delete(certificate)
     await session.flush()
     if remove_files:
-        remove_certificate_files(paths)
+        remove_certificate_files(paths, domain=domain)
     return paths
 
 
-def remove_certificate_files(paths: list[Path]) -> None:
+def remove_certificate_files(paths: list[Path], *, domain: str | None = None) -> None:
     """Remove certificate generations after a successful configuration apply."""
 
     parents: set[Path] = set()
@@ -412,15 +429,24 @@ def remove_certificate_files(paths: list[Path]) -> None:
             path.unlink(missing_ok=True)
         except OSError:
             continue
-    # Remove older certificate generations left behind by renewals, but never
-    # touch unrelated files.
+    # Remove older generations only when the directory is explicitly owned by
+    # this domain.  Legacy directories without a marker keep their older
+    # generations rather than risking deletion of another certificate's key.
     for parent in sorted(parents):
-        for pattern in ("fullchain-*.pem", "privkey-*.pem"):
-            for candidate in parent.glob(pattern):
-                try:
-                    candidate.unlink()
-                except OSError:
-                    pass
+        marker = parent / ".ostium-domain"
+        owned = False
+        if domain is not None and marker.is_file():
+            try:
+                owned = marker.read_text(encoding="utf-8").strip() == domain
+            except OSError:
+                owned = False
+        if owned:
+            for pattern in ("fullchain-*.pem", "privkey-*.pem", ".ostium-domain"):
+                for candidate in parent.glob(pattern):
+                    try:
+                        candidate.unlink()
+                    except OSError:
+                        pass
         try:
             parent.rmdir()
         except OSError:

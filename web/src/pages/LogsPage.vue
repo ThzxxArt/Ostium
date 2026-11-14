@@ -110,8 +110,7 @@ async function scrollToBottom() {
 function onScroll() {
   const element = container.value
   if (!element) return
-  const atBottom =
-    element.scrollTop + element.clientHeight >= element.scrollHeight - 40
+  const atBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 40
   // Scrolling up to read history must turn off auto-follow; otherwise every
   // new record yanks the viewport back to the bottom.
   if (!atBottom && follow.value) follow.value = false

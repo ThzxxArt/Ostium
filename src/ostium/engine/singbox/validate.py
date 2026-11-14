@@ -215,7 +215,7 @@ def _reject_forbidden_keys(value: Any, depth: int = 0) -> None:
 
 def _validate_paths(value: Any, allowed_paths: list[Path], depth: int = 0) -> None:
     if depth > 40:
-        return
+        raise ConfigRejected("configuration nesting is too deep")
     if isinstance(value, dict):
         for key, child in value.items():
             if isinstance(child, str) and _looks_like_path(key, child):

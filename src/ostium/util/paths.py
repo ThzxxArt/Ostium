@@ -26,11 +26,25 @@ def store_path(settings: Settings, path: Path | str) -> str:
 
 
 def resolve_path(settings: Settings, stored: str | Path | None) -> Path | None:
-    """Resolve a stored path, accepting both relative and legacy absolute rows."""
+    """Resolve a stored path, accepting both relative and legacy absolute rows.
+
+    Relative rows are data-dir-scoped.  A restored/legacy database must not be
+    able to point a certificate or rule set at ``../../etc/passwd``; such a
+    path is treated as missing so the caller fails closed instead of reading an
+    arbitrary host file.
+    """
 
     if stored is None or str(stored) == "":
         return None
     value = Path(stored)
     if value.is_absolute():
         return value
-    return (settings.data_dir / value).resolve()
+    if ".." in value.parts:
+        return None
+    root = settings.data_dir.resolve()
+    resolved = (root / value).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        return None
+    return resolved

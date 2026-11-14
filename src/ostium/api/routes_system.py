@@ -70,7 +70,7 @@ class ModeRequest(BaseModel):
 async def info(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage(str(services.settings.data_dir))
@@ -123,7 +123,7 @@ async def info(
 async def doctor(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -190,7 +190,7 @@ async def toggle_proxy(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "system proxy is a client feature", "role_mismatch")
@@ -198,12 +198,30 @@ async def toggle_proxy(
         raise ApiError(409, "TUN and system proxy are mutually exclusive", "mode_conflict")
     if payload.enabled:
         try:
+            core = await services.engine.client.status()
+        except Exception as exc:
+            raise ApiError(
+                409,
+                f"connect the client core before enabling the system proxy: {exc}",
+                "core_not_running",
+            ) from exc
+        if not core.get("running"):
+            raise ApiError(
+                409,
+                "connect the client core before enabling the system proxy",
+                "core_not_running",
+            )
+        try:
             result = await asyncio.to_thread(
                 services.proxy.enable, "127.0.0.1", services.settings.mixed_port
             )
         except Exception as exc:
             raise ApiError(500, f"could not enable system proxy: {exc}", "proxy_failed") from exc
         services.settings.mode = Mode.SYSTEM_PROXY
+        from ostium.services.settings import set_setting
+
+        await set_setting(session, "client_paused", False)
+        services.client_paused = False
     else:
         try:
             result = await asyncio.to_thread(services.proxy.disable)
@@ -239,7 +257,7 @@ async def toggle_tun(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "TUN is a client feature", "role_mismatch")
@@ -280,6 +298,10 @@ async def toggle_tun(
             except OSError:
                 pass
             raise ApiError(500, f"TUN could not be enabled: {exc}", "tun_failed") from exc
+        from ostium.services.settings import set_setting
+
+        await set_setting(session, "client_paused", False)
+        services.client_paused = False
         message = "TUN enabled"
     else:
         services.settings.tun_enabled = False
@@ -315,7 +337,7 @@ async def set_mode(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "connection modes are a client feature", "role_mismatch")
@@ -350,7 +372,7 @@ async def connect(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "connect is a client action", "role_mismatch")
@@ -361,6 +383,14 @@ async def connect(
         code = getattr(exc, "code", "engine_error")
         status = getattr(exc, "status_code", 502)
         raise ApiError(status, str(exc), code) from exc
+    from ostium.services.settings import set_setting
+
+    await set_setting(session, "client_paused", False)
+    services.client_paused = False
+    # Persist the intent before restoring the OS proxy: if proxy restoration
+    # fails, the core is still connected and a later restart must not treat
+    # this as a disconnected client.
+    await session.commit()
     if services.settings.mode is Mode.SYSTEM_PROXY:
         try:
             await asyncio.to_thread(
@@ -381,11 +411,19 @@ async def disconnect(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if services.settings.role is not Role.CLIENT:
         raise ApiError(400, "disconnect is a client action", "role_mismatch")
     services.watchdog_suspended = True
+    services.client_paused = True
+    from ostium.services.settings import set_setting
+
+    # Persist the operator's intent before touching the proxy or core.  A
+    # control-plane restart must not auto-connect last-good after an explicit
+    # Disconnect, even if stopping the core then fails.
+    await set_setting(session, "client_paused", True)
+    await session.commit()
     if (await asyncio.to_thread(services.proxy.status)).get("enabled"):
         try:
             await asyncio.to_thread(services.proxy.disable)
@@ -449,7 +487,7 @@ async def restart_service(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if name not in {"ostium", "ostium-core"}:
         raise ApiError(404, "unknown service", "not_found")
@@ -471,7 +509,7 @@ async def restart_service(
 async def diagnostics(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     doctor_result = await doctor(_, services, session)
     try:
@@ -498,7 +536,7 @@ async def diagnostics(
 async def diagnostics_download(
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> Response:
     payload = await diagnostics(admin, services, session)
     body = json.dumps(payload, indent=2, ensure_ascii=False).encode()
@@ -521,36 +559,47 @@ async def preflight_reality(
     port: int = 443,
     _: AdminUser = Depends(get_current_admin),
 ) -> dict[str, Any]:
-    from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+    from ostium.services.netguard import UnsafeUrlError, resolve_remote_url
 
     if not 1 <= port <= 65535:
         return {"ok": False, "host": host, "message": "port must be between 1 and 65535"}
     url_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
     try:
         # Resolve the hostname too: validating only literal addresses would
-        # let a public hostname pivot this probe to loopback/metadata.
-        await asyncio.to_thread(
-            validate_remote_url, f"https://{url_host}:{port}", allow_private=False
+        # let a public hostname pivot this probe to loopback/metadata.  Keep
+        # the validated addresses and connect to them directly; resolving the
+        # hostname again in create_connection would reopen the rebinding TOCTOU.
+        target = await asyncio.to_thread(
+            resolve_remote_url, f"https://{url_host}:{port}", allow_private=False
         )
     except (UnsafeUrlError, ValueError) as exc:
         return {"ok": False, "host": host, "message": str(exc)}
 
     def probe() -> dict[str, Any]:
         context = ssl.create_default_context()
-        with (
-            socket.create_connection((host, port), timeout=8) as sock,
-            context.wrap_socket(sock, server_hostname=host) as tls,
-        ):
-            version = tls.version()
-            cipher = tls.cipher()
-        ok = version == "TLSv1.3"
-        return {
-            "ok": ok,
-            "host": host,
-            "tls_version": version,
-            "cipher": cipher[0] if cipher else None,
-            "message": "TLS 1.3 handshake succeeded" if ok else "TLS 1.3 is required for Reality",
-        }
+        last_error: Exception | None = None
+        for address in target.addresses:
+            candidate = address.split("%", 1)[0]
+            try:
+                with (
+                    socket.create_connection((candidate, port), timeout=8) as sock,
+                    context.wrap_socket(sock, server_hostname=host) as tls,
+                ):
+                    version = tls.version()
+                    cipher = tls.cipher()
+                ok = version == "TLSv1.3"
+                return {
+                    "ok": ok,
+                    "host": host,
+                    "tls_version": version,
+                    "cipher": cipher[0] if cipher else None,
+                    "message": (
+                        "TLS 1.3 handshake succeeded" if ok else "TLS 1.3 is required for Reality"
+                    ),
+                }
+            except Exception as exc:
+                last_error = exc
+        raise last_error or RuntimeError("the host resolved to no usable address")
 
     try:
         # Socket handshakes can block for up to eight seconds; never stall the

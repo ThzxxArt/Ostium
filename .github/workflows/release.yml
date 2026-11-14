@@ -157,22 +157,38 @@ jobs:
           uv run pytest -m integration
 
   upgrade-e2e:
+    needs: [wheel, core]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.11.14"
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: core-linux-amd64
+          path: dist/core
+      - name: Select the real core archive
+        run: |
+          core="$(find dist/core -maxdepth 1 -name 'ostium-core-*-linux-amd64.tar.gz' | head -1)"
+          test -n "$core"
+          echo "OSTIUM_INSTALL_E2E_CORE=$core" >> "$GITHUB_ENV"
       - run: uv sync --locked
       - name: Upgrade a real 0.1.1 installation
         run: ./scripts/upgrade-e2e.sh
       - name: Install, reinstall and uninstall the real package
-        run: sudo ./scripts/install-e2e.sh
+        run: sudo --preserve-env=OSTIUM_INSTALL_E2E_CORE ./scripts/install-e2e.sh
 
   windows:
     needs: [wheel, core]
     runs-on: windows-2022
     environment: release-signing
+    env:
+      OSTIUM_SIGN_THUMBPRINT: ${{ secrets.OSTIUM_SIGN_THUMBPRINT }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -448,7 +464,9 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          overwrite_files: true
+          # Published assets are immutable.  A failed draft should be deleted
+          # and recreated, never silently overwritten on a retry.
+          overwrite_files: false
           body_path: RELEASE_NOTES.md
           files: |
             dist/release/*.whl

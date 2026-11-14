@@ -8,6 +8,7 @@ import OStatCard from '@/components/OStatCard.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OTrafficChart from '@/components/OLazyChart.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
+import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
 import type { ConnectionEntry, StatsOverview, TrafficPoint } from '@/api/types'
 import { formatBytes } from '@/utils/format'
@@ -19,6 +20,8 @@ const series = ref<TrafficPoint[]>([])
 const connections = ref<ConnectionEntry[]>([])
 const days = ref(7)
 const loading = ref(true)
+const error = ref('')
+let loadRequest = 0
 
 const totalUp = computed(() => series.value.reduce((sum, point) => sum + point.up, 0))
 const totalDown = computed(() => series.value.reduce((sum, point) => sum + point.down, 0))
@@ -32,6 +35,7 @@ const topDestinations = computed(() => {
 })
 
 async function load() {
+  const request = ++loadRequest
   loading.value = true
   try {
     const [stats, traffic, connectionData] = await Promise.all([
@@ -39,20 +43,34 @@ async function load() {
       api.stats.traffic(days.value),
       api.stats.connections(),
     ])
+    if (request !== loadRequest) return
     overview.value = stats
     series.value = traffic.series
     connections.value = connectionData.connections
-  } catch {
-    /* handled by empty states */
+    error.value = ''
+  } catch (err) {
+    if (request === loadRequest) error.value = (err as Error).message
   } finally {
-    loading.value = false
+    if (request === loadRequest) loading.value = false
   }
 }
 
 async function changeDays(value: number) {
+  const request = ++loadRequest
   days.value = value
-  const traffic = await api.stats.traffic(days.value)
-  series.value = traffic.series
+  loading.value = true
+  try {
+    const traffic = await api.stats.traffic(value)
+    // A slow response for the old range must not overwrite the newly selected
+    // range's chart.
+    if (request !== loadRequest) return
+    series.value = traffic.series
+    error.value = ''
+  } catch (err) {
+    if (request === loadRequest) error.value = (err as Error).message
+  } finally {
+    if (request === loadRequest) loading.value = false
+  }
 }
 
 onMounted(load)
@@ -80,6 +98,8 @@ onMounted(load)
         </NButton>
       </template>
     </OPageHeader>
+
+    <OErrorState v-if="error" :title="t('common.load_failed')" :message="error" @retry="load" />
 
     <div class="o-grid o-grid-4">
       <OStatCard

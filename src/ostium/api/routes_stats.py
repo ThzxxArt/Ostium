@@ -22,7 +22,7 @@ router = APIRouter(tags=["stats"])
 async def overview(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     users = (await session.execute(select(ProxyUser))).scalars().all()
     today = utcnow().date()
@@ -76,7 +76,7 @@ async def traffic(
     days: int = Query(default=30, ge=1, le=365),
     user_id: str | None = None,
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     series = await usage_series(session, days=days, user_id=user_id)
     return {"series": series, "days": days, "user_id": user_id}
@@ -98,6 +98,8 @@ async def connections(
             if needle in str(item.get("metadata", {}).get("host", "")).lower()
             or needle in str(item.get("metadata", {}).get("destinationIP", "")).lower()
             or needle in str(item.get("metadata", {}).get("processPath", "")).lower()
+            or needle in str(item.get("metadata", {}).get("user", "")).lower()
+            or needle in str(item.get("metadata", {}).get("rule", "")).lower()
         ]
     return {
         "connections": items,
@@ -143,7 +145,7 @@ async def engine_stats(
 async def prometheus_metrics(
     _: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> Any:
     from fastapi.responses import PlainTextResponse
 

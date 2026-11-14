@@ -55,6 +55,13 @@ async function activate(profile: Profile) {
   try {
     const result = await api.profiles.activate(profile.id)
     if (result.warning) message.warning(result.warning)
+    if (result.applied === false) {
+      // The database desired state changed, but the running core did not.  Do
+      // not claim this profile is current; the reconciler will retry and the
+      // UI can refresh after it succeeds.
+      await load()
+      return
+    }
     activeProfileId.value = profile.id
     message.success(t('profiles.activated'))
   } catch (err) {

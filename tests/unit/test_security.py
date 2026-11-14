@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
 
 from ostium.util.security import (
+    BACKUP_V2_CHUNK_SIZE,
     CryptoError,
     FieldCipher,
     consume_recovery_code,
     decrypt_blob,
+    decrypt_stream,
     encrypt_blob,
+    encrypt_stream,
     generate_recovery_codes,
     generate_session_token,
     generate_totp_secret,
@@ -20,6 +24,30 @@ from ostium.util.security import (
     verify_password,
     verify_totp,
 )
+
+
+def test_streamed_backup_round_trip_and_tamper_rejection() -> None:
+    payload = b"a" * (BACKUP_V2_CHUNK_SIZE * 2 + 17)
+    source = io.BytesIO(payload)
+    container = io.BytesIO()
+    encrypt_stream(source, container, "long-passphrase")
+    data = container.getvalue()
+    assert data.startswith(b"OSTB2")
+
+    output = io.BytesIO()
+    decrypt_stream(io.BytesIO(data), output, "long-passphrase")
+    assert output.getvalue() == payload
+
+    tampered = bytearray(data)
+    tampered[-20] ^= 0x01
+    with pytest.raises(CryptoError):
+        decrypt_stream(io.BytesIO(bytes(tampered)), io.BytesIO(), "long-passphrase")
+    with pytest.raises(CryptoError):
+        decrypt_stream(io.BytesIO(data[:-5]), io.BytesIO(), "long-passphrase")
+    with pytest.raises(CryptoError):
+        decrypt_stream(io.BytesIO(data + b"x"), io.BytesIO(), "long-passphrase")
+    with pytest.raises(CryptoError):
+        decrypt_stream(io.BytesIO(data), io.BytesIO(), "wrong-passphrase")
 
 
 def test_master_key_created_0600(tmp_path: Path) -> None:

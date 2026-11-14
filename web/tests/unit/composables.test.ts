@@ -172,4 +172,51 @@ describe('composables', () => {
     expect(status.coreReachable.value).toBe(false)
     wrapper.unmount()
   })
+
+  it('does not poll while hidden or signed out, and start/stop are idempotent', async () => {
+    const calls = installFetchMock()
+    const Page = defineComponent({
+      setup() {
+        const status = useStatus()
+        return { status }
+      },
+      template: '<div>{{ status.mode.value }}</div>',
+    })
+    let authStore: ReturnType<typeof useAuthStore>
+    const { wrapper } = await mountPage(Page, {}, (pinia) => {
+      const auth = useAuthStore(pinia)
+      authStore = auth
+      auth.status = {
+        initialized: true,
+        has_admin: true,
+        authenticated: true,
+        must_change_password: false,
+        totp_enabled: false,
+        role: 'server',
+        version: '0.1.2',
+        public_ui: false,
+      }
+      auth.ready = true
+    })
+    await settle()
+    const status = (wrapper.findComponent(Page).vm as any).status
+    const before = calls.calls.length
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    await status.refresh()
+    expect(calls.calls.length).toBe(before)
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+
+    authStore!.status = {
+      ...authStore!.status!,
+      authenticated: false,
+    }
+    await status.refresh()
+    expect(calls.calls.length).toBe(before)
+
+    status.start()
+    status.start()
+    status.stop()
+    status.stop()
+    wrapper.unmount()
+  })
 })

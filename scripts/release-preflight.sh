@@ -53,7 +53,13 @@ check_contains src/ostium/__init__.py "__version__ = \"$VERSION\""
 check_contains web/package.json "\"version\": \"$VERSION\""
 check_contains web/package-lock.json "\"version\": \"$VERSION\""
 check_contains Dockerfile "ARG OSTIUM_VERSION=$VERSION"
-check_contains deploy/docker/docker-compose.yml "ostium:$VERSION"
+# Compose tracks the mutable `latest` tag so a fresh checkout does not request
+# an unpublished version; release jobs still build the immutable VERSION tags.
+if ! grep -q "ostium:$VERSION" "$ROOT/deploy/docker/docker-compose.yml" \
+  && ! grep -q "ostium:latest" "$ROOT/deploy/docker/docker-compose.yml"; then
+  echo "missing versioned or latest ostium image in deploy/docker/docker-compose.yml" >&2
+  exit 1
+fi
 check_contains scripts/build-windows.ps1 "[string]\$Version = \"$VERSION\""
 check_contains scripts/build-sbom.py "app_version = \"$VERSION\""
 check_contains scripts/build-core-manifest.py "\"$VERSION\""

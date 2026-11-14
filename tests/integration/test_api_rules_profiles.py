@@ -120,7 +120,7 @@ def test_rule_sets_lifecycle(api_client: TestClient, session_token: str, setting
 
     with respx.mock:
         respx.get("https://example.com/ads.srs").mock(
-            return_value=httpx.Response(200, content=b"rules", headers={"etag": '"v1"'})
+            return_value=httpx.Response(200, content=b"SRS\x01rules", headers={"etag": '"v1"'})
         )
         updated = api_client.post(f"/api/v1/rule-sets/{rule_set['id']}/update", headers=headers)
     assert updated.status_code == 200

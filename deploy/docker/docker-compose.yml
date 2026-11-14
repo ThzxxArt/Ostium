@@ -1,12 +1,14 @@
 # Hardened single-container server deployment.
 #
-# The container must bind 0.0.0.0 for Docker port publishing, so the admin UI
-# is plaintext inside the container.  Restrict 8443 on the host firewall or
-# put Nginx/Caddy with TLS in front; never publish 8443 directly to the
-# internet.
+# Host networking is used so sing-box can bind 80/443.  The admin UI stays on
+# loopback by default; reach it through an SSH tunnel, host Nginx/Caddy with
+# TLS, or explicitly opt into a public bind with a firewall.
 services:
   ostium:
-    image: ghcr.io/thzxxart/ostium:0.1.2
+    # GHCR publishes <version>, v<version> and latest; latest is used here so a
+    # fresh checkout does not request an unpublished version. Pin an immutable
+    # digest or version tag for production reproducibility.
+    image: ghcr.io/thzxxart/ostium:latest
     container_name: ostium
     restart: unless-stopped
     network_mode: host
@@ -23,8 +25,8 @@ services:
     # drops all other capabilities and runs unprivileged.
     environment:
       OSTIUM_ROLE: server
-      OSTIUM_HOST: 0.0.0.0
-      OSTIUM_ALLOW_INSECURE_BIND: "true"
+      OSTIUM_HOST: 127.0.0.1
+      OSTIUM_ALLOW_INSECURE_BIND: "false"
       OSTIUM_ADMIN_PASSWORD: ${OSTIUM_ADMIN_PASSWORD:-}
       OSTIUM_DOMAIN: ${OSTIUM_DOMAIN:-}
     volumes:

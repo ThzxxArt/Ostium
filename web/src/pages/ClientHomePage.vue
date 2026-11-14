@@ -18,6 +18,7 @@ import OPageHeader from '@/components/OPageHeader.vue'
 import OConnectOrb from '@/components/OConnectOrb.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
+import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
 import type { ConnectionEntry, Profile, SystemInfo } from '@/api/types'
 import { formatBytes, formatDuration, formatRate } from '@/utils/format'
@@ -32,6 +33,8 @@ const selectedProfileId = ref<string | null>(null)
 const activeProfileId = ref<string | null>(null)
 const connections = ref<ConnectionEntry[]>([])
 const loading = ref(true)
+const loadError = ref('')
+let loadRequest = 0
 const busy = ref(false)
 const sessionUp = ref(0)
 const sessionDown = ref(0)
@@ -84,45 +87,58 @@ const warning = computed(() => {
 })
 
 async function load() {
+  const request = ++loadRequest
   loading.value = true
   try {
-    const [systemInfo, profileData, connectionData] = await Promise.all([
+    const results = await Promise.allSettled([
       api.system.info(),
       api.profiles.list(),
       api.stats.connections(),
     ])
-    info.value = systemInfo
-    profiles.value = profileData.profiles
-    activeProfileId.value = profileData.active_profile_id
-    if (!selectedProfileId.value) {
-      const preferred =
-        profiles.value.find(
-          (profile) => profile.id === profileData.active_profile_id && profile.endpoints.length,
-        ) || profiles.value.find((profile) => profile.endpoints.length)
-      selectedProfileId.value = preferred?.id || profiles.value[0]?.id || null
-    }
-    connections.value = connectionData.connections
-    const up = connectionData.upload_total
-    const down = connectionData.download_total
-    const now = Date.now()
-    const elapsed = Math.max(1, (now - lastTotals.at) / 1000)
-    if (firstSample) {
-      firstSample = false
-      rateUp.value = 0
-      rateDown.value = 0
+    if (request !== loadRequest) return
+    const failures: string[] = []
+    const [systemInfo, profileData, connectionData] = results
+    if (systemInfo.status === 'fulfilled') info.value = systemInfo.value
+    else failures.push((systemInfo.reason as Error).message)
+    if (profileData.status === 'fulfilled') {
+      profiles.value = profileData.value.profiles
+      activeProfileId.value = profileData.value.active_profile_id
+      if (!selectedProfileId.value) {
+        const preferred =
+          profiles.value.find(
+            (profile) =>
+              profile.id === profileData.value.active_profile_id && profile.endpoints.length,
+          ) || profiles.value.find((profile) => profile.endpoints.length)
+        selectedProfileId.value = preferred?.id || profiles.value[0]?.id || null
+      }
     } else {
-      rateUp.value = Math.max(0, (up - lastTotals.up) / elapsed)
-      rateDown.value = Math.max(0, (down - lastTotals.down) / elapsed)
+      failures.push((profileData.reason as Error).message)
     }
-    lastTotals = { up, down, at: now }
-    sessionUp.value = up
-    sessionDown.value = down
+    if (connectionData.status === 'fulfilled') {
+      connections.value = connectionData.value.connections
+      const up = connectionData.value.upload_total
+      const down = connectionData.value.download_total
+      const now = Date.now()
+      const elapsed = Math.max(1, (now - lastTotals.at) / 1000)
+      if (firstSample) {
+        firstSample = false
+        rateUp.value = 0
+        rateDown.value = 0
+      } else {
+        rateUp.value = Math.max(0, (up - lastTotals.up) / elapsed)
+        rateDown.value = Math.max(0, (down - lastTotals.down) / elapsed)
+      }
+      lastTotals = { up, down, at: now }
+      sessionUp.value = up
+      sessionDown.value = down
+    } else {
+      failures.push((connectionData.reason as Error).message)
+    }
+    loadError.value = failures[0] || ''
     if (connected.value && connectedAt.value === null) connectedAt.value = Date.now()
     if (!connected.value) connectedAt.value = null
-  } catch (err) {
-    message.error((err as Error).message)
   } finally {
-    loading.value = false
+    if (request === loadRequest) loading.value = false
   }
 }
 
@@ -152,6 +168,10 @@ async function selectProfile(id: string) {
     if (id !== activeProfileId.value) {
       const result = await api.profiles.activate(id)
       if (result.warning) message.warning(result.warning)
+      if (result.applied === false) {
+        await load()
+        return
+      }
       activeProfileId.value = id
       message.success(t('profiles.activated'))
     }
@@ -213,7 +233,14 @@ onBeforeUnmount(() => {
       </template>
     </OPageHeader>
 
-    <div v-if="!loading && !profiles.length" class="o-card">
+    <OErrorState
+      v-if="loadError && !info && !profiles.length"
+      :title="t('common.load_failed')"
+      :message="loadError"
+      @retry="load"
+    />
+
+    <div v-else-if="!loadError && !loading && !profiles.length" class="o-card">
       <OEmptyState
         :title="t('home.no_profile')"
         :description="t('home.no_profile_desc')"
@@ -227,6 +254,11 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else class="home-grid">
+      <div v-if="loadError" class="o-card warning-banner" role="alert">
+        <strong>{{ t('common.load_failed') }}</strong>
+        <span class="o-small o-muted">{{ loadError }}</span>
+        <NButton size="tiny" secondary @click="load">{{ t('common.retry') }}</NButton>
+      </div>
       <section class="hero o-card">
         <div class="hero-top">
           <div class="mode-chips">
@@ -592,6 +624,17 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: var(--success);
   flex: none;
+}
+.warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.warning-banner .o-small {
+  flex: 1;
 }
 @media (max-width: 1000px) {
   .home-grid {

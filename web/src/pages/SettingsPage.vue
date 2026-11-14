@@ -35,6 +35,7 @@ import OStatusPill from '@/components/OStatusPill.vue'
 import OCopyButton from '@/components/OCopyButton.vue'
 import OQrModal from '@/components/OQrModal.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
+import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
 import type { AppSettings, Backup, Certificate } from '@/api/types'
 import { formatBytes, formatDate } from '@/utils/format'
@@ -78,6 +79,8 @@ const maintenance = ref({
 const allowlist = ref('')
 const publicUiDomain = ref('')
 const publicUiEnabled = ref(false)
+const publicUiRestart = ref('')
+const loadError = ref('')
 
 const passwordForm = ref({ current: '', next: '', confirm: '' })
 const totpStart = ref<{ secret: string; uri: string; recovery_codes: string[] } | null>(null)
@@ -119,14 +122,28 @@ const apiTokens = computed<Array<Record<string, unknown>>>(() =>
 async function load() {
   loading.value = true
   try {
-    const [data, certData, backupData] = await Promise.all([
+    // Settings is required for the page; certificates and backups are
+    // independent panels.  A certificates/backups failure must not blank the
+    // entire settings page.
+    const [dataResult, certResult, backupResult] = await Promise.allSettled([
       api.settings.get(),
       server.value ? api.certificates.list() : Promise.resolve({ certificates: [] }),
       api.backups.list(),
     ])
+    if (dataResult.status === 'rejected') throw dataResult.reason
+    const data = dataResult.value
     settings.value = data
-    certificates.value = certData.certificates
-    backups.value = backupData.backups
+    loadError.value = ''
+    if (certResult.status === 'fulfilled') {
+      certificates.value = certResult.value.certificates
+    } else {
+      message.warning((certResult.reason as Error).message)
+    }
+    if (backupResult.status === 'fulfilled') {
+      backups.value = backupResult.value.backups
+    } else {
+      message.warning((backupResult.reason as Error).message)
+    }
     general.value = {
       log_level: data.general.log_level,
       mixed_port: data.general.mixed_port,
@@ -154,6 +171,7 @@ async function load() {
     publicUiEnabled.value = data.general.public_ui
     publicUiDomain.value = data.general.domain || ''
   } catch (err) {
+    loadError.value = (err as Error).message
     message.error((err as Error).message)
   } finally {
     loading.value = false
@@ -255,9 +273,15 @@ async function togglePublicUi(value: boolean) {
   try {
     const result = await api.settings.publicUi(value, publicUiDomain.value || undefined)
     // The backend returns "Restart ostium.service..."; presenting that as a
-    // success message hid the fact that the listener has not changed yet.
-    if (result.restart_required) message.warning(t('common.restart_required'))
-    else message.success(result.message)
+    // transient success toast hid the fact that the listener has not changed.
+    // Keep a persistent, actionable warning until the operator restarts.
+    if (result.restart_required) {
+      publicUiRestart.value = result.message || t('common.restart_required')
+      message.warning(t('common.restart_required'))
+    } else {
+      publicUiRestart.value = ''
+      message.success(result.message)
+    }
     await load()
   } catch (err) {
     publicUiEnabled.value = !value
@@ -270,8 +294,13 @@ async function onPublicUiDomainChange(value: string) {
   if (!publicUiEnabled.value || !value) return
   try {
     const result = await api.settings.publicUi(true, value)
-    if (result.restart_required) message.warning(t('common.restart_required'))
-    else message.success(result.message)
+    if (result.restart_required) {
+      publicUiRestart.value = result.message || t('common.restart_required')
+      message.warning(t('common.restart_required'))
+    } else {
+      publicUiRestart.value = ''
+      message.success(result.message)
+    }
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -449,6 +478,13 @@ onMounted(load)
       </template>
     </OPageHeader>
 
+    <OErrorState
+      v-if="loadError && !settings"
+      :title="t('common.load_failed')"
+      :message="loadError"
+      @retry="load"
+    />
+
     <div v-if="settings" class="settings-layout">
       <nav class="settings-nav o-card" :aria-label="t('settings.sections')">
         <button
@@ -593,6 +629,9 @@ onMounted(load)
                 />
               </label>
               <p v-if="!auth.totpEnabled" class="warning-text">{{ t('auth.totp_hint') }}</p>
+              <p v-if="publicUiRestart" class="warning-text" role="alert">
+                {{ publicUiRestart }}
+              </p>
             </div>
           </OSectionCard>
         </template>

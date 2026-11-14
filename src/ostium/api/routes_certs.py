@@ -57,7 +57,7 @@ async def _apply_server(services: Services, session: AsyncSession) -> dict[str, 
 @router.get("/certificates")
 async def list_certificates(
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = await cert_service.list_certificates(session)
     return {"certificates": [cert_service.serialize_certificate(row) for row in rows]}
@@ -69,7 +69,7 @@ async def issue_certificate(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     domain = payload.domain.strip().lower()
     try:
@@ -102,7 +102,7 @@ async def issue_certificate(
         try:
             # Only fill TLS inbounds that have no certificate yet.  Explicit
             # per-inbound assignments must never be overwritten by a new cert.
-            await cert_service.use_for_unbound(session, certificate)
+            await cert_service.use_for_unbound(session, certificate, settings=services.settings)
         except cert_service.CertificateError as exc:
             raise ApiError(exc.status_code, str(exc), exc.code) from exc
         applied = await _apply_server(services, session)
@@ -168,7 +168,9 @@ async def issue_certificate(
                 )
                 cert.auto_renew = payload.auto_renew
                 if not previous_ready:
-                    await cert_service.use_for_unbound(job_session, cert)
+                    await cert_service.use_for_unbound(
+                        job_session, cert, settings=services.settings
+                    )
                 await job_session.commit()
                 try:
                     await services.engine.apply_server(job_session)
@@ -208,7 +210,7 @@ async def upload_certificate(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     try:
         certificate = await cert_service.import_manual(
@@ -222,7 +224,7 @@ async def upload_certificate(
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     certificate.auto_renew = payload.auto_renew
     try:
-        await cert_service.use_for_unbound(session, certificate)
+        await cert_service.use_for_unbound(session, certificate, settings=services.settings)
     except cert_service.CertificateError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_server(services, session)
@@ -243,7 +245,7 @@ async def renew_certificate(
     payload: RenewRequest | None = None,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     certificate = await session.get(Certificate, certificate_id)
     if certificate is None:
@@ -307,13 +309,15 @@ async def use_certificate(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     certificate = await session.get(Certificate, certificate_id)
     if certificate is None:
         raise ApiError(404, "certificate not found", "not_found")
     try:
-        await cert_service.use_for_inbounds(session, certificate, kinds=payload.kinds)
+        await cert_service.use_for_inbounds(
+            session, certificate, kinds=payload.kinds, settings=services.settings
+        )
     except cert_service.CertificateError as exc:
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
     applied = await _apply_server(services, session)
@@ -334,7 +338,7 @@ async def delete_certificate(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     certificate = await session.get(Certificate, certificate_id)
     if certificate is None:
@@ -379,5 +383,5 @@ async def delete_certificate(
     # Files are removed only after a successful apply; a failed apply leaves
     # them for the old last-good config and can be cleaned up on a later apply.
     if applied.get("applied"):
-        cert_service.remove_certificate_files(paths)
+        cert_service.remove_certificate_files(paths, domain=domain)
     return {"deleted": True, **applied}

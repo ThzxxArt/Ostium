@@ -381,7 +381,9 @@ def make_local_login_token(settings: Settings) -> str:
 
     from ostium.util.security import load_or_create_master_key
 
-    key = load_or_create_master_key(settings.paths.master_key_path)
+    key = load_or_create_master_key(
+        settings.paths.master_key_path, database_path=settings.paths.db_path
+    )
     payload = f"{int(time.time()) + LOCAL_LOGIN_TTL}:{secrets.token_urlsafe(16)}"
     signature = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).digest()
     return base64.urlsafe_b64encode(payload.encode() + b"." + signature).decode().rstrip("=")
@@ -411,7 +413,9 @@ def verify_local_login_token(settings: Settings, token: str) -> bool:
         return False
     if expiry < int(time.time()):
         return False
-    key = load_or_create_master_key(settings.paths.master_key_path)
+    key = load_or_create_master_key(
+        settings.paths.master_key_path, database_path=settings.paths.db_path
+    )
     expected = hmac.new(key, payload_bytes, hashlib.sha256).digest()
     return hmac.compare_digest(signature, expected)
 

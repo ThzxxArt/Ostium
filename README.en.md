@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-630%20backend%20%C2%B7%20176%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-661%20backend%20%C2%B7%20192%20frontend-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -80,11 +80,11 @@ and auditable private-network console.
 | 🧭 **One app, two roles** | Server and client share one package, one SPA and one CLI. Learn once, use both. |
 | 🛡️ **Two-service isolation** | `ostium.service` runs the Web/API/database. `ostium-core.service` only validates, starts and supervises sing-box. The UI never holds root/TUN privileges. |
 | 📊 **Real traffic accounting** | A custom `sing-box` build with `with_v2ray_api` tracks per-user up/down, daily/monthly totals, quotas and expiry. |
-| 🌐 **A real desktop client** | Windows 11, macOS 14+ arm64 (x64 from source), and Linux x64/arm64 with mixed proxy, system proxy, TUN, URLTest and multiple subscriptions. |
+| 🌐 **A real desktop client** | Windows 10 22H2+ / 11 x64, macOS 14+ arm64 (x64 from source), and Linux x64/arm64 with mixed proxy, system proxy, TUN, URLTest and multiple subscriptions. |
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 630 backend tests (620 regular + 10 live sing-box integration), 176 frontend tests and 69 Playwright cases; coverage is reported by CI. |
+| 🧪 **Verified** | 661 backend tests (651 regular + 10 live sing-box integration) and 192 frontend tests; Playwright is rerun before publication (see release status). |
 
 ---
 
@@ -193,21 +193,21 @@ flowchart LR
 Linux server:
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS client:
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows client (admin PowerShell):
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1 | iex
 ```
 
 The installer:
@@ -276,7 +276,7 @@ installer from the extracted sdist:
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
-Download: <https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.2>
+Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.1 before 0.1.2 is published; v0.1.2 afterwards)
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -407,8 +407,11 @@ docker run -d --name ostium --network host \
   ostium:0.1.2
 ```
 
-> Docker uses host networking so it can bind 443/80. Configure the firewall, TLS and off-host
-> backups yourself.
+> Docker uses host networking so it can bind 443/80; the admin UI still listens on
+> `127.0.0.1` by default. Use an SSH tunnel or a host Nginx/Caddy reverse proxy. A
+> plaintext public bind requires explicitly setting `OSTIUM_HOST=0.0.0.0` and
+> `OSTIUM_ALLOW_INSECURE_BIND=true` plus a restricted 8443 firewall. Configure TLS
+> and off-host backups yourself.
 
 ### Option 7 — PyPI / uv / pipx (servers, CLI and development)
 
@@ -420,14 +423,14 @@ uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
 # or pin the release
-uv tool install "ostium-ctl==0.1.2"
+uv tool install ostium-ctl    # pin "ostium-ctl==0.1.2" after 0.1.2 is published
 ```
 
 Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.2"
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # pin ==0.1.2 after publication
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -440,7 +443,7 @@ Upgrade:
 ```bash
 uv tool upgrade ostium-ctl
 # or
-sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.2"
+sudo /opt/ostium/venv/bin/pip install --upgrade ostium-ctl
 ```
 
 > The PyPI wheel contains the complete SPA assets. For production, prefer the native packages:
@@ -647,7 +650,7 @@ A failed renewal keeps the previous ready certificate and does not downgrade the
 ```bash
 sudo bash install-online.sh upgrade
 # pin a version
-sudo bash install-online.sh upgrade --version 0.1.2
+# pin a version (available after 0.1.2 is published): sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 The upgrade keeps the database, `master.key`, configuration, certificates, users and
@@ -707,7 +710,7 @@ One-click uninstall (data preserved by default):
 
 ```bash
 sudo bash install-online.sh uninstall
-# also remove data, configuration and users
+# also remove data, configuration and programs (service accounts are kept)
 sudo bash install-online.sh uninstall --purge
 ```
 
@@ -848,13 +851,13 @@ npx playwright test
 
 Current results:
 
-- Backend: **620 passed** (regular suite) + **10 passed**
-  (live sing-box integration), **94.95%** statements / **91.37%** branches.
-- Frontend: **174 passed**, **90.69%** statements / **85.07%** branches /
-  **88.34%** functions / **92.00%** lines.
+- Backend: **651 passed** (regular suite) + **10 passed**
+  (live sing-box integration), **94.07%** statements / **90.38%** branches.
+- Frontend: **192 passed**, **90.69%** statements / **85.13%** branches /
+  **88.08%** functions / **92.17%** lines.
 - Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
-  baselines, axe on every core page (serious/critical=0), LCP/CLS performance budgets, PWA
-  service-worker registration, navigation and the command palette.
+  baselines, axe on every core page, LCP/CLS performance budgets, PWA service-worker
+  registration, navigation and the command palette.
 - `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev
   toolchain audit is also clean after breaking upgrades/overrides.
 - Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -38,13 +39,13 @@ class RulePatch(BaseModel):
 
 
 class RuleTest(BaseModel):
-    domain: str | None = None
-    ip: str | None = None
+    domain: str | None = Field(default=None, max_length=512)
+    ip: str | None = Field(default=None, max_length=64)
     port: int | None = None
     source_port: int | None = None
     network: Literal["tcp", "udp"] | None = None
-    protocol: str | None = None
-    process_name: str | None = None
+    protocol: str | None = Field(default=None, max_length=32)
+    process_name: str | None = Field(default=None, max_length=512)
 
 
 class ReorderRequest(BaseModel):
@@ -109,7 +110,7 @@ async def _apply_client(services: Services, session: AsyncSession) -> dict[str, 
 @router.get("/rules")
 async def list_rules(
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (
         (await session.execute(select(Rule).order_by(Rule.priority, Rule.created_at)))
@@ -125,7 +126,7 @@ async def add_rule(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rule = Rule(
         action=payload.action,
@@ -150,7 +151,7 @@ async def update_rule(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rule = await session.get(Rule, rule_id)
     if rule is None:
@@ -185,7 +186,7 @@ async def delete_rule(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rule = await session.get(Rule, rule_id)
     if rule is None:
@@ -205,7 +206,7 @@ async def reorder(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (await session.execute(select(Rule))).scalars().all()
     by_id = {rule.id: rule for rule in rows}
@@ -231,7 +232,7 @@ async def reorder(
 async def test_rule(
     payload: RuleTest,
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (
         (
@@ -246,25 +247,32 @@ async def test_rule(
         {"id": rule.id, "action": rule.action, "match": rule.match_json, "enabled": rule.enabled}
         for rule in rows
     ]
-    result = rule_service.evaluate(
-        rules,
-        {
-            "domain": payload.domain,
-            "ip": payload.ip,
-            "port": payload.port,
-            "source_port": payload.source_port,
-            "network": payload.network,
-            "protocol": payload.protocol,
-            "process_name": payload.process_name,
-        },
-    )
+    target = {
+        "domain": payload.domain,
+        "ip": payload.ip,
+        "port": payload.port,
+        "source_port": payload.source_port,
+        "network": payload.network,
+        "protocol": payload.protocol,
+        "process_name": payload.process_name,
+    }
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(rule_service.evaluate, rules, target), timeout=2.0
+        )
+    except TimeoutError as exc:
+        raise ApiError(
+            422,
+            "rule test exceeded its time budget; simplify the regular expression",
+            "rule_timeout",
+        ) from exc
     return result
 
 
 @router.get("/rule-sets")
 async def list_rule_sets(
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (await session.execute(select(RuleSet).order_by(RuleSet.name))).scalars().all()
     return {"rule_sets": [rule_service.serialize_rule_set(row) for row in rows]}
@@ -276,7 +284,7 @@ async def add_rule_set(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     try:
         name = rule_service.validate_rule_set_name(payload.name)
@@ -319,7 +327,7 @@ async def update_rule_set(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rule_set = await session.get(RuleSet, rule_set_id)
     if rule_set is None:
@@ -343,7 +351,7 @@ async def delete_rule_set(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rule_set = await session.get(RuleSet, rule_set_id)
     if rule_set is None:

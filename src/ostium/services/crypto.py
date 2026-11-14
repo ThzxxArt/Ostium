@@ -13,7 +13,12 @@ class SecretStore:
 
     @classmethod
     def from_data_dir(cls, data_dir: Path) -> SecretStore:
-        return cls(FieldCipher.from_file(data_dir / "master.key"))
+        from ostium.util.security import load_or_create_master_key
+
+        key = load_or_create_master_key(
+            data_dir / "master.key", database_path=data_dir / "ostium.db"
+        )
+        return cls(FieldCipher(key))
 
     @staticmethod
     def aad(table: str, record_id: str, field: str) -> str:

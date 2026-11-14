@@ -32,6 +32,27 @@ SemVer.
   PyPI, then promotes GHCR tags; installers follow `latest` instead of a
   hardcoded previous version.
 
+### Review round 1 (2026-11-15)
+
+- Admin/API mutations now commit before the response is sent; a failed commit
+  returns an error instead of reporting success.
+- Quota/expiry enforcement still runs when V2Ray statistics are unavailable and
+  raises a critical alert after a sustained outage.
+- Startup refuses to generate a replacement `master.key` when an existing
+  database contains encrypted fields.
+- Webhook delivery and Reality preflight pin the validated DNS addresses;
+  webhook secrets are encrypted at rest.
+- Backup v2 streams encryption/decryption, rejects path traversal, and refuses
+  to create a backup that omits the key for encrypted data.
+- Rule-set downloads validate the SRS/source format; rule tests are bounded.
+- Public UI recovery restores the original listener and secure-cookie policy;
+  explicit Disconnect is persisted across restarts.
+- Frontend auth recovery, subscription/user-detail races, rule-condition
+  preservation, error states, Public UI restart warnings and coverage gates
+  were corrected.
+- Release workflow no longer overwrites published assets, provides the core to
+  install/upgrade e2e jobs, and Docker defaults the admin UI to loopback.
+
 ## [0.1.1] - 2026-11-14
 
 ### Security

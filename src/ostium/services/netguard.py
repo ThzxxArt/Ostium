@@ -225,6 +225,41 @@ class FetchedPayload:
             return self.content.decode("utf-8", errors="replace")
 
 
+async def post_limited(
+    url: str,
+    *,
+    content: bytes,
+    headers: dict[str, str] | None = None,
+    timeout: float = 10.0,
+    max_response_bytes: int = 64 * 1024,
+    allow_private: bool = False,
+) -> int:
+    """POST without following redirects, pinning the validated DNS addresses.
+
+    Webhook delivery used to validate the hostname and then let httpx resolve it
+    again, leaving the same DNS-rebinding window that affects GET fetches.  The
+    response body is irrelevant, so it is drained only up to a small bound.
+    """
+
+    target = resolve_remote_url(url, allow_private=allow_private)
+    async with _DNS_PIN_LOCK:
+        with _pin_dns(target.host, target.addresses):
+            async with (
+                httpx.AsyncClient(
+                    timeout=httpx.Timeout(timeout, connect=min(3.0, timeout)),
+                    follow_redirects=False,
+                    trust_env=False,
+                ) as client,
+                client.stream("POST", target.url, content=content, headers=headers) as response,
+            ):
+                read = 0
+                async for chunk in response.aiter_bytes():
+                    read += len(chunk)
+                    if read > max_response_bytes:
+                        break
+                return response.status_code
+
+
 async def fetch_limited(
     url: str,
     *,

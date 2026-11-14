@@ -96,10 +96,14 @@ async def csrf(request: Request, response: Response) -> dict[str, str]:
 async def status(
     request: Request,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
-    initialized = await is_initialized(session)
     admin = await auth_service.get_admin(session)
+    # A database can have an administrator but a missing/rolled-back
+    # ``initialized`` marker (interrupted setup, restored database, old
+    # upgrade).  Treating that state as uninitialised redirected /login to
+    # /setup, where the existing admin made setup return 409 forever.
+    initialized = await is_initialized(session) or admin is not None
     authenticated = False
     must_change = False
     totp_enabled = False
@@ -128,7 +132,7 @@ async def setup(
     request: Request,
     response: Response,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if await is_initialized(session) or await auth_service.get_admin(session) is not None:
         raise ApiError(409, "Ostium is already initialised", "already_initialized")
@@ -215,9 +219,9 @@ async def login(
     request: Request,
     response: Response,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
-    if not await is_initialized(session):
+    if await auth_service.get_admin(session) is None:
         raise ApiError(409, "Ostium has not been initialised", "not_initialized")
     ip = client_ip(request)
     try:
@@ -271,7 +275,7 @@ async def logout(
     request: Request,
     response: Response,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     cookie = request.cookies.get(SESSION_COOKIE)
     if cookie:
@@ -307,7 +311,7 @@ async def change_password(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if not await auth_service.check_password(admin, payload.current_password):
         raise ApiError(403, "current password is incorrect", "invalid_password")
@@ -330,7 +334,7 @@ async def totp_start(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     secret, uri, codes = auth_service.start_totp(admin, services.settings)
     await session.flush()
@@ -344,7 +348,7 @@ async def totp_confirm(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     try:
         auth_service.confirm_totp(admin, services.settings, payload.code)
@@ -359,7 +363,7 @@ async def totp_cancel(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     """Abandon a pending TOTP enrollment without changing login policy."""
 
@@ -373,7 +377,7 @@ async def local_login(
     token: str,
     request: Request,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> Response:
     from fastapi.responses import RedirectResponse
 
@@ -404,7 +408,7 @@ async def totp_disable(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, bool]:
     if not await auth_service.check_password(admin, payload.password):
         raise ApiError(403, "password is incorrect", "invalid_password")

@@ -264,6 +264,7 @@ export default {
     no_online: '目前没有在线用户',
     alerts: '告警',
     no_alerts: '没有需要处理的告警。',
+    alerts_unavailable: '告警暂时不可用，当前数量未知。',
     quick_actions: '快捷操作',
     add_user: '新增用户',
     view_subscriptions: '查看订阅',
@@ -443,7 +444,8 @@ export default {
     move_up: '上移',
     move_down: '下移',
     advanced: '高级 JSON 组合条件',
-    advanced_locked: '此规则包含多个条件；请先在 JSON 中保留一个条件，再切回简单模式，以免丢失条件。',
+    advanced_locked:
+      '此规则包含多个条件；请先在 JSON 中保留一个条件，再切回简单模式，以免丢失条件。',
     advanced_json: '匹配 JSON',
     advanced_hint:
       '支持 domain/ip_cidr/port/source_port/protocol/process_name/rule_set/network 等组合；保存前会由服务端校验。',

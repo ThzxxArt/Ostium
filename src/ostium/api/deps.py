@@ -41,6 +41,9 @@ class Services:
     # Set by an explicit Disconnect so the auto-reconnect watchdog does not
     # immediately undo the operator's action.
     watchdog_suspended: bool = False
+    # Persisted form of the same intent.  A control-plane or machine restart
+    # must not resurrect last-good after the operator explicitly disconnected.
+    client_paused: bool = False
 
     @property
     def proxy(self) -> Any:
@@ -109,7 +112,7 @@ def is_loopback(request: Request) -> bool:
 async def get_current_admin(
     request: Request,
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> AdminUser:
     from ostium.api.errors import ApiError
 

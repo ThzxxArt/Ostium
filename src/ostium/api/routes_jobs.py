@@ -26,7 +26,7 @@ router = APIRouter(tags=["jobs"])
 async def jobs(
     limit: int = 100,
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = await list_jobs(session, limit=max(1, min(limit, 500)))
     return {"jobs": [serialize_job(row) for row in rows]}
@@ -36,7 +36,7 @@ async def jobs(
 async def job_detail(
     job_id: str,
     _: AdminUser = Depends(get_current_admin),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     row = await session.get(Job, job_id)
     if row is None:
@@ -50,7 +50,7 @@ async def cancel_job(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     row = await session.get(Job, job_id)
     if row is None:

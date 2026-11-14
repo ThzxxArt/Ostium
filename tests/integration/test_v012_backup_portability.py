@@ -15,7 +15,12 @@ import pytest
 from ostium.config import Role, Settings
 from ostium.db.models import Certificate, RuleSet
 from ostium.db.session import create_engine, create_schema, create_session_factory
-from ostium.services.backup import BackupError, create_backup, restore_backup
+from ostium.services.backup import (
+    BackupError,
+    _portable_suffix,
+    create_backup,
+    restore_backup,
+)
 from ostium.services.crypto import SecretStore
 from ostium.services.users import create_user
 from ostium.util.time import utcnow
@@ -130,15 +135,48 @@ def test_backup_without_master_key_is_rejected_when_data_is_encrypted(tmp_path: 
     async def _run() -> None:
         source = _settings(tmp_path, "source")
         await _seed(source)
-        created = create_backup(source, include_master_key=False)
+        # Creating an unrestorable backup is itself an error: a backup missing
+        # the key can never recover this database.
+        with pytest.raises(BackupError) as excinfo:
+            create_backup(source, include_master_key=False)
+        assert excinfo.value.code == "missing_master_key"
+
+        created = create_backup(source)
+        with tarfile.open(created["path"]) as archive:
+            members = {
+                member.name: archive.extractfile(member).read()
+                for member in archive.getmembers()
+                if member.isfile()
+            }
+        members.pop("master.key", None)
+        manifest = json.loads(members["manifest.json"])
+        manifest["master_key_included"] = False
+        manifest.get("checksums", {}).pop("master.key", None)
+        members["manifest.json"] = json.dumps(manifest).encode()
+        missing_key = tmp_path / "missing-key.tar.gz"
+        with tarfile.open(missing_key, "w:gz") as archive:
+            for name, data in members.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
         target = _settings(tmp_path, "target")
         with pytest.raises(BackupError) as excinfo:
-            restore_backup(target, Path(created["path"]))
+            restore_backup(target, missing_key)
         assert excinfo.value.code == "missing_master_key"
         # The target database must not be replaced by the rejected restore.
         assert not target.paths.db_path.exists()
 
     asyncio.run(_run())
+
+
+def test_restored_paths_cannot_escape_the_data_directory(tmp_path: Path) -> None:
+    from ostium.util.paths import resolve_path
+
+    settings = _settings(tmp_path, "paths")
+    with pytest.raises(BackupError, match="path traversal"):
+        _portable_suffix("certs/../../etc/passwd", "certs")
+    assert resolve_path(settings, "certs/../../etc/passwd") is None
+    assert resolve_path(settings, "../../etc/passwd") is None
 
 
 def test_modified_backup_fails_checksum_validation(tmp_path: Path) -> None:

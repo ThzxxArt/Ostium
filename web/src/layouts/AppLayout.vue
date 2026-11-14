@@ -47,6 +47,7 @@ const { coreRunning, coreReachable, version } = useStatus()
 const browserNotifications = useBrowserNotifications()
 
 const alerts = ref<Alert[]>([])
+const alertsError = ref(false)
 const alertsOpen = ref(false)
 const userOpen = ref(false)
 const statusOpen = ref(false)
@@ -98,8 +99,10 @@ const statusOptions = computed(() => {
 async function loadAlerts() {
   try {
     alerts.value = (await api.alerts.list()).alerts
+    alertsError.value = false
   } catch {
-    alerts.value = []
+    // Keep the last known alerts visible; a failed poll is not "zero alerts".
+    alertsError.value = true
   }
 }
 
@@ -115,7 +118,10 @@ async function ackAlert(alert: Alert) {
 function onUserSelect(key: string) {
   userOpen.value = false
   if (key === 'logout') {
-    void auth.logout().then(() => router.push('/login'))
+    // logout() deliberately clears local state even when the API fails, so the
+    // navigation must run in finally; otherwise an offline/500 logout leaves
+    // the user on a protected page with stale data.
+    void auth.logout().finally(() => router.push('/login'))
   } else if (key === 'settings') {
     void router.push('/settings')
   } else if (key === 'shortcuts') {
@@ -353,7 +359,12 @@ onBeforeUnmount(() => {
         >
           <template #trigger>
             <button type="button" class="icon-btn" :aria-label="t('dashboard.alerts')">
-              <NBadge :value="notificationCount" :max="9" :show="notificationCount > 0" dot>
+              <NBadge
+                :value="alertsError ? '!' : notificationCount"
+                :max="9"
+                :show="alertsError || notificationCount > 0"
+                :dot="!alertsError"
+              >
                 <Bell :size="18" :stroke-width="1.7" />
               </NBadge>
             </button>
@@ -363,7 +374,12 @@ onBeforeUnmount(() => {
               <strong>{{ t('dashboard.alerts') }}</strong>
               <span class="o-micro o-subtle">{{ notificationCount }}</span>
             </div>
-            <div v-if="!alerts.length" class="alerts-empty">{{ t('dashboard.no_alerts') }}</div>
+            <div v-if="alertsError" class="alerts-empty" role="alert">
+              {{ t('dashboard.alerts_unavailable') }}
+            </div>
+            <div v-else-if="!alerts.length" class="alerts-empty">
+              {{ t('dashboard.no_alerts') }}
+            </div>
             <ul v-else class="alert-list">
               <li v-for="alert in alerts" :key="alert.id" class="alert">
                 <span class="alert-dot" :class="alert.level" />

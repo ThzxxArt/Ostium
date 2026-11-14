@@ -59,6 +59,8 @@ user_rc=$?
 set -e
 [[ "$user_rc" -eq 0 || "$user_rc" -eq 3 ]] || fail "0.1.1 user add exited $user_rc"
 grep -q '"user": "alice"' "$WORK/old-user.json" || fail "0.1.1 user creation failed"
+# 0.1.1 lacks the newer --acknowledge-plaintext flag; this fixture is created
+# by the published old CLI intentionally, then restored by current code.
 "$WORK/old/bin/ostium" backup create --output "$WORK/from-0.1.1.tar.gz" >/dev/null
 
 OLD_KEY="$(sha256sum "$DATA/master.key" | awk '{print $1}')"

@@ -8,11 +8,18 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
+from ostium.api.deps import (
+    Services,
+    client_ip,
+    get_current_admin,
+    get_services,
+    get_session,
+    require_scope,
+)
 from ostium.api.errors import ApiError
 from ostium.db.models import AdminUser, Backup
 from ostium.services import backup as backup_service
@@ -34,19 +41,20 @@ def _backup_path(services: Services, filename: str) -> Path:
 
 
 class BackupRequest(BaseModel):
-    password: str | None = None
+    password: str | None = Field(default=None, max_length=1024)
     acknowledge_plaintext: bool = False
 
 
 class RestoreRequest(BaseModel):
-    password: str | None = None
+    password: str | None = Field(default=None, max_length=1024)
 
 
 @router.get("/backups")
 async def list_backups(
     _: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("backup:read")),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     rows = (
         (await session.execute(select(Backup).order_by(Backup.created_at.desc()))).scalars().all()
@@ -78,7 +86,7 @@ async def create_backup(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     if payload.password is not None and len(payload.password) < 8:
         raise ApiError(400, "backup password must be at least 8 characters", "weak_password")
@@ -131,7 +139,7 @@ async def restore_backup(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     row = await session.get(Backup, backup_id)
     if row is None:
@@ -171,21 +179,32 @@ async def delete_backup(
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
     services: Services = Depends(get_services),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
     row = await session.get(Backup, backup_id)
     if row is None:
         raise ApiError(404, "backup not found", "not_found")
     path = _backup_path(services, row.filename)
-    path.unlink(missing_ok=True)
+    filename = row.filename
     await session.delete(row)
     await audit(
         session,
         actor=admin.username,
         action="backup.deleted",
-        target=row.filename,
+        target=filename,
         ip=client_ip(request),
     )
+    # Commit the row deletion before unlinking the file.  The old order deleted
+    # the backup first; a failed commit then left a list entry pointing at a
+    # file that no longer existed.  An orphaned file after a successful commit
+    # is recoverable; a lost backup with a live row is not.
+    await session.commit()
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        raise ApiError(
+            500, f"backup record deleted but file could not be removed: {exc}", "delete_failed"
+        ) from exc
     return {"deleted": True}
 
 

@@ -396,6 +396,7 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
         session_factory=session_factory,
         bus=EventBus(),
         watchdog_suspended=False,
+        client_paused=False,
     )
     settings.auto_reconnect = True
 

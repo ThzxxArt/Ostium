@@ -492,10 +492,15 @@ def _rule_sets(spec: ClientConfigSpec) -> list[dict[str, Any]]:
         # every start.  ``POST /rule-sets/{id}/update`` downloads and
         # validates content into ``path`` first.
         if entry.get("path"):
+            fmt = str(entry.get("format") or "binary").lower()
+            if fmt == "srs":
+                # 0.1.1 rows used the file extension as the format name; the
+                # sing-box configuration expects "binary".
+                fmt = "binary"
             defined[tag] = {
                 "type": "local",
                 "tag": tag,
-                "format": entry.get("format", "binary"),
+                "format": fmt,
                 "path": entry["path"],
             }
     return list(defined.values())

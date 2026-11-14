@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import tarfile
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -79,6 +80,48 @@ def test_init_is_idempotent_and_rejects_negative_quota(tmp_path: Path, monkeypat
     negative = runner.invoke(app, ["user", "add", "alice", "--quota", "-1G", "--json"])
     assert negative.exit_code == 2
     assert "size must be" in negative.output
+
+
+def test_init_public_ui_public_base_url_includes_the_listener_port(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data = tmp_path / "public-data"
+    config = tmp_path / "public-config"
+    monkeypatch.setenv("OSTIUM_DATA_DIR", str(data))
+    monkeypatch.setenv("OSTIUM_CONFIG_DIR", str(config))
+    monkeypatch.setenv("OSTIUM_ROLE", "server")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "server",
+            "--no-input",
+            "--data-dir",
+            str(data),
+            "--config-dir",
+            str(config),
+            "--dev",
+            "--password",
+            "verysecret123",
+            "--domain",
+            "vpn.example.com",
+            "--public-ui",
+            "--port",
+            "8443",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    import json
+    import sqlite3
+
+    with sqlite3.connect(data / "ostium.db") as connection:
+        row = connection.execute(
+            "SELECT value_json FROM settings WHERE key = 'public_base_url'"
+        ).fetchone()
+    assert row is not None
+    assert json.loads(row[0]) == "https://vpn.example.com:8443"
 
 
 def test_init_generated_password_force_and_invalid_role(tmp_path: Path, monkeypatch) -> None:
@@ -324,7 +367,7 @@ def test_v011_cli_safety_and_update_checks(tmp_path: Path, monkeypatch) -> None:
 
     served_calls: list[dict[str, object]] = []
 
-    def fake_serve(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+    def fake_serve(settings_arg, cert, key, *, reload, recovery=None):  # type: ignore[no-untyped-def]
         served_calls.append(
             {
                 "host": settings_arg.host,
@@ -700,7 +743,7 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
     assert issued.exit_code in {0, 3}, issued.output
     assert runner.invoke(app, ["cert", "list"]).exit_code == 0
 
-    created = runner.invoke(app, ["backup", "create"])
+    created = runner.invoke(app, ["backup", "create", "--acknowledge-plaintext"])
     assert created.exit_code == 0
     assert runner.invoke(app, ["backup", "list"]).exit_code == 0
 
@@ -711,7 +754,7 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
 
     recorded: dict[str, object] = {}
 
-    def fake_run(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+    def fake_run(settings_arg, cert, key, *, reload, recovery=None):  # type: ignore[no-untyped-def]
         recorded.update(
             {
                 "host": settings_arg.host,
@@ -719,6 +762,7 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
                 "ssl_certfile": cert,
                 "ssl_keyfile": key,
                 "reload": reload,
+                "recovery": recovery,
             }
         )
 
@@ -823,12 +867,13 @@ def test_serve_uses_only_unexpired_ready_certificates(tmp_path: Path, monkeypatc
 
     recorded: dict[str, object] = {}
 
-    def fake_run(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+    def fake_run(settings_arg, cert, key, *, reload, recovery=None):  # type: ignore[no-untyped-def]
         recorded.update(
             {
                 "ssl_certfile": cert,
                 "ssl_keyfile": key,
                 "host": settings_arg.host,
+                "recovery": recovery,
             }
         )
 
@@ -1031,6 +1076,263 @@ def test_core_manifest_url_version_and_bad_archive(tmp_path: Path, monkeypatch) 
         )
         bad = runner.invoke(app, ["core", "install", "--manifest", str(empty_manifest)])
     assert bad.exit_code == 6
+
+
+def test_cli_error_helpers_and_manifest_validation(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    # Corrupt database / malformed core URL helpers must fail closed.
+    bad_db = tmp_path / "bad.db"
+    bad_db.write_bytes(b"not sqlite")
+    assert cli._database_has_admin(bad_db) is False
+    settings = cli._load_settings()
+    settings.core_url = "http://[bad"
+    assert cli._service_reachable(settings) is False
+
+    import typer
+
+    assert cli._parse_bytes("1.5G") == int(1.5 * 1024**3)
+    assert cli._parse_bytes("123B") == 123
+    with pytest.raises(typer.Exit):
+        cli._parse_expiry("2026-12-31T23:59:59")
+    with pytest.raises(typer.Exit):
+        cli._parse_expiry("not-a-date")
+    assert cli._parse_expiry("2026-12-31T23:59:59+08:00").tzinfo is not None
+
+    # An unencrypted backup requires explicit acknowledgement.
+    assert runner.invoke(app, ["backup", "create"]).exit_code == 2
+
+    import hashlib
+
+    content = b"SRS"
+    base_artifact = {
+        "os": "linux",
+        "arch": "amd64",
+        "version": "1.14.4",
+        "url": "https://example.com/core.tar.gz",
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+    manifest = {"artifacts": [base_artifact]}
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with respx.mock:
+        respx.get("https://example.com/core.tar.gz").mock(
+            return_value=httpx.Response(200, content=content)
+        )
+        # Plain HTTP artifact URL is rejected before any download.
+        manifest["artifacts"] = [{**base_artifact, "url": "http://example.com/core.tar.gz"}]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert (
+            runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)]).exit_code == 6
+        )
+
+        # Invalid SHA-256 shape is rejected.
+        manifest["artifacts"] = [{**base_artifact, "sha256": "not-a-hash"}]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert (
+            runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)]).exit_code == 6
+        )
+
+        # HTTP attestation URL and digest mismatch are rejected.
+        manifest["artifacts"] = [
+            {
+                **base_artifact,
+                "attestation": {"url": "http://example.com/proof", "sha256": "0" * 64},
+            }
+        ]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert (
+            runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)]).exit_code == 6
+        )
+
+        manifest["artifacts"] = [
+            {
+                **base_artifact,
+                "attestation": {"url": "https://example.com/proof", "sha256": "0" * 64},
+            }
+        ]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        respx.get("https://example.com/proof").mock(
+            return_value=httpx.Response(200, content=b"proof")
+        )
+        assert (
+            runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)]).exit_code == 6
+        )
+
+
+def test_cli_remaining_error_branches(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    import hashlib
+
+    content = b"SRS"
+    manifest = {
+        "artifacts": [
+            {
+                "os": "linux",
+                "arch": "amd64",
+                "version": "not-a-version",
+                "url": "https://example.com/core.tar.gz",
+                "sha256": hashlib.sha256(content).hexdigest(),
+            },
+            {
+                "os": "linux",
+                "arch": "amd64",
+                "version": "1.14.4",
+                "url": "https://example.com/core.tar.gz",
+                "sha256": hashlib.sha256(content).hexdigest(),
+            },
+        ]
+    }
+    manifest_path = tmp_path / "manifest2.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(cli.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(cli.platform, "machine", lambda: "sparc")
+    unsupported = runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)])
+    assert unsupported.exit_code == 6
+
+    monkeypatch.setattr(cli.platform, "machine", lambda: "x86_64")
+    with respx.mock:
+        respx.get("https://example.com/core.tar.gz").mock(
+            return_value=httpx.Response(200, content=content)
+        )
+        # The invalid version is tolerated by the version-key fallback.
+        # The archive is not a tar.gz, so the install fails at extraction.
+        bad_archive = runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)])
+    assert bad_archive.exit_code == 6
+
+    monkeypatch.setattr(
+        cli.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.HTTPError("down"))
+    )
+    assert runner.invoke(app, ["core", "status"]).exit_code == 4
+
+    monkeypatch.setattr(
+        cli.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.HTTPError("down"))
+    )
+    assert runner.invoke(app, ["update", "--check"]).exit_code == 4
+
+    created = runner.invoke(app, ["backup", "create", "--acknowledge-plaintext"])
+    assert created.exit_code == 0, created.output
+    backup = next((tmp_path / "data" / "backups").glob("ostium-backup-*"))
+    monkeypatch.setattr(cli, "_service_reachable", lambda settings: True)
+    assert runner.invoke(app, ["backup", "restore", str(backup), "--yes"]).exit_code == 5
+
+
+def test_cli_manifest_redirect_and_certificate_errors(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(cli.platform, "machine", lambda: "x86_64")
+    import hashlib
+
+    content = b"SRS"
+    manifest = {
+        "artifacts": [
+            {
+                "os": "linux",
+                "arch": "amd64",
+                "version": "1.14.4",
+                "url": "https://example.com/core.tar.gz",
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        ]
+    }
+
+    with respx.mock:
+        respx.get("https://example.com/manifest.json").mock(
+            return_value=httpx.Response(
+                302, headers={"location": "http://example.com/manifest.json"}
+            )
+        )
+        respx.get("http://example.com/manifest.json").mock(
+            return_value=httpx.Response(200, json=manifest)
+        )
+        redirected = runner.invoke(
+            app, ["core", "install", "--manifest", "https://example.com/manifest.json"]
+        )
+    assert redirected.exit_code == 6
+
+    # Attestation digest mismatch is rejected after the artifact is checked.
+    manifest["artifacts"][0]["attestation"] = {
+        "url": "https://example.com/proof",
+        "sha256": "0" * 64,
+    }
+    manifest_path = tmp_path / "manifest-proof.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with respx.mock:
+        respx.get("https://example.com/core.tar.gz").mock(
+            return_value=httpx.Response(200, content=content)
+        )
+        respx.get("https://example.com/proof").mock(
+            return_value=httpx.Response(200, content=b"different")
+        )
+        mismatch = runner.invoke(app, ["core", "install", "--manifest", str(manifest_path)])
+    assert mismatch.exit_code == 6
+
+
+def test_cli_misc_branches(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    settings = cli._load_settings()
+    settings.core_url = "http://127.0.0.1:0"
+    assert cli._service_reachable(settings) is False
+    settings.core_url = "http://[::1"
+    assert cli._service_reachable(settings) is False
+    settings.port = 0
+    settings.core_url = "http://127.0.0.1:0"
+    assert cli._service_reachable(settings) is False
+    cli._ALLOW_DEGRADED = True
+    cli._apply_failure("degraded for test")
+    cli._ALLOW_DEGRADED = False
+
+    # An interactive --force run can be declined without rewriting anything.
+    declined = runner.invoke(
+        app,
+        ["init", "--force", "--role", "client"],
+        input="n\n",
+    )
+    assert declined.exit_code != 0
+
+    # Re-running --force with an existing admin and a password updates the
+    # admin, while a non-dict server setting is normalized.
+    import sqlite3
+
+    with sqlite3.connect(tmp_path / "data" / "ostium.db") as connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO settings (key, value_json, updated_at) "
+            "VALUES ('server', '\"broken\"', '2026-01-01')"
+        )
+        connection.commit()
+    forced = runner.invoke(
+        app,
+        [
+            "init",
+            "--force",
+            "--no-input",
+            "--role",
+            "server",
+            "--password",
+            "another-secret-123",
+        ],
+    )
+    assert forced.exit_code == 0, forced.output
+
+    # Forcing without a password keeps the existing admin password.
+    forced_no_password = runner.invoke(app, ["init", "--force", "--no-input", "--role", "server"])
+    assert forced_no_password.exit_code == 0, forced_no_password.output
+
+    assert runner.invoke(app, ["tun", "bogus"]).exit_code == 2
+    assert runner.invoke(app, ["diagnostics", "bogus"]).exit_code == 2
+    assert runner.invoke(app, ["cert", "issue", "example.com"]).exit_code == 2
+
+    monkeypatch.setattr(
+        cli.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.HTTPError("down"))
+    )
+    with tempfile.TemporaryDirectory() as temp:
+        output = Path(temp) / "diag.tar.gz"
+        assert runner.invoke(app, ["diagnostics", "export", "--output", str(output)]).exit_code == 0
+        assert output.is_file()
+
+    monkeypatch.setattr(cli, "_serve_with_cert_reload", lambda *a, **k: None)
+    reloaded = runner.invoke(app, ["serve", "--reload"])
+    assert reloaded.exit_code == 0, reloaded.output
 
 
 def test_service_uninstall_success(tmp_path: Path, monkeypatch) -> None:

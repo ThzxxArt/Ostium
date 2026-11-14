@@ -158,7 +158,11 @@ router.beforeEach(async (to) => {
     if (to.name === 'login' || to.name === 'unavailable') return true
     return { name: 'unavailable' }
   }
-  if (!auth.initialized) {
+  // An administrator but no initialized marker is a recoverable state
+  // (interrupted setup, restored database, older upgrade).  Treat it as
+  // initialized so /login remains reachable; the backend login endpoint also
+  // accepts an existing admin instead of requiring the marker.
+  if (!auth.initialized && !auth.hasAdmin) {
     return to.name === 'setup' ? true : { name: 'setup' }
   }
   if (to.name === 'setup') {

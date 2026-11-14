@@ -23,8 +23,8 @@ ENV PYTHONUNBUFFERED=1 \
     OSTIUM_ROLE=server \
     OSTIUM_DATA_DIR=/var/lib/ostium \
     OSTIUM_CONFIG_DIR=/etc/ostium \
-    OSTIUM_HOST=0.0.0.0 \
-    OSTIUM_ALLOW_INSECURE_BIND=true \
+    OSTIUM_HOST=127.0.0.1 \
+    OSTIUM_ALLOW_INSECURE_BIND=false \
     OSTIUM_PORT=8443 \
     OSTIUM_ENGINE_PATH=/opt/ostium/core/sing-box
 RUN apt-get update \
@@ -55,7 +55,7 @@ COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod 0755 /entrypoint.sh
 
 USER ostium
-EXPOSE 443/tcp 443/udp 8388/tcp 8388/udp 8443/tcp 80/tcp
+EXPOSE 443/tcp 443/udp 8443/tcp 80/tcp
 VOLUME ["/var/lib/ostium", "/etc/ostium"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD sh -c 'port="${OSTIUM_PORT:-8443}"; curl -fsSk "https://127.0.0.1:$port/healthz" >/dev/null 2>&1 || curl -fsS "http://127.0.0.1:$port/healthz"'

@@ -349,13 +349,7 @@ const transportOptions = computed(() => [
             {{ t('common.previous') }}
           </NButton>
           <div class="spacer" />
-          <NButton
-            type="primary"
-            size="large"
-            :loading="loading"
-            :disabled="loading"
-            @click="next"
-          >
+          <NButton type="primary" size="large" :loading="loading" :disabled="loading" @click="next">
             {{
               step === steps.length - 1
                 ? role === 'server'
