@@ -37,7 +37,7 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20173%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20174%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -83,7 +83,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 595 backend tests (585 regular + 10 live sing-box integration), 173 frontend tests and 69 Playwright cases; 94.95% backend statements / 91.37% branches. |
+| 🧪 **Verified** | 595 backend tests (585 regular + 10 live sing-box integration), 174 frontend tests and 69 Playwright cases; 94.95% backend statements / 91.37% branches. |
 
 ---
 
@@ -849,8 +849,8 @@ Current results:
 
 - Backend: **585 passed / 0 skipped** (regular suite) + **10 passed / 0 skipped**
   (live sing-box integration), **94.95%** statements / **91.37%** branches.
-- Frontend: **173 passed**, **90.72%** statements / **85.07%** branches /
-  **88.42%** functions / **92.00%** lines.
+- Frontend: **174 passed**, **90.69%** statements / **85.07%** branches /
+  **88.34%** functions / **92.00%** lines.
 - Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
   baselines, axe on every core page (serious/critical=0), LCP/CLS performance budgets, PWA
   service-worker registration, navigation and the command palette.

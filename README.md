@@ -37,7 +37,7 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20173%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20174%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -79,7 +79,7 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 595 个后端测试（585 个常规 + 10 个真实 sing-box 集成）、173 个前端测试、69 个 Playwright 用例；后端 94.95% 语句 / 91.37% 分支。 |
+| 🧪 **可验证** | 595 个后端测试（585 个常规 + 10 个真实 sing-box 集成）、174 个前端测试、69 个 Playwright 用例；后端 94.95% 语句 / 91.37% 分支。 |
 
 ---
 
@@ -810,7 +810,7 @@ npx playwright test
 当前结果：
 
 - 后端：**585 passed / 0 skipped**（常规测试）+ **10 passed / 0 skipped**（真实 sing-box 集成），语句 **94.95%**、分支 **91.37%**；
-- 前端：**173 passed**，语句 **90.72%**、分支 **85.07%**、函数 **88.42%**、行 **92.00%**；
+- 前端：**174 passed**，语句 **90.69%**、分支 **85.07%**、函数 **88.34%**、行 **92.00%**；
 - Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe（serious/critical=0）、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

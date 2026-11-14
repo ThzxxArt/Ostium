@@ -743,7 +743,7 @@ shellcheck + bash -n                                  -> PASS
 ### 20.1 结论
 
 - R1 回归：**34/34 通过**；R2 回归：**31/31 通过**；R3 回归：**36/36 通过**。
-- 新增并修复 **59 项**：P0 2 项、P1 23 项、P2 34 项。
+- 新增并修复 **60 项**：P0 2 项、P1 23 项、P2 35 项。
 - 本地自动化与可构建性达到发布候选标准；公开 Release 仍为 **NO-GO**（外部平台/ACME/TUN/soak/性能/签名未实测，AppImage 本机未产出）。
 
 ### 20.2 重点根因
@@ -759,7 +759,7 @@ shellcheck + bash -n                                  -> PASS
 
 - 后端：**585 passed / 0 skipped**；语句 **94.95%**、分支 **91.37%**；覆盖率门禁通过。
 - 真实 sing-box 集成：**10 passed / 0 skipped**。
-- 前端：**173 passed**；语句 **90.72%**、分支 **85.07%**、函数 **88.42%**、行 **92.00%**；首屏 JS **193.4 KiB gzip**。
+- 前端：**174 passed**；语句 **90.69%**、分支 **85.07%**、函数 **88.34%**、行 **92.00%**；首屏 JS **193.3 KiB gzip**。
 - Playwright：**69 passed**（workers=1）；`ruff`/`ruff format`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict` 通过。
 - wheel/sdist/PyInstaller/DEB 0.1.1 成功；DEB 解包 `ostium version` 为 0.1.1；AppImage 本机 blocker，CI 依赖已补齐。
 - 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak/签名写成已验证。

@@ -49,8 +49,8 @@ platform/external validation, `[ ]` not done yet.
       frontend setup/rules/dashboard/i18n/session paths and docs truthfulness.
       See `V0.1.1_REVIEW_ROUND4.md`.
 - [x] Local final gates (review round 4): 585 regular backend tests + 10 real
-      sing-box integration tests; 173 frontend tests; 69 Playwright cases;
-      coverage gates green; first-load JS 193.4 KiB gzip.
+      sing-box integration tests; 174 frontend tests; 69 Playwright cases;
+      coverage gates green; first-load JS 193.3 KiB gzip.
 
 ## Delivered in this workspace
 
@@ -153,7 +153,7 @@ platform/external validation, `[ ]` not done yet.
 - Backend coverage: statements 94.95%, branches 91.37%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 90.72%, branches 85.07%, functions 88.42%,
+- Frontend coverage: statements 90.69%, branches 85.07%, functions 88.34%,
   lines 92.00% (Vitest v8, thresholds 85).
 - Playwright: 69 passed on desktop 1440, tablet 1024 and mobile 390; login,
   dashboard, command palette, PWA service worker, axe, LCP/CLS,
@@ -161,7 +161,7 @@ platform/external validation, `[ ]` not done yet.
 - `pip-audit` and full `npm audit`: 0 known vulnerabilities.
 - `mkdocs build --strict`, `shellcheck`, clean-wheel install and serve smoke:
   pass.
-- First-load JS: 193.4 KiB gzip (budget 300 KiB).
+- First-load JS: 193.3 KiB gzip (budget 300 KiB).
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS
   system proxy, 72h soak, usability tests and installer-on-fresh-VM are not
   run in this environment; see `MANUAL_TASKS.md`.

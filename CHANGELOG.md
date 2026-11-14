@@ -124,7 +124,8 @@ SemVer.
   restore expansion and statistics epoch loss on failed commits.
 - Frontend: subscription URLs in client setup, multi-condition rule editing,
   filtered batch selection, dashboard online/certificate/inbound truthfulness,
-  auto endpoint display, i18n/aria/timezone/scroll fixes.
+  auto endpoint display, keyboard-focusable log region, i18n/aria/timezone/scroll
+  fixes.
 - Release gates: branch coverage is measured, AppImage architecture/dependencies
   are correct and fail closed, Docker pushes wait for platform assets, and the
   release body comes from `RELEASE_NOTES.md`.
