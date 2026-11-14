@@ -1426,8 +1426,14 @@ a published asset is never replaced.</p>
       Playwright/axe/visual, pip-audit and npm audit.</li>
 <li>[ ] Version audit: <code>pyproject.toml</code>, <code>src/ostium/__init__.py</code>, installers,
       Inno, Docker/compose, manifest, README/docs.</li>
-<li>[ ] DEB/AppImage filenames and Debian <code>Version:</code> use <code>0.1.1</code>, never <code>v0.1.1</code>
+<li>[ ] DEB/AppImage filenames and Debian <code>Version:</code> use <code>X.Y.Z</code>, never <code>vX.Y.Z</code>
       (the build script strips the tag prefix).</li>
+<li>[ ] README.md, README.en.md, SECURITY.md, CHANGELOG.md and RELEASE_NOTES.md
+      describe <code>vX.Y.Z</code> as the release being published; no "not yet published"
+      or "pending publication" text remains, and the release-docs test passes.
+      Update this status before tagging so the tagged tree never advertises the
+      release as unpublished after assets go live. If publication fails before
+      any asset exists, revert the status text before retrying.</li>
 <li>[ ] <code>CHANGELOG.md</code>, migration guide and release notes drafted.</li>
 <li>[ ] Clean install on Linux, Windows and macOS evidence archived.</li>
 <li>[ ] Nginx/Docker/ACME/TUN/soak/performance/5-user evidence archived.</li>
@@ -1442,7 +1448,8 @@ a published asset is never replaced.</p>
       <code>SHA256SUMS</code> from that tag.</li>
 <li>[ ] Confirm <code>overwrite_files: false</code>; never re-run publication to replace an
       existing asset.</li>
-<li>[ ] PyPI <code>ostium-ctl==X.Y.Z</code> and GHCR tags published.</li>
+<li>[ ] PyPI <code>ostium-ctl==X.Y.Z</code> and GHCR tags <code>X.Y.Z</code>/<code>vX.Y.Z</code>/<code>latest</code>
+      published.</li>
 </ul>
 <h2 id="read-only-verification">Read-only verification<a class="headerlink" href="#read-only-verification" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1451,6 +1458,8 @@ a published asset is never replaced.</p>
 <li>[ ] <code>gh attestation verify</code> for every asset.</li>
 <li>[ ] Online installer, PyPI install and GHCR pull tested.</li>
 <li>[ ] <code>/healthz</code>, <code>/readyz</code>, login, subscription and core status checked.</li>
+<li>[ ] README/README.en/SECURITY/CHANGELOG and the GitHub Release body show the
+      published version with no stale status text. Correct docs on <code>main</code> if not.</li>
 <li>[ ] No asset changed after publication. Any fix goes to the next patch.</li>
 </ul>
 
