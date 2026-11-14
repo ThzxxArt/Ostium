@@ -691,9 +691,11 @@ def test_jobs_and_alerts(api_client: TestClient, session_token: str, settings: S
 
 
 def test_websocket_events(api_client: TestClient, monkeypatch) -> None:
-    with pytest.raises(WebSocketDisconnect) as excinfo:  # noqa: SIM117
-        with api_client.websocket_connect("/api/v1/events"):
-            pass
+    with (
+        api_client.websocket_connect("/api/v1/events") as websocket,
+        pytest.raises(WebSocketDisconnect) as excinfo,
+    ):
+        websocket.receive_text()
     assert excinfo.value.code == 4401
 
     setup_admin(api_client)

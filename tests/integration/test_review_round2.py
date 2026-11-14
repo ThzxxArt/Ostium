@@ -533,9 +533,11 @@ def test_websocket_honours_ip_allowlist(
     setup_admin(api_client)
     settings.ui_allowlist = ["203.0.113.0/24"]
     monkeypatch.setattr(routes_events, "client_ip", lambda _websocket: "198.51.100.7")
-    with pytest.raises(WebSocketDisconnect) as excinfo:  # noqa: SIM117
-        with api_client.websocket_connect("/api/v1/events"):
-            pass
+    with (
+        api_client.websocket_connect("/api/v1/events") as websocket,
+        pytest.raises(WebSocketDisconnect) as excinfo,
+    ):
+        websocket.receive_text()
     assert excinfo.value.code == 4403
     assert "allowlisted" in excinfo.value.reason
 

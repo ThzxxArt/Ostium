@@ -629,6 +629,21 @@ async def _cert_renewal(
             return
         except Exception as exc:
             services.bus.log("error", "certificate renewal loop failed", error=str(exc))
+            try:
+                from ostium.services.audit import create_alert
+
+                async with services.session_factory() as alert_session:
+                    await create_alert(
+                        alert_session,
+                        services.bus,
+                        level="critical",
+                        code="certificate_renewal_failed",
+                        message=f"certificate renewal failed: {exc}"[:500],
+                        dedupe_key="certificate-renewal",
+                    )
+                    await alert_session.commit()
+            except Exception:
+                logger.exception("could not record the certificate renewal alert")
 
 
 async def _profile_refresh(

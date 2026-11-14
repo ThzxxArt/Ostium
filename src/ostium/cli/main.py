@@ -242,7 +242,13 @@ def init(
     if role_value is Role.SERVER or settings.dev:
         settings.core_token_file = settings.data_dir / "runtime" / "core.token"
     if role_value is Role.SERVER and domain:
-        settings.trusted_hosts = sorted({*settings.trusted_hosts, domain.strip().lower()})
+        from ostium.services.certificates import CertificateError, validate_domain
+
+        try:
+            domain = validate_domain(domain)
+        except CertificateError as exc:
+            _fail(f"--domain is invalid: {exc}", 2)
+        settings.trusted_hosts = sorted({*settings.trusted_hosts, domain})
     settings.paths.ensure()
     settings.save()
 

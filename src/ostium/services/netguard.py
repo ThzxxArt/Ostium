@@ -16,6 +16,7 @@ METADATA_ADDRESSES = {
     "100.100.100.200",
     "fd00:ec2::254",
 }
+CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
 
 
 class UnsafeUrlError(ValueError):
@@ -49,13 +50,47 @@ def validate_target_host(host: str, *, allow_private: bool = False) -> str:
 def _is_blocked(
     address: ipaddress.IPv4Address | ipaddress.IPv6Address, allow_private: bool
 ) -> bool:
-    if str(address) in METADATA_ADDRESSES:
+    normalized = _normalise_address(address)
+    if normalized is None:
+        # Teredo tunnels can carry an embedded IPv4 address that is not
+        # visible to the checks below; they are never a legitimate target.
         return True
-    if address.is_loopback or address.is_link_local or address.is_multicast:
+    if str(normalized) in METADATA_ADDRESSES:
         return True
-    if address.is_unspecified or address.is_reserved:
+    if (
+        normalized.is_loopback
+        or normalized.is_link_local
+        or normalized.is_multicast
+        or normalized.is_unspecified
+        or normalized.is_reserved
+    ):
         return True
-    return bool(not allow_private and address.is_private)
+    # Python's ``is_private`` does not classify 100.64.0.0/10 as private.
+    # Treat it as private for outbound policy (server egress already blocks it).
+    if not allow_private and normalized in CGNAT_NETWORK:
+        return True
+    return bool(not allow_private and normalized.is_private)
+
+
+def _normalise_address(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Unwrap IPv4-in-IPv6 forms before applying the address policy.
+
+    ``::ffff:100.100.100.200`` and ``2002:6464:64c8::1`` both reach the
+    Alibaba metadata address over an IPv6 socket, but neither string matches
+    the IPv4 metadata literal.  Normalise them so the same policy applies.
+    """
+
+    if not isinstance(address, ipaddress.IPv6Address):
+        return address
+    if address.ipv4_mapped is not None:
+        return address.ipv4_mapped
+    if address.sixtofour is not None:
+        return address.sixtofour
+    if address.teredo is not None:
+        return None
+    return address
 
 
 def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
@@ -155,6 +190,7 @@ async def fetch_limited(
     if max_bytes <= 0:
         raise ValueError("max_bytes must be positive")
     current = validate_remote_url(url, allow_private=allow_private)
+    require_https = urlparse(current).scheme.lower() == "https"
     for _hop in range(MAX_REDIRECTS + 1):
         async with (
             httpx.AsyncClient(
@@ -168,9 +204,12 @@ async def fetch_limited(
                 location = response.headers.get("location", "")
                 if not location:
                     raise UnsafeUrlError("redirect response did not include a Location")
-                current = validate_remote_url(
+                target = validate_remote_url(
                     urljoin(current, location), allow_private=allow_private
                 )
+                if require_https and urlparse(target).scheme.lower() != "https":
+                    raise UnsafeUrlError("redirect from HTTPS to plaintext HTTP is not allowed")
+                current = target
                 continue
             body = bytearray()
             async for chunk in response.aiter_bytes():

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -263,6 +264,25 @@ def inbound_params(inbound: Inbound, store: SecretStore) -> dict[str, Any]:
         return {}
 
 
+def _endpoint_tag(user: ProxyUser, suffix: str) -> str:
+    """Return a stable endpoint tag that fits the 64-character contract.
+
+    Proxy-user names are allowed to be 64 characters, while endpoint tags are
+    also limited to 64.  Appending ``-reality``/``-ss2022`` to the raw name
+    used to overflow the model and break user creation and subscription
+    generation.  Long names get a short id-derived suffix so two users that
+    share the same prefix remain distinct.
+    """
+
+    raw = f"{user.name}-{suffix}"
+    if len(raw) <= 64:
+        return raw
+    digest = hashlib.sha256(user.id.encode("utf-8")).hexdigest()[:8]
+    tail = f"-{suffix}-{digest}"
+    keep = max(1, 64 - len(tail))
+    return f"{user.name[:keep]}{tail}"
+
+
 async def endpoints_for_user(
     session: AsyncSession,
     store: SecretStore,
@@ -272,6 +292,7 @@ async def endpoints_for_user(
     server_name: str | None = None,
 ) -> list[Endpoint]:
     from ostium.services.certificates import certificate_pin_sha256
+    from ostium.util.security import CryptoError
 
     inbounds = (await session.execute(select(Inbound))).scalars().all()
     certificates = {
@@ -283,8 +304,6 @@ async def endpoints_for_user(
         and Path(row.cert_path).is_file()
         and Path(row.key_path).is_file()
     }
-    password = decrypt_password(user, store)
-    ss_user_key = decrypt_ss_password(user, store)
     endpoints: list[Endpoint] = []
     display = server_name or server_host
     for inbound in sorted(
@@ -302,7 +321,7 @@ async def endpoints_for_user(
                 continue
             endpoints.append(
                 Endpoint(
-                    tag=f"{user.name}-reality",
+                    tag=_endpoint_tag(user, "reality"),
                     protocol=Protocol.VLESS_REALITY,
                     name=f"{display} · Reality",
                     server=server_host,
@@ -318,10 +337,14 @@ async def endpoints_for_user(
                 )
             )
         elif inbound.kind == "hysteria2" and cert is not None:
+            try:
+                password = decrypt_password(user, store)
+            except (UserError, CryptoError):
+                continue
             pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
             endpoints.append(
                 Endpoint(
-                    tag=f"{user.name}-hy2",
+                    tag=_endpoint_tag(user, "hy2"),
                     protocol=Protocol.HYSTERIA2,
                     name=f"{display} · Hysteria2",
                     server=server_host,
@@ -336,10 +359,14 @@ async def endpoints_for_user(
                 )
             )
         elif inbound.kind == "trojan" and cert is not None:
+            try:
+                password = decrypt_password(user, store)
+            except (UserError, CryptoError):
+                continue
             pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
             endpoints.append(
                 Endpoint(
-                    tag=f"{user.name}-trojan",
+                    tag=_endpoint_tag(user, "trojan"),
                     protocol=Protocol.TROJAN,
                     name=f"{display} · Trojan",
                     server=server_host,
@@ -353,6 +380,10 @@ async def endpoints_for_user(
                 )
             )
         elif inbound.kind == "shadowsocks":
+            try:
+                ss_user_key = decrypt_ss_password(user, store)
+            except (UserError, CryptoError):
+                continue
             server_key = str(params.get("server_key") or "").strip()
             # Shadowsocks 2022 multi-user outbound passwords are
             # ``server_key:user_key``.  The server inbound keeps the server key
@@ -360,7 +391,7 @@ async def endpoints_for_user(
             client_password = f"{server_key}:{ss_user_key}" if server_key else ss_user_key
             endpoints.append(
                 Endpoint(
-                    tag=f"{user.name}-ss2022",
+                    tag=_endpoint_tag(user, "ss2022"),
                     protocol=Protocol.SHADOWSOCKS,
                     name=f"{display} · SS2022",
                     server=server_host,

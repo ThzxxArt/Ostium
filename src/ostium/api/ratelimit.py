@@ -7,6 +7,11 @@ from collections import defaultdict, deque
 
 
 class SlidingWindowLimiter:
+    # A host with a large IPv6 prefix can rotate source addresses faster than
+    # the idle cleanup runs; without a hard ceiling the key dictionary grows
+    # for up to ``max_window`` seconds.  Evict the oldest key at the ceiling.
+    MAX_TRACKED_KEYS = 10_000
+
     def __init__(self, max_window: float = 3600.0) -> None:
         self._events: dict[str, deque[float]] = defaultdict(deque)
         self._max_window = max_window
@@ -24,7 +29,13 @@ class SlidingWindowLimiter:
         self._calls += 1
         if self._calls % 512 == 0:
             self._cleanup(now)
-        bucket = self._events[key]
+        bucket = self._events.get(key)
+        if bucket is None:
+            if len(self._events) >= self.MAX_TRACKED_KEYS:
+                self._cleanup(now)
+                while len(self._events) >= self.MAX_TRACKED_KEYS:
+                    self._events.pop(next(iter(self._events)), None)
+            bucket = self._events[key]
         while bucket and now - bucket[0] > window:
             bucket.popleft()
         if len(bucket) >= limit:

@@ -26,6 +26,12 @@ from ostium.util.time import iso, utcnow
 BACKUP_PREFIX = "ostium-backup-"
 AUTO_BACKUP_PREFIX = "ostium-auto-backup-"
 ALLOWED_MEMBERS = {"ostium.db", "master.key", "config.toml", "manifest.json"}
+# Bound both the file read into memory and the expanded archive.  A restore
+# is an admin action, but a corrupted/hostile archive must not fill the disk or
+# exhaust memory.
+MAX_BACKUP_FILE_BYTES = 2 * 1024 * 1024 * 1024
+MAX_RESTORE_EXPANDED_BYTES = 4 * 1024 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 20_000
 
 
 class BackupError(Exception):
@@ -145,6 +151,8 @@ def restore_backup(
 ) -> dict[str, Any]:
     if not backup_path.is_file():
         raise BackupError("backup file not found", "not_found", 404)
+    if backup_path.stat().st_size > MAX_BACKUP_FILE_BYTES:
+        raise BackupError("backup file is too large to restore", "backup_too_large", 413)
     raw = backup_path.read_bytes()
     if raw.startswith(b"OSTB1"):
         if not password:
@@ -283,7 +291,13 @@ def restore_backup(
 
 
 def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
-    for member in archive.getmembers():
+    total_size = 0
+    for index, member in enumerate(archive.getmembers()):
+        if index >= MAX_ARCHIVE_MEMBERS:
+            raise BackupError("backup contains too many entries", "invalid_archive")
+        total_size += max(0, int(member.size))
+        if total_size > MAX_RESTORE_EXPANDED_BYTES:
+            raise BackupError("backup expands beyond the restore size limit", "invalid_archive")
         raw_name = member.name
         # Validate before stripping ``./``: lstrip("./") would turn
         # ``../../manifest.json`` into an apparently safe ``manifest.json``.
@@ -344,6 +358,8 @@ def stage_restore(
 
     if not backup_path.is_file():
         raise BackupError("backup file not found", "not_found", 404)
+    if backup_path.stat().st_size > MAX_BACKUP_FILE_BYTES:
+        raise BackupError("backup file is too large to restore", "backup_too_large", 413)
     raw = backup_path.read_bytes()
     encrypted = raw.startswith(b"OSTB1")
     if encrypted and not password:

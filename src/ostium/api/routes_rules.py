@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -360,6 +361,7 @@ async def delete_rule_set(
             f"rule set is still referenced by {len(referenced_by)} rule(s)",
             "rule_set_in_use",
         )
+    downloaded = Path(rule_set.path) if rule_set.path else None
     await session.delete(rule_set)
     await session.flush()
     applied = await _apply_client(services, session)
@@ -370,4 +372,12 @@ async def delete_rule_set(
         target=rule_set.name,
         ip=client_ip(request),
     )
+    # Persist the row deletion before removing the file a previous config may
+    # still reference.  An unreferenced rule set is safe to unlink afterwards.
+    await session.commit()
+    if downloaded is not None:
+        try:
+            downloaded.unlink(missing_ok=True)
+        except OSError:
+            pass
     return {"deleted": True, **applied}

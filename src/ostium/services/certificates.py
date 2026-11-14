@@ -32,7 +32,10 @@ class CertificateError(Exception):
 
 
 def _cert_dir(settings: Settings, domain: str) -> Path:
-    safe = domain.replace("/", "_").replace("..", "_")
+    # IPv6 certificate names contain colons, which are illegal in Windows
+    # path components.  Keep directories portable while preserving a stable,
+    # readable name for DNS names.
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", domain)
     return settings.paths.certs_dir / safe
 
 
@@ -349,7 +352,17 @@ async def select_ready_certificate(
     return certificate
 
 
-async def delete_certificate(session: AsyncSession, certificate: Certificate) -> None:
+async def delete_certificate(
+    session: AsyncSession, certificate: Certificate, *, remove_files: bool = True
+) -> list[Path]:
+    """Delete a certificate row and detach its inbounds.
+
+    File removal is optional because the API must first apply a configuration
+    that no longer references the certificate.  Deleting the files while the
+    running core still uses them would break the next reload/restart if the
+    apply itself fails.
+    """
+
     inbounds = (
         (await session.execute(select(Inbound).where(Inbound.certificate_id == certificate.id)))
         .scalars()
@@ -361,6 +374,14 @@ async def delete_certificate(session: AsyncSession, certificate: Certificate) ->
     paths = [Path(certificate.cert_path), Path(certificate.key_path)]
     await session.delete(certificate)
     await session.flush()
+    if remove_files:
+        remove_certificate_files(paths)
+    return paths
+
+
+def remove_certificate_files(paths: list[Path]) -> None:
+    """Remove certificate generations after a successful configuration apply."""
+
     parents: set[Path] = set()
     for path in paths:
         parents.add(path.parent)

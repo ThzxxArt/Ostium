@@ -13,6 +13,7 @@ from ostium.acme.client import AcmeIssuer
 from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
 from ostium.api.errors import ApiError
 from ostium.db.models import AdminUser, Certificate
+from ostium.engine.manager import EngineError
 from ostium.services import certificates as cert_service
 from ostium.services.audit import audit
 from ostium.services.jobs import JobContext
@@ -338,8 +339,18 @@ async def delete_certificate(
     if certificate is None:
         raise ApiError(404, "certificate not found", "not_found")
     domain = certificate.domain
-    await cert_service.delete_certificate(session, certificate)
-    applied = await _apply_server(services, session)
+    paths = await cert_service.delete_certificate(session, certificate, remove_files=False)
+    try:
+        result = await services.engine.apply_server(session)
+        applied: dict[str, object] = {
+            "applied": True,
+            "revision": result["status"].get("revision"),
+        }
+    except EngineError as exc:
+        # The database row is gone and the inbounds are disabled, but the
+        # files stay on disk so the still-running old config remains valid.
+        # The operator sees an explicit warning instead of a fake apply.
+        applied = {"applied": False, "warning": str(exc)}
     await audit(
         session,
         actor=admin.username,
@@ -347,4 +358,10 @@ async def delete_certificate(
         target=domain,
         ip=client_ip(request),
     )
+    # Persist the row deletion before unlinking anything.  Files are removed
+    # only after a successful apply; a failed apply leaves them for the old
+    # last-good config and can be cleaned up on a later successful apply.
+    await session.commit()
+    if applied.get("applied"):
+        cert_service.remove_certificate_files(paths)
     return {"deleted": True, **applied}

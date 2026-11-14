@@ -53,9 +53,11 @@ def test_websocket_revalidates_while_events_keep_flowing(
 
 def test_websocket_rejects_invalid_session(api_client: TestClient) -> None:
     api_client.cookies.set("ostium_session", "not-a-session")
-    with pytest.raises(WebSocketDisconnect) as excinfo:  # noqa: SIM117
-        with api_client.websocket_connect("/api/v1/events"):
-            pass
+    with (
+        api_client.websocket_connect("/api/v1/events") as websocket,
+        pytest.raises(WebSocketDisconnect) as excinfo,
+    ):
+        websocket.receive_text()
     assert excinfo.value.code == 4401
     assert "expired" in excinfo.value.reason
 
@@ -63,10 +65,12 @@ def test_websocket_rejects_invalid_session(api_client: TestClient) -> None:
 def test_websocket_rejects_cross_origin(api_client: TestClient) -> None:
     setup_admin(api_client)
     with (
+        api_client.websocket_connect(
+            "/api/v1/events", headers={"origin": "https://evil.example"}
+        ) as websocket,
         pytest.raises(WebSocketDisconnect) as excinfo,
-        api_client.websocket_connect("/api/v1/events", headers={"origin": "https://evil.example"}),
     ):
-        pass
+        websocket.receive_text()
     assert excinfo.value.code == 4403
 
 

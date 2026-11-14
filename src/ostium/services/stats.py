@@ -244,15 +244,21 @@ class StatsCollector:
                     else:
                         row.uplink += delta.up
                         row.downlink += delta.down
-                for user_id, epoch in self._epoch_pending.items():
+                epochs = dict(self._epoch_pending)
+                for user_id, epoch in epochs.items():
                     await session.execute(
                         update(StatsEpoch)
                         .where(StatsEpoch.user_id == user_id, StatsEpoch.active.is_(True))
                         .values(active=False)
                     )
                     session.add(StatsEpoch(user_id=user_id, epoch=epoch, active=True))
-                self._epoch_pending.clear()
                 await session.commit()
+                # Only drop the epochs that were actually committed.  If the
+                # commit failed, they stay pending for the next flush; and a
+                # newer epoch recorded while the commit was in flight wins.
+                for user_id, epoch in epochs.items():
+                    if self._epoch_pending.get(user_id) == epoch:
+                        self._epoch_pending.pop(user_id, None)
             async with self._pending_lock:
                 for key, delta in pending.items():
                     current = self._pending.get(key)

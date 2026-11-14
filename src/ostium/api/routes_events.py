@@ -43,6 +43,18 @@ def _origin_matches(origin: str, host: str) -> bool:
     return bool(parsed.netloc) and parsed.netloc.lower() == host.lower()
 
 
+async def _reject(websocket: WebSocket, code: int, reason: str) -> None:
+    """Complete the handshake before closing so browsers see the app code.
+
+    Uvicorn turns a ``close`` before ``accept`` into an HTTP 403 handshake
+    response; browsers then report 1006 and cannot distinguish an auth failure
+    from a transient network error.  Accepting first makes 4401/4403 visible.
+    """
+
+    await websocket.accept()
+    await websocket.close(code=code, reason=reason)
+
+
 @router.websocket("/events")
 async def events(websocket: WebSocket) -> None:
     services: Services = websocket.app.state.services
@@ -51,22 +63,22 @@ async def events(websocket: WebSocket) -> None:
     # Browsers send Origin on WebSocket handshakes.  Reject cross-origin
     # consoles instead of relying on SameSite cookies alone.
     if origin and not _origin_matches(origin, host):
-        await websocket.close(code=4403, reason="origin rejected")
+        await _reject(websocket, 4403, "origin rejected")
         return
     if services.settings.ui_allowlist and not _ip_allowed(
         client_ip(websocket),
         services.settings.ui_allowlist,
     ):
-        await websocket.close(code=4403, reason="client address is not allowlisted")
+        await _reject(websocket, 4403, "client address is not allowlisted")
         return
     token = websocket.cookies.get("ostium_session")
     if not token:
-        await websocket.close(code=4401, reason="authentication required")
+        await _reject(websocket, 4401, "authentication required")
         return
     async with services.session_factory() as session:
         resolved = await resolve_session(session, token)
         if resolved is None:
-            await websocket.close(code=4401, reason="session expired")
+            await _reject(websocket, 4401, "session expired")
             return
         await session.commit()
     await websocket.accept()
