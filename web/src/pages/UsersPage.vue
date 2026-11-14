@@ -286,7 +286,8 @@ function confirmReset(user: User) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.users.resetUsage(user.id)
+        const result = await api.users.resetUsage(user.id)
+        if (result.warning) message.warning(result.warning)
         message.success(t('users.usage_reset'))
         await load()
       } catch (err) {
@@ -304,7 +305,8 @@ function confirmDelete(user: User) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.users.remove(user.id)
+        const result = await api.users.remove(user.id)
+        if (result.warning) message.warning(result.warning)
         message.success(t('users.deleted'))
         drawerOpen.value = false
         await load()
@@ -345,6 +347,7 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
       message.success(t('users.exported'))
       return
     }
+    let bulkWarning: string | undefined
     if (action === 'delete') {
       const confirmed = await new Promise<boolean>((resolve, reject) => {
         dialog.error({
@@ -354,7 +357,8 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
             try {
-              await api.users.bulk('delete', ids)
+              const result = await api.users.bulk('delete', ids)
+              bulkWarning = result.warning
               resolve(true)
             } catch (err) {
               reject(err)
@@ -365,8 +369,10 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
       })
       if (!confirmed) return
     } else {
-      await api.users.bulk(action, ids)
+      const result = await api.users.bulk(action, ids)
+      bulkWarning = result.warning
     }
+    if (bulkWarning) message.warning(bulkWarning)
     message.success(t('users.updated'))
     selected.value = new Set()
     await load()

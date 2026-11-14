@@ -6,6 +6,8 @@ import NetworkPage from '@/pages/NetworkPage.vue'
 import StatsPage from '@/pages/StatsPage.vue'
 import DiagnosticsPage from '@/pages/DiagnosticsPage.vue'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/api'
+import { vi } from 'vitest'
 import {
   cleanupPage,
   clickAllButtons,
@@ -14,6 +16,10 @@ import {
   mountPage,
   settle,
 } from './helpers'
+
+function stateOf(wrapper: any, component: any) {
+  return wrapper.findComponent(component).vm.$.setupState
+}
 
 const pages = [
   ['ClientHomePage', ClientHomePage],
@@ -53,6 +59,42 @@ describe('client pages', () => {
     const { wrapper } = await mountPage(page)
     await settle()
     expect(wrapper.html()).toBeTruthy()
+  })
+
+  it('ClientHomePage activates the selected profile', async () => {
+    const second = { ...fixtures.profile, id: 'profile-2', name: 'JP' }
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/profiles': {
+          profiles: [fixtures.profile, second],
+          active_profile_id: fixtures.profile.id,
+        },
+      },
+    })
+    const activate = vi.spyOn(api.profiles, 'activate').mockResolvedValueOnce({
+      profile: second,
+      applied: true,
+    })
+    vi.spyOn(api.profiles, 'update').mockResolvedValueOnce({ profile: second, applied: true })
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    const state = stateOf(wrapper, ClientHomePage)
+    await state.selectProfile('profile-2')
+    await settle()
+    expect(activate).toHaveBeenCalledWith('profile-2')
+  })
+
+  it('ClientHomePage displays the configured mixed port', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': { ...fixtures.systemInfo, mixed_port: 8123 },
+      },
+    })
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    expect(wrapper.text()).toContain('8123')
   })
 
   it('NetworkPage shows LAN proxy addresses when allow_lan is enabled', async () => {

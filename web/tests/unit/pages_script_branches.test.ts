@@ -104,7 +104,7 @@ describe('page script branches', () => {
   })
 
   it('exercises rule testing, editing and rule-set branches', async () => {
-    installFetchMock()
+    const { calls } = installFetchMock()
     const { wrapper } = await mountPage(RulesPage)
     const state = stateOf(wrapper, RulesPage)
     await settle()
@@ -132,7 +132,25 @@ describe('page script branches', () => {
     state.testDomain = '1.2.3.4'
     await state.testRule()
     state.testDomain = 'example.com'
+    state.testSourcePort = 8443
+    state.testProtocol = 'udp'
     await state.testRule()
+    const testCall = calls.filter((call) => call.path === '/api/v1/rules/test').at(-1)
+    expect(testCall?.body).toMatchObject({
+      domain: 'example.com',
+      source_port: 8443,
+      protocol: 'udp',
+    })
+
+    state.openAdd()
+    state.form.type = 'source_port'
+    state.form.values = '443, 8443'
+    state.form.action = 'block'
+    await state.saveRule()
+    const sourcePortCall = calls
+      .filter((call) => call.path === '/api/v1/rules' && call.method === 'POST')
+      .at(-1)
+    expect(sourcePortCall?.body).toMatchObject({ match: { source_port: [443, 8443] } })
 
     state.ruleSetForm.name = ''
     state.ruleSetForm.url = ''

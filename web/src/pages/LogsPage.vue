@@ -24,13 +24,13 @@ const error = ref<string | null>(null)
 const container = ref<HTMLElement | null>(null)
 let timer: number | null = null
 
-const levelOptions = [
+const levelOptions = computed(() => [
   { label: t('logs.all_levels'), value: '' },
   { label: 'Debug', value: 'debug' },
   { label: 'Info', value: 'info' },
   { label: 'Warning', value: 'warning' },
   { label: 'Error', value: 'error' },
-]
+])
 
 const filteredRecords = computed(() => {
   let list = records.value

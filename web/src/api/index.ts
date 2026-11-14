@@ -139,7 +139,10 @@ export const api = {
       http.post<{ profile: Profile; applied: boolean; warning?: string }>(
         `${v1}/profiles/${id}/activate`,
       ),
-    reorder: (ids: string[]) => http.post<{ ok: boolean }>(`${v1}/profiles/reorder`, { ids }),
+    reorder: (ids: string[]) =>
+      http.post<{ ok: boolean; applied?: boolean; warning?: string }>(`${v1}/profiles/reorder`, {
+        ids,
+      }),
     remove: (id: string) =>
       http.delete<{ deleted: boolean; applied: boolean; warning?: string }>(`${v1}/profiles/${id}`),
     refresh: (id: string) =>
@@ -155,21 +158,32 @@ export const api = {
   },
   rules: {
     list: () => http.get<{ rules: Rule[] }>(`${v1}/rules`),
-    create: (payload: Record<string, unknown>) => http.post<{ rule: Rule }>(`${v1}/rules`, payload),
+    create: (payload: Record<string, unknown>) =>
+      http.post<{ rule: Rule; applied?: boolean; warning?: string }>(`${v1}/rules`, payload),
     update: (id: string, payload: Record<string, unknown>) =>
-      http.patch<{ rule: Rule }>(`${v1}/rules/${id}`, payload),
-    remove: (id: string) => http.delete<{ deleted: boolean }>(`${v1}/rules/${id}`),
-    reorder: (ids: string[]) => http.post<{ ok: boolean }>(`${v1}/rules/reorder`, { ids }),
+      http.patch<{ rule: Rule; applied?: boolean; warning?: string }>(`${v1}/rules/${id}`, payload),
+    remove: (id: string) =>
+      http.delete<{ deleted: boolean; applied?: boolean; warning?: string }>(`${v1}/rules/${id}`),
+    reorder: (ids: string[]) =>
+      http.post<{ ok: boolean; applied?: boolean; warning?: string }>(`${v1}/rules/reorder`, {
+        ids,
+      }),
     test: (payload: Record<string, unknown>) =>
       http.post<{ matched: boolean; rule?: Rule; action?: string }>(`${v1}/rules/test`, payload),
     ruleSets: () => http.get<{ rule_sets: RuleSet[] }>(`${v1}/rule-sets`),
     addRuleSet: (payload: Record<string, unknown>) =>
       http.post<{ rule_set: RuleSet }>(`${v1}/rule-sets`, payload),
     updateRuleSet: (id: string) =>
-      http.post<{ result: Record<string, unknown>; rule_set: RuleSet }>(
-        `${v1}/rule-sets/${id}/update`,
+      http.post<{
+        result: Record<string, unknown>
+        rule_set: RuleSet
+        applied?: boolean
+        warning?: string
+      }>(`${v1}/rule-sets/${id}/update`),
+    removeRuleSet: (id: string) =>
+      http.delete<{ deleted: boolean; applied?: boolean; warning?: string }>(
+        `${v1}/rule-sets/${id}`,
       ),
-    removeRuleSet: (id: string) => http.delete<{ deleted: boolean }>(`${v1}/rule-sets/${id}`),
   },
   stats: {
     overview: () => http.get<StatsOverview>(`${v1}/stats/overview`),
@@ -238,7 +252,10 @@ export const api = {
         `${v1}/certificates/${id}/use`,
         { kinds },
       ),
-    remove: (id: string) => http.delete<{ deleted: boolean }>(`${v1}/certificates/${id}`),
+    remove: (id: string) =>
+      http.delete<{ deleted: boolean; applied?: boolean; warning?: string }>(
+        `${v1}/certificates/${id}`,
+      ),
   },
   jobs: {
     list: (limit = 100) => http.get<{ jobs: Job[] }>(`${v1}/jobs?limit=${limit}`),
@@ -275,7 +292,12 @@ export const api = {
   settings: {
     get: () => http.get<AppSettings>(`${v1}/settings`),
     update: (payload: Record<string, unknown>) =>
-      http.patch<{ ok: boolean; restart_required?: boolean }>(`${v1}/settings`, payload),
+      http.patch<{
+        ok: boolean
+        restart_required?: boolean
+        applied?: boolean
+        warning?: string
+      }>(`${v1}/settings`, payload),
     publicUi: (enabled: boolean, domain?: string) =>
       http.post<{ public_ui: boolean; restart_required: boolean; message: string }>(
         `${v1}/settings/public-ui`,

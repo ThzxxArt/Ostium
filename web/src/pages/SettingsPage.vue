@@ -173,6 +173,7 @@ async function saveGeneral() {
       acme_staging: general.value.acme_staging,
       block_private_egress: general.value.block_private_egress,
     })
+    if (result.warning) message.warning(result.warning)
     message.success(t('settings.saved'))
     if (result.restart_required) message.warning(t('settings.restart_hint'))
     await load()

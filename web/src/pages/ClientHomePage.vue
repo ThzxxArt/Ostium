@@ -29,6 +29,7 @@ const message = useMessage()
 const info = ref<SystemInfo | null>(null)
 const profiles = ref<Profile[]>([])
 const selectedProfileId = ref<string | null>(null)
+const activeProfileId = ref<string | null>(null)
 const connections = ref<ConnectionEntry[]>([])
 const loading = ref(true)
 const busy = ref(false)
@@ -88,9 +89,13 @@ async function load() {
     ])
     info.value = systemInfo
     profiles.value = profileData.profiles
+    activeProfileId.value = profileData.active_profile_id
     if (!selectedProfileId.value) {
-      const active = profiles.value.find((profile) => profile.endpoints.length)
-      selectedProfileId.value = active?.id || profiles.value[0]?.id || null
+      const preferred =
+        profiles.value.find(
+          (profile) => profile.id === profileData.active_profile_id && profile.endpoints.length,
+        ) || profiles.value.find((profile) => profile.endpoints.length)
+      selectedProfileId.value = preferred?.id || profiles.value[0]?.id || null
     }
     connections.value = connectionData.connections
     const up = connectionData.upload_total
@@ -137,10 +142,24 @@ async function toggleConnection() {
 }
 
 async function selectProfile(id: string) {
-  selectedProfileId.value = id
-  const profile = profiles.value.find((item) => item.id === id)
-  if (profile) {
-    await selectEndpoint(profile.selected_endpoint || profile.endpoints[0]?.tag || '')
+  if (busy.value) return
+  busy.value = true
+  try {
+    if (id !== activeProfileId.value) {
+      const result = await api.profiles.activate(id)
+      if (result.warning) message.warning(result.warning)
+      activeProfileId.value = id
+      message.success(t('profiles.activated'))
+    }
+    selectedProfileId.value = id
+    const profile = profiles.value.find((item) => item.id === id)
+    if (profile) {
+      await selectEndpoint(profile.selected_endpoint || profile.endpoints[0]?.tag || '')
+    }
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    busy.value = false
   }
 }
 
@@ -299,7 +318,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <span>{{ t('common.port') }}</span><strong class="o-mono">{{
-                mode === 'tun' ? 'TUN' : '7890'
+                mode === 'tun' ? 'TUN' : info?.mixed_port || 7890
               }}</strong>
             </div>
             <div>

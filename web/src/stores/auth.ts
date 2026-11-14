@@ -68,6 +68,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function expire() {
+    // A 401 from any API must update the guard's source of truth before it
+    // redirects to /login; otherwise the guard sees the stale authenticated
+    // flag and immediately sends the user back to the protected page.
+    status.value = status.value ? { ...status.value, authenticated: false } : null
+    me.value = null
+  }
+
   return {
     status,
     me,
@@ -86,5 +94,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     setup,
     logout,
+    expire,
   }
 })

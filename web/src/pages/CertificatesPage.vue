@@ -140,7 +140,8 @@ function remove(certificate: Certificate) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.certificates.remove(certificate.id)
+        const result = await api.certificates.remove(certificate.id)
+        if (result.warning) message.warning(result.warning)
         message.success(t('common.delete'))
         await load()
       } catch (err) {

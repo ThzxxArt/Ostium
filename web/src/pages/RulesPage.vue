@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   NButton,
   NCheckbox,
   NInput,
+  NInputNumber,
   NModal,
   NSelect,
   NSwitch,
@@ -40,6 +41,8 @@ const ruleOpen = ref(false)
 const ruleSetOpen = ref(false)
 const editing = ref<Rule | null>(null)
 const testDomain = ref('')
+const testSourcePort = ref<number | null>(null)
+const testProtocol = ref('')
 const testResult = ref<Record<string, unknown> | null>(null)
 const testing = ref(false)
 
@@ -52,6 +55,8 @@ const form = ref({
     | 'domain_regex'
     | 'ip_cidr'
     | 'port'
+    | 'source_port'
+    | 'protocol'
     | 'process_name'
     | 'rule_set'
     | 'network',
@@ -62,22 +67,24 @@ const advanced = ref(false)
 const advancedJson = ref('{}')
 const ruleSetForm = ref({ name: '', url: '', format: 'binary' })
 
-const typeOptions = [
+const typeOptions = computed(() => [
   { label: t('rules.domain'), value: 'domain' },
   { label: t('rules.domain_suffix'), value: 'domain_suffix' },
   { label: t('rules.domain_keyword'), value: 'domain_keyword' },
   { label: t('rules.domain_regex'), value: 'domain_regex' },
   { label: t('rules.ip_cidr'), value: 'ip_cidr' },
   { label: t('rules.port'), value: 'port' },
+  { label: t('rules.source_port'), value: 'source_port' },
+  { label: t('rules.protocol'), value: 'protocol' },
   { label: t('rules.process'), value: 'process_name' },
   { label: t('rules.rule_set_ref'), value: 'rule_set' },
   { label: t('rules.network'), value: 'network' },
-]
-const actionOptions = [
+])
+const actionOptions = computed(() => [
   { label: t('rules.action_proxy'), value: 'proxy' },
   { label: t('rules.action_direct'), value: 'direct' },
   { label: t('rules.action_block'), value: 'block' },
-]
+])
 
 async function load() {
   loading.value = true
@@ -133,18 +140,21 @@ async function saveRule() {
       .map((value) => value.trim())
       .filter(Boolean)
     if (!values.length) return
+    const numeric = form.value.type === 'port' || form.value.type === 'source_port'
     match = {
-      [form.value.type]: form.value.type === 'port' ? values.map(Number) : values,
+      [form.value.type]: numeric ? values.map(Number) : values,
     }
   }
   try {
-    if (editing.value)
-      await api.rules.update(editing.value.id, {
-        action: form.value.action,
-        match,
-        note: form.value.note,
-      })
-    else await api.rules.create({ action: form.value.action, match, note: form.value.note })
+    const result = editing.value
+      ? await api.rules.update(editing.value.id, {
+          action: form.value.action,
+          match,
+          note: form.value.note,
+        })
+      : await api.rules.create({ action: form.value.action, match, note: form.value.note })
+    if (result.warning) message.warning(result.warning)
+    else message.success(t('rules.applied'))
     ruleOpen.value = false
     await load()
   } catch (err) {
@@ -160,7 +170,8 @@ async function moveRule(index: number, delta: number) {
   next.splice(target, 0, moved)
   rules.value = next
   try {
-    await api.rules.reorder(next.map((rule) => rule.id))
+    const result = await api.rules.reorder(next.map((rule) => rule.id))
+    if (result.warning) message.warning(result.warning)
   } catch (err) {
     message.error((err as Error).message)
     await load()
@@ -169,8 +180,9 @@ async function moveRule(index: number, delta: number) {
 
 async function toggleRule(rule: Rule, enabled: boolean) {
   try {
-    await api.rules.update(rule.id, { enabled })
+    const result = await api.rules.update(rule.id, { enabled })
     rule.enabled = enabled
+    if (result.warning) message.warning(result.warning)
   } catch (err) {
     message.error((err as Error).message)
   }
@@ -184,7 +196,8 @@ function removeRule(rule: Rule) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.rules.remove(rule.id)
+        const result = await api.rules.remove(rule.id)
+        if (result.warning) message.warning(result.warning)
         await load()
       } catch (err) {
         message.error((err as Error).message)
@@ -198,9 +211,12 @@ async function testRule() {
   testing.value = true
   try {
     const isIp = /^\d+\.\d+\.\d+\.\d+/.test(testDomain.value.trim())
-    testResult.value = await api.rules.test(
-      isIp ? { ip: testDomain.value.trim() } : { domain: testDomain.value.trim() },
-    )
+    const payload: Record<string, unknown> = isIp
+      ? { ip: testDomain.value.trim() }
+      : { domain: testDomain.value.trim() }
+    if (testSourcePort.value) payload.source_port = testSourcePort.value
+    if (testProtocol.value.trim()) payload.protocol = testProtocol.value.trim()
+    testResult.value = await api.rules.test(payload)
   } catch (err) {
     message.error((err as Error).message)
   } finally {
@@ -225,6 +241,8 @@ async function updateRuleSet(ruleSet: RuleSet) {
     const result = await api.rules.updateRuleSet(ruleSet.id)
     if (result.result?.error) {
       message.error(String(result.result.error))
+    } else if (result.warning) {
+      message.warning(result.warning)
     } else {
       message.success(t('rules.applied'))
     }
@@ -242,7 +260,8 @@ function removeRuleSet(ruleSet: RuleSet) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.rules.removeRuleSet(ruleSet.id)
+        const result = await api.rules.removeRuleSet(ruleSet.id)
+        if (result.warning) message.warning(result.warning)
         await load()
       } catch (err) {
         message.error((err as Error).message)
@@ -338,6 +357,14 @@ onMounted(load)
         <p class="o-small o-muted">{{ t('rules.test_hint') }}</p>
         <div class="test-row">
           <NInput v-model:value="testDomain" placeholder="example.com" @keyup.enter="testRule" />
+          <NInputNumber
+            v-model:value="testSourcePort"
+            :min="1"
+            :max="65535"
+            :show-button="false"
+            :placeholder="t('rules.test_source_port')"
+          />
+          <NInput v-model:value="testProtocol" :placeholder="t('rules.test_protocol')" />
           <NButton type="primary" :loading="testing" @click="testRule">{{
             t('common.test')
           }}</NButton>
@@ -540,8 +567,15 @@ onMounted(load)
 }
 .test-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+.test-row :deep(.n-input) {
+  flex: 1 1 140px;
+}
+.test-row :deep(.n-input-number) {
+  flex: 0 1 130px;
 }
 .test-result {
   margin-top: 14px;

@@ -298,6 +298,14 @@ onMounted(load)
               </div>
             </div>
           </template>
+          <template v-if="inbound.kind === 'hysteria2'">
+            <div class="detail">
+              <span>{{ t('inbounds.obfs') }}</span>
+              <strong>{{
+                inbound.params.has_obfs ? t('common.enabled') : t('common.disabled')
+              }}</strong>
+            </div>
+          </template>
           <div v-if="inbound.requires_certificate" class="detail wide">
             <span>{{ t('inbounds.certificate') }}</span>
             <div class="cert-state">
@@ -319,7 +327,7 @@ onMounted(load)
             <NSelect
               :value="inbound.certificate?.id || null"
               :options="certificateOptions"
-              clearable
+              :clearable="!inbound.enabled"
               size="small"
               :placeholder="t('inbounds.select_certificate')"
               :disabled="!readyCertificates.length || busy === inbound.kind"

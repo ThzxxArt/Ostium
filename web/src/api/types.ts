@@ -262,6 +262,7 @@ export interface SystemInfo {
   server_host: string | null
   mode: ConnectionMode
   allow_lan: boolean
+  mixed_port: number
   lan_addresses: string[]
   lan_port: number
   proxy: {

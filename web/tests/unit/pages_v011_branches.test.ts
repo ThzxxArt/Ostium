@@ -9,7 +9,8 @@ import RoutingPage from '@/pages/RoutingPage.vue'
 import UsersPage from '@/pages/UsersPage.vue'
 import SetupPage from '@/pages/SetupPage.vue'
 import OnboardingPage from '@/pages/OnboardingPage.vue'
-import { fixtures, installFetchMock, mountPage, settle, cleanupPage } from './helpers'
+import { api } from '@/api'
+import { fixtures, installFetchMock, mountPage, settle, cleanupPage, clickByText } from './helpers'
 
 function stateOf(wrapper: any, component: any) {
   return wrapper.findComponent(component).vm.$.setupState
@@ -368,5 +369,173 @@ describe('v0.1.1 page branches', () => {
     state.skip()
     await settle()
     expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('surfaces non-applied warnings on profile, user and certificate actions', async () => {
+    installFetchMock()
+    const profiles = await mountPage(ProfilesPage)
+    await settle()
+    const profilesState = stateOf(profiles.wrapper, ProfilesPage)
+    const second = { ...fixtures.profile, id: 'profile-2', name: 'JP', sort_order: 10 }
+    vi.spyOn(api.profiles, 'reorder').mockResolvedValueOnce({
+      ok: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    profilesState.dragId = fixtures.profile.id
+    await profilesState.onDrop(second)
+    vi.spyOn(api.profiles, 'remove').mockResolvedValueOnce({
+      deleted: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    profilesState.remove(fixtures.profile)
+    await settle()
+    await clickByText('Delete')
+    await settle()
+
+    installFetchMock()
+    const users = await mountPage(UsersPage)
+    await settle()
+    const usersState = stateOf(users.wrapper, UsersPage)
+    vi.spyOn(api.users, 'resetUsage').mockResolvedValueOnce({
+      user: fixtures.user,
+      applied: false,
+      warning: 'stored only',
+    })
+    usersState.confirmReset(fixtures.user)
+    await settle()
+    await clickByText('Confirm')
+    await settle()
+    vi.spyOn(api.users, 'remove').mockResolvedValueOnce({
+      deleted: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    usersState.confirmDelete(fixtures.user)
+    await settle()
+    await clickByText('Delete')
+    await settle()
+    vi.spyOn(api.users, 'bulk').mockResolvedValueOnce({
+      count: 1,
+      action: 'disable',
+      applied: false,
+      warning: 'stored only',
+    })
+    usersState.selected = new Set([fixtures.user.id])
+    await usersState.bulk('disable')
+    await settle()
+
+    installFetchMock()
+    const certs = await mountPage((await import('@/pages/CertificatesPage.vue')).default)
+    await settle()
+    const certsState = stateOf(
+      certs.wrapper,
+      (await import('@/pages/CertificatesPage.vue')).default,
+    )
+    vi.spyOn(api.certificates, 'remove').mockResolvedValueOnce({
+      deleted: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    certsState.remove(fixtures.certificate)
+    await settle()
+    await clickByText('Delete')
+    await settle()
+    expect(profiles.wrapper.html()).toBeTruthy()
+    expect(users.wrapper.html()).toBeTruthy()
+    expect(certs.wrapper.html()).toBeTruthy()
+  })
+
+  it('surfaces non-applied warnings on server and client rule pages', async () => {
+    installFetchMock()
+    const rules = await mountPage(RulesPage)
+    await settle()
+    const rulesState = stateOf(rules.wrapper, RulesPage)
+    vi.spyOn(api.rules, 'create').mockResolvedValueOnce({
+      rule: fixtures.rule,
+      applied: false,
+      warning: 'stored only',
+    })
+    rulesState.openAdd()
+    rulesState.form.values = 'example.com'
+    await rulesState.saveRule()
+    vi.spyOn(api.rules, 'update').mockResolvedValue({
+      rule: fixtures.rule,
+      applied: false,
+      warning: 'stored only',
+    })
+    await rulesState.toggleRule(fixtures.rule, false)
+    await rulesState.moveRule(0, 1)
+    vi.spyOn(api.rules, 'updateRuleSet').mockResolvedValueOnce({
+      result: { updated: false },
+      rule_set: fixtures.ruleSet,
+      applied: false,
+      warning: 'stored only',
+    })
+    await rulesState.updateRuleSet(fixtures.ruleSet)
+    vi.spyOn(api.rules, 'remove').mockResolvedValueOnce({
+      deleted: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    rulesState.removeRule(fixtures.rule)
+    await settle()
+    await clickByText('Delete')
+    await settle()
+    vi.spyOn(api.rules, 'removeRuleSet').mockResolvedValueOnce({
+      deleted: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    rulesState.removeRuleSet(fixtures.ruleSet)
+    await settle()
+    await clickByText('Delete')
+    await settle()
+
+    installFetchMock({ role: 'client' })
+    const routing = await mountPage(RoutingPage)
+    await settle()
+    const routingState = stateOf(routing.wrapper, RoutingPage)
+    vi.spyOn(api.settings, 'update').mockResolvedValueOnce({
+      ok: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    await routingState.setPreset('global')
+    vi.spyOn(api.rules, 'create').mockResolvedValueOnce({
+      rule: fixtures.rule,
+      applied: false,
+      warning: 'stored only',
+    })
+    routingState.openAdd()
+    routingState.form.values = 'example.com'
+    await routingState.saveRule()
+    vi.spyOn(api.rules, 'update').mockResolvedValue({
+      rule: fixtures.rule,
+      applied: false,
+      warning: 'stored only',
+    })
+    await routingState.toggleRule(fixtures.rule, false)
+    routingState.removeRule(fixtures.rule)
+    await settle()
+    await clickByText('Confirm')
+    await settle()
+
+    installFetchMock()
+    const settingsPage = await mountPage(SettingsPage)
+    await settle()
+    const settingsState = stateOf(settingsPage.wrapper, SettingsPage)
+    vi.spyOn(api.settings, 'update').mockResolvedValueOnce({
+      ok: true,
+      applied: false,
+      warning: 'stored only',
+    })
+    await settingsState.saveGeneral()
+    await settle()
+
+    expect(rules.wrapper.html()).toBeTruthy()
+    expect(routing.wrapper.html()).toBeTruthy()
+    expect(settingsPage.wrapper.html()).toBeTruthy()
   })
 })

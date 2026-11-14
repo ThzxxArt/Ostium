@@ -26,14 +26,16 @@ const message = useMessage()
 const { t } = useI18n()
 
 const role = computed(() => auth.role)
-const serverSteps = [
-  t('setup.step_account'),
-  t('setup.step_role'),
-  t('setup.step_transport'),
-  t('setup.step_review'),
-]
-const clientSteps = [t('setup.step_account'), t('setup.step_import'), t('setup.step_mode')]
-const steps = computed(() => (role.value === 'server' ? serverSteps : clientSteps))
+const steps = computed(() =>
+  role.value === 'server'
+    ? [
+        t('setup.step_account'),
+        t('setup.step_role'),
+        t('setup.step_transport'),
+        t('setup.step_review'),
+      ]
+    : [t('setup.step_account'), t('setup.step_import'), t('setup.step_mode')],
+)
 const step = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)

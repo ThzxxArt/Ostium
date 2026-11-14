@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -21,6 +21,14 @@ afterEach(async () => {
 })
 
 describe('PWA generator', () => {
+  it('uses the same default theme as the application store', async () => {
+    const source = await readFile(
+      join(import.meta.dirname, '..', '..', 'public', 'theme-init.js'),
+      'utf-8',
+    )
+    expect(source).toContain("localStorage.getItem('ostium.theme') || 'dark'")
+  })
+
   it('hashes asset contents, not just stable filenames', async () => {
     const directory = await fixture()
     const first = await buildServiceWorker(directory)

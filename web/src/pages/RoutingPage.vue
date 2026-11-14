@@ -43,6 +43,8 @@ const form = ref({
     | 'domain_regex'
     | 'ip_cidr'
     | 'port'
+    | 'source_port'
+    | 'protocol'
     | 'process_name',
   values: '',
   note: '',
@@ -56,20 +58,22 @@ const presets = computed(() => [
 ])
 const activePreset = computed(() => settings.value?.general.routing_mode || 'smart')
 
-const typeOptions = [
+const typeOptions = computed(() => [
   { label: t('rules.domain'), value: 'domain' },
   { label: t('rules.domain_suffix'), value: 'domain_suffix' },
   { label: t('rules.domain_keyword'), value: 'domain_keyword' },
   { label: t('rules.domain_regex'), value: 'domain_regex' },
   { label: t('rules.ip_cidr'), value: 'ip_cidr' },
   { label: t('rules.port'), value: 'port' },
+  { label: t('rules.source_port'), value: 'source_port' },
+  { label: t('rules.protocol'), value: 'protocol' },
   { label: t('rules.process'), value: 'process_name' },
-]
-const actionOptions = [
+])
+const actionOptions = computed(() => [
   { label: t('rules.action_proxy'), value: 'proxy' },
   { label: t('rules.action_direct'), value: 'direct' },
   { label: t('rules.action_block'), value: 'block' },
-]
+])
 
 async function load() {
   loading.value = true
@@ -86,9 +90,10 @@ async function load() {
 
 async function setPreset(id: string) {
   try {
-    await api.settings.update({ routing_mode: id })
+    const result = await api.settings.update({ routing_mode: id })
     if (settings.value) settings.value.general.routing_mode = id
-    message.success(t('rules.applied'))
+    if (result.warning) message.warning(result.warning)
+    else message.success(t('rules.applied'))
   } catch (err) {
     message.error((err as Error).message)
   }
@@ -123,18 +128,18 @@ async function saveRule() {
     message.error(t('errors.validation'))
     return
   }
-  const match = { [form.value.type]: form.value.type === 'port' ? values.map(Number) : values }
+  const numeric = form.value.type === 'port' || form.value.type === 'source_port'
+  const match = { [form.value.type]: numeric ? values.map(Number) : values }
   try {
-    if (editing.value) {
-      await api.rules.update(editing.value.id, {
-        action: form.value.action,
-        match,
-        note: form.value.note,
-      })
-    } else {
-      await api.rules.create({ action: form.value.action, match, note: form.value.note })
-    }
-    message.success(t('rules.applied'))
+    const result = editing.value
+      ? await api.rules.update(editing.value.id, {
+          action: form.value.action,
+          match,
+          note: form.value.note,
+        })
+      : await api.rules.create({ action: form.value.action, match, note: form.value.note })
+    if (result.warning) message.warning(result.warning)
+    else message.success(t('rules.applied'))
     ruleOpen.value = false
     await load()
   } catch (err) {
@@ -144,8 +149,9 @@ async function saveRule() {
 
 async function toggleRule(rule: Rule, enabled: boolean) {
   try {
-    await api.rules.update(rule.id, { enabled })
+    const result = await api.rules.update(rule.id, { enabled })
     rule.enabled = enabled
+    if (result.warning) message.warning(result.warning)
   } catch (err) {
     message.error((err as Error).message)
   }
@@ -159,7 +165,8 @@ function removeRule(rule: Rule) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.rules.remove(rule.id)
+        const result = await api.rules.remove(rule.id)
+        if (result.warning) message.warning(result.warning)
         await load()
       } catch (err) {
         message.error((err as Error).message)

@@ -66,6 +66,16 @@ describe('stores', () => {
     expect(store.status?.authenticated).toBe(false)
   })
 
+  it('expires the local auth state before the unauthorized redirect', async () => {
+    installFetchMock()
+    const store = useAuthStore()
+    await store.bootstrap()
+    expect(store.authenticated).toBe(true)
+    store.expire()
+    expect(store.authenticated).toBe(false)
+    expect(store.me).toBeNull()
+  })
+
   it('captures bootstrap errors and handles missing status', async () => {
     vi.stubGlobal(
       'fetch',

@@ -19,10 +19,12 @@ import OJobDrawer from '@/components/OJobDrawer.vue'
 import OPwaUpdate from '@/components/OPwaUpdate.vue'
 import OShortcutModal from '@/components/OShortcutModal.vue'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 import { darkThemeOverrides, lightThemeOverrides } from '@/design/theme'
 
 const app = useAppStore()
+const auth = useAuthStore()
 const { locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
@@ -33,6 +35,7 @@ const naiveLocale = computed(() => (locale.value.startsWith('zh') ? zhCN : enUS)
 const naiveDateLocale = computed(() => (locale.value.startsWith('zh') ? dateZhCN : dateEnUS))
 
 function onUnauthorized() {
+  auth.expire()
   if (route.path === '/login') return
   void router.replace({ path: '/login', query: { next: route.fullPath } })
 }

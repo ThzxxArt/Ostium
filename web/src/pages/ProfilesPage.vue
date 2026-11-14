@@ -93,7 +93,8 @@ async function onDrop(target: Profile) {
   next.splice(to, 0, moved)
   profiles.value = next.map((item, index) => ({ ...item, sort_order: index * 10 }))
   try {
-    await api.profiles.reorder(next.map((item) => item.id))
+    const result = await api.profiles.reorder(next.map((item) => item.id))
+    if (result.warning) message.warning(result.warning)
     message.success(t('profiles.reordered'))
   } catch (err) {
     message.error((err as Error).message)
@@ -158,7 +159,8 @@ function remove(profile: Profile) {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        await api.profiles.remove(profile.id)
+        const result = await api.profiles.remove(profile.id)
+        if (result.warning) message.warning(result.warning)
         message.success(t('common.delete'))
         await load()
       } catch (err) {
