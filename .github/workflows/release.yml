@@ -197,9 +197,10 @@ jobs:
 
   macos:
     needs: [wheel, core]
-    # macos-14 currently resolves to an arm64 runner that is unavailable for
-    # this repository; macos-13 (Intel) can still package the arm64 DMG.
-    runs-on: macos-13
+    # macos-13 and macos-14 are retired, so jobs using those labels never get
+    # a runner. macos-15-intel is the supported Intel label and can package
+    # the arm64 DMG because packaging does not execute the core binary.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - name: Download wheel

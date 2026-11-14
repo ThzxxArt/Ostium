@@ -68,8 +68,7 @@ def test_release_notes_are_not_generated_from_an_empty_template() -> None:
 
 
 def test_release_macos_uses_an_available_runner_and_names_the_core_arch() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "runs-on: macos-13" in workflow
+    assert _release()["jobs"]["macos"]["runs-on"] == "macos-15-intel"
     script = (ROOT / "scripts" / "build-macos.sh").read_text(encoding="utf-8")
     assert "OSTIUM_MACOS_ARCH" in script
     assert '*-darwin-arm64.tar.gz) CORE_ARCH="arm64"' in script
