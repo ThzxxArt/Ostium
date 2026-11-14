@@ -269,7 +269,7 @@ winreg 调用，以及 `db/session.py` 的 SQLite PRAGMA 回调声明。它们�
 4. **72h soak/性能预算**：需要稳定宿主、真实流量和 Lighthouse/性能采样。
 5. **5 用户可用性测试**：需要真实用户。
 6. **签名/公证**：需要 Windows 代码签名证书与 Apple Developer ID。
-7. **发布**：PyPI `ostium-ctl`、GHCR、GitHub Release、Docker push 均需爸爸明确授权；未执行。
+7. **发布**：PyPI `ostium-ctl`、GHCR、GitHub Release、Docker push 均需发布负责人明确授权；未执行。
 8. **Docker 本地构建**：本机无 Docker；workflow 已配置。
 9. **全页 axe/键盘走查**：登录页 axe 自动通过；全站人工走查与 200% 缩放仍需执行。
 10. **live collector 已覆盖**：`test_collector_live.py` 使用自定义核心 + 官方客户端 + 真实 loopback 流量 + 真实 gRPC + 真实 collector tick。
@@ -456,7 +456,7 @@ shellcheck + bash -n                                  -> PASS
 
 ### 13.4 仍未验证 / 外部阻塞
 
-- **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。本轮已按爸爸批准 **push 代码到 `main`**；没有 tag 或发布。
+- **没有 tag、GitHub Release、PyPI、GHCR 或 Docker 发布**；README 中的 Release/PyPI/GHCR 链接仍会 404。本轮已按发布负责人批准 **push 代码到 `main`**；没有 tag 或发布。
 - 推送后的 GitHub Actions 在 `77a3e34` 全部通过：CI `43352777103`、E2E `43352777113`、Security `43352777052`；Docs 在包含 docs 变更的 `cbf9b70` 为 `43342090287`。
 - **Windows**：未在 Windows runner/实机执行 PyInstaller one-dir、Inno 安装/卸载、服务启动、TUN/Wintun、PAC 恢复；PowerShell 只做了解析和静态检查。R3-03/R3-05 的运行时行为必须实机确认。
 - **macOS**：launchd、`ostium` 组、token 权限、UI 以用户启动、Gatekeeper/签名未实机验证。
