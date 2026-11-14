@@ -6,7 +6,7 @@
 # internet.
 services:
   ostium:
-    image: ghcr.io/thzxxart/ostium:0.1.1
+    image: ghcr.io/thzxxart/ostium:0.1.2
     container_name: ostium
     restart: unless-stopped
     network_mode: host

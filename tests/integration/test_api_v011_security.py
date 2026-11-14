@@ -23,6 +23,36 @@ def test_api_docs_require_authentication(api_client: TestClient) -> None:
     assert api_client.get("/api/openapi.json").status_code == 200
 
 
+def test_read_api_token_cannot_export_plaintext_credentials(api_client: TestClient) -> None:
+    token = setup_admin(api_client)
+    created = api_client.post("/api/v1/users", json={"name": "alice"}, headers=_headers(token))
+    assert created.status_code == 201, created.text
+    user_id = created.json()["user"]["id"]
+
+    read_token = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "read-only", "scopes": ["read"]},
+        headers=_headers(token),
+    )
+    assert read_token.status_code == 201, read_token.text
+    bearer = {"Authorization": f"Bearer {read_token.json()['token']}"}
+    denied = api_client.get(f"/api/v1/users/{user_id}/export", headers=bearer)
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "insufficient_scope"
+
+    scoped_token = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "scoped", "scopes": ["read", "user:read"]},
+        headers=_headers(token),
+    )
+    assert scoped_token.status_code == 201, scoped_token.text
+    allowed = api_client.get(
+        f"/api/v1/users/{user_id}/export",
+        headers={"Authorization": f"Bearer {scoped_token.json()['token']}"},
+    )
+    assert allowed.status_code == 200, allowed.text
+
+
 def test_local_login_token_is_single_use(api_client: TestClient, settings: Settings) -> None:
     setup_admin(api_client)
     token = make_local_login_token(settings)

@@ -3,14 +3,18 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 import type { AuthStatus, Me } from '@/api/types'
 
+export type AuthState = 'idle' | 'ready' | 'error'
+
 export const useAuthStore = defineStore('auth', () => {
   const status = ref<AuthStatus | null>(null)
   const me = ref<Me | null>(null)
   const loading = ref(false)
   const ready = ref(false)
   const error = ref<string | null>(null)
+  const statusState = ref<AuthState>('idle')
+  let inFlight: Promise<void> | null = null
 
-  const initialized = computed(() => status.value?.initialized ?? false)
+  const initialized = computed(() => status.value?.initialized === true)
   const authenticated = computed(() => status.value?.authenticated ?? false)
   const role = computed(() => status.value?.role ?? 'server')
   const isServer = computed(() => role.value === 'server')
@@ -18,33 +22,67 @@ export const useAuthStore = defineStore('auth', () => {
   const mustChangePassword = computed(() => me.value?.must_change_password ?? false)
   const totpEnabled = computed(() => me.value?.totp_enabled ?? false)
 
-  async function bootstrap() {
-    if (ready.value) return
+  async function load(force: boolean): Promise<void> {
+    if (!force && ready.value && statusState.value !== 'error') return
+    if (inFlight) return inFlight
     loading.value = true
-    try {
-      status.value = await api.auth.status()
-      if (status.value.authenticated) {
-        me.value = await api.auth.me()
-      } else {
-        me.value = null
+    inFlight = (async () => {
+      try {
+        status.value = await api.auth.status()
+        me.value = status.value.authenticated ? await api.auth.me() : null
+        error.value = null
+        statusState.value = 'ready'
+      } catch (err) {
+        // A failed status probe must never be interpreted as "not initialized":
+        // that sent existing installations to /setup and locked the operator
+        // out even though the administrator still existed.
+        error.value = err instanceof Error ? err.message : String(err)
+        statusState.value = 'error'
+      } finally {
+        loading.value = false
+        ready.value = true
+        inFlight = null
       }
-      error.value = null
-    } catch (err) {
-      error.value = (err as Error).message
-    } finally {
-      loading.value = false
-      ready.value = true
-    }
+    })()
+    return inFlight
+  }
+
+  async function bootstrap(force = false) {
+    await load(force)
   }
 
   async function refresh() {
-    status.value = await api.auth.status()
-    me.value = status.value.authenticated ? await api.auth.me() : null
+    await load(true)
+    if (statusState.value === 'error') {
+      throw new Error(error.value ?? 'authentication status is unavailable')
+    }
+  }
+
+  function markAuthenticatedAfterRefreshFailure() {
+    // The login/setup API call already succeeded and set the session cookie.
+    // If the follow-up status request fails, keep the successful fact instead
+    // of showing "login failed" and leaving the user on the form.
+    status.value = {
+      initialized: true,
+      has_admin: true,
+      authenticated: true,
+      must_change_password: false,
+      totp_enabled: status.value?.totp_enabled ?? false,
+      role: status.value?.role ?? 'server',
+      version: status.value?.version ?? '',
+      public_ui: status.value?.public_ui ?? false,
+    }
+    me.value = null
+    statusState.value = 'ready'
   }
 
   async function login(username: string, password: string, totp?: string, recoveryCode?: string) {
     await api.auth.login(username, password, totp, recoveryCode)
-    await refresh()
+    try {
+      await refresh()
+    } catch {
+      markAuthenticatedAfterRefreshFailure()
+    }
   }
 
   async function setup(payload: {
@@ -56,7 +94,11 @@ export const useAuthStore = defineStore('auth', () => {
     lines?: 'reality' | 'later'
   }) {
     await api.auth.setup(payload)
-    await refresh()
+    try {
+      await refresh()
+    } catch {
+      markAuthenticatedAfterRefreshFailure()
+    }
   }
 
   async function logout() {
@@ -82,6 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     ready,
     error,
+    statusState,
     initialized,
     authenticated,
     role,

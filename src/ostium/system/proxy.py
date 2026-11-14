@@ -80,6 +80,15 @@ class BaseProxy:
             "port": state.get("port", self.settings.mixed_port),
         }
 
+    def _already_enabled(self, host: str, port: int) -> bool:
+        state = _read_state(self.state_path).get(STATE_KEY, {})
+        if not state.get("enabled"):
+            return False
+        try:
+            return str(state.get("host")) == host and int(state.get("port") or 0) == int(port)
+        except (TypeError, ValueError):
+            return False
+
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         raise ProxyError(f"system proxy is not supported on this platform ({self.platform})")
 
@@ -122,6 +131,8 @@ class GnomeProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
+        if self._already_enabled(host, port):
+            return self.status()
         original = {
             "mode": self._get("org.gnome.system.proxy", "mode"),
             "http_host": self._get("org.gnome.system.proxy.http", "host"),
@@ -258,6 +269,8 @@ class KdeProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
+        if self._already_enabled(host, port):
+            return self.status()
         keys = ("ProxyType", "httpProxy", "httpsProxy", "socksProxy", "NoProxyFor")
         original = {key: self._read(key) for key in keys} if self._can_read else {}
         state = _read_state(self.state_path)
@@ -353,6 +366,8 @@ class MacProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
+        if self._already_enabled(host, port):
+            return self.status()
         original: dict[str, Any] = {}
         for service in self._services():
             states: dict[str, Any] = {}
@@ -448,6 +463,8 @@ class WindowsProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
+        if self._already_enabled(host, port):
+            return self.status()
         import winreg  # pragma: no cover - Windows only
 
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -498,6 +515,11 @@ class WindowsProxy(BaseProxy):
 
         state = _read_state(self.state_path)
         entry = state.get(STATE_KEY, {})
+        if not entry.get("enabled"):
+            # Without a state entry Ostium never changed this user's proxy.
+            # Clearing ProxyEnable/ProxyServer here used to destroy a manual
+            # proxy configuration that this process did not create.
+            return self.status()
         original = entry.get("original") or {}
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
         with winreg.OpenKey(

@@ -125,16 +125,51 @@ def _check_version(db_path: Path) -> None:
 
 
 def migrate_database(db_path: Path) -> None:
-    """Run Alembic ``upgrade head`` synchronously.
+    """Run Alembic ``upgrade head`` synchronously with a snapshot and lock.
 
     Called before the app opens the database, so blocking briefly is preferable
     to serving requests against an unmigrated schema.  The Alembic environment
     is synchronous to avoid nested event loops.
     """
 
+    from filelock import FileLock, Timeout
+
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    _check_version(db_path)
-    command.upgrade(_alembic_config(db_path), "head")
+    lock = FileLock(str(db_path.with_suffix(".migrate.lock")), timeout=60)
+    try:
+        with lock:
+            _check_version(db_path)
+            snapshot = db_path.with_suffix(".pre-migrate.db")
+            if db_path.is_file():
+                _snapshot_database(db_path, snapshot)
+            try:
+                command.upgrade(_alembic_config(db_path), "head")
+            except Exception:
+                if snapshot.is_file():
+                    # Restore the exact bytes SQLite produced, not a partial
+                    # migration that would make the next start fail again.
+                    for leftover in (
+                        db_path.with_name(db_path.name + "-wal"),
+                        db_path.with_name(db_path.name + "-shm"),
+                    ):
+                        leftover.unlink(missing_ok=True)
+                    snapshot.replace(db_path)
+                raise
+    except Timeout as exc:
+        raise RuntimeError(f"another Ostium process is migrating {db_path}; try again") from exc
+
+
+def _snapshot_database(source: Path, destination: Path) -> None:
+    """Copy a consistent SQLite image, including committed WAL frames."""
+
+    src = sqlite3.connect(source)
+    dst = sqlite3.connect(destination)
+    try:
+        src.execute("PRAGMA wal_checkpoint(FULL)")
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
 
 
 async def create_schema(engine: AsyncEngine) -> None:
@@ -145,6 +180,14 @@ async def create_schema(engine: AsyncEngine) -> None:
         raise RuntimeError("the database URL does not contain a file path")
     db_path = Path(str(raw_path))
     fresh = not _has_tables(db_path)
+    if not fresh and _read_version(db_path) is None:
+        # A database with tables but no Alembic metadata cannot be upgraded
+        # safely: running the initial revision would fail on existing tables
+        # and leave the operator without a recovery path.
+        raise DatabaseVersionError(
+            f"database {db_path} has tables but no alembic_version; "
+            "restore a backup or re-run the supported upgrade path"
+        )
     if fresh:
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
@@ -157,9 +200,22 @@ async def create_schema(engine: AsyncEngine) -> None:
                 "INSERT OR IGNORE INTO alembic_version(version_num) VALUES (?)",
                 (SCHEMA_HEAD,),
             )
+        _tighten_database_files(db_path)
         return
     _check_version(db_path)
     migrate_database(db_path)
+    _tighten_database_files(db_path)
+
+
+def _tighten_database_files(db_path: Path) -> None:
+    if os.name != "posix":
+        return
+    for path in (
+        db_path,
+        db_path.with_name(db_path.name + "-wal"),
+        db_path.with_name(db_path.name + "-shm"),
+    ):
+        tighten_permissions(path)
 
 
 def check_database_integrity(path: Path) -> None:

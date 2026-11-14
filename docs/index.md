@@ -2,12 +2,13 @@
 
 Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包可以装到服务器，也可以装到你的电脑；服务端和客户端共用一套 Web UI、CLI 和安装器。数据面是固定版本的 sing-box，控制面是 FastAPI + Vue 3。
 
-当前发布版本：**v0.1.1**（2026-11-14）。
+当前公开版本：**v0.1.1**（2026-11-14）。`0.1.2` 正在准备中，发布状态与已验证/未验证项以 [发布状态](release-status.md) 为准。
 
 > 文档以中文为主。英文概览见 [`README.en.md`](https://github.com/ThzxxArt/Ostium/blob/main/README.en.md)。
 
 ## 从这里开始
 
+- [发布状态](release-status.md) — 当前版本、已验证/未验证项、签名与回滚
 - [一键安装（推荐）](guides/install.md) — 不预装 Python，一条命令完成安装
 - [Linux 云服务器完整部署](guides/linux-cloud-server.md) — root/非 root、systemd/非 systemd、Public UI 与首次公网访问
 - [服务管理](guides/service-manager.md) — systemd、OpenRC、runit、s6、supervisord、root 模式
@@ -25,7 +26,7 @@ Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包
 - [安全模型](security/threat-model.md)
 - [安全公告：默认管理面绑定](security/advisory-2026-11-default-bind.md)
 
-## v0.1.1 范围
+## 当前 0.1.x 范围
 
 锁定范围见 [`PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/PLAN.md)：
 

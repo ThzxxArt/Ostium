@@ -35,7 +35,9 @@ async def subscription(
     if user is None:
         return Response(status_code=404, content=b"not found", media_type="text/plain")
     try:
-        content, media_type = await render_subscription(session, services.store, user, fmt)
+        content, media_type = await render_subscription(
+            session, services.store, user, fmt, settings=services.settings
+        )
     except SubscriptionInactive:
         return Response(status_code=403, content=b"subscription inactive", media_type="text/plain")
     except UserError as exc:

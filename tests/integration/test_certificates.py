@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -12,6 +11,7 @@ from ostium.db.session import create_engine, create_schema, create_session_facto
 from ostium.services import certificates as cert_service
 from ostium.services.crypto import SecretStore
 from ostium.services.users import ensure_inbounds
+from ostium.util.paths import resolve_path
 
 
 def test_self_signed_certificate_and_removal(settings: Settings) -> None:
@@ -26,8 +26,8 @@ def test_self_signed_certificate_and_removal(settings: Settings) -> None:
                 session, settings, domain="vpn.example.com"
             )
             await session.commit()
-            assert Path(certificate.cert_path).is_file()
-            assert Path(certificate.key_path).is_file()
+            assert resolve_path(settings, certificate.cert_path).is_file()
+            assert resolve_path(settings, certificate.key_path).is_file()
             assert certificate.status == "ready"
             await cert_service.use_for_inbounds(session, certificate)
             await session.commit()
@@ -48,8 +48,8 @@ def test_manual_certificate_mismatch_rejected(settings: Settings) -> None:
         async with factory() as session:
             cert = await cert_service.create_self_signed(session, settings, domain="a.example.com")
             await session.commit()
-            cert_pem = Path(cert.cert_path).read_text()
-            key_pem = Path(cert.key_path).read_text()
+            cert_pem = resolve_path(settings, cert.cert_path).read_text()
+            key_pem = resolve_path(settings, cert.key_path).read_text()
             with pytest.raises(cert_service.CertificateError):
                 await cert_service.import_manual(
                     session,

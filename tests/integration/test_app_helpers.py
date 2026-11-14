@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -282,7 +283,8 @@ def test_on_quota_callback(tmp_path: Path, monkeypatch) -> None:
             raise RuntimeError("quota apply failed")
 
         monkeypatch.setattr(app_module.EngineManager, "apply_server", fail)
-        client.portal.call(services.stats.on_quota, ["alice"])
+        with pytest.raises(RuntimeError, match="quota apply failed"):
+            client.portal.call(services.stats.on_quota, ["alice"])
         assert any(
             "quota configuration apply failed" in item["message"] for item in services.bus.logs()
         )

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ostium.config import Settings
 from ostium.db.models import RuleSet
+from ostium.util.paths import store_path
 from ostium.util.time import utcnow
 
 RULE_MATCH_KEYS = {
@@ -30,6 +31,11 @@ RULE_MATCH_KEYS = {
 }
 RULE_SET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 MAX_RULE_SET_BYTES = 32 * 1024 * 1024
+MAX_REGEX_LENGTH = 200
+# Go RE2 (used by sing-box) has no lookaround, backreferences, atomic groups
+# or Python named groups.  Accepting them here produced configs that passed the
+# UI test but failed `sing-box check`.
+RE2_FORBIDDEN = re.compile(r"\(\?(?:[=!]|<[=!]|>|#|P<|P=|'|\{|[a-zA-Z]*-[a-zA-Z]*:)|\\[1-9]|\\k<")
 
 
 class RuleValidationError(ValueError):
@@ -50,6 +56,15 @@ def validate_rule_match(
             values = _string_list(value, key)
             if key == "domain_regex":
                 for pattern in values:
+                    if len(pattern) > MAX_REGEX_LENGTH:
+                        raise RuleValidationError(
+                            f"domain_regex is limited to {MAX_REGEX_LENGTH} characters"
+                        )
+                    if RE2_FORBIDDEN.search(pattern):
+                        raise RuleValidationError(
+                            f"domain_regex {pattern!r} uses syntax that sing-box (RE2) "
+                            "does not support (lookaround, backreferences or named groups)"
+                        )
                     try:
                         re.compile(pattern)
                     except re.error as exc:
@@ -121,6 +136,11 @@ def validate_rule_set_name(name: str) -> str:
 
 
 def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
+    if match.get("rule_set"):
+        # Binary/source rule sets are evaluated by sing-box, not by this
+        # offline tester.  Returning True made a rule-set-only block rule look
+        # like it matched every flow.
+        return False
     domain = str(target.get("domain") or "").lower()
     ip = target.get("ip")
     port = target.get("port")
@@ -132,7 +152,7 @@ def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
         if domain not in [str(item).lower() for item in values]:
             return False
     if values := match.get("domain_suffix"):
-        if not any(domain.endswith(str(item).lower()) for item in values):
+        if not any(_domain_suffix(domain, str(item)) for item in values):
             return False
     if values := match.get("domain_keyword"):
         if not any(str(item).lower() in domain for item in values):
@@ -167,6 +187,11 @@ def matches(match: dict[str, Any], target: dict[str, Any]) -> bool:
     return bool(match)
 
 
+def _domain_suffix(domain: str, suffix: str) -> bool:
+    value = suffix.strip().lower().lstrip(".")
+    return bool(value) and (domain == value or domain.endswith("." + value))
+
+
 def _regex(pattern: str) -> re.Pattern[str]:
     try:
         return re.compile(pattern, re.IGNORECASE)
@@ -178,8 +203,17 @@ def evaluate(rules: list[dict[str, Any]], target: dict[str, Any]) -> dict[str, A
     for rule in rules:
         if not rule.get("enabled", True):
             continue
-        if matches(rule.get("match", {}), target):
+        match = rule.get("match", {}) or {}
+        if matches(match, target):
             return {"matched": True, "rule": rule}
+        if match.get("rule_set"):
+            return {
+                "matched": False,
+                "unknown": True,
+                "reason": (
+                    "rule_set conditions are evaluated by sing-box and cannot be tested offline"
+                ),
+            }
     return {"matched": False, "action": "proxy"}
 
 
@@ -254,7 +288,7 @@ async def update_rule_set(
             temporary.replace(target)
         finally:
             temporary.unlink(missing_ok=True)
-        rule_set.path = str(target)
+        rule_set.path = store_path(settings, target)
         rule_set.sha256 = digest
         rule_set.etag = fetched.headers.get("etag")
         rule_set.updated_at = utcnow()

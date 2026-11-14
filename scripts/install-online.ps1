@@ -5,7 +5,7 @@ Ostium 一键在线安装器（Windows 客户端）。
   irm https://raw.githubusercontent.com/ThzxxArt/Ostium/main/scripts/install-online.ps1 | iex
 
 带参数：
-  & ([scriptblock]::Create((irm .../install-online.ps1))) -Version 0.1.1 -RunAsSystem
+  & ([scriptblock]::Create((irm .../install-online.ps1))) -Version latest -RunAsSystem
 
 离线：
   .\install-online.ps1 -LocalDir D:\Ostium-release
@@ -15,7 +15,7 @@ Ostium 一键在线安装器（Windows 客户端）。
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.1",
+    [string]$Version = "latest",
     [ValidateSet("client")]
     [string]$Role = "client",
     [string]$LocalDir = "",

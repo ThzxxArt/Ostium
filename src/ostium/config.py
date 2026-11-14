@@ -93,6 +93,12 @@ class Paths(BaseModel):
         return self.runtime_dir / "last-good.meta.json"
 
     @property
+    def enforcement_path(self) -> Path:
+        """Users disabled by quota/expiry; survives a control-plane restart."""
+
+        return self.data_dir / "enforcement.json"
+
+    @property
     def clash_secret_path(self) -> Path:
         return self.runtime_dir / "clash.secret"
 

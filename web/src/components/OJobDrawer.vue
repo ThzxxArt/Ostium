@@ -71,7 +71,7 @@ function icon(status: string) {
 </script>
 
 <template>
-  <NDrawer v-model:show="visible" :width="420" placement="right">
+  <NDrawer v-model:show="visible" :width="'min(420px, 100vw)'" placement="right">
     <NDrawerContent :title="t('jobs.title')" closable>
       <div class="drawer-body">
         <div class="head">

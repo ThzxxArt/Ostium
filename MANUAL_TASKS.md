@@ -1,10 +1,11 @@
 # Manual tasks / external validation
 
 These items cannot be completed inside this Linux workspace. They are required
-for the v0.1.1 release gates and must be performed by a human with the relevant
-hardware or accounts.
+for the v0.1.2 release gates and must be performed by a human with the relevant
+hardware or accounts. v0.1.1 was published on 2026-11-14; its tag and assets are
+immutable. The checked boxes below describe that published release, not 0.1.2.
 
-## v0.1.1 external matrix
+## v0.1.1 external matrix (published; kept as historical evidence)
 
 - [ ] Windows 11: run `Ostium-0.1.1-windows-x64-setup.exe`, verify OstiumCore
       service, Wintun/TUN, PAC, token/last-good ACL, SmartScreen and uninstall
@@ -104,10 +105,10 @@ hardware or accounts.
       PyPI wheel install and GHCR tags (`0.1.0`, `v0.1.0`, `latest`) verified.
 - [ ] Decide whether to buy a Windows code-signing certificate and Apple
       Developer ID/notarization (optional per PLAN).
-- [ ] If immutable provenance is required for the post-release
-      `install-online.sh`/`SHA256SUMS` hotfix, publish `v0.1.1` (PyPI 0.1.0
-      sdist and tag source still contain the pre-hotfix copy).
+- [x] Published `v0.1.1` on 2026-11-14 with GitHub Release, PyPI
+      `ostium-ctl==0.1.1` and GHCR tags; 23 assets verified read-only.
 - [ ] Complete the legal/AUP review for the chosen hosting provider and
       jurisdiction; this project provides no legal advice.
-- [ ] Confirm the final 72h soak, ACME, backup/restore and upgrade/rollback
-      gates before announcing v0.1.1.
+- [ ] Complete the 0.1.2 external matrix (Windows/macOS/Debian/RHEL/Nginx/
+      Docker/ACME/TUN/soak/performance/signing) before describing those items
+      as verified. See `docs/release-status.md`.

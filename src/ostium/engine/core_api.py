@@ -48,9 +48,11 @@ class CoreClient:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token()}", "Accept": "application/json"}
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _request(
+        self, method: str, path: str, *, timeout: float | None = None, **kwargs: Any
+    ) -> Any:
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(self.timeout, connect=1.5), trust_env=False
+            timeout=httpx.Timeout(timeout or self.timeout, connect=1.5), trust_env=False
         ) as client:
             try:
                 response = await client.request(
@@ -97,6 +99,10 @@ class CoreClient:
             await self._request(
                 "POST",
                 "/v1/apply",
+                # sing-box check alone may take 30 seconds on a large config.
+                # A 5-second HTTP timeout reported "unreachable" while the
+                # core was still applying the same request.
+                timeout=max(self.timeout, 45.0),
                 json={
                     "config": config,
                     "sha256": sha256,

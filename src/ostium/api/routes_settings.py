@@ -49,15 +49,23 @@ class PublicUiRequest(BaseModel):
     domain: str | None = None
 
 
-def _default_scopes() -> list[Literal["read", "write"]]:
+TokenScope = Literal[
+    "read",
+    "write",
+    "subscription:read",
+    "subscription:write",
+    "user:read",
+    "backup:read",
+]
+
+
+def _default_scopes() -> list[TokenScope]:
     return ["read", "write"]
 
 
 class TokenRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    scopes: list[Literal["read", "write"]] = Field(
-        default_factory=_default_scopes, min_length=1, max_length=2
-    )
+    scopes: list[TokenScope] = Field(default_factory=_default_scopes, min_length=1, max_length=8)
     expires_at: datetime | None = None
 
 
@@ -304,15 +312,19 @@ async def public_ui(
         certificate = (
             await session.execute(select(Certificate).where(Certificate.domain == payload.domain))
         ).scalar_one_or_none()
-        from pathlib import Path
+        from ostium.util.paths import resolve_path
 
+        cert_file = resolve_path(services.settings, certificate.cert_path) if certificate else None
+        key_file = resolve_path(services.settings, certificate.key_path) if certificate else None
         if (
             certificate is None
             or certificate.status != "ready"
             or certificate.expires_at is None
             or as_utc(certificate.expires_at) <= utcnow()
-            or not Path(certificate.cert_path).is_file()
-            or not Path(certificate.key_path).is_file()
+            or cert_file is None
+            or key_file is None
+            or not cert_file.is_file()
+            or not key_file.is_file()
         ):
             raise ApiError(
                 409,
@@ -340,7 +352,11 @@ async def public_ui(
         )
         await set_setting(session, "server", server_info)
         if not await get_setting(session, "public_base_url"):
-            await set_setting(session, "public_base_url", f"https://{payload.domain}")
+            from ostium.services.public_url import base_url_for_domain
+
+            await set_setting(
+                session, "public_base_url", base_url_for_domain(candidate, payload.domain)
+            )
     else:
         candidate.public_ui = False
         candidate.secure_cookies = False

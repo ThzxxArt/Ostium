@@ -12,7 +12,7 @@
 ## 一键安装（推荐）
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
@@ -30,7 +30,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 
 从 GitHub Release 下载：
 
-- `ostium_ctl-0.1.1-py3-none-any.whl`
+- `ostium_ctl-0.1.2-py3-none-any.whl`
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 - 源码包或包含 `scripts/`、`deploy/` 的目录
@@ -38,7 +38,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
 sudo ./install.sh --role server \
-  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.2-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
@@ -119,11 +119,11 @@ sudo systemctl restart ostium
 
 UI 默认只监听回环；非回环明文监听需要显式 `allow_insecure_bind`，否则 `ostium serve` 直接拒绝启动。Public UI 仍需 TLS + TOTP。当前版本只支持 HTTP-01。
 
-在 Settings 开启 Public UI 时，如果当前监听地址仍是回环，Ostium 会自动改为 `0.0.0.0` 并在关闭时恢复 `127.0.0.1`；自定义监听地址不会被覆盖。重启后请先从本机确认 `https://域名/healthz`，再关闭 SSH 隧道。
+在 Settings 开启 Public UI 时，如果当前监听地址仍是回环，Ostium 会自动改为 `0.0.0.0` 并在关闭时恢复 `127.0.0.1`；自定义监听地址不会被覆盖。默认端口是 8443，因此健康检查是 `https://域名:8443/healthz`；只有显式把服务监听改成 443 时才省略端口。重启后请先从本机确认健康检查，再关闭 SSH 隧道。
 
 ## 分流规则
 
-服务端 **Routing** 页会把规则保存在本地数据库，但 v0.1.1 不会把自定义规则通过订阅分发给客户端；客户端会在应用的
+服务端 **Routing** 页会把规则保存在本地数据库，但 v0.1.2 不会把自定义规则通过订阅分发给客户端；客户端会在应用的
 Routing 页使用同一套规则编辑器，并立即应用到自己的核心。需要统一分流时，请在每个客户端导入/配置对应规则。
 
 ## 备份
@@ -140,13 +140,17 @@ root 模式下把 `sudo -u ostium` 换成 `sudo`。
 
 ## 日常运维
 
+服务端配置默认是 `0600 ostium:ostium`；普通 sudo 用户直接运行会读不到配置。使用服务用户执行：
+
 ```bash
-ostium doctor
-ostium logs --source core -f
-ostium diagnostics export
-ostium core version
-ostium update --check
+sudo -u ostium ostium doctor
+sudo -u ostium ostium logs --source core -f
+sudo -u ostium ostium diagnostics export
+sudo -u ostium ostium core version
+sudo ostium update --check
 ```
+
+root 部署（`--run-as-root`）去掉 `sudo -u ostium`。
 
 ## 安全底线
 

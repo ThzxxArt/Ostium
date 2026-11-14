@@ -360,23 +360,40 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
     from ostium.api.app import _watchdog_tick
     from ostium.services.events import EventBus
 
-    class Client:
+    class Engine:
         def __init__(self) -> None:
-            self.reloads = 0
+            self.reconciled = 0
             self.running = False
 
-        async def status(self):
-            return {"running": self.running}
-
-        async def reload(self):
-            self.reloads += 1
+        async def reconcile_client(self, session, *, force: bool = False):
+            self.reconciled += 1
             self.running = True
-            return {"running": True}
+            return True
 
-    client = Client()
+    class Client:
+        def __init__(self, engine: Engine) -> None:
+            self.engine = engine
+
+        async def status(self):
+            return {"running": self.engine.running}
+
+    class Session:
+        async def __aenter__(self):
+            return None
+
+        async def __aexit__(self, *args):  # type: ignore[no-untyped-def]
+            return False
+
+    engine = Engine()
+    engine.client = Client(engine)
+
+    def session_factory():
+        return Session()
+
     services = SimpleNamespace(
         settings=settings,
-        engine=SimpleNamespace(client=client),
+        engine=engine,
+        session_factory=session_factory,
         bus=EventBus(),
         watchdog_suspended=False,
     )
@@ -384,25 +401,25 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
 
     # No last-good configuration yet: do not touch the core.
     asyncio.run(_watchdog_tick(services))
-    assert client.reloads == 0
+    assert engine.reconciled == 0
 
     settings.paths.last_good_path.write_text("{}", encoding="utf-8")
     asyncio.run(_watchdog_tick(services))
-    assert client.reloads == 1
+    assert engine.reconciled == 1
 
-    # Already running: no redundant reload.
+    # Already running: no redundant reconcile.
     asyncio.run(_watchdog_tick(services))
-    assert client.reloads == 1
+    assert engine.reconciled == 1
 
-    client.running = False
+    engine.running = False
     services.watchdog_suspended = True
     asyncio.run(_watchdog_tick(services))
-    assert client.reloads == 1
+    assert engine.reconciled == 1
 
     services.watchdog_suspended = False
     settings.auto_reconnect = False
     asyncio.run(_watchdog_tick(services))
-    assert client.reloads == 1
+    assert engine.reconciled == 1
 
 
 def test_automatic_backup_is_listed_and_restorable(api_client: TestClient) -> None:

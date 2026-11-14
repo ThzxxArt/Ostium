@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -14,13 +18,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+      - name: Release metadata preflight
+        run: bash scripts/release-preflight.sh --tag "$GITHUB_REF_NAME"
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.11.14"
       - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
-      - run: uv sync
+      - run: uv sync --locked
       - run: uv run ruff check src tests scripts
       - run: uv run ruff format --check src tests scripts
       - run: uv run mypy src/ostium
@@ -130,9 +136,43 @@ jobs:
     permissions:
       contents: read
 
+  integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.11.14"
+      - run: uv sync --locked
+      - name: Fetch pinned sing-box for integration checks
+        run: |
+          curl -sL -o /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz
+          tar -xzf /tmp/sing-box.tar.gz -C /tmp
+          install -m 0755 /tmp/sing-box-1.14.4-linux-amd64/sing-box /usr/local/bin/sing-box
+      - name: Build the Ostium custom core
+        run: ./scripts/build-core.sh --os linux amd64
+      - run: >-
+          OSTIUM_TEST_ENGINE=/usr/local/bin/sing-box
+          OSTIUM_TEST_CUSTOM_ENGINE=$PWD/dist/core/ostium-core-1.14.4-ostium.1-linux-amd64/sing-box
+          uv run pytest -m integration
+
+  upgrade-e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.11.14"
+      - run: uv sync --locked
+      - name: Upgrade a real 0.1.1 installation
+        run: ./scripts/upgrade-e2e.sh
+      - name: Install, reinstall and uninstall the real package
+        run: sudo ./scripts/install-e2e.sh
+
   windows:
     needs: [wheel, core]
     runs-on: windows-2022
+    environment: release-signing
     steps:
       - uses: actions/checkout@v7
         with:
@@ -201,6 +241,7 @@ jobs:
     # a runner. macos-15-intel is the supported Intel label and can package
     # the arm64 DMG because packaging does not execute the core binary.
     runs-on: macos-15-intel
+    environment: release-signing
     steps:
       - uses: actions/checkout@v7
       - name: Download wheel
@@ -250,7 +291,7 @@ jobs:
         with:
           name: core-linux-${{ matrix.arch }}
           path: dist
-      - run: uv sync
+      - run: uv sync --locked
       - run: uv run pyinstaller --noconfirm --clean deploy/pyinstaller/ostium.spec
       - name: Install packaging tools
         run: |
@@ -268,13 +309,17 @@ jobs:
           path: dist/packages/*
 
   docker:
-    # Do not move GHCR tags for a version whose platform artifacts failed.
-    needs: [verify, wheel, windows, macos, linux-packages]
+    # Build a staging image only.  Version/latest tags are moved after PyPI and
+    # the draft release are verified, so a partial failure cannot leave a
+    # public tag pointing at an incomplete release.
+    needs: [verify, integration, wheel, windows, macos, linux-packages]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -293,10 +338,10 @@ jobs:
         with:
           images: ghcr.io/thzxxart/ostium
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern=v{{version}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
-      - uses: docker/build-push-action@v7
+            type=raw,value=staging
+            type=raw,value=staging-${{ github.sha }}
+      - id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -307,11 +352,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   publish:
-    needs: [verify, wheel, core, windows, macos, linux-packages, docker]
+    needs:
+      [verify, integration, upgrade-e2e, wheel, core, windows, macos, linux-packages, docker]
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:
       contents: write
+      packages: write
       id-token: write
       attestations: write
     steps:
@@ -397,12 +444,11 @@ jobs:
             dist/release/*.AppImage
             dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Create draft release with every artifact
+        uses: softprops/action-gh-release@v3
         with:
-          packages-dir: dist/pypi
-      - uses: softprops/action-gh-release@v3
-        with:
-          overwrite_files: false
+          draft: true
+          overwrite_files: true
           body_path: RELEASE_NOTES.md
           files: |
             dist/release/*.whl
@@ -417,3 +463,54 @@ jobs:
             dist/release/*.AppImage
             dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
+      - name: Verify the draft before any public registry changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.ref_name }}"
+          count="$(gh release view "$tag" --json assets --jq '.assets | length')"
+          if [[ "$count" -lt 20 ]]; then
+            echo "draft release has only $count assets" >&2
+            exit 1
+          fi
+          if ! gh release view "$tag" --json isDraft --jq '.isDraft' | grep -qx true; then
+            echo "release must still be a draft before PyPI is published" >&2
+            exit 1
+          fi
+          gh release download "$tag" --dir /tmp/draft-assets
+          (cd /tmp/draft-assets && sha256sum -c SHA256SUMS)
+      - name: Verify the draft with the release verifier
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash scripts/verify-release.sh --version "${GITHUB_REF_NAME#v}" \
+            --skip-attestation --skip-pypi
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/pypi
+      - name: Promote the verified staging image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ github.ref_name }}"
+          version="${version#v}"
+          digest="${{ needs.docker.outputs.digest }}"
+          if [[ -z "$digest" ]]; then
+            echo "docker job did not publish a digest" >&2
+            exit 1
+          fi
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          tags=(-t "ghcr.io/thzxxart/ostium:${version}" -t "ghcr.io/thzxxart/ostium:v${version}")
+          if [[ "$version" != *-* ]]; then
+            tags+=(-t "ghcr.io/thzxxart/ostium:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" "ghcr.io/thzxxart/ostium@${digest}"
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref_name }}" == *-* ]]; then
+            gh release edit "${{ github.ref_name }}" --draft=false
+          else
+            gh release edit "${{ github.ref_name }}" --draft=false --latest
+          fi

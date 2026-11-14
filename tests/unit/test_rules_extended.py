@@ -16,6 +16,7 @@ from ostium.services.rules import (
     serialize_rule_set,
     update_rule_set,
 )
+from ostium.util.paths import resolve_path
 
 
 def test_all_match_types_and_failures() -> None:
@@ -119,8 +120,8 @@ def test_rule_set_update_and_serialization(tmp_path: Path) -> None:
             assert result["updated"] is False
             assert rule_set.last_error
 
-            assert Path(str(rule_set.path)).name == f"{rule_set.id}.srs"
-            assert Path(str(rule_set.path)).is_file()
+            assert resolve_path(settings, rule_set.path).name == f"{rule_set.id}.srs"
+            assert resolve_path(settings, rule_set.path).is_file()
             assert path_for(settings, "missing") is None
             assert path_for(settings, "../../etc/passwd") is None
         await engine.dispose()

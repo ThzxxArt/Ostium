@@ -227,7 +227,12 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
             await session.commit()
 
             endpoints = await endpoints_for_user(
-                session, store, user, server_host="vpn.example.com", server_name="Display"
+                session,
+                store,
+                user,
+                server_host="vpn.example.com",
+                server_name="Display",
+                settings=settings,
             )
             assert {item.protocol.value for item in endpoints} == {
                 "vless-reality",
@@ -249,7 +254,7 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
             cert.source = "acme"
             await session.flush()
             endpoints = await endpoints_for_user(
-                session, store, user, server_host="vpn.example.com"
+                session, store, user, server_host="vpn.example.com", settings=settings
             )
             hy2 = next(item for item in endpoints if item.protocol.value == "hysteria2")
             assert hy2.tls.insecure is False
@@ -258,7 +263,10 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
             for inbound in inbounds:
                 inbound.enabled = False
             await session.flush()
-            assert await endpoints_for_user(session, store, user, server_host="x") == []
+            assert (
+                await endpoints_for_user(session, store, user, server_host="x", settings=settings)
+                == []
+            )
 
             # Hysteria2/Trojan without a certificate are skipped.
             for inbound in inbounds:
@@ -266,7 +274,9 @@ def test_endpoints_for_user_all_protocols(settings: Settings) -> None:
                     inbound.enabled = True
                     inbound.certificate_id = None
             await session.flush()
-            endpoints = await endpoints_for_user(session, store, user, server_host="x")
+            endpoints = await endpoints_for_user(
+                session, store, user, server_host="x", settings=settings
+            )
             assert not any(item.protocol.value in {"hysteria2", "trojan"} for item in endpoints)
         await engine.dispose()
 

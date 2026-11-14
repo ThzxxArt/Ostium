@@ -19,6 +19,12 @@ const router = createRouter({
       meta: { public: true, titleKey: 'setup.title' },
     },
     {
+      path: '/unavailable',
+      name: 'unavailable',
+      component: () => import('@/pages/UnavailablePage.vue'),
+      meta: { public: true, titleKey: 'connection_error_title' },
+    },
+    {
       path: '/onboarding',
       name: 'onboarding',
       component: () => import('@/pages/OnboardingPage.vue'),
@@ -145,6 +151,13 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   await auth.bootstrap()
 
+  if (auth.statusState === 'error') {
+    // Keep the login form reachable: a transient /auth/status failure must not
+    // send an existing installation to setup, and the operator may still be
+    // able to sign in while the probe recovers.
+    if (to.name === 'login' || to.name === 'unavailable') return true
+    return { name: 'unavailable' }
+  }
   if (!auth.initialized) {
     return to.name === 'setup' ? true : { name: 'setup' }
   }

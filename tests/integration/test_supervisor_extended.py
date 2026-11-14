@@ -11,6 +11,7 @@ import pytest
 from ostium.config import Role, Settings
 from ostium.engine.singbox import supervisor as supervisor_module
 from ostium.engine.singbox.config import (
+    CONFIG_POLICY_VERSION,
     RealitySpec,
     ServerConfigSpec,
     ServerInbound,
@@ -235,6 +236,9 @@ def test_start_rejects_invalid_last_good(tmp_path: Path) -> None:
         _good_script(Path(settings.engine_path))  # type: ignore[arg-type]
         supervisor = CoreSupervisor(settings)
         settings.paths.last_good_path.write_text("not-json")
+        settings.paths.last_good_meta_path.write_text(
+            json.dumps({"policy_version": CONFIG_POLICY_VERSION}), encoding="utf-8"
+        )
         await supervisor.start()
         status = supervisor.status()
         assert status.running is False
@@ -305,6 +309,9 @@ def test_start_and_apply_error_paths(tmp_path: Path, monkeypatch) -> None:
         _good_script(Path(settings.engine_path))  # type: ignore[arg-type]
         supervisor = CoreSupervisor(settings)
         settings.paths.last_good_path.write_text(json.dumps(_server_config()))
+        settings.paths.last_good_meta_path.write_text(
+            json.dumps({"policy_version": CONFIG_POLICY_VERSION}), encoding="utf-8"
+        )
 
         async def fail_spawn() -> None:
             raise EngineStartFailed("spawn failed")

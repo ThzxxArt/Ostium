@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <NDrawer v-model:show="detailOpen" :width="440" placement="right">
+    <NDrawer v-model:show="detailOpen" :width="'min(440px, 100vw)'" placement="right">
       <NDrawerContent v-if="detail" closable :title="t('connections.details')">
         <div class="detail-list">
           <div v-for="(value, key) in detail.metadata" :key="key" class="detail-row">

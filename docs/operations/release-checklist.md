@@ -9,8 +9,8 @@ a published asset is never replaced.
 - [ ] PR/main CI green for Python and frontend gates; release `verify` workflow
       additionally green for shellcheck, PowerShell parse, mkdocs `--strict`,
       Playwright/axe/visual, pip-audit and npm audit.
-- [ ] Version audit: `pyproject.toml`, `src/ostium/__init__.py`, installers,
-      Inno, Docker/compose, manifest, README/docs.
+- [ ] Version preflight passes: `scripts/release-preflight.sh --tag vX.Y.Z`.
+      It checks `VERSION`, Python/web/Docker/installer defaults and README/docs.
 - [ ] DEB/AppImage filenames and Debian `Version:` use `X.Y.Z`, never `vX.Y.Z`
       (the build script strips the tag prefix).
 - [ ] README.md, README.en.md, SECURITY.md, CHANGELOG.md and RELEASE_NOTES.md
@@ -29,12 +29,15 @@ a published asset is never replaced.
 
 - [ ] Create exactly one annotated `vX.Y.Z` tag on the final commit; push once.
 - [ ] Release workflow builds wheel/sdist, five core archives, Windows setup,
-      macOS DMG, Linux DEB/AppImage, Docker, installers, manifest, SBOM and
-      `SHA256SUMS` from that tag.
-- [ ] Confirm `overwrite_files: false`; never re-run publication to replace an
-      existing asset.
-- [ ] PyPI `ostium-ctl==X.Y.Z` and GHCR tags `X.Y.Z`/`vX.Y.Z`/`latest`
-      published.
+      macOS DMG, Linux DEB/AppImage, Docker staging image, installers, manifest,
+      SBOM and `SHA256SUMS` from that tag.
+- [ ] The workflow creates a **draft** release, verifies its checksum manifest,
+      runs real-core integration and `0.1.1 -> current` upgrade e2e, then
+      publishes PyPI.
+- [ ] Only after PyPI succeeds are GHCR tags `X.Y.Z`/`vX.Y.Z`/`latest`
+      promoted from the verified digest, and the draft is made public.
+- [ ] A failed run leaves a draft and staging image only; no public version tag
+      or PyPI version is half-published.
 
 ## Read-only verification
 

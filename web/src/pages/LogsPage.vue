@@ -32,30 +32,23 @@ const levelOptions = computed(() => [
   { label: 'Error', value: 'error' },
 ])
 
-const filteredRecords = computed(() => {
-  let list = records.value
-  if (level.value) list = list.filter((item) => item.level === level.value)
-  if (search.value.trim()) {
-    const needle = search.value.toLowerCase()
-    list = list.filter((item) => item.message.toLowerCase().includes(needle))
-  }
-  return list
-})
+// Filtering happens on the server.  Filtering only the 800 buffered records
+// made "Error" look empty even when older errors existed on disk.
+const filteredRecords = computed(() => records.value)
+const filteredLines = computed(() => lines.value)
 
-const filteredLines = computed(() => {
-  let list = lines.value
-  if (search.value.trim()) {
-    const needle = search.value.toLowerCase()
-    list = list.filter((item) => item.toLowerCase().includes(needle))
-  }
-  return list
-})
+let filterTimer: number | null = null
 
 async function load() {
   loading.value = true
   error.value = null
   try {
-    const data = await api.logs.get(source.value, level.value || undefined, undefined, 800)
+    const data = await api.logs.get(
+      source.value,
+      level.value || undefined,
+      search.value.trim() || undefined,
+      800,
+    )
     records.value = data.records || []
     lines.value = data.lines || []
     if (data.unavailable) error.value = data.error || t('logs.unavailable', { message: '' })
@@ -69,6 +62,10 @@ async function load() {
 
 function appendRecord(record: LogRecord) {
   if (source.value !== 'ostium' || paused.value) return
+  if (level.value && record.level !== level.value) return
+  if (search.value.trim() && !record.message.toLowerCase().includes(search.value.toLowerCase())) {
+    return
+  }
   records.value.push(record)
   if (records.value.length > 2000) records.value.shift()
   if (follow.value) void scrollToBottom()
@@ -95,9 +92,29 @@ watch(source, () => {
   void load()
 })
 
+watch([level, search], () => {
+  records.value = []
+  lines.value = []
+  if (filterTimer !== null) window.clearTimeout(filterTimer)
+  filterTimer = window.setTimeout(() => {
+    filterTimer = null
+    void load()
+  }, 300)
+})
+
 async function scrollToBottom() {
   await nextTick()
   if (container.value) container.value.scrollTop = container.value.scrollHeight
+}
+
+function onScroll() {
+  const element = container.value
+  if (!element) return
+  const atBottom =
+    element.scrollTop + element.clientHeight >= element.scrollHeight - 40
+  // Scrolling up to read history must turn off auto-follow; otherwise every
+  // new record yanks the viewport back to the bottom.
+  if (!atBottom && follow.value) follow.value = false
 }
 
 function togglePause() {
@@ -122,6 +139,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)
+  if (filterTimer !== null) window.clearTimeout(filterTimer)
 })
 </script>
 
@@ -187,11 +205,15 @@ onBeforeUnmount(() => {
       <div class="log-head">
         <Terminal :size="14" />
         <span>{{ source === 'core' ? 'ostium-core' : 'ostium.service' }}</span>
-        <span class="o-subtle">{{ paused ? t('common.paused') : t('common.live') }}</span>
+        <span v-if="!events.connected" class="live-off" role="status">
+          {{ t('logs.disconnected') }}
+        </span>
+        <span v-else class="o-subtle">{{ paused ? t('common.paused') : t('common.live') }}</span>
       </div>
       <div
         ref="container"
         class="log-body o-scroll"
+        @scroll.passive="onScroll"
         tabindex="0"
         role="log"
         :aria-label="t('logs.title')"
@@ -301,6 +323,9 @@ onBeforeUnmount(() => {
 }
 .log-head span:nth-child(2) {
   flex: 1;
+}
+.live-off {
+  color: var(--warning, #d97706);
 }
 .log-body {
   height: min(62vh, 640px);

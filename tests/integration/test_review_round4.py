@@ -26,6 +26,7 @@ from ostium.services.events import EventBus
 from ostium.services.netguard import UnsafeUrlError, validate_remote_url, validate_target_host
 from ostium.services.stats import StatsCollector
 from ostium.services.users import create_user
+from ostium.util.paths import resolve_path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -114,11 +115,16 @@ def test_certificate_files_survive_a_failed_apply_on_delete(
     assert issued.status_code == 202, issued.text
     certificate_id = issued.json()["certificate"]["id"]
 
+    settings = api_client.app.state.services.settings
+
     async def _paths() -> tuple[Path, Path]:
         async with api_client.app.state.services.session_factory() as session:
             row = await session.get(Certificate, certificate_id)
             assert row is not None
-            return Path(row.cert_path), Path(row.key_path)
+            return (
+                resolve_path(settings, row.cert_path),
+                resolve_path(settings, row.key_path),
+            )
 
     cert_path, key_path = asyncio.run(_paths())
     assert cert_path.is_file() and key_path.is_file()
@@ -196,7 +202,7 @@ def test_deleting_rule_set_removes_its_downloaded_file(
             f"/api/v1/rule-sets/{rule_set_id}/update", headers=_headers(session_token)
         )
     assert updated.status_code == 200, updated.text
-    path = Path(updated.json()["rule_set"]["path"])
+    path = resolve_path(api_client.app.state.services.settings, updated.json()["rule_set"]["path"])
     assert path.is_file()
 
     deleted = api_client.delete(f"/api/v1/rule-sets/{rule_set_id}", headers=_headers(session_token))
@@ -398,13 +404,16 @@ def test_installers_do_not_echo_a_user_supplied_admin_password() -> None:
     assert 'ADMIN_PASSWORD_DISPLAY="使用 --password 提供（未回显）"' in install
 
 
-def test_readme_marks_v011_as_published() -> None:
+def test_readme_marks_the_current_release_status() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "发布状态：v0.1.1 已于" in readme
-    assert "尚未发布" not in readme
+    assert "v0.1.1 已于" in readme
+    assert "v0.1.2 正在准备" in readme
+    assert "v0.1.2 已于" not in readme
+    assert "v0.1.1 尚未发布" not in readme
     assert "release status: v0.1.1 was published" in readme_en.lower()
-    assert "not yet published" not in readme_en.lower()
+    assert "v0.1.2 is in" in readme_en.lower()
+    assert "v0.1.2 was published" not in readme_en.lower()
 
 
 def test_setup_overview_does_not_break_on_a_corrupt_user(

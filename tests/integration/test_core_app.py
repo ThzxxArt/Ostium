@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from ostium.config import Role, Settings
 from ostium.core import app as core_app_module
 from ostium.core.app import create_core_app, run_core
+from ostium.engine.singbox.config import CONFIG_POLICY_VERSION
 from ostium.engine.singbox.supervisor import CoreError, EngineUnavailable, SupervisorStatus
 
 
@@ -248,6 +249,9 @@ def test_core_apply_forwards_allow_lan(tmp_path: Path) -> None:
 def test_core_lifespan_start_failure_is_reported(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     settings.paths.last_good_path.write_text("not-json")
+    settings.paths.last_good_meta_path.write_text(
+        json.dumps({"policy_version": CONFIG_POLICY_VERSION}), encoding="utf-8"
+    )
     app = create_core_app(settings)
     with TestClient(app) as client:
         status = client.get("/v1/status", headers=_headers(settings)).json()

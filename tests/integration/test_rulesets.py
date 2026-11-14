@@ -10,6 +10,7 @@ from ostium.config import Role, Settings
 from ostium.db.models import RuleSet
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.services.rules import update_rule_set
+from ostium.util.paths import resolve_path
 
 
 def test_update_rule_set_atomic(tmp_path: Path) -> None:
@@ -41,7 +42,7 @@ def test_update_rule_set_atomic(tmp_path: Path) -> None:
                 await session.commit()
             assert result["updated"] is True
             assert rule_set.path is not None
-            assert Path(rule_set.path).read_bytes() == b"binary-rules"
+            assert resolve_path(settings, rule_set.path).read_bytes() == b"binary-rules"
             assert rule_set.etag == '"abc"'
         await engine.dispose()
 

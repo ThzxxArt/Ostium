@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
@@ -128,6 +128,9 @@ async def get_current_admin(
         api_token = await resolve_api_token(session, token)
         if api_token is not None:
             scopes = set(api_token.scopes or [])
+            # Keep the scopes on the request so sensitive read endpoints can
+            # require a narrower scope than the legacy blanket "read".
+            request.state.api_token_scopes = scopes
             if not scopes.intersection({"read", "write"}):
                 raise ApiError(403, "API token has no usable scope", "insufficient_scope")
             if request.method not in {"GET", "HEAD", "OPTIONS"} and "write" not in scopes:
@@ -144,6 +147,30 @@ async def get_current_admin(
         raise ApiError(401, "session expired", "session_expired")
     admin, _row = resolved
     return admin
+
+
+def require_scope(scope: str) -> Callable[[Request], Awaitable[None]]:
+    """Require a narrow scope for sensitive reads.
+
+    Cookie sessions and the loopback CLI token are not API tokens and keep
+    full access; only bearer API tokens are constrained.
+    """
+
+    async def dependency(request: Request) -> None:
+        from ostium.api.errors import ApiError
+
+        scopes = getattr(request.state, "api_token_scopes", None)
+        if scopes is None:
+            return
+        if "write" in scopes or scope in scopes:
+            return
+        raise ApiError(
+            403,
+            f"API token lacks the {scope} scope",
+            "insufficient_scope",
+        )
+
+    return dependency
 
 
 def actor_name(admin: AdminUser) -> str:

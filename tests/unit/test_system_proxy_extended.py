@@ -373,14 +373,12 @@ def test_windows_proxy(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
     assert store["ProxyServer"] == "old:1"
     assert store["AutoConfigURL"] == "http://pac.example/proxy.pac"
 
-    # Missing originals are created as disabled/empty values.
+    # Without an Ostium state entry, disable must not touch a user's own proxy.
     proxy.state_path.unlink()
     store.clear()
     monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
     proxy.disable()
-    assert store["ProxyEnable"] == 0
-    assert "ProxyServer" not in store
-    assert "AutoConfigURL" not in store
+    assert store == {}
 
     monkeypatch.setattr(proxy_module.sys, "platform", "linux")
     assert WindowsProxy(settings).supported is False
@@ -402,6 +400,26 @@ def test_windows_proxy_removes_values_it_created(
     assert "ProxyServer" not in store
     assert "ProxyOverride" not in store
     assert "AutoConfigURL" not in store
+
+
+def test_windows_proxy_double_enable_keeps_the_original_values(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: dict[str, Any] = {
+        "ProxyEnable": 1,
+        "ProxyServer": "corp.example:8080",
+        "ProxyOverride": "<local>",
+    }
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    proxy.enable(port=7894)
+    proxy.enable(port=7894)
+    proxy.disable()
+    assert store["ProxyEnable"] == 1
+    assert store["ProxyServer"] == "corp.example:8080"
+    assert store["ProxyOverride"] == "<local>"
 
 
 def test_system_proxy_factory(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:

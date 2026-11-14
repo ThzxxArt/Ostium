@@ -143,11 +143,30 @@ def totp_uri(secret: str, username: str, issuer: str = "Ostium") -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name=issuer)
 
 
-def verify_totp(secret: str, code: str, valid_window: int = 1) -> bool:
+_USED_TOTP: dict[tuple[str, str], float] = {}
+
+
+def verify_totp(secret: str, code: str, valid_window: int = 1, *, consume: bool = True) -> bool:
     if not code:
         return False
+    import time
+
     cleaned = code.replace(" ", "").replace("-", "")
-    return pyotp.TOTP(secret).verify(cleaned, valid_window=valid_window)
+    now = time.monotonic()
+    # A TOTP remains valid for a window (90 seconds with valid_window=1).
+    # Reject a code that already authenticated once so a captured value cannot
+    # be replayed inside that window.
+    for key, used_at in list(_USED_TOTP.items()):
+        if now - used_at > 180:
+            _USED_TOTP.pop(key, None)
+    key = (secret, cleaned)
+    if consume and key in _USED_TOTP:
+        return False
+    if not pyotp.TOTP(secret).verify(cleaned, valid_window=valid_window):
+        return False
+    if consume:
+        _USED_TOTP[key] = now
+    return True
 
 
 def generate_recovery_codes(count: int = 10) -> list[str]:

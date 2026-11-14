@@ -25,6 +25,9 @@ from ostium.util.time import iso, utcnow
 
 BACKUP_PREFIX = "ostium-backup-"
 AUTO_BACKUP_PREFIX = "ostium-auto-backup-"
+# Directories copied verbatim into a backup.  ``acme`` holds the encrypted
+# account key; ``rulesets`` was missing in v1 and broke client restores.
+BACKUP_DIRECTORIES = ("certs", "rulesets", "acme")
 ALLOWED_MEMBERS = {"ostium.db", "master.key", "config.toml", "manifest.json"}
 # Bound both the file read into memory and the expanded archive.  A restore
 # is an admin action, but a corrupted/hostile archive must not fill the disk or
@@ -69,27 +72,41 @@ def create_backup(
         temp_path = Path(temp)
         db_copy = temp_path / "ostium.db"
         _sqlite_backup(paths.db_path, db_copy)
+        members: list[tuple[str, Path]] = [("ostium.db", db_copy)]
+        master_key_included = bool(include_master_key and paths.master_key_path.is_file())
+        if master_key_included:
+            members.append(("master.key", paths.master_key_path))
+        if settings.config_file.is_file():
+            members.append(("config.toml", settings.config_file))
+        for directory_name in BACKUP_DIRECTORIES:
+            directory = paths.data_dir / directory_name
+            if not directory.is_dir():
+                continue
+            for item in directory.rglob("*"):
+                if not item.is_file():
+                    continue
+                if item.name == "issue.lock":
+                    continue
+                arcname = str(Path(directory_name) / item.relative_to(directory))
+                members.append((arcname, item))
+        checksums = {
+            arcname: _sha256_file(source) for arcname, source in members if source.is_file()
+        }
         manifest = {
             "format": "ostium-backup",
-            "version": 1,
+            "version": 2,
             "app_version": __version__,
             "created_at": iso(utcnow()),
             "role": settings.role.value,
             "encrypted": encrypted,
+            "master_key_included": master_key_included,
+            "directories": list(BACKUP_DIRECTORIES),
+            "checksums": checksums,
         }
         buffer = io.BytesIO()
         with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-            archive.add(db_copy, arcname="ostium.db")
-            if include_master_key and paths.master_key_path.is_file():
-                archive.add(paths.master_key_path, arcname="master.key")
-            if settings.config_file.is_file():
-                archive.add(settings.config_file, arcname="config.toml")
-            if paths.certs_dir.is_dir():
-                for item in paths.certs_dir.rglob("*"):
-                    if item.is_file():
-                        archive.add(
-                            item, arcname=str(Path("certs") / item.relative_to(paths.certs_dir))
-                        )
+            for arcname, source in members:
+                archive.add(source, arcname=arcname)
             manifest_bytes = json.dumps(manifest, indent=2).encode()
             info = tarfile.TarInfo("manifest.json")
             info.size = len(manifest_bytes)
@@ -142,6 +159,144 @@ def _sqlite_backup(source: Path, destination: Path) -> None:
         src.close()
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _database_requires_master_key(path: Path) -> bool:
+    """Return True when the database contains fields encrypted by master.key."""
+
+    probes = (
+        ("admin_users", "totp_secret_enc"),
+        ("proxy_users", "password_enc"),
+        ("proxy_users", "ss_password_enc"),
+        ("proxy_users", "subscription_token_enc"),
+        ("profiles", "config_enc"),
+        ("profiles", "subscription_url_enc"),
+        ("inbounds", "params_enc"),
+    )
+    try:
+        with sqlite3.connect(path) as connection:
+            tables = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            for table, column in probes:
+                if table not in tables:
+                    continue
+                # table/column come from the fixed allowlist above, never from
+                # user input.
+                row = connection.execute(
+                    f"SELECT 1 FROM {table} WHERE {column} IS NOT NULL AND {column} != '' LIMIT 1"  # noqa: S608
+                ).fetchone()
+                if row is not None:
+                    return True
+    except sqlite3.DatabaseError as exc:
+        raise BackupError(
+            f"could not inspect the backup database: {exc}", "invalid_archive"
+        ) from exc
+    return False
+
+
+def _verify_checksums(staging: Path, manifest: dict[str, Any]) -> None:
+    checksums = manifest.get("checksums")
+    if checksums is None:
+        # v1 backups have no checksums; the SQLite integrity check below is the
+        # only portable validation available for them.
+        return
+    if not isinstance(checksums, dict):
+        raise BackupError("backup manifest has invalid checksums", "invalid_archive")
+    for name, expected in checksums.items():
+        candidate = (staging / str(name)).resolve()
+        try:
+            candidate.relative_to(staging.resolve())
+        except ValueError as exc:
+            raise BackupError("backup contains an unsafe checksum path", "invalid_archive") from exc
+        if not candidate.is_file():
+            raise BackupError(f"backup is missing {name}", "invalid_archive")
+        if not isinstance(expected, str) or _sha256_file(candidate) != expected:
+            raise BackupError(f"backup file failed its checksum: {name}", "invalid_archive")
+
+
+def _portable_suffix(stored: str, directory_name: str) -> str:
+    """Map an old absolute path to ``<dir>/<relative...>``."""
+
+    normalized = stored.replace("\\", "/")
+    parts = [part for part in normalized.split("/") if part]
+    if directory_name in parts:
+        index = len(parts) - 1 - parts[::-1].index(directory_name)
+        return "/".join(parts[index:])
+    return f"{directory_name}/{Path(normalized).name}"
+
+
+def _rewrite_portable_paths(db_path: Path, paths: Any) -> None:
+    """Rewrite certificate/rule-set rows after a restore.
+
+    A backup taken on another machine contains the old absolute paths.  New
+    rows are stored relative to ``data_dir``; this also upgrades v1 backups.
+    """
+
+    try:
+        with sqlite3.connect(db_path) as connection:
+            tables = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if "certificates" in tables:
+                rows = connection.execute(
+                    "SELECT id, cert_path, key_path FROM certificates"
+                ).fetchall()
+                for certificate_id, cert_path, key_path in rows:
+                    new_cert = _portable_suffix(str(cert_path), "certs")
+                    new_key = _portable_suffix(str(key_path), "certs")
+                    connection.execute(
+                        "UPDATE certificates SET cert_path = ?, key_path = ? WHERE id = ?",
+                        (new_cert, new_key, certificate_id),
+                    )
+            if "rule_sets" in tables:
+                rows = connection.execute(
+                    "SELECT id, path FROM rule_sets WHERE path IS NOT NULL"
+                ).fetchall()
+                for rule_set_id, stored in rows:
+                    new_path = _portable_suffix(str(stored), "rulesets")
+                    exists = (paths.data_dir / new_path).is_file()
+                    connection.execute(
+                        "UPDATE rule_sets SET path = ? WHERE id = ?",
+                        (new_path if exists else None, rule_set_id),
+                    )
+            connection.commit()
+    except sqlite3.DatabaseError as exc:
+        raise BackupError(f"could not rewrite restored paths: {exc}", "restore_failed") from exc
+
+
+def _clear_runtime_configuration(paths: Any) -> None:
+    """Drop last-good/core state so the restored database is authoritative."""
+
+    for path in (
+        paths.last_good_path,
+        paths.last_good_meta_path,
+        paths.core_state_path,
+    ):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            continue
+    # Enforcement names from the pre-restore database must not strip users in
+    # the restored database; the next quota tick rewrites this file.
+    try:
+        paths.enforcement_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def restore_backup(
     settings: Settings,
     backup_path: Path,
@@ -188,12 +343,31 @@ def restore_backup(
                 "role_mismatch",
                 409,
             )
+        _verify_checksums(staging, manifest)
         from ostium.db.session import check_database_integrity, migrate_database
 
         try:
             check_database_integrity(staging / "ostium.db")
         except Exception as exc:
             raise BackupError(f"backup database is corrupt: {exc}", "invalid_archive") from exc
+        requires_key = _database_requires_master_key(staging / "ostium.db")
+        has_key = (staging / "master.key").is_file()
+        if requires_key and not has_key:
+            # Continuing would make every password, TOTP secret, subscription
+            # token and inbound credential undecryptable, and the old code
+            # silently created a new master key that could never read them.
+            raise BackupError(
+                "backup contains encrypted data but no master.key; restore it "
+                "with the original key or the data will be unreadable",
+                "missing_master_key",
+                409,
+            )
+        if requires_key and not include_master_key:
+            raise BackupError(
+                "restoring encrypted data requires including the backup master.key",
+                "missing_master_key",
+                409,
+            )
         paths = settings.paths
         paths.ensure()
         db_target = paths.db_path
@@ -255,21 +429,35 @@ def restore_backup(
                 remember(settings.config_file)
                 settings.config_file.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(staging / "config.toml", settings.config_file)
-            certs = staging / "certs"
-            if certs.is_dir():
-                for item in certs.rglob("*"):
-                    if item.is_file():
-                        relative = item.relative_to(certs)
-                        destination = (paths.certs_dir / relative).resolve()
-                        try:
-                            destination.relative_to(paths.certs_dir.resolve())
-                        except ValueError as exc:
-                            raise BackupError(
-                                "backup contains an unsafe certificate path", "invalid_archive"
-                            ) from exc
-                        remember(destination)
-                        destination.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(item, destination)
+            for directory_name in BACKUP_DIRECTORIES:
+                source_root = staging / directory_name
+                if not source_root.is_dir():
+                    continue
+                destination_root = (paths.data_dir / directory_name).resolve()
+                for item in source_root.rglob("*"):
+                    if not item.is_file():
+                        continue
+                    relative = item.relative_to(source_root)
+                    destination = (destination_root / relative).resolve()
+                    try:
+                        destination.relative_to(destination_root)
+                    except ValueError as exc:
+                        raise BackupError(
+                            "backup contains an unsafe data path", "invalid_archive"
+                        ) from exc
+                    remember(destination)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(item, destination)
+                    if os.name == "posix":
+                        private = (
+                            directory_name == "acme"
+                            or destination.suffix == ".key"
+                            or destination.name.startswith("privkey-")
+                            or destination.name == "master.key"
+                        )
+                        destination.chmod(0o600 if private else 0o644)
+            _rewrite_portable_paths(db_target, paths)
+            _clear_runtime_configuration(paths)
         except Exception as exc:
             rollback_files()
             if previous_db.is_file():
@@ -313,7 +501,7 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
         if not member.isfile():
             raise BackupError("backup contains a non-regular file", "invalid_archive")
         top = name.split("/", 1)[0]
-        if name not in ALLOWED_MEMBERS and top != "certs":
+        if name not in ALLOWED_MEMBERS and top not in BACKUP_DIRECTORIES:
             raise BackupError(f"backup contains an unexpected entry: {name}", "invalid_archive")
         if ".." in Path(name).parts or Path(name).is_absolute():
             raise BackupError("backup contains an unsafe path", "invalid_archive")
@@ -369,38 +557,53 @@ def stage_restore(
             decrypt_blob(raw, password)
         except CryptoError as exc:
             raise BackupError(str(exc), "invalid_password", 400) from exc
-    # Validate the archive and role now, while the service is still running,
-    # so a bad backup is rejected instead of breaking the next startup.
+    # Validate the complete archive, checksums, database and key pairing now,
+    # while the service is still running, so a bad backup is rejected instead
+    # of breaking the next startup.
     import io as _io
+
+    from ostium.db.session import check_database_integrity
 
     blob = raw
     if encrypted:
         assert password is not None
         blob = decrypt_blob(raw, password)
-    try:
-        with tarfile.open(name=None, fileobj=_io.BytesIO(blob), mode="r:gz") as archive:
-            manifest_member = next(
-                (member for member in archive.getmembers() if member.name == "manifest.json"),
-                None,
+    with tempfile.TemporaryDirectory(prefix="ostium-stage-") as temp:
+        staging = Path(temp)
+        try:
+            with tarfile.open(name=None, fileobj=_io.BytesIO(blob), mode="r:gz") as archive:
+                _safe_extract(archive, staging)
+        except (tarfile.TarError, OSError) as exc:
+            raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
+        manifest_path = staging / "manifest.json"
+        if not manifest_path.is_file():
+            raise BackupError("backup is missing its manifest", "invalid_archive")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise BackupError("backup manifest is not valid JSON", "invalid_archive") from exc
+        if manifest.get("format") != "ostium-backup":
+            raise BackupError("not an Ostium backup", "invalid_archive")
+        if manifest.get("role") and manifest["role"] != settings.role.value:
+            raise BackupError(
+                f"backup belongs to the {manifest['role']} role, not {settings.role.value}",
+                "role_mismatch",
+                409,
             )
-            if manifest_member is None:
-                raise BackupError("backup is missing its manifest", "invalid_archive")
-            extracted = archive.extractfile(manifest_member)
-            if extracted is None:
-                raise BackupError("backup manifest is unreadable", "invalid_archive")
-            manifest = json.loads(extracted.read())
-    except BackupError:
-        raise
-    except (tarfile.TarError, OSError, ValueError) as exc:
-        raise BackupError(f"backup archive is invalid: {exc}", "invalid_archive") from exc
-    if manifest.get("format") != "ostium-backup":
-        raise BackupError("not an Ostium backup", "invalid_archive")
-    if manifest.get("role") and manifest["role"] != settings.role.value:
-        raise BackupError(
-            f"backup belongs to the {manifest['role']} role, not {settings.role.value}",
-            "role_mismatch",
-            409,
-        )
+        _verify_checksums(staging, manifest)
+        database = staging / "ostium.db"
+        if not database.is_file():
+            raise BackupError("backup does not contain a database", "invalid_archive")
+        try:
+            check_database_integrity(database)
+        except Exception as exc:
+            raise BackupError(f"backup database is corrupt: {exc}", "invalid_archive") from exc
+        if _database_requires_master_key(database) and not (staging / "master.key").is_file():
+            raise BackupError(
+                "backup contains encrypted data but no master.key",
+                "missing_master_key",
+                409,
+            )
     store = SecretStore.from_data_dir(settings.data_dir)
     password_token = (
         store.encrypt(password, table="settings", record_id="restore", field="password")

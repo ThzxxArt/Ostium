@@ -292,7 +292,7 @@ def confirm_totp(admin: AdminUser, settings: Settings, code: str) -> None:
         _TOTP_PENDING.pop(admin.id, None)
         raise AuthError("TOTP setup has not started or has expired", "totp_not_started", 400)
     secret, codes, _expiry = pending
-    if not verify_totp(secret, code):
+    if not verify_totp(secret, code, consume=False):
         raise AuthError("the TOTP code is not valid", "totp_invalid", 400)
     store = SecretStore.from_data_dir(settings.data_dir)
     admin.totp_secret_enc = store.encrypt(

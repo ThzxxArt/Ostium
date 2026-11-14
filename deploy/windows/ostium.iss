@@ -1,7 +1,7 @@
 ; Inno Setup 6 script for the Ostium Windows x64 client.
-; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.1
+; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.2
 #ifndef AppVersion
-  #define AppVersion "0.1.1"
+  #define AppVersion "0.1.2"
 #endif
 
 [Setup]
@@ -30,6 +30,20 @@ UninstallDisplayIcon={app}\ostium.exe
 
 [Files]
 Source: "..\..\dist\windows\Ostium\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  { The service executable is locked while OstiumCore runs.  Stop it before
+    Inno copies the new bundle, otherwise the upgrade fails halfway through
+    and can leave a mixed old/new installation. }
+  Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;
 
 [Icons]
 Name: "{group}\Ostium"; Filename: "{app}\ostium.exe"; Parameters: "open"

@@ -91,6 +91,9 @@ describe('stores', () => {
     await store.bootstrap()
     expect(store.error).toBeTruthy()
     expect(store.ready).toBe(true)
+    expect(store.statusState).toBe('error')
+    // A failed probe is not an uninitialised installation.
+    expect(store.initialized).toBe(false)
 
     vi.stubGlobal(
       'fetch',
@@ -105,6 +108,38 @@ describe('stores', () => {
     store.status = null
     await store.logout()
     expect(store.status).toBeNull()
+  })
+
+  it('keeps a successful login even when the follow-up status probe fails', async () => {
+    let calls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls += 1
+        if (String(url).includes('/auth/login')) {
+          return {
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: async () => ({ ok: true }),
+            text: async (): Promise<string> => '{}',
+          }
+        }
+        return {
+          ok: false,
+          status: 500,
+          headers: new Headers({ 'content-type': 'application/problem+json' }),
+          json: async () => ({ detail: 'status unavailable' }),
+          text: async (): Promise<string> => 'status unavailable',
+        }
+      }),
+    )
+    const store = useAuthStore()
+    await store.login('admin', 'secret')
+    expect(calls).toBeGreaterThan(1)
+    expect(store.authenticated).toBe(true)
+    expect(store.statusState).toBe('ready')
+    expect(store.status?.initialized).toBe(true)
   })
 
   it('applies themes, language and sidebar state', () => {

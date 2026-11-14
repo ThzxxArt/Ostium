@@ -196,13 +196,28 @@ def test_linux_uninstall_restores_proxy_and_preserves_data_by_default() -> None:
 
 def test_release_workflow_publishes_all_platform_assets_immutably() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "overwrite_files: false" in workflow
+    # Assets are collected on a draft release first; only after PyPI succeeds is
+    # the draft made public.  Replacing files on a draft is safe.
+    assert "draft: true" in workflow
+    assert "overwrite_files: true" in workflow
+    assert "gh release edit" in workflow and "--draft=false" in workflow
     assert "macos-dmg" in workflow
     assert "linux-packages" in workflow
     assert "build-linux-packages.sh" in workflow
     assert "build-sbom.py" in workflow
     assert "ostium-sbom.cdx.json" in workflow
     assert "npx playwright test" in workflow
+
+
+def test_windows_installer_removes_inherited_programdata_access() -> None:
+    install = (ROOT / "deploy" / "windows" / "install.ps1").read_text(encoding="utf-8")
+    assert "icacls $DataDir /inheritance:r /grant:r" in install
+    assert "*S-1-5-18" in install and "*S-1-5-32-544" in install
+    setup = (ROOT / "deploy" / "windows" / "ostium.iss").read_text(encoding="utf-8")
+    # The core service must stop before Inno replaces its executable.
+    assert "PrepareToInstall" in setup
+    assert "Stop-Service" in setup
+    assert "[Code]" in setup
 
 
 def test_core_checksum_file_is_download_friendly() -> None:

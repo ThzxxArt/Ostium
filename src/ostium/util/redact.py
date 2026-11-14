@@ -53,6 +53,22 @@ def redact_mapping(data: dict[str, object]) -> dict[str, object]:
             out[key] = redact(value)
         elif isinstance(value, dict):
             out[key] = redact_mapping(value)
+        elif isinstance(value, list):
+            out[key] = [_redact_value(item, sensitive) for item in value]
+        elif isinstance(value, tuple):
+            out[key] = tuple(_redact_value(item, sensitive) for item in value)
         else:
             out[key] = value
     return out
+
+
+def _redact_value(value: object, sensitive: set[str]) -> object:
+    if isinstance(value, dict):
+        return redact_mapping(value)
+    if isinstance(value, list):
+        return [_redact_value(item, sensitive) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_value(item, sensitive) for item in value)
+    if isinstance(value, str):
+        return redact(value)
+    return value

@@ -8,7 +8,7 @@
 - RHEL / Rocky Linux / AlmaLinux（dnf、firewalld）
 - Alpine / OpenRC 等非 systemd 发行版使用 `--no-service` + supervisord，见第 4.4 节
 
-> **兼容性说明**：Ostium 0.1.1 的发布验证矩阵是 Ubuntu 24.04 / Debian 13，其他发行版没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
+> **兼容性说明**：Ubuntu 24.04 / Debian 13 是 0.1.2 的目标平台；截至本文撰写时，0.1.2 尚未在这些平台完成实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
 
 ## 1. 主方案与端口规划
 
@@ -68,7 +68,7 @@ Nginx 方案见本文附录，不作为主路径。
 
 **默认不能。**
 
-Ostium 0.1.1 默认把管理 UI 绑定在 `127.0.0.1:8443`，只允许本机访问。这是安全设计，不是安装失败。默认安装后：
+Ostium 0.1.2 默认把管理 UI 绑定在 `127.0.0.1:8443`，只允许本机访问。这是安全设计，不是安装失败。默认安装后：
 
 - `http://公网IP:8443` 连接不上；
 - `https://公网IP:8443` 也连接不上；
@@ -133,11 +133,11 @@ https://vpn.example.com
 仅在隔离测试环境、且明确接受风险时，可以临时这样做：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.1 \
+      --version 0.1.2 \
       --ui-host 0.0.0.0 \
       --allow-insecure-bind
 ```
@@ -269,21 +269,21 @@ timedatectl status
 这是推荐组合：安装器以 root 运行，服务以无特权 `ostium` 用户运行。
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.1
+      --version 0.1.2
 ```
 
 ### 4.2 普通 sudo 用户 + 默认非 root 运行
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.1
+      --version 0.1.2
 ```
 
 安装器会：
@@ -295,7 +295,7 @@ curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-o
 - 注册并启动 `ostium-core.service`、`ostium.service`；
 - 打印一次性管理员密码。
 
-不要把 `--public-ui` 加到首次安装命令里。0.1.1 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。
+不要把 `--public-ui` 加到首次安装命令里。0.1.2 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。
 
 安装完成后检查：
 
@@ -314,11 +314,11 @@ sudo ss -lntup | grep -E ':(8443|443|9443|8388)\b'
 ### 4.3 root 运行模式（可选，不推荐生产）
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.1 \
+      --version 0.1.2 \
       --run-as-root
 ```
 
@@ -342,11 +342,11 @@ root 模式取消控制面与 root 的隔离，只建议单用户测试机、临
 安装文件但不注册 systemd：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install \
       --role server \
       --domain vpn.example.com \
-      --version 0.1.1 \
+      --version 0.1.2 \
       --no-service
 ```
 
@@ -847,8 +847,8 @@ journalctl -u ostium -n 100 --no-pager
 
 客户端：
 
-- Windows：`Ostium-0.1.1-windows-x64-setup.exe`
-- macOS：`Ostium-0.1.1-macos-arm64.dmg`
+- Windows：`Ostium-0.1.2-windows-x64-setup.exe`
+- macOS：`Ostium-0.1.2-macos-arm64.dmg`
 - Linux：在线安装器 `install --role client`，或 DEB/AppImage
 - 也可以用 Clash/sing-box/v2rayN 等兼容客户端导入订阅
 
@@ -1027,14 +1027,14 @@ sudo -u ostium env \
 systemd：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- upgrade
 ```
 
 指定版本：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- upgrade --version 0.1.2
 ```
 
@@ -1044,7 +1044,7 @@ root 模式安装器会自动识别 drop-in 并保持 root；如果没识别，�
 
 ```bash
 sudo supervisorctl stop ostium ostium-core
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- upgrade --no-service
 sudo supervisorctl start ostium-core ostium
 ```
@@ -1054,14 +1054,14 @@ sudo supervisorctl start ostium-core ostium
 保留数据：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- uninstall
 ```
 
 同时删除数据/配置/证书（不可恢复）：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- uninstall --purge
 ```
 
@@ -1136,8 +1136,8 @@ sudo sysctl --system
 ```bash
 # 1. DNS 灰云，证书路径确认
 # 2. 安装（root 登录去掉 sudo）
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
-  | sudo bash -s -- install --role server --domain vpn.example.com --version 0.1.1
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
+  | sudo bash -s -- install --role server --domain vpn.example.com --version 0.1.2
 
 # 3. SSH 隧道登录
 ssh -N -L 8443:127.0.0.1:8443 root@SERVER_IP

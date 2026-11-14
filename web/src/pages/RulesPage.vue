@@ -99,6 +99,16 @@ async function load() {
   }
 }
 
+const advancedLocked = computed(() => {
+  if (!advanced.value) return false
+  try {
+    const parsed = JSON.parse(advancedJson.value)
+    return Boolean(parsed) && typeof parsed === 'object' && Object.keys(parsed).length > 1
+  } catch {
+    return false
+  }
+})
+
 function openAdd() {
   editing.value = null
   form.value = { action: 'proxy', type: 'domain_suffix', values: '', note: '' }
@@ -442,7 +452,10 @@ onMounted(load)
           ><span>{{ t('common.note') }}</span
           ><NInput v-model:value="form.note"
         /></label>
-        <NCheckbox v-model:checked="advanced">{{ t('rules.advanced') }}</NCheckbox>
+        <NCheckbox v-model:checked="advanced" :disabled="advancedLocked">
+          {{ t('rules.advanced') }}
+        </NCheckbox>
+        <small v-if="advancedLocked" class="o-subtle">{{ t('rules.advanced_locked') }}</small>
         <label v-if="advanced" class="field">
           <span>{{ t('rules.advanced_json') }}</span>
           <NInput

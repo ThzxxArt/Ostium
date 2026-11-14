@@ -13,8 +13,10 @@ from datetime import date, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from ostium.config import Settings
 from ostium.db.models import ProxyUser, StatsEpoch, TrafficDaily
 from ostium.engine.singbox.v2ray_stats import StatsUnavailable, V2RayStatsClient
+from ostium.services.enforcement import DISABLED_REASONS, write_enforcement
 from ostium.services.events import EventBus
 from ostium.util.time import as_utc, iso, utcnow
 
@@ -44,12 +46,13 @@ class StatsCollector:
     def __init__(
         self,
         *,
-        settings: object,
+        settings: Settings,
         session_factory: async_sessionmaker[AsyncSession],
         bus: EventBus,
         on_quota: QuotaCallback | None = None,
         interval: float = 5.0,
     ) -> None:
+        self.settings = settings
         self.session_factory = session_factory
         self.bus = bus
         self.on_quota = on_quota
@@ -223,8 +226,17 @@ class StatsCollector:
                     total = delta.up + delta.down
                     if total <= 0:
                         continue
-                    user.used_bytes += total
-                    user.last_seen_at = utcnow()
+                    # Atomic SQL increment: a concurrent admin reset writes 0,
+                    # and the next flush adds only the sample it owns instead
+                    # of restoring the pre-reset value from a stale ORM object.
+                    await session.execute(
+                        update(ProxyUser)
+                        .where(ProxyUser.id == user.id)
+                        .values(
+                            used_bytes=ProxyUser.used_bytes + total,
+                            last_seen_at=utcnow(),
+                        )
+                    )
                     row = (
                         await session.execute(
                             select(TrafficDaily).where(
@@ -245,6 +257,14 @@ class StatsCollector:
                         row.uplink += delta.up
                         row.downlink += delta.down
                 epochs = dict(self._epoch_pending)
+                valid_ids = {user.id for user in users}
+                for user_id in list(epochs):
+                    if user_id not in valid_ids:
+                        # The user was deleted after the epoch was recorded.
+                        # Keeping it would make every future flush fail on the
+                        # foreign key and block all other users' traffic.
+                        self._epoch_pending.pop(user_id, None)
+                        epochs.pop(user_id)
                 for user_id, epoch in epochs.items():
                     await session.execute(
                         update(StatsEpoch)
@@ -307,6 +327,10 @@ class StatsCollector:
                 quota_disabled = not user.enabled and user.disabled_reason == "quota_exceeded"
                 user.used_bytes = 0
                 user.cycle_started_at = now
+                # Samples collected before the boundary belong to the old
+                # cycle; flushing them after this reset would immediately
+                # consume the new quota.
+                self._pending.pop(user.id, None)
                 self._alerted.pop(user.id, None)
                 self._epochs[user.id] += 1
                 await session.execute(
@@ -366,6 +390,23 @@ class StatsCollector:
             # Only now is the startup recovery decision durable.  If the
             # commit failed, the next tick must still seed pending disables.
             self._first_enforce = False
+            disabled_names = {
+                user.name
+                for user in users
+                if not user.enabled and user.disabled_reason in DISABLED_REASONS
+            }
+            # Persist the revocation policy before applying it to the running
+            # core.  The privileged core reads this file on every start, so a
+            # crash between the database commit and the apply can no longer
+            # resurrect an over-quota or expired user from stale last-good.
+            try:
+                write_enforcement(self.settings.paths.enforcement_path, disabled_names)
+            except OSError as exc:
+                self.bus.log(
+                    "error",
+                    "could not persist the disabled-user enforcement policy",
+                    error=str(exc),
+                )
         if to_disable:
             self._pending_disable.update(to_disable)
             self.bus.log("warning", "users disabled by policy", users=", ".join(to_disable))
@@ -393,6 +434,17 @@ class StatsCollector:
 
         delta = self._pending.get(user_id)
         return 0 if delta is None else delta.up + delta.down
+
+    def reset_user(self, user_id: str, name: str) -> None:
+        """Discard unflushed samples and start a fresh accounting epoch."""
+
+        self._pending.pop(user_id, None)
+        self._epochs[user_id] += 1
+        self._epoch_pending[user_id] = self._epochs[user_id]
+        self._alerted.pop(user_id, None)
+        self._last.pop(name, None)
+        self.usage.pop(user_id, None)
+        self._pending_disable.discard(name)
 
     def snapshot(self) -> dict[str, object]:
         users = list(self.usage.values())

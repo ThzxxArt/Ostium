@@ -74,6 +74,7 @@ dev = [
   "grpcio-tools==1.85.1",
   "pyinstaller==6.22.3",
   "types-PyYAML==6.0.12.20250915",
+  "pytest-timeout==2.5.0",
 ]
 
 [project.scripts]
@@ -90,7 +91,7 @@ Issues = "https://github.com/ThzxxArt/Ostium/issues"
 source = "vcs"
 
 [tool.hatch.version.raw-options]
-fallback_version = "0.1.1"
+fallback_version = "0.1.2"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/ostium/_version.py"
@@ -128,6 +129,7 @@ include = [
   "/README.md",
   "/README.en.md",
   "/assets",
+  "/VERSION",
   "/LICENSE",
   "/NOTICE",
   "/CHANGELOG.md",
@@ -146,6 +148,8 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 filterwarnings = ["ignore::DeprecationWarning"]
+addopts = "--strict-markers --strict-config"
+timeout = 180
 markers = [
   "integration: requires a real sing-box binary",
   "slow: long-running test",

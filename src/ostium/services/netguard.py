@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import ipaddress
 import socket
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -93,8 +97,52 @@ def _normalise_address(
     return address
 
 
-def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
-    """Validate an outbound http(s) URL and its resolved addresses.
+@dataclass(frozen=True)
+class ResolvedTarget:
+    """A validated URL plus the addresses the request is pinned to."""
+
+    url: str
+    host: str
+    port: int
+    addresses: tuple[str, ...]
+
+
+_DNS_PIN_LOCK = asyncio.Lock()
+
+
+@contextlib.contextmanager
+def _pin_dns(host: str, addresses: tuple[str, ...]) -> Iterator[None]:
+    """Force the resolver to return the already-validated addresses.
+
+    httpx/httpcore resolves the hostname again during connect.  An attacker who
+    controls DNS can answer the validation lookup with a public address and the
+    connect lookup with 169.254.169.254.  Patching getaddrinfo for this one
+    hostname closes that window without changing TLS SNI or the Host header.
+    """
+
+    if not addresses:
+        yield
+        return
+    original = socket.getaddrinfo
+    lowered = host.lower()
+
+    def pinned(query_host: str, query_port: int, *args: Any, **kwargs: Any) -> Any:
+        if str(query_host).lower() != lowered:
+            return original(query_host, query_port, *args, **kwargs)
+        results: list[Any] = []
+        for address in addresses:
+            results.extend(original(address, query_port, *args, **kwargs))
+        return results
+
+    socket.getaddrinfo = pinned  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = original
+
+
+def resolve_remote_url(url: str, *, allow_private: bool = False) -> ResolvedTarget:
+    """Validate an outbound URL and return the addresses to pin.
 
     ``allow_private`` is used for client subscriptions, which legitimately
     point at a LAN server.  Loopback, link-local and cloud metadata remain
@@ -122,7 +170,7 @@ def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
     if literal is not None:
         if _is_blocked(literal, allow_private):
             raise UnsafeUrlError(f"URL address {host} is not allowed")
-        return value
+        return ResolvedTarget(value, host, port, (host,))
     if host.lower() in {"localhost", "localhost.localdomain"} or host.lower().endswith(".local"):
         raise UnsafeUrlError("local hostnames are not allowed")
     try:
@@ -139,7 +187,13 @@ def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
             continue
         if _is_blocked(address, allow_private):
             raise UnsafeUrlError(f"URL resolves to a blocked address: {raw}")
-    return value
+    return ResolvedTarget(value, host, port, tuple(sorted(addresses)))
+
+
+def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
+    """Validate an outbound URL and return its normalized form."""
+
+    return resolve_remote_url(url, allow_private=allow_private).url
 
 
 MAX_REDIRECTS = 5
@@ -189,37 +243,41 @@ async def fetch_limited(
 
     if max_bytes <= 0:
         raise ValueError("max_bytes must be positive")
-    current = validate_remote_url(url, allow_private=allow_private)
-    require_https = urlparse(current).scheme.lower() == "https"
-    for _hop in range(MAX_REDIRECTS + 1):
-        async with (
-            httpx.AsyncClient(
-                timeout=httpx.Timeout(timeout, connect=min(5.0, timeout)),
-                follow_redirects=False,
-                trust_env=False,
-            ) as client,
-            client.stream("GET", current, headers=headers) as response,
-        ):
-            if response.status_code in {301, 302, 303, 307, 308}:
-                location = response.headers.get("location", "")
-                if not location:
-                    raise UnsafeUrlError("redirect response did not include a Location")
-                target = validate_remote_url(
-                    urljoin(current, location), allow_private=allow_private
-                )
-                if require_https and urlparse(target).scheme.lower() != "https":
-                    raise UnsafeUrlError("redirect from HTTPS to plaintext HTTP is not allowed")
-                current = target
-                continue
-            body = bytearray()
-            async for chunk in response.aiter_bytes():
-                body.extend(chunk)
-                if len(body) > max_bytes:
-                    raise ValueError(f"response exceeds the {max_bytes} byte limit")
-            return FetchedPayload(
-                url=current,
-                status_code=response.status_code,
-                headers={key.lower(): value for key, value in response.headers.items()},
-                content=bytes(body),
-            )
-    raise UnsafeUrlError(f"too many redirects (maximum {MAX_REDIRECTS})")
+    async with _DNS_PIN_LOCK:
+        current = resolve_remote_url(url, allow_private=allow_private)
+        require_https = urlparse(current.url).scheme.lower() == "https"
+        for _hop in range(MAX_REDIRECTS + 1):
+            with _pin_dns(current.host, current.addresses):
+                async with (
+                    httpx.AsyncClient(
+                        timeout=httpx.Timeout(timeout, connect=min(5.0, timeout)),
+                        follow_redirects=False,
+                        trust_env=False,
+                    ) as client,
+                    client.stream("GET", current.url, headers=headers) as response,
+                ):
+                    if response.status_code in {301, 302, 303, 307, 308}:
+                        location = response.headers.get("location", "")
+                        if not location:
+                            raise UnsafeUrlError("redirect response did not include a Location")
+                        target = resolve_remote_url(
+                            urljoin(current.url, location), allow_private=allow_private
+                        )
+                        if require_https and urlparse(target.url).scheme.lower() != "https":
+                            raise UnsafeUrlError(
+                                "redirect from HTTPS to plaintext HTTP is not allowed"
+                            )
+                        current = target
+                        continue
+                    body = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        body.extend(chunk)
+                        if len(body) > max_bytes:
+                            raise ValueError(f"response exceeds the {max_bytes} byte limit")
+                    return FetchedPayload(
+                        url=current.url,
+                        status_code=response.status_code,
+                        headers={key.lower(): value for key, value in response.headers.items()},
+                        content=bytes(body),
+                    )
+        raise UnsafeUrlError(f"too many redirects (maximum {MAX_REDIRECTS})")

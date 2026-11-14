@@ -52,6 +52,19 @@ describe('router guards', () => {
     expect(router.currentRoute.value.path).toBe('/profiles')
   })
 
+  it('shows a recoverable error instead of setup when the status probe fails', async () => {
+    const auth = useAuthStore()
+    auth.statusState = 'error'
+    auth.error = 'network down'
+    auth.ready = true
+    await router.push('/users')
+    expect(router.currentRoute.value.name).toBe('unavailable')
+
+    // The login form stays reachable while the probe is failing.
+    await router.push('/login')
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
   it('sets document titles for server and client homes', async () => {
     const auth = useAuthStore()
     auth.status = { ...base, authenticated: true, role: 'server' }

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Create the signed core manifest consumed by the installer and updater."""
+"""Create the checksummed core manifest consumed by the installer and updater.
+
+This manifest is not a signature: it records size and SHA-256 for each core
+archive. Platform signatures, when available, are published separately.
+"""
 
 from __future__ import annotations
 
@@ -33,7 +37,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--release-version",
-        default=os.environ.get("OSTIUM_RELEASE_VERSION", "0.1.1"),
+        default=os.environ.get("OSTIUM_RELEASE_VERSION", "0.1.2"),
         help="Ostium release tag/version that hosts the core archives",
     )
     parser.add_argument("--output", type=Path, default=Path("dist/core-manifest.json"))

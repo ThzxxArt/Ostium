@@ -898,7 +898,8 @@ onBeforeUnmount(() => {
     display: none;
   }
   .topbar {
-    padding: 0 14px;
+    height: calc(var(--topbar-height) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 14px 0;
     gap: 4px;
   }
   .breadcrumb {

@@ -10,6 +10,26 @@ from ostium.config import Settings
 from ostium.services.settings import get_setting
 
 
+def base_url_for_domain(settings: Settings, domain: str) -> str:
+    """Build the canonical URL for a public host.
+
+    Public UI usually listens on 8443, so omitting the port produced
+    subscription links that pointed at 443 and could never reach Ostium.
+    Nginx/TLS-on-443 deployments keep ``public_ui`` disabled and therefore do
+    not gain a port.
+    """
+
+    host = domain.strip().lower().rstrip("/")
+    if host.startswith(("http://", "https://")):
+        try:
+            return normalize_base_url(host)
+        except ValueError:
+            host = host.split("://", 1)[-1]
+    port = settings.port if settings.public_ui else 443
+    suffix = "" if port in {443, 80} else f":{port}"
+    return f"https://{host}{suffix}"
+
+
 def normalize_base_url(value: str) -> str:
     """Validate and normalise a user-supplied public base URL."""
 
@@ -55,7 +75,7 @@ async def public_base_url(session: AsyncSession, settings: Settings) -> str:
                 except ValueError:
                     pass
             else:
-                return f"https://{host}"
+                return base_url_for_domain(settings, host)
     return f"http://127.0.0.1:{settings.port}"
 
 

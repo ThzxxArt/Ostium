@@ -20,7 +20,7 @@
 #   sudo bash install-online.sh install --local-dir /path/to/source-checkout
 set -euo pipefail
 
-VERSION="${OSTIUM_VERSION:-0.1.1}"
+VERSION="${OSTIUM_VERSION:-latest}"
 CORE_VERSION="${OSTIUM_CORE_VERSION:-1.14.4-ostium.1}"
 UV_VERSION="${OSTIUM_UV_VERSION:-0.11.14}"
 ROLE="server"
@@ -63,7 +63,7 @@ Ostium 一键安装器
   --role server|client       角色（默认 server；macOS 仅支持 client）
   --domain DOMAIN            服务端域名
   --password PASSWORD        初始管理员密码（省略则随机生成）
-  --version VERSION          Release 版本（默认 0.1.1，可写 latest）
+  --version VERSION          Release 版本（默认 latest；可写 latest 或明确版本）
   --prefix PATH              安装目录（默认 /opt/ostium）
   --local-dir DIR            离线安装：包含 scripts/install.sh 的源码 checkout
   --run-as-root              不创建 ostium 用户，所有服务以 root 运行（降低隔离，谨慎使用）

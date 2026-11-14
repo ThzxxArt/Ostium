@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -17,6 +16,7 @@ from ostium.db.models import AdminUser, Rule, RuleSet
 from ostium.engine.manager import EngineError
 from ostium.services import rules as rule_service
 from ostium.services.audit import audit
+from ostium.util.paths import resolve_path
 
 router = APIRouter(tags=["rules"])
 
@@ -91,6 +91,7 @@ async def _apply_client(services: Services, session: AsyncSession) -> dict[str, 
                 "through subscriptions; apply routing rules on each client"
             ),
         }
+    await session.commit()
     try:
         result = await services.engine.apply_client(session)
         return {"applied": True, "revision": result["status"].get("revision")}
@@ -361,10 +362,9 @@ async def delete_rule_set(
             f"rule set is still referenced by {len(referenced_by)} rule(s)",
             "rule_set_in_use",
         )
-    downloaded = Path(rule_set.path) if rule_set.path else None
+    downloaded = resolve_path(services.settings, rule_set.path)
     await session.delete(rule_set)
     await session.flush()
-    applied = await _apply_client(services, session)
     await audit(
         session,
         actor=admin.username,
@@ -373,9 +373,14 @@ async def delete_rule_set(
         ip=client_ip(request),
     )
     # Persist the row deletion before removing the file a previous config may
-    # still reference.  An unreferenced rule set is safe to unlink afterwards.
+    # still reference.
     await session.commit()
-    if downloaded is not None:
+    applied = await _apply_client(services, session)
+    # On a client, a failed apply means the running core may still reference
+    # the old file; keep it so the next reload does not fail.  On a server the
+    # file is not part of the server core configuration and can be removed.
+    safe_to_remove = services.settings.role is not Role.CLIENT or bool(applied.get("applied"))
+    if downloaded is not None and safe_to_remove:
         try:
             downloaded.unlink(missing_ok=True)
         except OSError:

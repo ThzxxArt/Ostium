@@ -66,6 +66,7 @@ async def _get_profile(session: AsyncSession, profile_id: str) -> Profile:
 
 
 async def _apply_client(services: Services, session: AsyncSession) -> dict[str, Any]:
+    await session.commit()
     try:
         result = await services.engine.apply_client(session)
         return {"applied": True, "revision": result["status"].get("revision")}

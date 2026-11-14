@@ -64,7 +64,7 @@ def test_redact_mapping_nested_and_sensitive() -> None:
     assert result["UUID"] == "[REDACTED]"
     assert result["nested"]["secret"] == "[REDACTED]"
     assert "nested" in result["nested"]["safe"] or "token" in result["nested"]["safe"]
-    assert result["list"] == ["token=abc"]
+    assert result["list"] == ["token=[REDACTED]"]
     assert result["count"] == 2
 
 

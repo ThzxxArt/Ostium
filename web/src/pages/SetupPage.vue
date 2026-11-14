@@ -71,6 +71,7 @@ async function next() {
     if (step.value === 0 && password.value !== confirm.value)
       error.value = t('auth.password_mismatch')
     else if (step.value === 0) error.value = t('auth.password_too_short')
+    else if (step.value === steps.value.length - 1) error.value = t('setup.accept_required')
     return
   }
   error.value = null
@@ -352,7 +353,7 @@ const transportOptions = computed(() => [
             type="primary"
             size="large"
             :loading="loading"
-            :disabled="!canNext"
+            :disabled="loading"
             @click="next"
           >
             {{

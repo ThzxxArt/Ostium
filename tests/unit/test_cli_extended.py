@@ -49,6 +49,38 @@ def _init(
     return runner
 
 
+def test_init_is_idempotent_and_rejects_negative_quota(tmp_path: Path, monkeypatch) -> None:
+    data = tmp_path / "data"
+    config = tmp_path / "config"
+    runner = _init(tmp_path, monkeypatch)
+    before = (config / "config.toml").read_bytes()
+
+    # Re-running init with different listener options must not silently rewrite
+    # an existing installation.
+    again = runner.invoke(
+        app,
+        [
+            "init",
+            "--role",
+            "client",
+            "--no-input",
+            "--data-dir",
+            str(data),
+            "--config-dir",
+            str(config),
+            "--port",
+            "9999",
+        ],
+    )
+    assert again.exit_code == 0, again.output
+    assert "already initialised" in again.output
+    assert (config / "config.toml").read_bytes() == before
+
+    negative = runner.invoke(app, ["user", "add", "alice", "--quota", "-1G", "--json"])
+    assert negative.exit_code == 2
+    assert "size must be" in negative.output
+
+
 def test_init_generated_password_force_and_invalid_role(tmp_path: Path, monkeypatch) -> None:
     data = tmp_path / "generated-data"
     config = tmp_path / "generated-config"
@@ -122,7 +154,10 @@ def test_status_open_and_connect_commands(tmp_path: Path, monkeypatch) -> None:
         cli,
         "_api",
         lambda settings, method, path, **kwargs: {
-            "services": [{}, {"running": True, "reachable": True}]
+            "services": [
+                {"name": "ostium.service", "running": True},
+                {"name": "ostium-core.service", "running": True, "reachable": True},
+            ]
         },
     )
     status = runner.invoke(app, ["status", "--json"])
@@ -287,13 +322,26 @@ def test_v011_cli_safety_and_update_checks(tmp_path: Path, monkeypatch) -> None:
     )
     assert runner.invoke(app, ["update", "--check"]).exit_code == 4
 
-    import uvicorn
+    served_calls: list[dict[str, object]] = []
 
-    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    def fake_serve(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+        served_calls.append(
+            {
+                "host": settings_arg.host,
+                "port": settings_arg.port,
+                "cert": cert,
+                "key": key,
+                "reload": reload,
+            }
+        )
+
+    monkeypatch.setattr(cli, "_serve_with_cert_reload", fake_serve)
     monkeypatch.setenv("OSTIUM_PUBLIC_UI", "true")
-    public_refused = runner.invoke(app, ["serve"])
-    assert public_refused.exit_code == 6
-    assert "TOTP is not configured" in public_refused.output
+    public_recovery = runner.invoke(app, ["serve"])
+    assert public_recovery.exit_code == 0
+    assert "TOTP is not configured" in public_recovery.output
+    assert "recovery" in public_recovery.output and "console" in public_recovery.output
+    assert served_calls[-1]["cert"] is None
     monkeypatch.setenv("OSTIUM_PUBLIC_UI", "false")
 
     monkeypatch.setenv("OSTIUM_HOST", "0.0.0.0")
@@ -646,7 +694,10 @@ def test_profile_url_import_refresh_and_errors(tmp_path: Path, monkeypatch) -> N
 def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
     runner = _init(tmp_path, monkeypatch)
     assert runner.invoke(app, ["cert", "issue", "cert.example.com"]).exit_code == 2
-    assert runner.invoke(app, ["cert", "issue", "cert.example.com", "--self-signed"]).exit_code == 0
+    issued = runner.invoke(app, ["cert", "issue", "cert.example.com", "--self-signed"])
+    # The certificate is persisted even when the local core service is not
+    # running; the CLI reports the pending apply with exit code 3.
+    assert issued.exit_code in {0, 3}, issued.output
     assert runner.invoke(app, ["cert", "list"]).exit_code == 0
 
     created = runner.invoke(app, ["backup", "create"])
@@ -660,11 +711,18 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
 
     recorded: dict[str, object] = {}
 
-    def fake_run(app_obj, **kwargs):  # type: ignore[no-untyped-def]
-        recorded["app"] = app_obj
-        recorded.update(kwargs)
+    def fake_run(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+        recorded.update(
+            {
+                "host": settings_arg.host,
+                "port": settings_arg.port,
+                "ssl_certfile": cert,
+                "ssl_keyfile": key,
+                "reload": reload,
+            }
+        )
 
-    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setattr(cli, "_serve_with_cert_reload", fake_run)
     served = runner.invoke(app, ["serve", "--host", "127.0.0.1", "--port", "18445"])
     assert served.exit_code == 0, served.output
     assert recorded["host"] == "127.0.0.1"
@@ -703,8 +761,12 @@ def test_cert_backup_and_serve_commands(tmp_path: Path, monkeypatch) -> None:
     settings = Settings.load()
     settings.public_ui = True
     settings.save()
-    refused = runner.invoke(app, ["serve"])
-    assert refused.exit_code == 6
+    recovery = runner.invoke(app, ["serve"])
+    assert recovery.exit_code == 0
+    assert "public UI disabled" in recovery.output
+    assert "recovery" in recovery.output and "console" in recovery.output
+    assert recorded["ssl_certfile"] is None
+    assert recorded["host"] == "127.0.0.1"
 
 
 def test_serve_uses_only_unexpired_ready_certificates(tmp_path: Path, monkeypatch) -> None:
@@ -761,10 +823,16 @@ def test_serve_uses_only_unexpired_ready_certificates(tmp_path: Path, monkeypatc
 
     recorded: dict[str, object] = {}
 
-    def fake_run(_app, **kwargs):  # type: ignore[no-untyped-def]
-        recorded.update(kwargs)
+    def fake_run(settings_arg, cert, key, *, reload):  # type: ignore[no-untyped-def]
+        recorded.update(
+            {
+                "ssl_certfile": cert,
+                "ssl_keyfile": key,
+                "host": settings_arg.host,
+            }
+        )
 
-    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setattr(cli, "_serve_with_cert_reload", fake_run)
     asyncio.run(enable_totp())
     asyncio.run(add_certificate(utcnow() + timedelta(days=30)))
     served = runner.invoke(app, ["serve"])
@@ -774,7 +842,9 @@ def test_serve_uses_only_unexpired_ready_certificates(tmp_path: Path, monkeypatc
 
     asyncio.run(add_certificate(utcnow() - timedelta(days=1)))
     expired = runner.invoke(app, ["serve"])
-    assert expired.exit_code == 6
+    assert expired.exit_code == 0
+    assert recorded["ssl_certfile"] is None
+    assert recorded["host"] == "127.0.0.1"
 
 
 def test_core_run_delegates(tmp_path: Path, monkeypatch) -> None:
@@ -975,6 +1045,13 @@ def test_service_uninstall_success(tmp_path: Path, monkeypatch) -> None:
         def __init__(self, *parts: str) -> None:
             self.parts = parts
 
+        @property
+        def stem(self) -> str:
+            return self.parts[-1].removesuffix(".service")
+
+        def is_file(self) -> bool:
+            return True
+
         def unlink(self, missing_ok: bool = False) -> None:
             unlinked.append(self.parts)
 
@@ -987,8 +1064,9 @@ def test_service_uninstall_success(tmp_path: Path, monkeypatch) -> None:
     )
     result = runner.invoke(app, ["service", "uninstall"])
     assert result.exit_code == 0
-    assert len(unlinked) == 2
-    assert system_calls == [["systemctl", "daemon-reload"]]
+    assert len(unlinked) == 4
+    assert system_calls.count(["systemctl", "daemon-reload"]) == 1
+    assert len([call for call in system_calls if call[:2] == ["systemctl", "disable"]]) == 4
 
 
 def test_cli_module_main_guard(monkeypatch) -> None:

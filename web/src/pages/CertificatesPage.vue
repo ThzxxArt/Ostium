@@ -97,6 +97,8 @@ async function upload() {
     if (result.warning) message.warning(result.warning)
     message.success(t('certs.uploaded'))
     uploadOpen.value = false
+    // Do not keep the private key in reactive memory after a successful upload.
+    uploadForm.value = { domain: '', cert_pem: '', key_pem: '', auto_renew: false }
     await load()
   } catch (err) {
     message.error((err as Error).message)

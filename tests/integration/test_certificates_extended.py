@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import ipaddress
-from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -18,6 +17,7 @@ from ostium.db.session import create_engine, create_schema, create_session_facto
 from ostium.services import certificates as cert_service
 from ostium.services.crypto import SecretStore
 from ostium.services.users import ensure_inbounds
+from ostium.util.paths import resolve_path
 from ostium.util.time import utcnow
 
 
@@ -66,11 +66,11 @@ def test_self_signed_validation_and_reissue(settings: Settings) -> None:
                 session, settings, domain="vpn.example.com"
             )
             await session.commit()
-            first_path = certificate.cert_path
+            first_path = resolve_path(settings, certificate.cert_path)
             assert certificate.issuer == "self-signed"
             assert certificate.source == "self-signed"
             assert certificate.expires_at is not None
-            assert cert_service.certificate_pin_sha256(first_path)
+            assert cert_service.certificate_pin_sha256(str(first_path))
 
             # Reissuing updates the existing row and files in place.
             again = await cert_service.create_self_signed(
@@ -183,10 +183,10 @@ def test_inbound_assignment_and_deletion(settings: Settings) -> None:
                 rows[kind].enabled = True
             await session.commit()
 
-            await cert_service.delete_certificate(session, certificate)
+            await cert_service.delete_certificate(session, certificate, settings=settings)
             await session.commit()
-            assert not Path(certificate.cert_path).exists()
-            assert not Path(certificate.key_path).exists()
+            assert not resolve_path(settings, certificate.cert_path).exists()
+            assert not resolve_path(settings, certificate.key_path).exists()
             rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
             assert rows["hysteria2"].enabled is False
             assert rows["trojan"].enabled is False
@@ -204,7 +204,9 @@ def test_certificate_pin_and_serialization(settings: Settings) -> None:
                 session, settings, domain="vpn.example.com"
             )
             await session.commit()
-            assert cert_service.certificate_pin_sha256(certificate.cert_path)
+            assert cert_service.certificate_pin_sha256(
+                str(resolve_path(settings, certificate.cert_path))
+            )
             assert cert_service.certificate_pin_sha256("/does/not/exist") is None
             data = cert_service.serialize_certificate(certificate)
             assert data["days_remaining"] is not None
@@ -227,18 +229,26 @@ def test_ready_certificate_selection_and_unbound_assignment(settings: Settings) 
             )
             await session.commit()
 
-            selected = await cert_service.select_ready_certificate(session, certificate.id)
+            selected = await cert_service.select_ready_certificate(
+                session, certificate.id, settings
+            )
             assert selected is not None
-            assert await cert_service.select_ready_certificate(session, None) is None
-            assert await cert_service.select_ready_certificate(session, "missing") is None
+            assert await cert_service.select_ready_certificate(session, None, settings) is None
+            assert await cert_service.select_ready_certificate(session, "missing", settings) is None
 
-            path = Path(certificate.cert_path)
+            path = resolve_path(settings, certificate.cert_path)
             path.unlink()
-            assert await cert_service.select_ready_certificate(session, certificate.id) is None
+            assert (
+                await cert_service.select_ready_certificate(session, certificate.id, settings)
+                is None
+            )
             path.write_text("restored")
             certificate.status = "pending"
             await session.flush()
-            assert await cert_service.select_ready_certificate(session, certificate.id) is None
+            assert (
+                await cert_service.select_ready_certificate(session, certificate.id, settings)
+                is None
+            )
             certificate.status = "ready"
             await session.flush()
             certificate.expires_at = utcnow() - dt.timedelta(days=1)

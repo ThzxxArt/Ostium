@@ -73,6 +73,45 @@ def _load_settings() -> Settings:
     return Settings.load()
 
 
+def _database_has_admin(path: Path) -> bool:
+    """Check for an existing installation without opening SQLAlchemy."""
+
+    import sqlite3
+
+    if not path.is_file():
+        return False
+    try:
+        with sqlite3.connect(path) as connection:
+            row = connection.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone()
+        return row is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _service_reachable(settings: Settings) -> bool:
+    """Best-effort check that the UI or core is still listening locally."""
+
+    import socket
+    from urllib.parse import urlparse
+
+    ports = {int(settings.port)}
+    try:
+        parsed = urlparse(settings.core_url)
+        if parsed.port:
+            ports.add(int(parsed.port))
+    except ValueError:
+        pass
+    for port in ports:
+        if port <= 0:
+            continue
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _json(value: Any) -> None:
     console.print_json(json.dumps(value, ensure_ascii=False, default=str))
 
@@ -207,6 +246,19 @@ def init(
             state_dir=Path(),
             core_token_file=Path(),
         )
+    prospective_data = data_dir or settings.data_dir
+    if force and not no_input:
+        typer.confirm(
+            "reinitialising rewrites the role/listener configuration; data is kept. Continue?",
+            abort=True,
+        )
+    if not force and _database_has_admin(prospective_data / "ostium.db"):
+        console.print(
+            "[yellow]Ostium is already initialised in "
+            f"{prospective_data}; nothing changed. Use --force to rewrite the "
+            "role, listener and Public UI configuration.[/yellow]"
+        )
+        return
     if data_dir:
         settings.data_dir = data_dir
         if "OSTIUM_STATE_DIR" not in os.environ:
@@ -318,6 +370,130 @@ def init(
     console.print("Next: `ostium serve` (control plane) and `ostium core-run` (core service).")
 
 
+async def _public_ui_certificate(settings: Settings) -> tuple[str, str] | None:
+    """Resolve the certificate the Public UI should serve."""
+
+    from sqlalchemy import select
+
+    from ostium.db.models import Certificate
+    from ostium.services.settings import get_setting
+    from ostium.util.paths import resolve_path
+    from ostium.util.time import as_utc, utcnow
+
+    engine, factory, _store = await _database(settings)
+    try:
+        async with factory() as session:
+            server_info = await get_setting(session, "server", {})
+            domain = server_info.get("domain") if isinstance(server_info, dict) else None
+            query = select(Certificate).where(
+                Certificate.status == "ready",
+                Certificate.expires_at.is_not(None),
+            )
+            if domain:
+                query = query.where(Certificate.domain == domain)
+            else:
+                query = query.order_by(Certificate.expires_at.desc())
+            certs = (await session.execute(query)).scalars().all()
+        now = utcnow()
+        cert = next(
+            (
+                item
+                for item in certs
+                if item.expires_at is not None and as_utc(item.expires_at) > now
+            ),
+            None,
+        )
+        if cert is None:
+            return None
+        cert_path = resolve_path(settings, cert.cert_path)
+        key_path = resolve_path(settings, cert.key_path)
+        if (
+            cert_path is None
+            or key_path is None
+            or not cert_path.is_file()
+            or not key_path.is_file()
+        ):
+            return None
+        return (str(cert_path), str(key_path))
+    finally:
+        await engine.dispose()
+
+
+def _serve_with_cert_reload(
+    settings: Settings,
+    ssl_certfile: str | None,
+    ssl_keyfile: str | None,
+    *,
+    reload: bool,
+) -> None:
+    """Run uvicorn and rebuild its TLS context when the Public UI cert changes."""
+
+    import threading
+    import time
+
+    import uvicorn
+
+    if reload:
+        # ``reload=True`` requires an import string; passing the app object was
+        # silently ignored by uvicorn and broke development reloads.
+        uvicorn.run(
+            "ostium.api.app:create_app",
+            factory=True,
+            host=settings.host,
+            port=settings.port,
+            reload=True,
+            log_level=settings.log_level,
+            access_log=False,
+            server_header=False,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+        )
+        return
+
+    from ostium.api.app import build_app
+
+    marker = settings.paths.runtime_dir / "reload-ui"
+    last_marker = marker.stat().st_mtime_ns if marker.is_file() else 0
+    while True:
+        app = build_app(settings)
+        config = uvicorn.Config(
+            app,
+            host=settings.host,
+            port=settings.port,
+            log_level=settings.log_level,
+            access_log=False,
+            server_header=False,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+        )
+        server = uvicorn.Server(config)
+        requested = threading.Event()
+
+        def _watch(server: uvicorn.Server = server, requested: threading.Event = requested) -> None:
+            nonlocal last_marker
+            while not server.should_exit:
+                time.sleep(1.0)
+                try:
+                    stamp = marker.stat().st_mtime_ns
+                except OSError:
+                    continue
+                if stamp > last_marker:
+                    last_marker = stamp
+                    requested.set()
+                    server.should_exit = True
+                    return
+
+        watcher = threading.Thread(target=_watch, name="ostium-cert-reload", daemon=True)
+        watcher.start()
+        server.run()
+        if not requested.is_set():
+            return
+        found = _run(_public_ui_certificate(settings))
+        if found is not None:
+            ssl_certfile, ssl_keyfile = found
+        err_console.print("[green]certificate changed; TLS listener reloaded[/green]")
+
+
 @app.command()
 def serve(
     host: str | None = typer.Option(None, "--host"),
@@ -331,9 +507,6 @@ def serve(
 ) -> None:
     """Run the Ostium control plane (Web UI + API)."""
 
-    import uvicorn
-
-    from ostium.api.app import build_app
     from ostium.services.backup import apply_pending_restore
 
     settings = _load_settings()
@@ -371,13 +544,9 @@ def serve(
         )
     ssl_certfile = ssl_keyfile = None
     if settings.public_ui:
-        from sqlalchemy import select
-
-        from ostium.db.models import Certificate
+        from ostium.services.auth import get_admin
 
         async def _public_ui_totp_ready() -> bool:
-            from ostium.services.auth import get_admin
-
             engine, factory, _store = await _database(settings)
             try:
                 async with factory() as session:
@@ -386,68 +555,28 @@ def serve(
             finally:
                 await engine.dispose()
 
-        if not _run(_public_ui_totp_ready()):
-            err_console.print(
-                "[yellow]public UI is enabled but TOTP is not configured; "
-                "refusing to expose the admin UI[/yellow]"
+        totp_ready = _run(_public_ui_totp_ready())
+        found = _run(_public_ui_certificate(settings))
+        if not totp_ready or found is None:
+            # Never lock the administrator out because a certificate expired
+            # before the renewal loop could run.  Serve a loopback-only,
+            # plaintext recovery console on the configured port; the renewal
+            # loop runs immediately and switches back after a successful
+            # renewal (which triggers the TLS reload).
+            reason = (
+                "TOTP is not configured" if not totp_ready else "no ready certificate is available"
             )
-            raise typer.Exit(code=6)
-
-        async def _find_cert() -> tuple[str, str] | None:
-            from ostium.services.settings import get_setting
-            from ostium.util.time import as_utc, utcnow
-
-            engine, factory, _store = await _database(settings)
-            try:
-                async with factory() as session:
-                    server_info = await get_setting(session, "server", {})
-                    domain = server_info.get("domain") if isinstance(server_info, dict) else None
-                    query = select(Certificate).where(
-                        Certificate.status == "ready",
-                        Certificate.expires_at.is_not(None),
-                    )
-                    if domain:
-                        query = query.where(Certificate.domain == domain)
-                    else:
-                        query = query.order_by(Certificate.expires_at.desc())
-                    certs = (await session.execute(query)).scalars().all()
-                now = utcnow()
-                cert = next(
-                    (
-                        item
-                        for item in certs
-                        if item.expires_at is not None and as_utc(item.expires_at) > now
-                    ),
-                    None,
-                )
-                if cert is None:
-                    return None
-                if not (Path(cert.cert_path).is_file() and Path(cert.key_path).is_file()):
-                    return None
-                return (cert.cert_path, cert.key_path)
-            finally:
-                await engine.dispose()
-
-        found = _run(_find_cert())
-        if found:
-            ssl_certfile, ssl_keyfile = found
+            err_console.print(
+                f"[red]public UI disabled: {reason}.[/red] "
+                "Starting a loopback-only recovery console on "
+                f"http://127.0.0.1:{settings.port}."
+            )
+            settings.host = "127.0.0.1"
+            settings.public_ui = False
+            settings.secure_cookies = False
         else:
-            err_console.print(
-                "[yellow]public UI is enabled but no certificate is ready; "
-                "refusing to serve HTTP publicly[/yellow]"
-            )
-            raise typer.Exit(code=6)
-    uvicorn.run(
-        build_app(settings),
-        host=settings.host,
-        port=settings.port,
-        reload=reload,
-        log_level=settings.log_level,
-        access_log=False,
-        server_header=False,
-        ssl_certfile=ssl_certfile,
-        ssl_keyfile=ssl_keyfile,
-    )
+            ssl_certfile, ssl_keyfile = found
+    _serve_with_cert_reload(settings, ssl_certfile, ssl_keyfile, reload=reload)
 
 
 @app.command("core-run")
@@ -472,11 +601,15 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         "config_file": str(settings.config_file),
         "database": settings.paths.db_path.is_file(),
         "core_binary": _engine_binary(settings).is_file(),
-        "ui_url": f"http://127.0.0.1:{settings.port}",
+        "ui_url": (f"{'https' if settings.public_ui else 'http'}://127.0.0.1:{settings.port}"),
         "core": None,
     }
     try:
-        payload["core"] = _api(settings, "GET", "/api/v1/system/services")["services"][1]
+        services = _api(settings, "GET", "/api/v1/system/services").get("services", [])
+        payload["core"] = next(
+            (item for item in services if item.get("name") == "ostium-core.service"),
+            {"running": False, "reachable": False},
+        )
     except SystemExit:
         payload["core"] = {"running": False, "reachable": False}
     if json_output:
@@ -1239,7 +1372,9 @@ def user_export(
             ).scalar_one_or_none()
             if user is None:
                 _fail("user not found", 1)
-            content, _ = await render_subscription(session, store, user, "ostium")
+            content, _ = await render_subscription(
+                session, store, user, "ostium", settings=settings
+            )
         await engine.dispose()
         return content
 
@@ -1677,6 +1812,8 @@ def backup_create(
 
     from ostium.services.backup import create_backup
 
+    if password and len(password) < 8:
+        _fail("backup password must be at least 8 characters", 2)
     settings = _load_settings()
     if not password:
         err_console.print(
@@ -1684,12 +1821,32 @@ def backup_create(
             "database; store it on encrypted media or pass --password.[/yellow]"
         )
     result = create_backup(settings, password=password, target=output)
-    _audit_sync(
-        settings,
-        "backup.created",
-        str(result.get("filename")),
-        encrypted=bool(result.get("encrypted")),
-    )
+
+    async def _record() -> None:
+        from ostium.db.models import Backup
+
+        engine, factory, _store = await _database(settings)
+        try:
+            async with factory() as session:
+                session.add(
+                    Backup(
+                        filename=result["filename"],
+                        size=result["size"],
+                        sha256=result["sha256"],
+                        encrypted=result["encrypted"],
+                    )
+                )
+                await _audit(
+                    session,
+                    "backup.created",
+                    str(result.get("filename")),
+                    encrypted=bool(result.get("encrypted")),
+                )
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+    _run(_record())
     console.print_json(json.dumps(result))
 
 
@@ -1718,6 +1875,12 @@ def backup_restore(
             "restore will replace the current database and certificates; continue?", abort=True
         )
     settings = _load_settings()
+    if _service_reachable(settings):
+        _fail(
+            "stop ostium and ostium-core before restoring; a running service can "
+            "overwrite the restored database or keep serving the old configuration",
+            5,
+        )
     result = restore_backup(settings, path, password=password)
     _audit_sync(settings, "backup.restored", path.name)
     console.print_json(json.dumps(result))
@@ -1752,7 +1915,7 @@ def cert_list() -> None:
 def cert_issue(domain: str, self_signed: bool = typer.Option(False, "--self-signed")) -> None:
     """Issue an ACME or self-signed certificate."""
 
-    from ostium.services.certificates import create_self_signed
+    from ostium.services.certificates import create_self_signed, use_for_unbound
 
     settings = _load_settings()
     if not self_signed:
@@ -1766,16 +1929,23 @@ def cert_issue(domain: str, self_signed: bool = typer.Option(False, "--self-sign
         engine, factory, _store = await _database(settings)
         async with factory() as session:
             cert = await create_self_signed(session, settings, domain=domain)
+            # A self-signed certificate cannot be renewed by ACME.  Bind it to
+            # the TLS inbounds that have none, so issuing it actually makes the
+            # service usable instead of leaving an unassigned database row.
+            cert.auto_renew = False
+            await use_for_unbound(session, cert)
             await _audit(session, "certificate.self_signed", cert.domain)
             await session.commit()
             result = {
                 "domain": cert.domain,
                 "expires_at": cert.expires_at.isoformat() if cert.expires_at else None,
+                "assigned": True,
             }
         await engine.dispose()
         return result
 
     _json(_run(_issue()))
+    _server_apply(settings)
 
 
 # ---------------------------------------------------------------------------- install
@@ -1815,10 +1985,24 @@ def service_uninstall() -> None:
 
     if sys.platform != "linux" or os.geteuid() != 0:
         _fail("run as root on Linux", 5)
-    for name in ("ostium.service", "ostium-core.service"):
-        Path("/etc/systemd/system", name).unlink(missing_ok=True)
     import subprocess
 
+    for name in (
+        "ostium.service",
+        "ostium-core.service",
+        "ostium-client-ui.service",
+        "ostium-core-client.service",
+    ):
+        unit = Path("/etc/systemd/system", name)
+        if not unit.is_file():
+            continue
+        subprocess.run(
+            ["systemctl", "disable", "--now", unit.stem],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        unit.unlink(missing_ok=True)
     result = subprocess.run(
         ["systemctl", "daemon-reload"], capture_output=True, text=True, check=False
     )
@@ -1828,11 +2012,18 @@ def service_uninstall() -> None:
 
 
 def _parse_bytes(value: str) -> int:
-    value = value.strip().upper()
-    units = {"K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
-    if value[-1] in units:
-        return int(float(value[:-1]) * units[value[-1]])
-    return int(value)
+    import re
+
+    text = value.strip().upper()
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([KMGT]?)", text)
+    if match is None:
+        _fail("size must be a positive number with an optional K/M/G/T suffix", 2)
+    number, unit = match.groups()
+    units = {"": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
+    result = int(float(number) * units[unit])
+    if result <= 0:
+        _fail("size must be greater than zero", 2)
+    return result
 
 
 if __name__ == "__main__":

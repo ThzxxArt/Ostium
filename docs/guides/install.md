@@ -7,7 +7,7 @@ Ostium 提供**在线一键安装器**：不需要预装 Python，也不需要�
 ## Linux 服务端
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
@@ -27,7 +27,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 ## Linux 客户端
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -36,7 +36,7 @@ curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-o
 ## macOS 客户端
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -47,7 +47,7 @@ macOS 只支持客户端；服务端请用 Linux。
 以**管理员 PowerShell**运行：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1 | iex
 ```
 
 脚本会下载并静默运行 Windows 安装包、校验 SHA256；不会再创建或打印管理员密码，首次打开 UI 时完成设置向导。默认：
@@ -59,7 +59,7 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.p
 需要连 UI 也以 SYSTEM 运行时：
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1))) -RunAsSystem
+& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1))) -RunAsSystem
 ```
 
 **风险**：默认 UI 以当前用户运行，只有核心服务是 LocalSystem。`-RunAsSystem` 会取消这层隔离，UI/浏览器漏洞可能直接获得 SYSTEM 权限；只建议在隔离测试机使用。
@@ -68,10 +68,10 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.p
 
 Release 同时提供可离线使用的原生包：
 
-- Linux DEB：`ostium_0.1.1_amd64.deb` / `arm64`，安装后注册 systemd；
-- Linux AppImage：`Ostium-0.1.1-linux-amd64.AppImage` / `arm64`；
-- macOS DMG：`Ostium-0.1.1-macos-arm64.dmg`，挂载后运行 `install-macos.sh client`；
-- Windows：`Ostium-0.1.1-windows-x64-setup.exe`。
+- Linux DEB：`ostium_0.1.2_amd64.deb` / `arm64`，安装后注册 systemd；
+- Linux AppImage：`Ostium-0.1.2-linux-amd64.AppImage` / `arm64`；
+- macOS DMG：`Ostium-0.1.2-macos-arm64.dmg`，挂载后运行 `install-macos.sh client`；DMG 不内置 Python/uv/wheelhouse，安装时仍需联网获取依赖（这是当前限制，不是离线包）；
+- Windows：`Ostium-0.1.2-windows-x64-setup.exe`。
 
 未配置代码签名证书时，Windows/DMG 资产会明确标注为未签名；这不影响离线校验和
 `SHA256SUMS`，但不能声称已通过 Authenticode/notarization。
@@ -98,7 +98,7 @@ Release 同时提供可离线使用的原生包：
 |---|---|
 | `--role server\|client` | 角色；默认 server |
 | `--domain vpn.example.com` | 服务端域名（Reality 可省略） |
-| `--version 0.1.1` | 指定 Release 版本；`latest` 自动解析 |
+| `--version 0.1.2` | 指定 Release 版本；`latest` 自动解析 |
 | `--password '...'` | 初始管理员密码；省略则随机生成 |
 | `--prefix /opt/ostium` | 安装目录 |
 | `--run-as-root` | 不创建用户，两个服务都用 root 运行 |
@@ -177,8 +177,8 @@ sudo OSTIUM_ROLE=server OSTIUM_CONFIG_FILE=/etc/ostium/config.toml \
 ```text
 release/
 ├── install-online.sh
-├── ostium_ctl-0.1.1-py3-none-any.whl
-├── ostium_ctl-0.1.1.tar.gz
+├── ostium_ctl-0.1.2-py3-none-any.whl
+├── ostium_ctl-0.1.2.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz.sha256
 ├── core-manifest.json
@@ -220,7 +220,7 @@ sudo bash install-online.sh upgrade
 指定版本：
 
 ```bash
-sudo bash install-online.sh upgrade --version 0.1.1
+sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 ## 卸载

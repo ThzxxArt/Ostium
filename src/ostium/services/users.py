@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ostium.config import Settings
 from ostium.db.models import Certificate, Inbound, ProxyUser
 from ostium.domain.endpoints import Endpoint, Protocol, TLSConfig
 from ostium.services.crypto import SecretStore
@@ -132,7 +133,16 @@ async def rotate_subscription(session: AsyncSession, store: SecretStore, user: P
     return token
 
 
-async def reset_usage(session: AsyncSession, user: ProxyUser) -> None:
+async def reset_usage(
+    session: AsyncSession, user: ProxyUser, *, stats: object | None = None
+) -> None:
+    if stats is not None:
+        reset = getattr(stats, "reset_user", None)
+        if callable(reset):
+            # Drop samples that have not reached the database yet; otherwise
+            # the next flush would immediately bill the old interval again and
+            # could re-disable a user the operator just recovered.
+            reset(user.id, user.name)
     user.used_bytes = 0
     user.cycle_started_at = utcnow()
     if user.disabled_reason == "quota_exceeded":
@@ -290,20 +300,27 @@ async def endpoints_for_user(
     *,
     server_host: str,
     server_name: str | None = None,
+    settings: Settings | None = None,
 ) -> list[Endpoint]:
     from ostium.services.certificates import certificate_pin_sha256
+    from ostium.util.paths import resolve_path
     from ostium.util.security import CryptoError
 
     inbounds = (await session.execute(select(Inbound))).scalars().all()
-    certificates = {
-        row.id: row
-        for row in (await session.execute(select(Certificate))).scalars().all()
-        if row.status == "ready"
-        and row.expires_at is not None
-        and as_utc(row.expires_at) > utcnow()
-        and Path(row.cert_path).is_file()
-        and Path(row.key_path).is_file()
-    }
+    certificates: dict[str, Certificate] = {}
+    for row in (await session.execute(select(Certificate))).scalars().all():
+        cert_path = resolve_path(settings, row.cert_path) if settings else Path(row.cert_path)
+        key_path = resolve_path(settings, row.key_path) if settings else Path(row.key_path)
+        if (
+            row.status == "ready"
+            and row.expires_at is not None
+            and as_utc(row.expires_at) > utcnow()
+            and cert_path is not None
+            and key_path is not None
+            and cert_path.is_file()
+            and key_path.is_file()
+        ):
+            certificates[row.id] = row
     endpoints: list[Endpoint] = []
     display = server_name or server_host
     for inbound in sorted(
@@ -341,7 +358,12 @@ async def endpoints_for_user(
                 password = decrypt_password(user, store)
             except (UserError, CryptoError):
                 continue
-            pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
+            resolved = resolve_path(settings, cert.cert_path) if settings else Path(cert.cert_path)
+            pin = (
+                certificate_pin_sha256(str(resolved))
+                if cert.source == "self-signed" and resolved is not None
+                else None
+            )
             endpoints.append(
                 Endpoint(
                     tag=_endpoint_tag(user, "hy2"),
@@ -363,7 +385,12 @@ async def endpoints_for_user(
                 password = decrypt_password(user, store)
             except (UserError, CryptoError):
                 continue
-            pin = certificate_pin_sha256(cert.cert_path) if cert.source == "self-signed" else None
+            resolved = resolve_path(settings, cert.cert_path) if settings else Path(cert.cert_path)
+            pin = (
+                certificate_pin_sha256(str(resolved))
+                if cert.source == "self-signed" and resolved is not None
+                else None
+            )
             endpoints.append(
                 Endpoint(
                     tag=_endpoint_tag(user, "trojan"),
@@ -405,8 +432,19 @@ async def endpoints_for_user(
 
 
 async def server_hostname(session: AsyncSession) -> str:
+    from urllib.parse import urlparse
+
     from ostium.services.settings import get_setting
 
+    # An explicit public base URL is the operator's statement of how clients
+    # reach this server.  Use its host for node endpoints as well; otherwise
+    # an explicit https://vpn.example.com produced subscriptions whose nodes
+    # still pointed at 127.0.0.1.
+    stored = await get_setting(session, "public_base_url")
+    if isinstance(stored, str) and stored.strip():
+        parsed = urlparse(stored.strip())
+        if parsed.hostname:
+            return parsed.hostname
     server = await get_setting(session, "server", {})
     if isinstance(server, dict):
         value = server.get("public_host") or server.get("domain")

@@ -72,6 +72,8 @@ const subscriptionOpen = ref(false)
 const subscription = ref<SubscriptionPayload | null>(null)
 const subscriptionUser = ref<User | null>(null)
 const subscriptionRevealed = ref(false)
+const subscriptionLoading = ref(false)
+const subscriptionError = ref<string | null>(null)
 const createdPassword = ref<string | null>(null)
 const qrOpen = ref(false)
 const qrValue = ref('')
@@ -130,11 +132,26 @@ function openCreate() {
   createOpen.value = true
 }
 
+function quotaInput(bytes: number): string {
+  if (!bytes) return ''
+  const units: Array<[string, number]> = [
+    ['T', 1024 ** 4],
+    ['G', 1024 ** 3],
+    ['M', 1024 ** 2],
+    ['K', 1024],
+  ]
+  for (const [unit, factor] of units) {
+    if (bytes % factor === 0) return `${bytes / factor}${unit}`
+  }
+  // Preserve the exact byte count rather than rounding 1.5 GiB to "2GiB".
+  return `${bytes}B`
+}
+
 function openEdit(user: User) {
   editing.value = user
   form.value = {
     name: user.name,
-    quota: user.quota_bytes ? formatBytes(user.quota_bytes, 0).replace(' ', '') : '',
+    quota: quotaInput(user.quota_bytes),
     cycle: user.quota_cycle,
     expires: user.expires_at ? new Date(user.expires_at).getTime() : null,
     note: user.note,
@@ -232,27 +249,48 @@ async function openDetail(user: User) {
   }
 }
 
+let subscriptionRequest = 0
+
 async function openSubscription(user: User) {
+  const request = ++subscriptionRequest
   subscriptionUser.value = user
   subscriptionOpen.value = true
   subscription.value = null
   subscriptionRevealed.value = false
   createdPassword.value = null
+  subscriptionLoading.value = true
+  subscriptionError.value = null
   try {
-    subscription.value = await api.users.subscription(user.id)
-    subscriptionRevealed.value = !subscription.value.reveal_required
+    const result = await api.users.subscription(user.id)
+    // Clicking A then B must not let A's slower response overwrite B.
+    if (request !== subscriptionRequest) return
+    subscription.value = result
+    subscriptionRevealed.value = !result.reveal_required
   } catch (err) {
-    message.error((err as Error).message)
+    if (request !== subscriptionRequest) return
+    subscriptionError.value = (err as Error).message
+    message.error(subscriptionError.value)
+  } finally {
+    if (request === subscriptionRequest) subscriptionLoading.value = false
   }
 }
 
 async function revealSubscription() {
   if (!subscriptionUser.value) return
+  const request = ++subscriptionRequest
+  subscriptionLoading.value = true
+  subscriptionError.value = null
   try {
-    subscription.value = await api.users.subscription(subscriptionUser.value.id, true)
+    const result = await api.users.subscription(subscriptionUser.value.id, true)
+    if (request !== subscriptionRequest) return
+    subscription.value = result
     subscriptionRevealed.value = true
   } catch (err) {
-    message.error((err as Error).message)
+    if (request !== subscriptionRequest) return
+    subscriptionError.value = (err as Error).message
+    message.error(subscriptionError.value)
+  } finally {
+    if (request === subscriptionRequest) subscriptionLoading.value = false
   }
 }
 
@@ -667,7 +705,7 @@ onMounted(async () => {
       </template>
     </NModal>
 
-    <NDrawer v-model:show="drawerOpen" :width="520" placement="right">
+    <NDrawer v-model:show="drawerOpen" :width="'min(520px, 100vw)'" placement="right">
       <NDrawerContent v-if="activeUser" closable>
         <template #header>
           <div class="drawer-header">
@@ -777,7 +815,17 @@ onMounted(async () => {
       :bordered="false"
     >
       <template #header>{{ t('subscriptions.title') }} · {{ subscriptionUser?.name }}</template>
-      <div v-if="!subscription" class="loading">…</div>
+      <div v-if="subscriptionLoading" class="loading">…</div>
+      <div v-else-if="subscriptionError" class="sub-locked">
+        <p class="error" role="alert">{{ subscriptionError }}</p>
+        <NButton
+          type="primary"
+          @click="subscriptionUser && openSubscription(subscriptionUser)"
+        >
+          {{ t('retry') }}
+        </NButton>
+      </div>
+      <div v-else-if="!subscription" class="loading">…</div>
       <div v-else class="sub-body">
         <div v-if="createdPassword" class="password-once">
           <strong>{{ t('users.password_once') }}</strong>

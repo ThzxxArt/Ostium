@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ostium.config import Settings
 from ostium.db.models import Certificate, Inbound
+from ostium.util.paths import resolve_path, store_path
 from ostium.util.time import as_utc, iso, utcnow
 
 
@@ -256,8 +257,8 @@ async def _persist(
     if existing is None:
         existing = Certificate(
             domain=domain,
-            cert_path=str(cert_path),
-            key_path=str(key_path),
+            cert_path=store_path(settings, cert_path),
+            key_path=store_path(settings, key_path),
             issuer=issuer,
             expires_at=expires_at,
             status="ready",
@@ -265,8 +266,8 @@ async def _persist(
         )
         session.add(existing)
     else:
-        existing.cert_path = str(cert_path)
-        existing.key_path = str(key_path)
+        existing.cert_path = store_path(settings, cert_path)
+        existing.key_path = store_path(settings, key_path)
         existing.issuer = issuer
         existing.expires_at = expires_at
         existing.status = "ready"
@@ -329,31 +330,48 @@ async def use_for_unbound(
     await session.flush()
 
 
-def certificate_is_ready(certificate: Certificate) -> bool:
-    return (
-        certificate.status == "ready"
-        and certificate.expires_at is not None
-        and as_utc(certificate.expires_at) > utcnow()
-    )
+def certificate_is_ready(certificate: Certificate, settings: Settings | None = None) -> bool:
+    if (
+        certificate.status != "ready"
+        or certificate.expires_at is None
+        or as_utc(certificate.expires_at) <= utcnow()
+    ):
+        return False
+    if settings is not None:
+        cert_path = resolve_path(settings, certificate.cert_path)
+        key_path = resolve_path(settings, certificate.key_path)
+        if cert_path is None or key_path is None:
+            return False
+        if not (cert_path.is_file() and key_path.is_file()):
+            return False
+    return True
 
 
 async def select_ready_certificate(
-    session: AsyncSession, certificate_id: str | None
+    session: AsyncSession,
+    certificate_id: str | None,
+    settings: Settings | None = None,
 ) -> Certificate | None:
     """Return exactly the certificate bound to an inbound, if it is usable."""
 
     if not certificate_id:
         return None
     certificate = await session.get(Certificate, certificate_id)
-    if certificate is None or not certificate_is_ready(certificate):
+    if certificate is None or not certificate_is_ready(certificate, settings):
         return None
-    if not (Path(certificate.cert_path).is_file() and Path(certificate.key_path).is_file()):
+    if settings is None and not (
+        Path(certificate.cert_path).is_file() and Path(certificate.key_path).is_file()
+    ):
         return None
     return certificate
 
 
 async def delete_certificate(
-    session: AsyncSession, certificate: Certificate, *, remove_files: bool = True
+    session: AsyncSession,
+    certificate: Certificate,
+    *,
+    remove_files: bool = True,
+    settings: Settings | None = None,
 ) -> list[Path]:
     """Delete a certificate row and detach its inbounds.
 
@@ -371,7 +389,12 @@ async def delete_certificate(
     for inbound in inbounds:
         inbound.enabled = False
         inbound.certificate_id = None
-    paths = [Path(certificate.cert_path), Path(certificate.key_path)]
+    if settings is not None:
+        cert_path = resolve_path(settings, certificate.cert_path)
+        key_path = resolve_path(settings, certificate.key_path)
+        paths = [path for path in (cert_path, key_path) if path is not None]
+    else:
+        paths = [Path(certificate.cert_path), Path(certificate.key_path)]
     await session.delete(certificate)
     await session.flush()
     if remove_files:

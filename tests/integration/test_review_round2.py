@@ -36,6 +36,7 @@ from ostium.services.events import EventBus
 from ostium.services.profiles import create_profile
 from ostium.services.stats import StatsCollector
 from ostium.services.users import create_user
+from ostium.util.paths import resolve_path
 from tests.conftest import setup_admin
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -560,21 +561,23 @@ def test_certificate_renewal_uses_a_new_file_generation(tmp_path: Path) -> None:
             async with factory() as session:
                 first = await create_self_signed(session, settings, domain="vpn.example.com")
                 await session.commit()
-                first_cert = Path(first.cert_path)
-                first_key = Path(first.key_path)
+                first_cert = resolve_path(settings, first.cert_path)
+                first_key = resolve_path(settings, first.key_path)
                 assert first_cert.is_file() and first_key.is_file()
 
                 second = await create_self_signed(session, settings, domain="vpn.example.com")
                 await session.commit()
-                assert second.cert_path != str(first_cert)
-                assert second.key_path != str(first_key)
-                assert Path(second.cert_path).is_file()
+                second_cert = resolve_path(settings, second.cert_path)
+                second_key = resolve_path(settings, second.key_path)
+                assert second_cert != first_cert
+                assert second_key != first_key
+                assert second_cert.is_file()
                 assert first_cert.is_file()
 
-                await delete_certificate(session, second)
+                await delete_certificate(session, second, settings=settings)
                 await session.commit()
-                assert not Path(second.cert_path).exists()
-                assert not Path(second.key_path).exists()
+                assert not second_cert.exists()
+                assert not second_key.exists()
                 assert not first_cert.exists()
         finally:
             await engine.dispose()

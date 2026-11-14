@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="0.1.1"
+VERSION="$(cat "$ROOT/VERSION" 2>/dev/null || echo 0.1.2)"
 ARCH="amd64"
 CORE=""
 OUT="$ROOT/dist/packages"
@@ -22,14 +22,14 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2 ;;
     --skip-appimage) SKIP_APPIMAGE="true"; shift ;;
     -h|--help)
-      echo "usage: $0 --version 0.1.1 --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
+      echo "usage: $0 --version 0.1.2 --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
-# Release tags are v0.1.1; Debian versions and filenames must be 0.1.1.
+# Release tags are vX.Y.Z; Debian versions and filenames use X.Y.Z.
 VERSION="${VERSION#v}"
 
 if [[ ! -x "$APP/ostium" ]]; then

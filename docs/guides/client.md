@@ -9,7 +9,7 @@
 管理员 PowerShell：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1 | iex
 ```
 
 脚本会下载并静默运行 Windows 安装包并校验 SHA256；不会创建或打印管理员密码，首次打开 UI 时完成设置向导。
@@ -27,7 +27,7 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.p
 需要 UI 也以 SYSTEM 运行（不创建用户级隔离）：
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1))) -RunAsSystem
+& ([scriptblock]::Create((irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1))) -RunAsSystem
 ```
 
 **风险**：这会让 UI 也以 SYSTEM 运行，任何 UI 漏洞都可能直接影响整机。默认安装不建议开启，只在隔离测试机或已有其他隔离的环境使用。
@@ -37,7 +37,7 @@ irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.p
 ### macOS 14+
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
@@ -71,7 +71,7 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role client --run-a
 
 ## 离线安装
 
-Windows：运行 `Ostium-0.1.1-windows-x64-setup.exe`。
+Windows：运行 `Ostium-0.1.2-windows-x64-setup.exe`。
 
 macOS：
 
@@ -83,7 +83,7 @@ Linux：
 
 ```bash
 sudo ./install.sh --role client \
-  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.2-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 

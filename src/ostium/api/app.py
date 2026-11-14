@@ -96,10 +96,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             async with factory() as session:
                 try:
                     await engine_manager.apply_server(session)
-                    await session.commit()
                 except Exception as exc:
                     await session.rollback()
                     bus.log("error", "quota configuration apply failed", error=str(exc))
+                    # The collector keeps the pending revocations and retries.
+                    # Swallowing the error here used to clear them, leaving a
+                    # disabled user in the running core forever.
+                    raise
 
         stats = (
             StatsCollector(settings=settings, session_factory=factory, bus=bus, on_quota=on_quota)
@@ -126,6 +129,16 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 with contextlib.suppress(Exception):
                     await ensure_inbounds(session, store)
                     await session.commit()
+            # An upgrade can leave a last-good configuration from the previous
+            # release (or from before the database was changed).  Always
+            # regenerate and apply once at startup so a stale policy is never
+            # the long-running state.  Failure is retried by the reconciler.
+            try:
+                async with factory() as session:
+                    await engine_manager.reconcile_server(session, force=True)
+                bus.log("info", "server configuration reconciled at startup")
+            except Exception as exc:
+                bus.log("warning", "startup configuration reconcile failed", error=str(exc))
         elif settings.auto_connect:
             try:
                 async with factory() as session:
@@ -145,6 +158,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         if settings.role is Role.SERVER:
             services.tasks.append(
                 asyncio.create_task(_cert_renewal(services), name="ostium-acme-renew")
+            )
+            services.tasks.append(
+                asyncio.create_task(_server_reconcile(services), name="ostium-server-reconcile")
             )
         else:
             services.tasks.append(
@@ -599,7 +615,9 @@ async def _cert_renewal(
 
     while True:
         try:
-            await sleep(6 * 3600)
+            # Run immediately: after a restart with an expired Public UI
+            # certificate, waiting six hours before the first renewal attempt
+            # would keep the recovery listener on HTTP for the whole window.
             async with services.session_factory() as session:
                 certs = (await session.execute(select(Certificate))).scalars().all()
                 for cert in certs:
@@ -619,12 +637,26 @@ async def _cert_renewal(
                     )
                     await session.commit()
                     services.bus.log("info", "certificate renewed", domain=cert.domain)
+                    # The TLS listener was constructed at process start and
+                    # does not notice a new certificate.  Signal the CLI to
+                    # rebuild its SSL context; otherwise browsers keep the old
+                    # certificate until the next manual restart, and an expired
+                    # certificate locks the administrator out.
+                    try:
+                        marker = services.settings.paths.runtime_dir / "reload-ui"
+                        marker.parent.mkdir(parents=True, exist_ok=True)
+                        marker.touch()
+                    except OSError as exc:
+                        services.bus.log(
+                            "warning", "could not signal the UI to reload TLS", error=str(exc)
+                        )
                     try:
                         await services.engine.apply_server(session)
                     except Exception as exc:
                         services.bus.log(
                             "error", "apply after certificate renewal failed", error=str(exc)
                         )
+            await sleep(6 * 3600)
         except asyncio.CancelledError:
             return
         except Exception as exc:
@@ -644,6 +676,37 @@ async def _cert_renewal(
                     await alert_session.commit()
             except Exception:
                 logger.exception("could not record the certificate renewal alert")
+
+
+async def _server_reconcile(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    """Keep the running server core converged to the database.
+
+    Apply failures are recorded by the caller but no longer strand the core on
+    an old configuration: the next tick regenerates it.  Backoff avoids an
+    apply storm while the core is down.
+    """
+
+    delay = 30.0
+    while True:
+        try:
+            await sleep(delay)
+            async with services.session_factory() as session:
+                applied = await services.engine.reconcile_server(session)
+            if applied:
+                services.bus.log("info", "server configuration reconciled with the database")
+            delay = 30.0
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            delay = min(delay * 2, 300.0)
+            services.bus.log(
+                "warning",
+                "server configuration reconciliation failed; will retry",
+                error=str(exc),
+                retry_in=delay,
+            )
 
 
 async def _profile_refresh(
@@ -669,9 +732,11 @@ async def _profile_refresh(
                     .scalars()
                     .all()
                 )
+                refreshed = False
                 for profile in profiles:
                     try:
                         await refresh_profile(session, services.store, profile)
+                        refreshed = True
                         services.bus.log("info", "subscription refreshed", profile=profile.name)
                     except Exception as exc:
                         services.bus.log(
@@ -681,6 +746,16 @@ async def _profile_refresh(
                             error=str(exc),
                         )
                 await session.commit()
+                if refreshed:
+                    # A subscription can point at a different endpoint; the
+                    # running core must use it without waiting for an admin to
+                    # press refresh in the UI.
+                    try:
+                        await services.engine.reconcile_client(session, force=True)
+                    except Exception as exc:
+                        services.bus.log(
+                            "warning", "apply after subscription refresh failed", error=str(exc)
+                        )
         except asyncio.CancelledError:
             return
         except Exception as exc:
@@ -701,7 +776,11 @@ async def _watchdog_tick(services: Services) -> None:
     except Exception:
         pass
     try:
-        await services.engine.client.reload()
+        # Regenerate from the database instead of replaying a possibly stale
+        # last-good file.  This also picks up a subscription refreshed while
+        # the core was down.
+        async with services.session_factory() as session:
+            await services.engine.reconcile_client(session, force=True)
         services.bus.log("info", "client core auto-reconnected")
     except Exception as exc:
         services.bus.log("warning", "client core auto-reconnect failed", error=str(exc))

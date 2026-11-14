@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import asyncio
 from typing import Any
 
 from sqlalchemy import select
@@ -33,6 +33,7 @@ from ostium.services.users import (
     inbound_params,
 )
 from ostium.util.ids import new_token
+from ostium.util.paths import resolve_path
 from ostium.util.time import as_utc, utcnow
 
 
@@ -58,20 +59,43 @@ class EngineManager:
         self.bus = bus
         self.stats = stats
         self.client = CoreClient(settings)
+        # Every apply reaches the same privileged core.  Serialising them here
+        # prevents two requests that read different database snapshots from
+        # overwriting each other out of order.
+        self._apply_lock = asyncio.Lock()
+        self._last_applied: dict[str, str] = {}
 
     async def server_preview(self, session: AsyncSession) -> dict[str, Any]:
         spec = await self._server_spec(session)
         return build_server_config(spec)
 
     async def apply_server(self, session: AsyncSession) -> dict[str, Any]:
+        async with self._apply_lock:
+            config = await self.server_preview(session)
+            digest = config_digest(config)
+            try:
+                result = await self.client.apply(config, digest, Role.SERVER.value)
+            except CoreApiError as exc:
+                raise EngineError(exc.detail, exc.code, exc.status_code) from exc
+            self._last_applied["server"] = digest
+            await self._publish_applied("server", digest, result)
+            return {"config": config, "status": result, "sha256": digest}
+
+    async def reconcile_server(self, session: AsyncSession, *, force: bool = False) -> bool:
+        """Apply the database configuration when the running core is stale.
+
+        Returns ``True`` when an apply was attempted.  This is the safety net
+        for an apply that failed after the database commit, and for an upgrade
+        that left an old ``last-good.json`` behind: the next tick converges the
+        core to the database instead of waiting for an unrelated admin action.
+        """
+
         config = await self.server_preview(session)
         digest = config_digest(config)
-        try:
-            result = await self.client.apply(config, digest, Role.SERVER.value)
-        except CoreApiError as exc:
-            raise EngineError(exc.detail, exc.code, exc.status_code) from exc
-        await self._publish_applied("server", digest, result)
-        return {"config": config, "status": result, "sha256": digest}
+        if not force and self._last_applied.get("server") == digest:
+            return False
+        await self.apply_server(session)
+        return True
 
     async def client_preview(
         self,
@@ -100,20 +124,30 @@ class EngineManager:
         selected: str | None = None,
         routing_mode: str | None = None,
     ) -> dict[str, Any]:
-        config = await self.client_preview(
-            session,
-            mode=mode,
-            tun_enabled=tun_enabled,
-            selected=selected,
-            routing_mode=routing_mode,
-        )
+        async with self._apply_lock:
+            config = await self.client_preview(
+                session,
+                mode=mode,
+                tun_enabled=tun_enabled,
+                selected=selected,
+                routing_mode=routing_mode,
+            )
+            digest = config_digest(config)
+            try:
+                result = await self.client.apply(config, digest, Role.CLIENT.value)
+            except CoreApiError as exc:
+                raise EngineError(exc.detail, exc.code, exc.status_code) from exc
+            self._last_applied["client"] = digest
+            await self._publish_applied("client", digest, result)
+            return {"config": config, "status": result, "sha256": digest}
+
+    async def reconcile_client(self, session: AsyncSession, *, force: bool = False) -> bool:
+        config = await self.client_preview(session)
         digest = config_digest(config)
-        try:
-            result = await self.client.apply(config, digest, Role.CLIENT.value)
-        except CoreApiError as exc:
-            raise EngineError(exc.detail, exc.code, exc.status_code) from exc
-        await self._publish_applied("client", digest, result)
-        return {"config": config, "status": result, "sha256": digest}
+        if not force and self._last_applied.get("client") == digest:
+            return False
+        await self.apply_client(session)
+        return True
 
     async def _publish_applied(self, role: str, digest: str, result: dict[str, Any]) -> None:
         await self.bus.publish("engine.applied", {"role": role, "sha256": digest, "status": result})
@@ -124,6 +158,19 @@ class EngineManager:
             .scalars()
             .all()
         )
+        now = utcnow()
+        active: list[ProxyUser] = []
+        for user in users:
+            # Enforcement must not depend on the statistics loop: a user whose
+            # expiry or quota has already passed is never written into a new
+            # configuration, even before the next quota tick disables the row.
+            if user.expires_at is not None and as_utc(user.expires_at) <= now:
+                continue
+            if user.quota_bytes > 0:
+                pending = self.stats.pending_bytes(user.id) if self.stats is not None else 0
+                if user.used_bytes + pending >= user.quota_bytes:
+                    continue
+            active.append(user)
         credentials = [
             UserCredential(
                 name=user.name,
@@ -131,18 +178,23 @@ class EngineManager:
                 password=decrypt_password(user, self.store),
                 ss_password=decrypt_ss_password(user, self.store),
             )
-            for user in users
+            for user in active
         ]
         certs = (await session.execute(select(Certificate))).scalars().all()
-        ready = {
-            cert.id: cert
-            for cert in certs
-            if cert.status == "ready"
-            and cert.expires_at is not None
-            and as_utc(cert.expires_at) > utcnow()
-            and Path(cert.cert_path).is_file()
-            and Path(cert.key_path).is_file()
-        }
+        ready: dict[str, Certificate] = {}
+        for cert in certs:
+            cert_file = resolve_path(self.settings, cert.cert_path)
+            key_file = resolve_path(self.settings, cert.key_path)
+            if (
+                cert.status == "ready"
+                and cert.expires_at is not None
+                and as_utc(cert.expires_at) > utcnow()
+                and cert_file is not None
+                and key_file is not None
+                and cert_file.is_file()
+                and key_file.is_file()
+            ):
+                ready[cert.id] = cert
         inbound_rows = (await session.execute(select(Inbound))).scalars().all()
         inbounds: list[ServerInbound] = []
         for inbound in inbound_rows:
@@ -160,11 +212,14 @@ class EngineManager:
                     handshake_server=params.get("handshake_server"),
                     handshake_port=int(params.get("handshake_port", 443)),
                 )
-            certificate_spec = (
-                CertificateSpec(cert_path=certificate.cert_path, key_path=certificate.key_path)
-                if certificate is not None
-                else None
-            )
+            certificate_spec = None
+            if certificate is not None:
+                cert_file = resolve_path(self.settings, certificate.cert_path)
+                key_file = resolve_path(self.settings, certificate.key_path)
+                if cert_file is not None and key_file is not None:
+                    certificate_spec = CertificateSpec(
+                        cert_path=str(cert_file), key_path=str(key_file)
+                    )
             inbounds.append(
                 ServerInbound(
                     kind=inbound.kind,
@@ -242,7 +297,11 @@ class EngineManager:
             .scalars()
             .all()
         )
-        downloaded = {ruleset.name: ruleset.path for ruleset in rule_sets if ruleset.path}
+        downloaded = {
+            ruleset.name: resolve_path(self.settings, ruleset.path)
+            for ruleset in rule_sets
+            if ruleset.path
+        }
         for rule in rules:
             references = (rule.match_json or {}).get("rule_set", [])
             if isinstance(references, str):
@@ -271,7 +330,7 @@ class EngineManager:
                     "tag": ruleset.name,
                     "url": ruleset.url,
                     "format": ruleset.format,
-                    "path": ruleset.path,
+                    "path": str(resolve_path(self.settings, ruleset.path) or ""),
                 }
                 for ruleset in rule_sets
             ],

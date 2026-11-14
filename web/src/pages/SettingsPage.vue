@@ -254,10 +254,26 @@ async function togglePublicUi(value: boolean) {
   }
   try {
     const result = await api.settings.publicUi(value, publicUiDomain.value || undefined)
-    message.success(result.message)
+    // The backend returns "Restart ostium.service..."; presenting that as a
+    // success message hid the fact that the listener has not changed yet.
+    if (result.restart_required) message.warning(t('common.restart_required'))
+    else message.success(result.message)
     await load()
   } catch (err) {
     publicUiEnabled.value = !value
+    message.error((err as Error).message)
+  }
+}
+
+async function onPublicUiDomainChange(value: string) {
+  publicUiDomain.value = value
+  if (!publicUiEnabled.value || !value) return
+  try {
+    const result = await api.settings.publicUi(true, value)
+    if (result.restart_required) message.warning(t('common.restart_required'))
+    else message.success(result.message)
+    await load()
+  } catch (err) {
     message.error((err as Error).message)
   }
 }
@@ -570,9 +586,10 @@ onMounted(load)
               <label class="field">
                 <span>{{ t('certs.domain') }}</span>
                 <NSelect
-                  v-model:value="publicUiDomain"
+                  :value="publicUiDomain"
                   :options="certDomains"
                   :placeholder="t('setup.domain_placeholder')"
+                  @update:value="onPublicUiDomainChange"
                 />
               </label>
               <p v-if="!auth.totpEnabled" class="warning-text">{{ t('auth.totp_hint') }}</p>
@@ -864,7 +881,9 @@ onMounted(load)
       preset="card"
       :style="{ width: 'min(560px, calc(100vw - 32px))' }"
       :bordered="false"
-      @update:show="newToken = null"
+      :closable="false"
+      :mask-closable="false"
+      :close-on-esc="false"
     >
       <template #header>{{ t('settings.token_created') }}</template>
       <p class="o-muted o-small">{{ t('settings.token_once') }}</p>
@@ -872,6 +891,9 @@ onMounted(load)
         <code>{{ newToken }}</code>
         <OCopyButton v-if="newToken" :value="newToken" />
       </div>
+      <template #footer>
+        <NButton type="primary" @click="newToken = null">{{ t('common.confirm') }}</NButton>
+      </template>
     </NModal>
 
     <NModal

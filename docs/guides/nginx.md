@@ -9,7 +9,9 @@ Ostium 和 Nginx 装在同一台服务器时，先分清三类流量：
 | Hysteria2 | QUIC（UDP） | ❌ HTTP 反代不适用 |
 | Shadowsocks 2022 | TCP/UDP | ❌ 不能 HTTP 反代 |
 
-所以推荐架构是：
+这是**可选架构**，只适用于 443/tcp 已被 Nginx 占用、且你明确选择由 Nginx 终止 TLS 的部署。默认主方案是 Ostium Public UI 直接在 8443/tcp 提供 HTTPS；两者二选一，不要同时启用。
+
+采用 Nginx 时：
 
 - **Nginx 占 80/443/tcp**，用域名 + Let's Encrypt 证书终止 TLS，反代到 Ostium UI `127.0.0.1:8443`。
 - **Ostium 的 Reality/Trojan 改到 9443/tcp（或 9444/tcp）**，继续直连，不走 Nginx。
@@ -38,7 +40,7 @@ Ostium 和 Nginx 装在同一台服务器时，先分清三类流量：
 使用一键安装器的反向代理模式：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
   | sudo bash -s -- install --role server \
       --domain admin.example.com \
       --behind-proxy
@@ -153,14 +155,16 @@ Reality 不需要证书，它使用自己的密钥对。
 
 ## 第五步：TOTP 与公网 UI 策略
 
-即使 Nginx 已经终止 TLS，也建议：
+Nginx 终止 TLS 时，**不要开启 Settings → Public admin UI**。开启后 Ostium 会自己监听 TLS（通常改为 `0.0.0.0:8443`），Nginx 的 `http://127.0.0.1:8443` 反代会立即 502，并额外暴露一个公网 TLS 端口。
 
-1. 登录 Ostium；
-2. **Settings → Security** 启用 TOTP，保存恢复码；
-3. 如需让 Ostium 自己记录“公网 UI”策略，可在 **Settings → Public admin UI** 填域名并开启（需要先有该域名的证书记录）；
-4. 重启 `ostium.service`。
+正确做法：
 
-如果开启 Public admin UI 后通过 SSH 隧道访问 `http://127.0.0.1:8443`，Secure Cookie 不会发送，登录可能无法保持。请用 `https://admin.example.com` 访问，或临时关闭 `secure_cookies` 调试。
+1. 登录 Ostium，**Settings → Security** 启用 TOTP 并保存恢复码；
+2. 保持 `public_ui = false`，设置 `secure_cookies = true`；
+3. 把管理域名加入 `trusted_hosts`；
+4. 重启 `ostium.service`，只通过 `https://admin.example.com` 访问。
+
+如果通过 SSH 隧道访问 `http://127.0.0.1:8443`，Secure Cookie 不会发送，登录可能无法保持；调试时可临时关闭 `secure_cookies`，生产环境不要关闭。
 
 ## Nginx 配置要点
 

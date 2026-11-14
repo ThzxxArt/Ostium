@@ -63,7 +63,13 @@ def test_totp_and_recovery_codes() -> None:
     secret = generate_totp_secret()
     code = pyotp.TOTP(secret).now()
     assert verify_totp(secret, code)
+    assert not verify_totp(secret, code)  # replay inside the validity window
     assert not verify_totp(secret, "000000")
+
+    setup_secret = generate_totp_secret()
+    setup_code = pyotp.TOTP(setup_secret).now()
+    assert verify_totp(setup_secret, setup_code, consume=False)
+    assert verify_totp(setup_secret, setup_code)  # immediate first login
 
     codes = generate_recovery_codes()
     hashes = hash_recovery_codes(codes)

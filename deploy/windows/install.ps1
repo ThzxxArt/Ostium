@@ -88,10 +88,16 @@ set "OSTIUM_ENGINE_PATH=$CoreDir\sing-box.exe"
 "$InstallDir\ostium.exe" serve
 "@ | Set-Content -LiteralPath $uiCmd -Encoding ascii
 
-# Allow the interactive user to read/write the shared client data.
+# Allow only SYSTEM, Administrators and the interactive user to read/write the
+# shared client data.  Without /inheritance:r ProgramData's default inherited
+# read ACE lets every local account read ostium.db and master.key.
 $userAccount = if ($env:USERDOMAIN) { "$env:USERDOMAIN\$env:USERNAME" } else { $env:USERNAME }
 if (-not $userAccount) { throw "Could not determine the interactive user account for the core token ACL" }
-icacls $DataDir /grant "${userAccount}:(OI)(CI)M" | Out-Null
+icacls $DataDir /inheritance:r /grant:r `
+    "*S-1-5-18:(OI)(CI)F" `
+    "*S-1-5-32-544:(OI)(CI)F" `
+    "${userAccount}:(OI)(CI)M" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not lock down $DataDir" }
 
 # Register the privileged TUN core as a Windows service (LocalSystem).
 $serviceExe = Join-Path $ServiceDir "ostium-service.exe"

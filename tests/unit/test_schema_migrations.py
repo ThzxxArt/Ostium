@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import DatabaseError as SADatabaseError
 
 from ostium.db import session as session_module
 from ostium.db.session import (
@@ -93,11 +92,18 @@ def test_migrate_database_on_an_empty_file(tmp_path: Path) -> None:
         )
 
 
-def test_corrupt_database_version_read_is_tolerated(tmp_path: Path) -> None:
+def test_corrupt_database_is_rejected_before_migration(tmp_path: Path) -> None:
     db = tmp_path / "corrupt-version.db"
     db.write_bytes(b"not sqlite")
-    with pytest.raises(SADatabaseError):
+    with pytest.raises(sqlite3.DatabaseError):
         migrate_database(db)
+
+
+def test_schema_head_matches_the_alembic_graph(tmp_path: Path) -> None:
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory.from_config(session_module._alembic_config(tmp_path / "x.db"))
+    assert set(script.get_heads()) == {SCHEMA_HEAD}
 
 
 def test_missing_database_and_in_memory_engine(tmp_path: Path) -> None:

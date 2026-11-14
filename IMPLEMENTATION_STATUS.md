@@ -1,4 +1,4 @@
-# Ostium v0.1.1 implementation status
+# Ostium implementation status
 
 Updated: 2026-11-14
 
@@ -189,9 +189,11 @@ platform/external validation, `[ ]` not done yet.
       five core archives, Windows setup and flat `SHA256SUMS` all published.
 - [x] Downloaded all Release assets and verified `sha256sum -c SHA256SUMS`;
       real online installer and PyPI install both produced `ostium 0.1.0`.
-- [ ] Publish `v0.1.1` if immutable provenance is required for the post-release
-      `install-online.sh`/`SHA256SUMS` hotfix (PyPI 0.1.0 sdist and tag source
-      still contain the pre-hotfix installer copy).
+- [x] Published `v0.1.1` on 2026-11-14: GitHub Release, PyPI
+      `ostium-ctl==0.1.1`, GHCR tags and 23 verified assets.
+- [ ] 0.1.2 is in preparation; see `docs/release-status.md` for the current
+      verified/unverified matrix. Do not treat unexecuted platform items as
+      verified.
 
 ## External validation still open
 - [ ] Run TUN + system proxy acceptance on real Windows 11 and macOS 14, and

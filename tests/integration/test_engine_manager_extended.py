@@ -19,6 +19,7 @@ from ostium.services.events import EventBus
 from ostium.services.profiles import create_profile
 from ostium.services.settings import set_setting
 from ostium.services.users import create_user, ensure_inbounds
+from ostium.util.paths import resolve_path
 from ostium.util.time import utcnow
 
 
@@ -89,7 +90,9 @@ def test_server_spec_certificates_and_protocols(tmp_path: Path) -> None:
             by_type = {item["type"]: item for item in preview["inbounds"]}
             assert by_type["vless"]["tls"]["reality"]["handshake"]["server"] == "hs"
             assert by_type["hysteria2"]["obfs"]["password"] == "obfs"
-            assert by_type["hysteria2"]["tls"]["certificate_path"] == cert.cert_path
+            assert by_type["hysteria2"]["tls"]["certificate_path"] == str(
+                resolve_path(settings, cert.cert_path)
+            )
             assert by_type["shadowsocks"]["password"] == "ss-key"
 
             # Expired certificates are not eligible; the inbound then has no TLS.
@@ -107,7 +110,7 @@ def test_server_spec_certificates_and_protocols(tmp_path: Path) -> None:
             await session.flush()
             preview = await manager.server_preview(session)
             trojan = next(item for item in preview["inbounds"] if item["type"] == "trojan")
-            assert trojan["tls"]["certificate_path"] == cert.cert_path
+            assert trojan["tls"]["certificate_path"] == str(resolve_path(settings, cert.cert_path))
 
             inbounds["trojan"].certificate_id = None
             await session.flush()

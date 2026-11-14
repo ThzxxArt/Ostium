@@ -244,6 +244,7 @@ export default {
     client_import_hint: '粘贴订阅 URL、分享链接或 Ostium Profile JSON。也可以稍后导入。',
     client_mode_hint: '推荐从系统代理开始；需要全局接管时再开启 TUN。',
     finish_client: '完成并连接',
+    accept_required: '请先确认已理解默认安全策略，再继续。',
     already: 'Ostium 已经初始化，请直接登录。',
   },
   dashboard: {
@@ -442,6 +443,7 @@ export default {
     move_up: '上移',
     move_down: '下移',
     advanced: '高级 JSON 组合条件',
+    advanced_locked: '此规则包含多个条件；请先在 JSON 中保留一个条件，再切回简单模式，以免丢失条件。',
     advanced_json: '匹配 JSON',
     advanced_hint:
       '支持 domain/ip_cidr/port/source_port/protocol/process_name/rule_set/network 等组合；保存前会由服务端校验。',
@@ -506,6 +508,7 @@ export default {
     empty: '还没有日志。',
     unavailable: '核心日志暂不可用：{message}',
     all_levels: '全部级别',
+    disconnected: '实时连接已断开，新日志可能不会出现',
   },
   jobs: {
     title: '任务',
@@ -790,6 +793,11 @@ export default {
     boundary_title: '页面渲染失败',
     boundary_desc: '界面遇到未处理的错误。刷新后重试；如果持续出现，请导出诊断包。',
   },
+  connection_error_title: '无法读取认证状态',
+  connection_error_desc:
+    'Ostium 服务暂时不可达或返回了错误。已有安装不会因此进入初始化向导；请检查服务后重试。',
+  retry: '重试',
+  open_login: '前往登录',
   shortcuts: {
     title: '键盘快捷键',
     command: '打开命令面板',

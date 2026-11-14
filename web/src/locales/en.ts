@@ -249,6 +249,7 @@ export default {
       'Paste a subscription URL, share link, or Ostium Profile JSON. You can also do this later.',
     client_mode_hint: 'Start with the system proxy; switch to TUN when you need full takeover.',
     finish_client: 'Finish and connect',
+    accept_required: 'Confirm that you understand the default security policy before continuing.',
     already: 'Ostium is already initialised. Please sign in.',
   },
   dashboard: {
@@ -451,6 +452,8 @@ export default {
     move_up: 'Move up',
     move_down: 'Move down',
     advanced: 'Advanced JSON match',
+    advanced_locked:
+      'This rule has multiple conditions. Keep one condition in the JSON before switching to simple mode so none are silently dropped.',
     advanced_json: 'Match JSON',
     advanced_hint:
       'Combine domain/ip_cidr/port/source_port/protocol/process_name/rule_set/network; the server validates it before saving.',
@@ -515,6 +518,7 @@ export default {
     empty: 'No log lines yet.',
     unavailable: 'Core logs are unavailable: {message}',
     all_levels: 'All levels',
+    disconnected: 'Live connection lost; new logs may not appear',
   },
   jobs: {
     title: 'Jobs',
@@ -808,6 +812,11 @@ export default {
     boundary_desc:
       'The UI hit an unhandled error. Reload to try again; if it persists, export a diagnostics bundle.',
   },
+  connection_error_title: 'Cannot read authentication status',
+  connection_error_desc:
+    'Ostium is temporarily unreachable or returned an error. An existing installation will not be sent to setup; check the service and retry.',
+  retry: 'Retry',
+  open_login: 'Go to sign in',
   shortcuts: {
     title: 'Keyboard shortcuts',
     command: 'Open command palette',

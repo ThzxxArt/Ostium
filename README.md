@@ -37,26 +37,27 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20174%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-630%20backend%20%C2%B7%20176%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **发布状态：v0.1.1 已于 2026-11-14 发布。** 下方 v0.1.1 下载链接、包名和 Release
-> 徽章均已生效，当前公开可安装版本为 v0.1.1。仍在使用 v0.1.0 的部署请先按默认绑定
-> 安全公告完成缓解，并尽快升级。
+> **发布状态：v0.1.1 已于 2026-11-14 发布；v0.1.2 正在准备，尚未发布。**
+> 当前公开可安装版本仍是 v0.1.1。0.1.2 的已验证/未验证项见
+> [发布状态](docs/release-status.md)；在 0.1.2 正式发布前，请勿把本页的 0.1.2
+> 包名当作已存在的下载资产。
 
 > [!TIP]
-> **当前版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
+> **当前公开版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
 >
 > ```bash
-> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+> curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
 >   | sudo bash -s -- install --role server --domain vpn.example.com
 > ```
 >
 > Windows 客户端（管理员 PowerShell）：
 >
 > ```powershell
-> irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
+> irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.ps1 | iex
 > ```
 >
 > 管理 UI 默认只监听 `127.0.0.1:8443`。远程管理请使用 SSH 隧道，或启用带证书的 Public UI；
@@ -75,11 +76,11 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🧭 **双端一体** | 服务端和客户端使用同一个包、同一个 SPA、同一个 CLI；学会一次，两端通用。 |
 | 🛡️ **两服务隔离** | `ostium.service` 只跑 Web/API/数据库；`ostium-core.service` 只做校验、启动和监管 sing-box。UI 不接触 root/TUN 权限。 |
 | 📊 **真实流量账本** | 定制 `sing-box` 开启 `with_v2ray_api`，每用户上行/下行、日/月汇总、配额与到期自动禁用。 |
-| 🌐 **全平台客户端** | Windows 10 22H2+ / 11 x64、macOS 14+、Linux；混合代理、系统代理、TUN、URLTest、多订阅。 |
+| 🌐 **全平台客户端** | Windows 10 22H2+ / 11 x64、macOS 14+ arm64（x64 需从源码安装）、Linux x64/arm64；混合代理、系统代理、TUN、URLTest、多订阅。 |
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 595 个后端测试（585 个常规 + 10 个真实 sing-box 集成）、174 个前端测试、69 个 Playwright 用例；后端 94.95% 语句 / 91.37% 分支。 |
+| 🧪 **可验证** | 630 个后端测试（620 个常规 + 10 个真实 sing-box 集成）、176 个前端测试、69 个 Playwright 用例；后端覆盖率以 CI 报告为准。 |
 
 ---
 
@@ -155,9 +156,9 @@ flowchart LR
 
 | 角色 | 要求 |
 |---|---|
-| 服务端 | Ubuntu 24.04 / Debian 13，1 vCPU / 1 GB 起，20 GB SSD；开放 80/tcp、443/tcp、443/udp |
+| 服务端 | Ubuntu 24.04 / Debian 13，1 vCPU / 1 GB 起，20 GB SSD；开放 80/tcp、443/tcp、443/udp；只有启用 Public UI 且使用 8443 时才额外开放 8443/tcp |
 | Windows 客户端 | Windows 10 22H2+ / 11 x64；管理员权限用于安装 TUN 服务 |
-| macOS 客户端 | macOS 14+，arm64 / x64；`sudo` 安装 LaunchDaemon |
+| macOS 客户端 | macOS 14+ arm64 官方 DMG；x64 需从源码安装（未提供官方 DMG）；`sudo` 安装 LaunchDaemon |
 | Linux 客户端 | x64 / arm64；TUN 需要 root 或 `CAP_NET_ADMIN` |
 | 安装环境 | 一键脚本自动下载 uv + 托管 Python 3.13；**无需预装 Python** |
 | 开发 | Python 3.13、uv 0.11+、Node 24.19+（最低 22.12）、Go 1.25.5（仅构建定制核心） |
@@ -184,21 +185,21 @@ flowchart LR
 Linux 服务端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install --role server --domain vpn.example.com
 ```
 
 Linux / macOS 客户端：
 
 ```bash
-curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
+curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.sh \
   | sudo bash -s -- install --role client
 ```
 
 Windows 客户端（管理员 PowerShell）：
 
 ```powershell
-irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.ps1 | iex
+irm https://github.com/ThzxxArt/Ostium/releases/download/v0.1.2/install-online.ps1 | iex
 ```
 
 安装器会：
@@ -230,8 +231,8 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-se
 把同一版本的 Release 资产下载到同一目录（保持文件名不变）：
 
 - `install-online.sh`
-- `ostium_ctl-0.1.1-py3-none-any.whl`
-- `ostium_ctl-0.1.1.tar.gz`（安装脚本、systemd/launchd 文件）
+- `ostium_ctl-0.1.2-py3-none-any.whl`
+- `ostium_ctl-0.1.2.tar.gz`（安装脚本、systemd/launchd 文件）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（按架构选择）及其 `.sha256`
 - `SHA256SUMS`
 
@@ -256,29 +257,29 @@ sudo bash install-online.sh install \
 从 GitHub Release 下载 wheel、sdist、核心包和 `SHA256SUMS`，解压 sdist 后直接运行
 其中的平台安装器：
 
-- `ostium_ctl-0.1.1-py3-none-any.whl`
-- `ostium_ctl-0.1.1.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
+- `ostium_ctl-0.1.2-py3-none-any.whl`
+- `ostium_ctl-0.1.2.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
-下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.1>
+下载入口：<https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.2>
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.1.tar.gz
+tar -xzf ostium_ctl-0.1.2.tar.gz
 
-sudo ./ostium_ctl-0.1.1/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.2/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.2-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
 
 同一 Release 还提供：
 
-- `ostium_0.1.1_amd64.deb` / `ostium_0.1.1_arm64.deb`：原生 DEB，包含 PyInstaller 控制面与核心，安装后启用 systemd；
-- `Ostium-0.1.1-linux-amd64.AppImage` / `arm64`：单文件 AppImage，适合无 root 的客户端或临时运行；
-- `Ostium-0.1.1-macos-arm64.dmg`：macOS 客户端 DMG，内含 wheel、darwin 核心与 launchd 安装脚本；
-- `Ostium-0.1.1-windows-x64-setup.exe`：Windows 客户端安装包。
+- `ostium_0.1.2_amd64.deb` / `ostium_0.1.2_arm64.deb`：原生 DEB，包含 PyInstaller 控制面与核心，安装后启用 systemd；
+- `Ostium-0.1.2-linux-amd64.AppImage` / `arm64`：单文件 AppImage，适合无 root 的客户端或临时运行；
+- `Ostium-0.1.2-macos-arm64.dmg`：macOS 客户端 DMG，内含 wheel、darwin 核心与 launchd 安装脚本；
+- `Ostium-0.1.2-windows-x64-setup.exe`：Windows 客户端安装包。
 
 未配置代码签名证书时，Windows/DMG 资产会在 Release 说明中明确标注“未签名”；不要把它当作已签名构建。
 
@@ -306,6 +307,8 @@ sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 443/udp
+# 只有走 Public UI 8443 主方案时才需要：
+# sudo ufw allow 8443/tcp
 sudo ufw enable
 ```
 
@@ -321,8 +324,8 @@ journalctl -u ostium -u ostium-core -f
 同样先解压 sdist，再运行：
 
 ```bash
-sudo ./ostium_ctl-0.1.1/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.1-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.2/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.2-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -336,7 +339,7 @@ systemctl --user enable --now ostium
 
 ### 方式四：Windows 客户端（离线）
 
-1. 运行 `Ostium-0.1.1-windows-x64-setup.exe`。
+1. 运行 `Ostium-0.1.2-windows-x64-setup.exe`。
 2. 安装器会复制程序到 `%ProgramFiles%\Ostium`，注册 `OstiumCore` 服务，并设置登录时启动 UI。
 3. UI 数据保存在 `%ProgramData%\Ostium`；核心数据、token、last-good 配置位于 `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写）。
 4. 首次打开 <http://127.0.0.1:8787> 时完成设置向导并创建管理员；安装器不再生成或保存明文密码。
@@ -353,10 +356,10 @@ systemctl --user enable --now ostium
 推荐直接用方式一的一键在线安装。离线时解压 sdist，并用环境变量指向 wheel 与核心包：
 
 ```bash
-tar -xzf ostium_ctl-0.1.1.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.1-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.2.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.2-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.1/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.2/deploy/launchd/install-macos.sh client
 ```
 
 安装器会注册 `com.ostium.core` LaunchDaemon 和 `com.ostium.ui` LaunchAgent，并链接 `ostium` 命令。未签名/未公证构建会触发 Gatekeeper，请先校验校验和。
@@ -374,14 +377,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 本地构建：
 
 ```bash
-docker build -t ostium:0.1.1 .
+docker build -t ostium:0.1.2 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.1
+  ostium:0.1.2
 ```
 
 > Docker 使用 host 网络，以便绑定 443/80；请自行配置防火墙、TLS 和持久化备份。
@@ -396,14 +399,14 @@ uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
 # 或指定版本
-uv tool install "ostium-ctl==0.1.1"
+uv tool install "ostium-ctl==0.1.2"
 ```
 
 服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.1"
+sudo /opt/ostium/venv/bin/pip install "ostium-ctl==0.1.2"
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -416,7 +419,7 @@ sudo /opt/ostium/venv/bin/ostium core-run   # 终端 2：核心服务
 ```bash
 uv tool upgrade ostium-ctl
 # 或
-sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.1"
+sudo /opt/ostium/venv/bin/pip install --upgrade "ostium-ctl==0.1.2"
 ```
 
 > PyPI 版本包含完整 SPA 静态资源。生产环境仍建议使用原生安装包：它会创建非 root 的
@@ -615,7 +618,7 @@ sudo systemctl start ostium-core ostium
 ```bash
 sudo bash install-online.sh upgrade
 # 指定版本
-sudo bash install-online.sh upgrade --version 0.1.1
+sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 升级会保留数据库、`master.key`、配置、证书、用户和订阅，只替换 venv 与核心二进制；如果原来是 root 模式，会自动保持。
@@ -630,7 +633,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. 安装新 wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.1-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.2-py3-none-any.whl
 
 # 4. 启动；迁移在启动时执行
 sudo systemctl start ostium
@@ -737,7 +740,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 
 - 管理 UI 默认只监听回环；不要在没有 TLS + TOTP 的情况下暴露公网。
 - 首次登录后立即修改密码、启用 TOTP、保存恢复码；丢失验证器时可在登录页切换为恢复码登录。
-- 只开放必要端口：22、80、443/tcp、443/udp；不要默认开放 8388/8443。
+- 只开放必要端口：22、80、443/tcp、443/udp。使用 Public UI 8443 主方案时只额外开放 8443/tcp；不要默认开放 8388。
 - 使用非 root 用户运行控制面；核心服务才需要绑定低端口/TUN 权限。
 - 定期备份并把加密备份存到异地；备份包含主密钥，视同最高敏感文件。
 - 订阅 token 只显示一次；泄露后立即在用户页轮换。
@@ -809,7 +812,7 @@ npx playwright test
 
 当前结果：
 
-- 后端：**585 passed / 0 skipped**（常规测试）+ **10 passed / 0 skipped**（真实 sing-box 集成），语句 **94.95%**、分支 **91.37%**；
+- 后端：**620 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；覆盖率以 CI 报告为准；
 - 前端：**174 passed**，语句 **90.69%**、分支 **85.07%**、函数 **88.34%**、行 **92.00%**；
 - Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe（serious/critical=0）、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
@@ -819,9 +822,11 @@ npx playwright test
 
 ## 文档
 
+- [发布状态](docs/release-status.md)
 - [一键安装](docs/guides/install.md)
+- [Linux 云服务器完整部署](docs/guides/linux-cloud-server.md)
 - [服务管理（systemd / OpenRC / runit / s6 / supervisord）](docs/guides/service-manager.md)
-- [Nginx 共存与反向代理](docs/guides/nginx.md)
+- [Nginx 共存与反向代理（可选）](docs/guides/nginx.md)
 - [架构](docs/architecture.md)
 - [服务端指南](docs/guides/server.md)
 - [客户端指南](docs/guides/client.md)
@@ -835,8 +840,12 @@ npx playwright test
 - [端口与路径](docs/reference/ports.md)
 - [备份与恢复](docs/operations/backup.md)
 - [升级与回滚](docs/operations/upgrade.md)
+- [0.1.1 → 0.1.2 升级](docs/operations/upgrade-0.1.1-to-0.1.2.md)
+- [0.1.0 → 0.1.1 迁移](docs/operations/upgrade-0.1.0-to-0.1.1.md)
+- [发布清单](docs/operations/release-checklist.md)
 - [故障排查](docs/operations/troubleshooting.md)
 - [安全模型](docs/security/threat-model.md)
+- [安全公告：默认管理面绑定](docs/security/advisory-2026-11-default-bind.md)
 - [设计系统](docs/design-system.md)
 - [UX 规范](docs/ux.md)
 

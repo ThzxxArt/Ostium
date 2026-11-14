@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import sqlite3
@@ -219,6 +220,10 @@ def _backup_with_newer_schema(source: Settings, tmp_path: Path) -> Path:
         connection.commit()
         connection.execute("PRAGMA wal_checkpoint(FULL)")
     members["ostium.db"] = database.read_bytes()
+    manifest = json.loads(members["manifest.json"])
+    if isinstance(manifest.get("checksums"), dict):
+        manifest["checksums"]["ostium.db"] = hashlib.sha256(members["ostium.db"]).hexdigest()
+    members["manifest.json"] = json.dumps(manifest, indent=2).encode()
     output = tmp_path / "newer.tar.gz"
     with tarfile.open(output, "w:gz") as archive:
         for name, data in members.items():

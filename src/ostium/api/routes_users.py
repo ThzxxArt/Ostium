@@ -11,7 +11,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
+from ostium.api.deps import (
+    Services,
+    client_ip,
+    get_current_admin,
+    get_services,
+    get_session,
+    require_scope,
+)
 from ostium.api.errors import ApiError
 from ostium.db.models import AdminUser, ProxyUser
 from ostium.domain.endpoints import ProfileDocument
@@ -83,6 +90,11 @@ async def _get_user(session: AsyncSession, user_id: str) -> ProxyUser:
 
 
 async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
+    # Commit the desired state first.  If this fails the core is untouched and
+    # the client receives a 5xx; if the core apply fails the reconciler retries
+    # from the committed database instead of the database rolling back after a
+    # successful apply.
+    await session.commit()
     try:
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
@@ -143,6 +155,7 @@ async def add_user(
         user,
         base_url=await _public_base_url(session, services),
         token=token,
+        settings=services.settings,
     )
     return {
         "user": serialize_user(user),
@@ -262,7 +275,7 @@ async def reset_user_usage(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
-    await reset_usage(session, user)
+    await reset_usage(session, user, stats=services.stats)
     applied = await _apply_server(services, session)
     await audit(
         session,
@@ -297,6 +310,7 @@ async def get_subscription(
     request: Request,
     reveal: bool = False,
     admin: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -326,6 +340,7 @@ async def get_subscription(
         user,
         base_url=await _public_base_url(session, services),
         token=token,
+        settings=services.settings,
     )
     return {"token": token, **data}
 
@@ -335,6 +350,7 @@ async def rotate_user_subscription(
     user_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("subscription:write")),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -353,6 +369,7 @@ async def rotate_user_subscription(
         user,
         base_url=await _public_base_url(session, services),
         token=token,
+        settings=services.settings,
     )
     return {"token": token, **data}
 
@@ -362,6 +379,7 @@ async def export_user(
     user_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
+    _scope: None = Depends(require_scope("user:read")),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -463,7 +481,9 @@ async def subscriptions_overview(
                 "links": (
                     [
                         endpoint.to_uri()
-                        for endpoint in await build_endpoints(session, services.store, user)
+                        for endpoint in await build_endpoints(
+                            session, services.store, user, settings=services.settings
+                        )
                     ]
                     if status_of(user) in {"active", "online"}
                     else []

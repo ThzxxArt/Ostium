@@ -225,15 +225,17 @@ describe('page script branches', () => {
     const { wrapper } = await mountPage(LogsPage)
     const state = stateOf(wrapper, LogsPage)
     await settle()
+    // Filtering is delegated to the server; the local buffer is not silently
+    // reduced to the newest 800 records.
     state.level = 'error'
-    expect(state.filteredRecords).toHaveLength(1)
+    expect(state.filteredRecords).toHaveLength(2)
     state.search = 'boom'
-    expect(state.filteredRecords).toHaveLength(0)
+    expect(state.filteredRecords).toHaveLength(2)
     state.search = 'fail'
-    expect(state.filteredRecords).toHaveLength(1)
+    expect(state.filteredRecords).toHaveLength(2)
     state.level = null
     state.search = 'plane'
-    expect(state.filteredLines).toHaveLength(1)
+    expect(state.filteredLines).toHaveLength(2)
     state.appendRecord({ ts: 'now', level: 'info', message: 'appended', context: {} })
     state.togglePause()
     state.appendRecord({ ts: 'now', level: 'info', message: 'paused', context: {} })

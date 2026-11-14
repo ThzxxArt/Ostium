@@ -46,6 +46,7 @@ class RenewRequest(BaseModel):
 
 
 async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
+    await session.commit()
     try:
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
@@ -339,7 +340,31 @@ async def delete_certificate(
     if certificate is None:
         raise ApiError(404, "certificate not found", "not_found")
     domain = certificate.domain
-    paths = await cert_service.delete_certificate(session, certificate, remove_files=False)
+    if services.settings.public_ui:
+        from ostium.services.settings import get_setting
+
+        server_info = await get_setting(session, "server", {})
+        public_domain = server_info.get("domain") if isinstance(server_info, dict) else None
+        if public_domain and str(public_domain).lower() == domain.lower():
+            raise ApiError(
+                409,
+                "this certificate is serving the Public UI; disable the Public UI "
+                "or issue a replacement before deleting it",
+                "certificate_in_use",
+            )
+    paths = await cert_service.delete_certificate(
+        session, certificate, remove_files=False, settings=services.settings
+    )
+    await audit(
+        session,
+        actor=admin.username,
+        action="certificate.deleted",
+        target=domain,
+        ip=client_ip(request),
+    )
+    # Persist the row deletion before applying or unlinking anything.  A
+    # commit failure leaves the certificate and its files untouched.
+    await session.commit()
     try:
         result = await services.engine.apply_server(session)
         applied: dict[str, object] = {
@@ -351,17 +376,8 @@ async def delete_certificate(
         # files stay on disk so the still-running old config remains valid.
         # The operator sees an explicit warning instead of a fake apply.
         applied = {"applied": False, "warning": str(exc)}
-    await audit(
-        session,
-        actor=admin.username,
-        action="certificate.deleted",
-        target=domain,
-        ip=client_ip(request),
-    )
-    # Persist the row deletion before unlinking anything.  Files are removed
-    # only after a successful apply; a failed apply leaves them for the old
-    # last-good config and can be cleaned up on a later successful apply.
-    await session.commit()
+    # Files are removed only after a successful apply; a failed apply leaves
+    # them for the old last-good config and can be cleaned up on a later apply.
     if applied.get("applied"):
         cert_service.remove_certificate_files(paths)
     return {"deleted": True, **applied}

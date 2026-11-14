@@ -11,6 +11,7 @@ import segno
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ostium.config import Settings
 from ostium.domain.endpoints import Endpoint, ProfileDocument
 from ostium.services.crypto import SecretStore
 from ostium.services.users import (
@@ -27,11 +28,17 @@ class SubscriptionInactive(UserError):
         super().__init__("subscription is not active", "subscription_inactive", 403)
 
 
-async def build_endpoints(session: AsyncSession, store: SecretStore, user: Any) -> list[Endpoint]:
+async def build_endpoints(
+    session: AsyncSession,
+    store: SecretStore,
+    user: Any,
+    *,
+    settings: Settings | None = None,
+) -> list[Endpoint]:
     if status_of(user) != "online" and status_of(user) != "active":
         raise SubscriptionInactive()
     host = await server_hostname(session)
-    return await endpoints_for_user(session, store, user, server_host=host)
+    return await endpoints_for_user(session, store, user, server_host=host, settings=settings)
 
 
 async def render_subscription(
@@ -39,8 +46,10 @@ async def render_subscription(
     store: SecretStore,
     user: Any,
     fmt: str,
+    *,
+    settings: Settings | None = None,
 ) -> tuple[str, str]:
-    endpoints = await build_endpoints(session, store, user)
+    endpoints = await build_endpoints(session, store, user, settings=settings)
     if not endpoints:
         raise SubscriptionInactive()
     if fmt in {"ostium", "json"}:
@@ -119,9 +128,14 @@ async def subscription_payload(
     *,
     base_url: str,
     token: str,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     endpoints = await endpoints_for_user(
-        session, store, user, server_host=await server_hostname(session)
+        session,
+        store,
+        user,
+        server_host=await server_hostname(session),
+        settings=settings,
     )
     formats = {
         "ostium": "Ostium Profile v1",

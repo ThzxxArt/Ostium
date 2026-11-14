@@ -67,6 +67,13 @@ SERVER_EGRESS_BLOCK_CIDRS = [
 # relay must never be usable to send mail.
 SERVER_EGRESS_BLOCK_PORTS = [25]
 
+# Bumped whenever the generated configuration embeds a new security policy
+# (for example the 0.1.1 server egress block list).  The core refuses to start a
+# server last-good file that was generated under an older policy; the control
+# plane regenerates and applies the current configuration instead of silently
+# running stale rules after an upgrade.
+CONFIG_POLICY_VERSION = 2
+
 DEFAULT_RULE_SETS = {
     "geosite-cn": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
     "geoip-cn": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",

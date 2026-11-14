@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
 from ostium.api.errors import ApiError
+from ostium.config import Settings
 from ostium.db.models import AdminUser, Certificate, Inbound
 from ostium.engine.manager import EngineError
 from ostium.services.audit import audit
@@ -86,6 +87,7 @@ def _skipped_reason(
     inbound: Inbound,
     params: dict[str, Any],
     certificate: Certificate | None,
+    settings: Settings | None = None,
 ) -> str | None:
     if not inbound.enabled:
         return None
@@ -98,11 +100,25 @@ def _skipped_reason(
             return "the assigned certificate is not ready"
         from pathlib import Path
 
+        from ostium.util.paths import resolve_path
         from ostium.util.time import as_utc, utcnow
 
         if as_utc(certificate.expires_at) <= utcnow():
             return "the assigned certificate has expired"
-        if not (Path(certificate.cert_path).is_file() and Path(certificate.key_path).is_file()):
+        cert_path = (
+            resolve_path(settings, certificate.cert_path)
+            if settings
+            else Path(certificate.cert_path)
+        )
+        key_path = (
+            resolve_path(settings, certificate.key_path) if settings else Path(certificate.key_path)
+        )
+        if (
+            cert_path is None
+            or key_path is None
+            or not cert_path.is_file()
+            or not key_path.is_file()
+        ):
             return "the assigned certificate files are missing"
     return None
 
@@ -138,7 +154,10 @@ async def list_inbounds(
                 inbound_params(row, services.store),
                 certs.get(row.certificate_id or ""),
                 skipped_reason=_skipped_reason(
-                    row, inbound_params(row, services.store), certs.get(row.certificate_id or "")
+                    row,
+                    inbound_params(row, services.store),
+                    certs.get(row.certificate_id or ""),
+                    services.settings,
                 ),
                 port_conflict=conflicts.get(row.kind),
             )
@@ -243,7 +262,7 @@ async def update_inbound(
                     "certificate_required",
                 )
             certificate = await _resolve_certificate(
-                session, inbound, changes.get("certificate_id")
+                session, inbound, changes.get("certificate_id"), services.settings
             )
             if certificate is None:
                 raise ApiError(
@@ -256,7 +275,9 @@ async def update_inbound(
     if "certificate_id" in changes and changes["certificate_id"] is not None:
         if kind not in {"hysteria2", "trojan"}:
             raise ApiError(400, "only TLS inbounds accept a certificate", "bad_request")
-        certificate = await _resolve_certificate(session, inbound, changes["certificate_id"])
+        certificate = await _resolve_certificate(
+            session, inbound, changes["certificate_id"], services.settings
+        )
         if certificate is None:
             raise ApiError(404, "certificate not found", "not_found")
         inbound.certificate_id = certificate.id
@@ -327,7 +348,10 @@ async def update_inbound(
             params,
             await _certificate_for(session, inbound),
             skipped_reason=_skipped_reason(
-                inbound, params, await _certificate_for(session, inbound)
+                inbound,
+                params,
+                await _certificate_for(session, inbound),
+                services.settings,
             ),
         ),
         **applied,
@@ -368,14 +392,17 @@ async def rotate_reality_keys(
 
 
 async def _resolve_certificate(
-    session: AsyncSession, inbound: Inbound, certificate_id: str | None
+    session: AsyncSession,
+    inbound: Inbound,
+    certificate_id: str | None,
+    settings: Settings | None = None,
 ) -> Certificate | None:
     from ostium.services.certificates import select_ready_certificate
 
     if certificate_id:
-        return await select_ready_certificate(session, certificate_id)
+        return await select_ready_certificate(session, certificate_id, settings)
     if inbound.certificate_id:
-        return await select_ready_certificate(session, inbound.certificate_id)
+        return await select_ready_certificate(session, inbound.certificate_id, settings)
     return None
 
 
@@ -386,6 +413,7 @@ async def _certificate_for(session: AsyncSession, inbound: Inbound) -> Certifica
 
 
 async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
+    await session.commit()
     try:
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
