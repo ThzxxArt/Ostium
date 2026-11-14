@@ -41,13 +41,13 @@
 </p>
 
 > [!IMPORTANT]
-> **Release status: v0.1.1 is not yet published.** The v0.1.1 download links,
-> package names and release badge below take effect after the tag and GitHub Release
-> are created; until then those commands return 404. The current public release is
-> still v0.1.0 (apply the default-bind advisory mitigation first).
+> **Release status: v0.1.1 was published on 2026-11-14.** The v0.1.1 download
+> links, package names and release badge below are live, and the current public
+> release is v0.1.1. Deployments still on v0.1.0 should apply the default-bind
+> advisory mitigation first and upgrade as soon as possible.
 
 > [!TIP]
-> **Target version: v0.1.1.** The easiest install does not require Python:
+> **Current version: v0.1.1.** The easiest install does not require Python:
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \

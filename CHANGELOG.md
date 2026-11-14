@@ -3,7 +3,7 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [0.1.1] - 2026-11-14 (pending publication)
+## [0.1.1] - 2026-11-14
 
 ### Security
 
@@ -132,11 +132,12 @@ SemVer.
 
 ### Release status and blockers
 
-- v0.1.1 is **not published yet**: the tag, GitHub Release, PyPI package and
-  GHCR images are created only after the release owner signs off.
-- AppImage is built by the release workflow; it was not produced in the local
-  review environment (missing `file`/`appimagetool`) and is recorded as a local
-  blocker, not as a successful local build.
+- v0.1.1 is **published**: GitHub Release `v0.1.1`, PyPI `ostium-ctl==0.1.1`
+  and GHCR tags `0.1.1`/`v0.1.1`/`latest` are live. Release assets are
+  immutable; fixes go into the next patch release.
+- The AppImage was built by the release workflow and published; the local review
+  environment could not produce it (missing `file`/`appimagetool`) and is
+  recorded as a local blocker, not as a successful local build.
 - Windows 11, macOS 14, Nginx, Docker runtime, ACME, real TUN/LAN/DNS, 72h
   soak, performance, five-user usability and code signing remain external
   blockers; they are not claimed as verified.

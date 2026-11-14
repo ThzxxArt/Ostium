@@ -75,6 +75,35 @@ def test_release_macos_uses_an_available_runner_and_names_the_core_arch() -> Non
     assert "${CORE_ARCH:-$(uname -m)}" in script
 
 
+def test_release_docs_describe_the_current_release_as_published() -> None:
+    notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    heading = notes.splitlines()[0]
+    assert heading.startswith("# Ostium v")
+    version = heading.removeprefix("# Ostium v").strip()
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_en = " ".join(
+        line.lstrip("> ").lower()
+        for line in (ROOT / "README.en.md").read_text(encoding="utf-8").splitlines()
+    )
+    security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert f"发布状态：v{version} 已于" in readme
+    assert f"当前公开可安装版本为 v{version}" in readme
+    assert "尚未发布" not in readme
+    assert f"release status: v{version} was published" in readme_en
+    assert f"current public release is v{version}" in readme_en
+    assert "not yet published" not in readme_en
+    assert f"v{version} is the current release" in security
+    assert "not published yet" not in security.lower()
+    assert f"## [{version}]" in changelog
+    assert "pending publication" not in changelog.lower()
+    assert "not published yet" not in changelog.lower()
+    assert "## publication" in notes.lower()
+    assert "published on" in notes.lower()
+
+
 def test_release_windows_wintun_is_checked_and_located() -> None:
     windows = _release()["jobs"]["windows"]
     prepare = next(

@@ -763,3 +763,14 @@ shellcheck + bash -n                                  -> PASS
 - Playwright：**69 passed**（workers=1）；`ruff`/`ruff format`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict` 通过。
 - wheel/sdist/PyInstaller/DEB 0.1.1 成功；DEB 解包 `ostium version` 为 0.1.1；AppImage 本机 blocker，CI 依赖已补齐。
 - 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak/签名写成已验证。
+
+## 21. v0.1.1 发布与发布后核验（2026-11-14）
+
+§20 的 NO-GO 是 Review 时点结论。发布负责人明确接受外部平台/签名等 blocker 后，按以下结果发布：
+
+- Release run `43573608477` 成功；macOS DMG 在 `macos-15-intel` 上打包成功（`macos-13`/`macos-14` 已退役）。
+- GitHub Release `v0.1.1` 于 2026-11-14T08:36:01Z 发布，23 个资产；`scripts/verify-release.sh --version 0.1.1` 全部 SHA256 通过。
+- PyPI `ostium-ctl==0.1.1` 已发布，wheel SHA256 与 GitHub 资产一致；GHCR `0.1.1`/`v0.1.1`/`latest` 均存在，包含 linux/amd64 与 linux/arm64。
+- `gh attestation verify` 通过；发布包冒烟 `/healthz` 返回 `{"status":"ok","version":"0.1.1"}`，`/readyz` 返回 `ready:true`（未启动 core）。
+- 发布后发现用户可见文档仍写“尚未发布”，已在 `main` 回写并加发布文档门禁（D-065）；`v0.1.1` tag/资产按不可变约定未移动。
+- Windows 11、macOS 14 运行时、Nginx、Docker 运行时、ACME、真实 TUN/LAN/DNS、72h soak、性能、5 用户可用性、签名/公证仍未实测，不声称已验证。

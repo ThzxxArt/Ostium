@@ -7,6 +7,8 @@ platform/external validation, `[ ]` not done yet.
 
 ## v0.1.1 delta
 
+- [x] Published v0.1.1 on 2026-11-14: GitHub Release, PyPI `ostium-ctl==0.1.1`
+      and GHCR tags `0.1.1`/`v0.1.1`/`latest`; 23 assets verified read-only.
 - [x] Default admin bind is loopback; legacy `0.0.0.0` plaintext configs migrate;
       `serve` fails closed without `allow_insecure_bind`.
 - [x] Server egress blocks RFC1918/CGNAT/link-local/metadata/SMTP 25; verified

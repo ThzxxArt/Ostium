@@ -398,11 +398,13 @@ def test_installers_do_not_echo_a_user_supplied_admin_password() -> None:
     assert 'ADMIN_PASSWORD_DISPLAY="使用 --password 提供（未回显）"' in install
 
 
-def test_readme_marks_v011_as_pending_until_published() -> None:
+def test_readme_marks_v011_as_published() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "v0.1.1 尚未发布" in readme or "待发布" in readme
-    assert "not yet published" in readme_en.lower() or "pending" in readme_en.lower()
+    assert "发布状态：v0.1.1 已于" in readme
+    assert "尚未发布" not in readme
+    assert "release status: v0.1.1 was published" in readme_en.lower()
+    assert "not yet published" not in readme_en.lower()
 
 
 def test_setup_overview_does_not_break_on_a_corrupt_user(

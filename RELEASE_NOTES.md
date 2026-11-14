@@ -3,6 +3,13 @@
 This is a security, correctness and delivery-completeness release for the v0.1
 series. It does not add a new proxy protocol.
 
+## Publication
+
+Published on 2026-11-14 from tag `v0.1.1` (commit `a7f5696`). The GitHub
+Release, PyPI `ostium-ctl==0.1.1` and GHCR tags `0.1.1`/`v0.1.1`/`latest` are
+live. Post-release read-only verification passed for all 23 release assets.
+Assets are immutable; fixes go into the next patch release.
+
 ## Security and upgrade notes
 
 - The server admin UI now defaults to `127.0.0.1:8443`. Legacy plaintext
@@ -21,9 +28,9 @@ series. It does not add a new proxy protocol.
 
 ## Verification status
 
-This release was built from the final local commit with backend tests (546
-regular + 10 real sing-box), frontend tests (166), Playwright (69), coverage
-gates, static analysis, dependency audits and documentation checks passing.
+This release was built from tag `v0.1.1` with backend tests (585 regular + 10
+real sing-box), frontend tests (174), Playwright (69), coverage gates, static
+analysis, dependency audits and documentation checks passing.
 
 The following external checks are **not** claimed as verified in this release:
 Windows 11 setup/service/TUN/PAC/SmartScreen/uninstall, macOS 14
