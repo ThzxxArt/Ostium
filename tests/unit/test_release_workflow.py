@@ -104,6 +104,16 @@ def test_release_docs_describe_the_current_release_as_published() -> None:
     assert "published on" in notes.lower()
 
 
+def test_nightly_builds_the_custom_core_for_integration_tests() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["soak-smoke"]["steps"]
+    runs = "\n".join(step.get("run", "") for step in steps)
+    assert "./scripts/build-core.sh --os linux amd64" in runs
+    assert "OSTIUM_TEST_CUSTOM_ENGINE=" in runs
+
+
 def test_release_windows_wintun_is_checked_and_located() -> None:
     windows = _release()["jobs"]["windows"]
     prepare = next(

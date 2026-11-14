@@ -16,13 +16,22 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.11.14"
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.5"
+          cache: false
       - name: Fetch pinned core
         run: |
           curl -sL -o /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz
           tar -xzf /tmp/sing-box.tar.gz -C /tmp
           install -m 0755 /tmp/sing-box-1.14.4-linux-amd64/sing-box /usr/local/bin/sing-box
+      - name: Build the Ostium custom core
+        run: ./scripts/build-core.sh --os linux amd64
       - run: uv sync
-      - run: OSTIUM_TEST_ENGINE=/usr/local/bin/sing-box uv run pytest -m "integration or slow" --durations=20
+      - run: >-
+          OSTIUM_TEST_ENGINE=/usr/local/bin/sing-box
+          OSTIUM_TEST_CUSTOM_ENGINE=$PWD/dist/core/ostium-core-1.14.4-ostium.1-linux-amd64/sing-box
+          uv run pytest -m "integration or slow" --durations=20
       - name: Config generation and validation soak
         run: |
           uv run python scripts/soak-config.py \
