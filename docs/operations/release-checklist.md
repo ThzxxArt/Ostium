@@ -11,6 +11,8 @@ a published asset is never replaced.
       pip-audit, npm audit.
 - [ ] Version audit: `pyproject.toml`, `src/ostium/__init__.py`, installers,
       Inno, Docker/compose, manifest, README/docs.
+- [ ] DEB/AppImage filenames and Debian `Version:` use `0.1.1`, never `v0.1.1`
+      (the build script strips the tag prefix).
 - [ ] `CHANGELOG.md`, migration guide and release notes drafted.
 - [ ] Clean install on Linux, Windows and macOS evidence archived.
 - [ ] Nginx/Docker/ACME/TUN/soak/performance/5-user evidence archived.

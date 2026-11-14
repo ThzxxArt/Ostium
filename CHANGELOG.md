@@ -247,6 +247,34 @@ SemVer.
   config is read-only to the UI group, and tag releases now run a `verify`
   job before Docker/PyPI/GitHub publication.
 
+### Review round 3 (2026-11-14)
+
+- Linux client systemd units no longer double-substitute `/var/lib/ostium-core`
+  or rewrite `/etc/ostium/client.toml` into the data directory; default and
+  custom-path renders are covered by an executable regression test.
+- Enabled TLS inbounds can no longer be unbound by sending only
+  `certificate_id: null`; an explicit disable is required first.
+- CLI one-time subscription tokens are printed before a core apply that may
+  fail, so an unavailable core no longer destroys the only copy.
+- Subscription YAML alias expansion and deeply nested JSON are bounded; an
+  unknown response charset falls back to UTF-8 instead of returning 500.
+- Core logs are truncated while running and read from a bounded tail; statistics
+  flush preserves deltas sampled during the database commit.
+- Session expiry now clears the local auth state before redirecting to login,
+  eliminating the authenticated-route redirect loop.
+- Server routing rules are explicitly documented as local-only in v0.1.1; the
+  API and UI no longer claim they are distributed through subscriptions.
+- Client home shows the configured mixed port and activates the selected
+  profile; system-proxy reconnect restores the OS proxy, and a failed proxy
+  restoration leaves the core running instead of silently breaking networking.
+- Release DEB versions strip the `v` tag prefix; upgrade health checks read the
+  existing Public UI/port; macOS honours `--no-start`; purge removes per-user
+  client data.
+- Rule sets require HTTPS, writes are fsynced/atomic, profile endpoint choices
+  are validated, and reverse-proxy requests no longer gain loopback privileges.
+- Exported profiles/diagnostics are 0600 on POSIX; ACME directory URLs must use
+  HTTPS; connection IDs are URL-encoded before reaching the Clash API.
+
 ### Known boundaries
 
 - No NaiveProxy, standalone kill switch, native mobile app, multi-node server

@@ -36,6 +36,15 @@ platform/external validation, `[ ]` not done yet.
       read-only client-core cache path, pre-auth chunked body limit, rule-set
       remote fetch boundary, certificate generation switching and backup
       file-level rollback. See `V0.1.1_REVIEW_ROUND2.md`.
+- [x] Review round 3 revalidated R1/R2 and fixed 36 additional findings
+      (6 P1, 30 P2): Linux unit path rendering, enabled TLS inbound unbinding,
+      CLI one-time tokens, subscription alias/JSON limits, 401 redirect loop,
+      running-core log limits, statistics pending races, release DEB version,
+      upgrade health checks, reverse-proxy loopback semantics and frontend
+      contract/warning gaps. See `V0.1.1_REVIEW_ROUND3.md`.
+- [x] Local final gates (review round 3): 546 regular backend tests + 10 real
+      sing-box integration tests; 166 frontend tests; 69 Playwright cases;
+      coverage gates green; first-load JS 192.9 KiB gzip.
 
 ## Delivered in this workspace
 

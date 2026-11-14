@@ -702,3 +702,34 @@ shellcheck + bash -n                                  -> PASS
 - Playwright：**69 passed**；首屏 192.8 KiB gzip。
 - `ruff`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict`/`pip-audit`/`npm audit` 全绿。
 - 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak 写成已验证。
+
+---
+
+## 19. v0.1.1 第三轮全量 Review（2026-11-14）
+
+本轮独立回归 R1-01～R1-34、R2-01～R2-31，并对安装器渲染、启用中的 TLS inbound、订阅 YAML/JSON
+资源边界、统计并发、前端会话过期、升级健康检查与发布打包做第三轮审查。完整台账见
+`V0.1.1_REVIEW_ROUND3.md`。为避免覆盖本文件 §13 已使用的 `R3-01`～`R3-24`，本轮编号从 `R3-101` 开始。
+
+### 19.1 结论
+
+- R1 回归：**34/34 通过**；R2 回归：**31/31 通过**。
+- 新增并修复 **36 项**：P1 6 项、P2 30 项、P0 0 项。
+- 本地可执行门禁通过；外部平台项仍为 blocker。
+
+### 19.2 重点根因
+
+1. **安装器路径替换顺序**：通用前缀二次命中更具体路径，生成 `-core-core`，并把客户端配置路径改写进数据目录；改为最长匹配与占位符保护。
+2. **启用状态的隐式解绑**：TLS inbound 只清 `certificate_id` 会在下一次 apply 时静默移除监听；改为启用状态必须显式先禁用。
+3. **一次性凭据与失败顺序**：CLI 先 apply 再打印 token，核心不可用时永久丢失订阅凭据；改为先展示后应用。
+4. **输入展开边界**：Clash YAML 别名和深层 JSON 可耗尽内存/栈；增加别名/深度上限与 `RecursionError` 转换。
+5. **会话过期状态机**：401 只跳转不清理 auth store，守卫形成重定向循环；跳转前调用 `expire()`。
+6. **运行期资源泄漏**：核心日志只在 spawn 轮转；统计 flush 与 tick 的 pending 竞态会丢流量；均已加限额/锁。
+
+### 19.3 回归证据
+
+- 后端：**546 passed / 0 skipped**；语句 **95.05%**、分支 **91.36%**；覆盖率门禁通过。
+- 真实 sing-box 集成：**10 passed / 0 skipped**。
+- 前端：**166 passed**；语句 **90.55%**、分支 **85.16%**、函数 **88.31%**、行 **91.82%**；首屏 JS **192.9 KiB gzip**。
+- Playwright：**69 passed**；`ruff`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict`/`pip-audit`/`npm audit` 全绿。
+- 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak/签名写成已验证。
