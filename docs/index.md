@@ -9,6 +9,7 @@ Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包
 ## 从这里开始
 
 - [一键安装（推荐）](guides/install.md) — 不预装 Python，一条命令完成安装
+- [Linux 云服务器完整部署](guides/linux-cloud-server.md) — root/非 root、systemd/非 systemd、Public UI 与首次公网访问
 - [服务管理](guides/service-manager.md) — systemd、OpenRC、runit、s6、supervisord、root 模式
 - [Nginx 共存与反向代理](guides/nginx.md) — 80/443 被 Nginx 占用时的完整方案
 - [架构](architecture.md) — 进程、端口、信任边界
