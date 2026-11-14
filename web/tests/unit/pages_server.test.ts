@@ -46,6 +46,16 @@ describe('server pages', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('makes the scrollable log region keyboard focusable', async () => {
+    installFetchMock()
+    const { wrapper } = await mountPage(LogsPage)
+    await settle()
+    const body = wrapper.find('.log-body')
+    expect(body.exists()).toBe(true)
+    expect(body.attributes('tabindex')).toBe('0')
+    expect(body.attributes('role')).toBe('log')
+  })
+
   it.each(pages)('%s shows error state', async (_name, page) => {
     installFetchMock({ mode: 'error' })
     const { wrapper } = await mountPage(page)

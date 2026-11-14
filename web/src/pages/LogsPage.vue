@@ -189,7 +189,13 @@ onBeforeUnmount(() => {
         <span>{{ source === 'core' ? 'ostium-core' : 'ostium.service' }}</span>
         <span class="o-subtle">{{ paused ? t('common.paused') : t('common.live') }}</span>
       </div>
-      <div ref="container" class="log-body o-scroll">
+      <div
+        ref="container"
+        class="log-body o-scroll"
+        tabindex="0"
+        role="log"
+        :aria-label="t('logs.title')"
+      >
         <template v-if="source === 'ostium'">
           <div
             v-for="(record, index) in filteredRecords"
@@ -303,6 +309,10 @@ onBeforeUnmount(() => {
   font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.75;
+}
+.log-body:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .log-line {
   display: flex;
