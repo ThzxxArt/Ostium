@@ -85,7 +85,10 @@ async def _apply_client(services: Services, session: AsyncSession) -> dict[str, 
     if services.settings.role is not Role.CLIENT:
         return {
             "applied": False,
-            "warning": "rules are stored; the server applies them to clients via subscriptions",
+            "warning": (
+                "rules are stored on this server but v0.1.1 does not distribute them "
+                "through subscriptions; apply routing rules on each client"
+            ),
         }
     try:
         result = await services.engine.apply_client(session)
@@ -287,8 +290,10 @@ async def add_rule_set(
     from ostium.services.netguard import UnsafeUrlError, validate_target_host
 
     parsed_url = urlparse(payload.url)
-    if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
-        raise ApiError(422, "rule set URL must be an absolute http(s) URL", "invalid_rule_set")
+    if parsed_url.scheme != "https" or not parsed_url.hostname:
+        # The first download establishes the policy the core later trusts.
+        # Plain HTTP would let a network attacker replace it.
+        raise ApiError(422, "rule set URL must be an absolute HTTPS URL", "invalid_rule_set")
     try:
         validate_target_host(parsed_url.hostname, allow_private=False)
     except UnsafeUrlError as exc:
@@ -342,9 +347,13 @@ async def delete_rule_set(
     if rule_set is None:
         raise ApiError(404, "rule set not found", "not_found")
     rules = (await session.execute(select(Rule))).scalars().all()
-    referenced_by = [
-        rule.id for rule in rules if rule_set.name in (rule.match_json or {}).get("rule_set", [])
-    ]
+    referenced_by = []
+    for rule in rules:
+        references = (rule.match_json or {}).get("rule_set", [])
+        if isinstance(references, str):
+            references = [references]
+        if rule_set.name in references:
+            referenced_by.append(rule.id)
     if referenced_by:
         raise ApiError(
             409,

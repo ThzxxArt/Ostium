@@ -221,6 +221,14 @@ if [[ "$UNINSTALL" == "true" ]]; then
   if [[ "$PURGE" == "true" ]]; then
     echo "删除数据、配置与程序目录（不可恢复）……" >&2
     rm -rf "$DATA" "$CONFIG" "$PREFIX" "$CLIENT_DATA" "$CLIENT_UI_DATA"
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      # The non-root client UI keeps its database in the installing user's
+      # home rather than in the shared /var/lib tree.
+      user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+      if [[ -n "$user_home" ]]; then
+        rm -rf "$user_home/.local/share/ostium"
+      fi
+    fi
     echo "Ostium 已完全卸载（--purge）。"
   else
     echo "Ostium 程序与服务已移除；数据保留在："
@@ -327,12 +335,21 @@ render_unit() {
   fi
   install -d -m 0755 "$(dirname "$target")"
   temporary="$(mktemp "$target.XXXXXX")"
+  # Replace the most specific path first, and never let the shorter
+  # /var/lib/ostium pattern match the prefix of /var/lib/ostium-core.
+  # A plain "s#/var/lib/ostium#$data_dir#g" turns the default client path into
+  # /var/lib/ostium-core-core and breaks both Environment= and ReadWritePaths=.
+  # Protect the client config path while replacing the generic /etc/ostium
+  # prefix; otherwise a default CLIENT_CONFIG under /etc/ostium is rewritten
+  # a second time into the client data directory.
   sed \
     -e "s#/opt/ostium#$PREFIX#g" \
     -e "s#/var/lib/ostium-core#$CLIENT_DATA#g" \
-    -e "s#/var/lib/ostium#$data_dir#g" \
-    -e "s#/etc/ostium/client.toml#$CLIENT_CONFIG#g" \
+    -e "s#/var/lib/ostium\([ /]\)#$data_dir\1#g" \
+    -e "s#/var/lib/ostium\$#$data_dir#g" \
+    -e "s#/etc/ostium/client.toml#__OSTIUM_CLIENT_CONFIG__#g" \
     -e "s#/etc/ostium#$config_dir#g" \
+    -e "s#__OSTIUM_CLIENT_CONFIG__#$CLIENT_CONFIG#g" \
     "$source" >"$temporary"
   chmod 0644 "$temporary"
   mv -f "$temporary" "$target"
@@ -559,6 +576,17 @@ EOF
     exit 1
   fi
   if [[ "$UPGRADE" == "true" && -f "$CONFIG/config.toml" ]]; then
+    # The health check must target the listener that already exists.  Without
+    # reading these values, an upgrade of a Public UI / non-default port
+    # installation would probe http://127.0.0.1:8443 and roll back a good
+    # release.
+    if grep -Eq '^[[:space:]]*public_ui[[:space:]]*=[[:space:]]*true' "$CONFIG/config.toml"; then
+      PUBLIC_UI="true"
+    fi
+    EXISTING_PORT="$(sed -n 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$CONFIG/config.toml" | head -1)"
+    if [[ -n "$EXISTING_PORT" ]]; then
+      UI_PORT="$EXISTING_PORT"
+    fi
     if [[ "$ALLOW_INSECURE_BIND" != "true" && "$PUBLIC_UI" != "true" ]]; then
       if grep -Eq '^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"' "$CONFIG/config.toml"; then
         sed -i 's|^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"|host = "127.0.0.1"|' "$CONFIG/config.toml"

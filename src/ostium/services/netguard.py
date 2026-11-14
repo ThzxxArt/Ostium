@@ -128,7 +128,12 @@ class FetchedPayload:
             if key.lower() == "charset" and value:
                 charset = value.strip("\"'")
                 break
-        return self.content.decode(charset, errors="replace")
+        try:
+            return self.content.decode(charset, errors="replace")
+        except LookupError:
+            # A malicious or broken server must not turn an unknown charset
+            # into an unhandled 500 in the subscription/rule-set importer.
+            return self.content.decode("utf-8", errors="replace")
 
 
 async def fetch_limited(

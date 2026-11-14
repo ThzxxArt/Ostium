@@ -58,9 +58,14 @@ class AuthError(Exception):
 class LoginLimiter:
     failures: dict[str, tuple[int, float]]
     window: int = LOCK_SECONDS
+    # A spoofed/rotating username must not grow this dictionary without bound.
+    # The generic HTTP limiter has the same protection; login has a separate
+    # per-IP+username key, so it needs its own ceiling.
+    MAX_TRACKED_KEYS = 10_000
 
     def __init__(self) -> None:
         self.failures = {}
+        self._calls = 0
 
     def key(self, ip: str, username: str) -> str:
         return f"{ip}|{username.lower()}"
@@ -72,7 +77,9 @@ class LoginLimiter:
             self.failures.pop(key, None)
 
     def check(self, ip: str, username: str) -> None:
-        self._cleanup()
+        self._calls += 1
+        if self._calls % 128 == 0:
+            self._cleanup()
         record = self.failures.get(self.key(ip, username))
         if record and record[0] >= MAX_FAILURES and time.monotonic() < record[1]:
             raise AuthError("too many failed attempts; try again later", "rate_limited", 429)
@@ -80,6 +87,12 @@ class LoginLimiter:
     def fail(self, ip: str, username: str) -> None:
         key = self.key(ip, username)
         count, _ = self.failures.get(key, (0, 0.0))
+        if count == 0 and len(self.failures) >= self.MAX_TRACKED_KEYS:
+            self._cleanup()
+            while len(self.failures) >= self.MAX_TRACKED_KEYS:
+                # Dict insertion order is a reasonable eviction order here:
+                # the oldest unsuccessful username is the least valuable.
+                self.failures.pop(next(iter(self.failures)), None)
         self.failures[key] = (count + 1, time.monotonic() + LOCK_SECONDS)
 
     def success(self, ip: str, username: str) -> None:

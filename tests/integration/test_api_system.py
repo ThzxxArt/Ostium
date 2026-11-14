@@ -12,7 +12,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 
-from ostium.config import Settings
+from ostium.config import Mode, Settings
 from ostium.engine.core_api import CoreApiError
 from ostium.engine.manager import EngineError
 from ostium.util.time import utcnow
@@ -402,6 +402,15 @@ def test_client_modes_and_connect_disconnect(client_api: TestClient, fake_proxy:
     connected = client_api.post("/api/v1/system/connect", headers=headers)
     assert connected.status_code == 200
     assert connected.json()["connected"] is True
+
+    # Reconnecting in system-proxy mode must restore the OS proxy that a
+    # manual Disconnect disabled, not only the core process.
+    services.settings.mode = Mode.SYSTEM_PROXY
+    fake_proxy.enabled = False
+    restored = client_api.post("/api/v1/system/connect", headers=headers)
+    assert restored.status_code == 200
+    assert fake_proxy.enabled is True
+    services.settings.mode = Mode.MIXED
 
     async def fail(session, **kwargs) -> dict:  # type: ignore[no-untyped-def]
         raise EngineError("no core", "core_unreachable", 503)

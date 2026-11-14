@@ -161,11 +161,7 @@ async def get_user(
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     online = user.name in _online_names(services)
-    pending = 0
-    if services.stats is not None:
-        usage = services.stats.usage.get(user.id)
-        if usage:
-            pending = usage.up + usage.down
+    pending = services.stats.pending_bytes(user.id) if services.stats is not None else 0
     return {"user": serialize_user(user, online=online), "pending_bytes": pending}
 
 

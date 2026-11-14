@@ -17,6 +17,12 @@ def normalize_base_url(value: str) -> str:
     parsed = urlparse(candidate)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("public_base_url must be an absolute http(s) URL")
+    if not parsed.hostname:
+        raise ValueError("public_base_url must include a host")
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"public_base_url has an invalid port: {exc}") from exc
     if parsed.query or parsed.fragment:
         raise ValueError("public_base_url must not contain a query string or fragment")
     if parsed.username or parsed.password:

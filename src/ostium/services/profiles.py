@@ -27,6 +27,11 @@ class ProfileError(Exception):
 
 MAX_SUBSCRIPTION_BYTES = 2 * 1024 * 1024
 MAX_SUBSCRIPTION_ENDPOINTS = 500
+# YAML aliases are useful in hand-written Clash files but also enable
+# expansion bombs.  The subscription limit caps the input; these caps bound
+# the parser's output before construction.
+MAX_YAML_ALIASES = 500
+MAX_YAML_DEPTH = 40
 
 
 def parse_subscription_text(text: str) -> list[Endpoint]:
@@ -38,23 +43,23 @@ def parse_subscription_text(text: str) -> list[Endpoint]:
     if stripped.startswith("{"):
         try:
             payload = json.loads(stripped)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise ProfileError("invalid JSON subscription") from exc
         if isinstance(payload, dict) and "endpoints" in payload:
             try:
                 return _limit(ProfileDocument.model_validate(payload).endpoints)
-            except ValidationError as exc:
+            except (ValidationError, RecursionError) as exc:
                 raise ProfileError("invalid Ostium profile subscription") from exc
         if isinstance(payload, dict) and "outbounds" in payload:
             try:
                 return _limit(_from_singbox_outbounds(payload["outbounds"]))
-            except (ValidationError, TypeError, ValueError) as exc:
+            except (ValidationError, TypeError, ValueError, RecursionError) as exc:
                 raise ProfileError("invalid sing-box subscription") from exc
         raise ProfileError("JSON subscription does not contain endpoints or outbounds")
     if stripped.startswith("proxies:") or "\nproxies:" in stripped:
         try:
             return _limit(_from_clash(stripped))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise ProfileError("invalid Clash subscription") from exc
     decoded = _maybe_base64(stripped)
     if decoded is not None and "://" in decoded:
@@ -102,11 +107,34 @@ def _maybe_base64(value: str) -> str | None:
     return decoded
 
 
-def _from_clash(text: str) -> list[Endpoint]:
+def _safe_load_yaml(text: str) -> Any:
+    """Parse Clash YAML with explicit alias/depth resource bounds."""
+
+    aliases = 0
+    depth = 0
     try:
-        document = yaml.safe_load(text)
+        for event in yaml.parse(text, Loader=yaml.SafeLoader):
+            if isinstance(event, yaml.AliasEvent):
+                aliases += 1
+                if aliases > MAX_YAML_ALIASES:
+                    raise ProfileError(
+                        f"the Clash YAML contains more than {MAX_YAML_ALIASES} aliases"
+                    )
+            elif isinstance(event, (yaml.SequenceStartEvent, yaml.MappingStartEvent)):
+                depth += 1
+                if depth > MAX_YAML_DEPTH:
+                    raise ProfileError("the Clash YAML is nested too deeply")
+            elif isinstance(event, (yaml.SequenceEndEvent, yaml.MappingEndEvent)):
+                depth = max(0, depth - 1)
+        return yaml.safe_load(text)
+    except ProfileError:
+        raise
     except yaml.YAMLError as exc:
         raise ProfileError("invalid Clash YAML") from exc
+
+
+def _from_clash(text: str) -> list[Endpoint]:
+    document = _safe_load_yaml(text)
     endpoints: list[Endpoint] = []
     for index, proxy in enumerate(
         document.get("proxies", []) if isinstance(document, dict) else []

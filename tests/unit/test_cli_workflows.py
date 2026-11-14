@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -52,12 +53,16 @@ def test_cli_user_lifecycle(tmp_path: Path, monkeypatch) -> None:  # type: ignor
     assert run("user", "disable", "alice").exit_code == 0
     assert run("user", "enable", "alice").exit_code == 0
     assert run("user", "quota", "alice", "--quota", "2G").exit_code == 0
+    assert run("user", "quota", "alice", "--quota", "2G", "--cycle", "bogus").exit_code == 2
     assert run("user", "subscription", "alice").exit_code == 0
     assert run("user", "rotate", "alice").exit_code == 0
     output = tmp_path / "alice.json"
     assert run("user", "export", "alice", "--output", str(output)).exit_code == 0
     assert output.is_file()
+    if os.name == "posix":
+        assert output.stat().st_mode & 0o777 == 0o600
     assert run("user", "remove", "alice", "--yes").exit_code == 0
+    assert run("user", "remove", "alice", "--yes").exit_code == 1
 
 
 def test_cli_profiles_and_backup(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -89,4 +94,7 @@ def test_cli_profiles_and_backup(tmp_path: Path, monkeypatch) -> None:  # type: 
         app, ["diagnostics", "export", "--output", str(tmp_path / "diag.tar.gz")]
     )
     assert result.exit_code == 0
-    assert (tmp_path / "diag.tar.gz").is_file()
+    diagnostic = tmp_path / "diag.tar.gz"
+    assert diagnostic.is_file()
+    if os.name == "posix":
+        assert diagnostic.stat().st_mode & 0o777 == 0o600

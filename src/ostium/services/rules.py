@@ -186,7 +186,14 @@ def evaluate(rules: list[dict[str, Any]], target: dict[str, Any]) -> dict[str, A
 async def update_rule_set(
     session: AsyncSession, settings: Settings, rule_set: RuleSet
 ) -> dict[str, Any]:
+    from urllib.parse import urlparse
+
     from ostium.services.netguard import UnsafeUrlError, fetch_limited
+
+    if urlparse(rule_set.url).scheme != "https":
+        rule_set.last_error = "rule set URL must use HTTPS"
+        await session.flush()
+        return {"updated": False, "error": rule_set.last_error}
 
     target_dir = (settings.paths.rulesets_dir / f"{rule_set.id}.srs").resolve()
     root = settings.paths.rulesets_dir.resolve()
@@ -230,9 +237,23 @@ async def update_rule_set(
             raise RuleValidationError(f"rule set download failed: HTTP {fetched.status_code}")
         payload = fetched.content
         digest = hashlib.sha256(payload).hexdigest()
-        temp = target.with_suffix(".srs.tmp")
-        temp.write_bytes(payload)
-        temp.replace(target)
+        # A deterministic temp name lets two concurrent update requests
+        # interleave partial writes before the final replace.  Use a unique
+        # sibling and fsync it, so the file the core later reads is always a
+        # complete download.
+        import os
+        import tempfile
+
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=root)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
         rule_set.path = str(target)
         rule_set.sha256 = digest
         rule_set.etag = fetched.headers.get("etag")

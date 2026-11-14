@@ -127,6 +127,14 @@ class AcmeIssuer:
             return "https://acme-staging-v02.api.letsencrypt.org/directory"
         return self.settings.acme_directory
 
+    def _validated_directory_url(self, staging: bool | None = None) -> str:
+        from urllib.parse import urlparse
+
+        directory_url = self._directory_url(staging)
+        if urlparse(directory_url).scheme != "https":
+            raise AcmeError("the ACME directory URL must use HTTPS", "insecure_directory", 400)
+        return directory_url
+
     def _load_account_key(self) -> rsa.RSAPrivateKey:
         # The account key lives in a small file next to the master key; it is
         # encrypted at rest with the same master key.
@@ -203,6 +211,7 @@ class AcmeIssuer:
         staging: bool | None,
         email: str | None,
     ) -> tuple[str, str]:
+        _ = self._validated_directory_url(staging)
         account_key = self._load_account_key()
         acme_key = jose.JWKRSA(key=account_key)  # type: ignore[attr-defined]
         net = client.ClientNetwork(

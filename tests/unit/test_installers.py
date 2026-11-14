@@ -54,6 +54,8 @@ def test_installers_default_to_loopback_and_require_insecure_opt_in() -> None:
     assert "--allow-insecure-bind" in online
     assert "ALLOW_INSECURE_BIND" in online
     assert "0.0.0.0 已收敛为 127.0.0.1" in install
+    assert "grep -Eq '^[[:space:]]*public_ui[[:space:]]*=[[:space:]]*true'" in install
+    assert 'EXISTING_PORT="$(sed -n' in install
 
 
 def test_linux_uninstall_restores_proxy_and_preserves_data_by_default() -> None:
@@ -62,6 +64,7 @@ def test_linux_uninstall_restores_proxy_and_preserves_data_by_default() -> None:
     assert "--purge" in install
     assert "proxy off" in install
     assert 'rm -rf "$DATA" "$CONFIG" "$PREFIX" "$CLIENT_DATA" "$CLIENT_UI_DATA"' in install
+    assert 'rm -rf "$user_home/.local/share/ostium"' in install
     assert "Ostium 程序与服务已移除；数据保留在" in install
 
 
@@ -87,8 +90,10 @@ def test_linux_units_are_rendered_for_custom_paths() -> None:
     assert "render_unit()" in script
     assert "s#/opt/ostium#$PREFIX#g" in script
     assert "s#/var/lib/ostium-core#$CLIENT_DATA#g" in script
-    assert "s#/var/lib/ostium#$data_dir#g" in script
-    assert "s#/etc/ostium/client.toml#$CLIENT_CONFIG#g" in script
+    assert "s#/var/lib/ostium\\([ /]\\)#$data_dir\\1#g" in script
+    assert "s#/var/lib/ostium\\$#$data_dir#g" in script
+    assert "s#/etc/ostium/client.toml#__OSTIUM_CLIENT_CONFIG__#g" in script
+    assert "s#__OSTIUM_CLIENT_CONFIG__#$CLIENT_CONFIG#g" in script
     assert 'install_unit "' not in script
     assert 'install -m 0644 "$(dirname "$0")/../deploy/systemd/user/ostium.service"' not in script
 
@@ -104,3 +109,5 @@ def test_installers_reject_conflicting_tls_and_unsafe_links() -> None:
     assert 'validate_install_path "$SYSTEMD_DIR"' in online
     assert 'chmod 0640 "$CLIENT_CONFIG"' in install
     assert 'chmod 0660 "$CLIENT_CONFIG"' not in install
+    assert "export OSTIUM_NO_START=true" in online
+    assert "export OSTIUM_NO_START=1" not in online

@@ -211,7 +211,21 @@ async def update_profile(
             if await get_setting(session, "active_profile_id") == profile.id:
                 await set_setting(session, "active_profile_id", None)
     if "selected_endpoint" in changes:
-        profile.selected_endpoint = changes["selected_endpoint"]
+        selected = changes["selected_endpoint"]
+        if selected:
+            try:
+                tags = {
+                    endpoint.tag for endpoint in endpoints_from_profile(profile, services.store)
+                }
+            except ProfileError as exc:
+                raise ApiError(exc.status_code, str(exc), exc.code) from exc
+            if selected not in tags:
+                raise ApiError(
+                    422,
+                    "selected endpoint does not exist in this profile",
+                    "bad_endpoint",
+                )
+        profile.selected_endpoint = selected
     if "sort_order" in changes and changes["sort_order"] is not None:
         profile.sort_order = changes["sort_order"]
     await session.flush()
@@ -324,6 +338,14 @@ async def refresh(
         # propagates, so persist the diagnostic explicitly.
         await session.commit()
         raise ApiError(exc.status_code, str(exc), exc.code) from exc
+    if profile.selected_endpoint:
+        tags = {endpoint.tag for endpoint in endpoints_from_profile(profile, services.store)}
+        if profile.selected_endpoint not in tags:
+            # The provider may have removed the previously selected endpoint.
+            # Clear the stale reference instead of silently applying another
+            # endpoint while the UI still claims the old one is selected.
+            profile.selected_endpoint = None
+            await session.flush()
     applied = await _apply_client(services, session)
     await audit(
         session,
@@ -344,8 +366,12 @@ async def export_profile(
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    _require_client(services)
     profile = await _get_profile(session, profile_id)
-    endpoints = endpoints_from_profile(profile, services.store)
+    try:
+        endpoints = endpoints_from_profile(profile, services.store)
+    except ProfileError as exc:
+        raise ApiError(exc.status_code, str(exc), exc.code) from exc
     await audit(
         session,
         actor=admin.username,
@@ -371,7 +397,10 @@ async def test_profile(
 ) -> dict[str, Any]:
     _require_client(services)
     profile = await _get_profile(session, profile_id)
-    endpoints = endpoints_from_profile(profile, services.store)
+    try:
+        endpoints = endpoints_from_profile(profile, services.store)
+    except ProfileError as exc:
+        raise ApiError(exc.status_code, str(exc), exc.code) from exc
     proxies = (await services.clash.proxies()).get("proxies", {})
     import asyncio
 

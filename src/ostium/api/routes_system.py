@@ -106,6 +106,7 @@ async def info(
         else None,
         "mode": services.settings.mode.value,
         "allow_lan": services.settings.allow_lan,
+        "mixed_port": services.settings.mixed_port,
         "lan_addresses": _lan_addresses(),
         "lan_port": services.settings.mixed_port,
         "proxy": services.proxy.status(),
@@ -208,7 +209,7 @@ async def toggle_proxy(
             result = await asyncio.to_thread(services.proxy.disable)
         except Exception as exc:
             raise ApiError(500, f"could not disable system proxy: {exc}", "proxy_failed") from exc
-        if services.settings.mode is Mode.SYSTEM_PROXY:
+        if services.settings.mode is Mode.SYSTEM_PROXY and not services.settings.tun_enabled:
             services.settings.mode = Mode.MIXED
     try:
         services.settings.save()
@@ -360,6 +361,17 @@ async def connect(
         code = getattr(exc, "code", "engine_error")
         status = getattr(exc, "status_code", 502)
         raise ApiError(status, str(exc), code) from exc
+    if services.settings.mode is Mode.SYSTEM_PROXY:
+        try:
+            await asyncio.to_thread(
+                services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+            )
+        except Exception as exc:
+            raise ApiError(
+                502,
+                f"core is running but the system proxy could not be restored: {exc}",
+                "proxy_failed",
+            ) from exc
     await audit(session, actor=admin.username, action="client.connect", ip=client_ip(request))
     return {"connected": True, "status": result.get("status")}
 
@@ -377,8 +389,15 @@ async def disconnect(
     if (await asyncio.to_thread(services.proxy.status)).get("enabled"):
         try:
             await asyncio.to_thread(services.proxy.disable)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Leave the core running: stopping it with a still-active OS proxy
+            # would silently break all system traffic.
+            services.watchdog_suspended = False
+            raise ApiError(
+                502,
+                f"could not restore the system proxy; core left running: {exc}",
+                "proxy_failed",
+            ) from exc
     try:
         status = await services.engine.client.stop()
     except Exception as exc:

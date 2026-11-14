@@ -19,6 +19,10 @@ def _headers(token: str) -> dict[str, str]:
 class FakeStats:
     def __init__(self, user_id: str, name: str) -> None:
         self.usage = {user_id: UserUsage(user_id=user_id, name=name, up=10, down=20, online=True)}
+        self.pending = {user_id: 30}
+
+    def pending_bytes(self, user_id: str) -> int:
+        return self.pending.get(user_id, 0)
 
     def snapshot(self) -> dict:
         return {

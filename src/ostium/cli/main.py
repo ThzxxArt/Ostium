@@ -121,7 +121,8 @@ def _fail(message: str, code: int = 1) -> NoReturn:
 
 
 def _base_url(settings: Settings) -> str:
-    return f"http://127.0.0.1:{settings.port}"
+    scheme = "https" if settings.public_ui else "http"
+    return f"{scheme}://127.0.0.1:{settings.port}"
 
 
 def _engine_binary(settings: Settings) -> Path:
@@ -142,6 +143,11 @@ def _api(settings: Settings, method: str, path: str, **kwargs: Any) -> Any:
             headers=headers,
             timeout=30,
             trust_env=False,
+            # The local listener may present a valid ACME or a self-signed
+            # certificate.  This is a loopback-only CLI call authenticated by
+            # a 0600 token; pinning the local certificate would make `ostium
+            # status` unusable on self-signed Public UI installs.
+            verify=False,  # noqa: S501 - loopback-only, token-authenticated CLI call
             **kwargs,
         )
     except httpx.HTTPError as exc:
@@ -488,8 +494,10 @@ def open() -> None:  # noqa: A001
     from ostium.services.auth import make_local_login_token
 
     token = make_local_login_token(settings)
-    url = f"http://127.0.0.1:{settings.port}/api/v1/auth/local-login?token={quote(token)}"
-    console.print(f"http://127.0.0.1:{settings.port}")
+    scheme = "https" if settings.public_ui else "http"
+    base = f"{scheme}://127.0.0.1:{settings.port}"
+    url = f"{base}/api/v1/auth/local-login?token={quote(token)}"
+    console.print(base)
     webbrowser.open(url)
 
 
@@ -825,6 +833,11 @@ def diagnostics_export(
             info.size = len(data)
             info.mode = 0o600
             archive.addfile(info, io.BytesIO(data))
+    if os.name == "posix":
+        try:
+            output.chmod(0o600)
+        except OSError:
+            pass
     console.print(f"wrote {output}")
 
 
@@ -973,12 +986,15 @@ def user_add(
         return result
 
     result = _run(_add())
-    _server_apply(settings)
+    # The subscription token is revealed exactly once.  Print it before the
+    # core apply: an unavailable core must not destroy the only copy of the
+    # credential and force the operator to rotate the user immediately.
     if json_output:
         _json(result)
     else:
         console.print(f"[green]user {result['user']} created[/green]")
         console.print(f"subscription token: [bold]{result['token']}[/bold] (shown once)")
+    _server_apply(settings)
 
 
 @user_app.command("show")
@@ -1066,10 +1082,11 @@ def user_rotate(name: str, subscription: bool = typer.Option(False, "--subscript
         return token
 
     token = _run(_rotate())
-    _server_apply(settings)
     console.print(f"credentials rotated for {name}")
     if token:
+        # Never lose the one-time token if the core cannot apply immediately.
         console.print(f"new subscription token: {token}")
+    _server_apply(settings)
 
 
 @user_app.command("remove")
@@ -1112,6 +1129,8 @@ def user_quota(
 ) -> None:
     """Set a user's quota."""
 
+    if cycle not in {"total", "monthly"}:
+        _fail("--cycle must be total or monthly", 2)
     from sqlalchemy import select
 
     from ostium.db.models import ProxyUser
@@ -1219,6 +1238,11 @@ def user_export(
         return content
 
     output.write_text(_run(_export()), encoding="utf-8")
+    if os.name == "posix":
+        try:
+            output.chmod(0o600)
+        except OSError:
+            pass
     console.print(f"wrote {output}")
 
 
@@ -1355,14 +1379,27 @@ def profile_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
     settings = _load_settings()
 
     async def _remove() -> None:
+        from ostium.services.settings import get_setting, set_setting
+
         engine, factory, _store = await _database(settings)
         try:
             async with factory() as session:
-                profile = (
-                    await session.execute(select(Profile).where(Profile.name == name))
-                ).scalar_one_or_none()
-                if profile is None:
+                profiles = (
+                    (await session.execute(select(Profile).where(Profile.name == name)))
+                    .scalars()
+                    .all()
+                )
+                if not profiles:
                     _fail("profile not found", 1)
+                if len(profiles) > 1:
+                    _fail(
+                        f"multiple profiles are named {name!r}; remove them from the Web UI "
+                        "or rename one first",
+                        2,
+                    )
+                profile = profiles[0]
+                if await get_setting(session, "active_profile_id") == profile.id:
+                    await set_setting(session, "active_profile_id", None)
                 await session.delete(profile)
                 await _audit(session, "profile.deleted", name)
                 await session.commit()
@@ -1390,12 +1427,20 @@ def profile_refresh(name: str) -> None:
         count = 0
         try:
             async with factory() as session:
-                profile = (
-                    await session.execute(select(Profile).where(Profile.name == name))
-                ).scalar_one_or_none()
-                if profile is None:
+                profiles = (
+                    (await session.execute(select(Profile).where(Profile.name == name)))
+                    .scalars()
+                    .all()
+                )
+                if not profiles:
                     _fail("profile not found", 1)
-                count = await refresh_profile(session, store, profile)
+                if len(profiles) > 1:
+                    _fail(
+                        f"multiple profiles are named {name!r}; refresh them from the Web UI "
+                        "or rename one first",
+                        2,
+                    )
+                count = await refresh_profile(session, store, profiles[0])
                 await _audit(session, "profile.refreshed", name, endpoints=count)
                 await session.commit()
         finally:

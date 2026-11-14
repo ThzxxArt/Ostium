@@ -29,6 +29,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Release tags are v0.1.1; Debian versions and filenames must be 0.1.1.
+VERSION="${VERSION#v}"
+
 if [[ ! -x "$APP/ostium" ]]; then
   echo "missing PyInstaller bundle: $APP/ostium" >&2
   exit 2

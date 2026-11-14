@@ -160,9 +160,17 @@ async def setup(
         if payload.lines == "later":
             for inbound in inbounds:
                 inbound.enabled = False
+    domain: str | None = None
+    if payload.domain and payload.domain.strip():
+        from ostium.services.certificates import CertificateError, validate_domain
+
+        try:
+            domain = validate_domain(payload.domain)
+        except CertificateError as exc:
+            raise ApiError(400, str(exc), "invalid_domain") from exc
     server_info = {
-        "domain": payload.domain.strip().lower() if payload.domain else None,
-        "public_host": payload.domain.strip().lower() if payload.domain else None,
+        "domain": domain,
+        "public_host": domain,
         "public_ui": False,
         "acme_email": payload.acme_email,
         "lines": payload.lines,

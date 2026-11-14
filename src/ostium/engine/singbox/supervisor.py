@@ -18,6 +18,7 @@ from ostium.util.redact import redact
 from ostium.util.time import iso, utcnow
 
 MAX_LOG_BYTES = 10 * 1024 * 1024
+MAX_LOG_READ_BYTES = 2 * 1024 * 1024
 
 
 class CoreError(Exception):
@@ -224,13 +225,46 @@ class CoreSupervisor:
             engine_version=self.settings.engine_version,
         )
 
-    def read_logs(self, tail: int = 500) -> str:
+    def read_logs(self, tail: int = 500, *, max_bytes: int = MAX_LOG_READ_BYTES) -> str:
         if not self.log_path.is_file():
             return ""
         tail = max(1, min(tail, 5000))
-        with self.log_path.open("r", encoding="utf-8", errors="replace") as handle:
-            lines = handle.readlines()[-tail:]
-        return redact("".join(lines))
+        max_bytes = max(1, max_bytes)
+        try:
+            size = self.log_path.stat().st_size
+            read_bytes = min(size, max_bytes)
+            with self.log_path.open("rb") as handle:
+                if size > read_bytes:
+                    handle.seek(size - read_bytes)
+                raw = handle.read(read_bytes)
+        except OSError:
+            return ""
+        if size > read_bytes and b"\n" in raw:
+            # Drop the first, possibly partial, line.
+            raw = raw.split(b"\n", 1)[1]
+        text = raw.decode("utf-8", errors="replace")
+        lines = text.splitlines()[-tail:]
+        return redact("\n".join(lines)) + ("\n" if lines else "")
+
+    def enforce_log_limit(self, *, max_bytes: int = MAX_LOG_BYTES) -> bool:
+        """Cap a long-running core log without restarting sing-box.
+
+        sing-box keeps its log descriptor open with O_APPEND; truncating the
+        file is safe because its next write starts at the new end.  This is the
+        only way to bound the log between configuration reloads, which may be
+        days apart.
+        """
+
+        try:
+            size = self.log_path.stat().st_size
+            if size <= max(1, max_bytes):
+                return False
+            with self.log_path.open("r+b") as handle:
+                handle.truncate(0)
+            self._append_log("supervisor", "truncated the core log after reaching its size limit")
+            return True
+        except OSError:
+            return False
 
     async def _check(self, config_path: Path) -> None:
         command = [str(self.engine), "check", "-c", str(config_path)]

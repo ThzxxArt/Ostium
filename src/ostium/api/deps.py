@@ -97,6 +97,11 @@ def client_ip(request: Request | WebSocket) -> str:
 
 
 def is_loopback(request: Request) -> bool:
+    # A request arriving through Nginx/Caddy has a loopback peer address, but
+    # it is not a local operator.  Only direct loopback connections may use
+    # the CLI token or one-time local-login links.
+    if request.headers.get("x-forwarded-for"):
+        return False
     host = request.client.host if request.client else ""
     return host in {"127.0.0.1", "::1", "localhost", "testclient"}
 

@@ -71,6 +71,14 @@ def test_release_windows_wintun_is_checked_and_located() -> None:
     assert "dist/wintun/bin/amd64/wintun.dll" not in script
 
 
+def test_linux_package_version_is_normalised_from_the_git_tag() -> None:
+    script = (ROOT / "scripts" / "build-linux-packages.sh").read_text(encoding="utf-8")
+    assert 'VERSION="${VERSION#v}"' in script
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "build-linux-packages.sh" in workflow
+    assert '--version "${{ github.ref_name }}"' in workflow
+
+
 def test_release_publishes_both_docker_version_tags() -> None:
     docker = _release()["jobs"]["docker"]
     metadata = next(

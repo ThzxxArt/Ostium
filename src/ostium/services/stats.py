@@ -62,6 +62,7 @@ class StatsCollector:
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
         self._flush_lock = asyncio.Lock()
+        self._pending_lock = asyncio.Lock()
         self._tick = 0
         self._last_error: str | None = None
         self._last_flush = time.monotonic()
@@ -169,8 +170,9 @@ class StatsCollector:
             if delta_up or delta_down:
                 usage.online = True
                 usage.last_seen = iso(utcnow())
-            self._pending[user.id].up += delta_up
-            self._pending[user.id].down += delta_down
+            async with self._pending_lock:
+                self._pending[user.id].up += delta_up
+                self._pending[user.id].down += delta_down
         for name, (up, down) in counts.items():
             if name not in self._last:
                 self._last[name] = (up, down)
@@ -193,7 +195,15 @@ class StatsCollector:
         # same pending counters and bill them twice (or clear them while the
         # first commit is still in flight).
         async with self._flush_lock:
-            pending = {key: value for key, value in self._pending.items() if value.up or value.down}
+            async with self._pending_lock:
+                # Copy the counters: tick() may add new deltas while the
+                # database commit below is awaiting.  Clearing the live dict
+                # after the commit would silently drop those new bytes.
+                pending = {
+                    key: _Pending(up=value.up, down=value.down)
+                    for key, value in self._pending.items()
+                    if value.up or value.down
+                }
             if not pending:
                 self._last_flush = time.monotonic()
                 return
@@ -243,7 +253,15 @@ class StatsCollector:
                     session.add(StatsEpoch(user_id=user_id, epoch=epoch, active=True))
                 self._epoch_pending.clear()
                 await session.commit()
-            self._pending.clear()
+            async with self._pending_lock:
+                for key, delta in pending.items():
+                    current = self._pending.get(key)
+                    if current is None:
+                        continue
+                    current.up = max(0, current.up - delta.up)
+                    current.down = max(0, current.down - delta.down)
+                    if current.up == 0 and current.down == 0:
+                        self._pending.pop(key, None)
             self._last_flush = time.monotonic()
             if self.usage:
                 await self.bus.publish(
@@ -268,7 +286,6 @@ class StatsCollector:
         to_disable: list[str] = []
         reactivated: list[str] = []
         first_enforce = self._first_enforce
-        self._first_enforce = False
         now = utcnow()
         async with self.session_factory() as session:
             users = (await session.execute(select(ProxyUser))).scalars().all()
@@ -340,6 +357,9 @@ class StatsCollector:
             # Commit unconditionally: threshold alerts are also writes and
             # used to be rolled back when no user state changed.
             await session.commit()
+            # Only now is the startup recovery decision durable.  If the
+            # commit failed, the next tick must still seed pending disables.
+            self._first_enforce = False
         if to_disable:
             self._pending_disable.update(to_disable)
             self.bus.log("warning", "users disabled by policy", users=", ".join(to_disable))
@@ -361,6 +381,12 @@ class StatsCollector:
                 self.bus.log("error", "failed to apply quota configuration", error=str(exc))
                 return False
         return True
+
+    def pending_bytes(self, user_id: str) -> int:
+        """Bytes sampled but not yet committed to ``used_bytes``."""
+
+        delta = self._pending.get(user_id)
+        return 0 if delta is None else delta.up + delta.down
 
     def snapshot(self) -> dict[str, object]:
         users = list(self.usage.values())

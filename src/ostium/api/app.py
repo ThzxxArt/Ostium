@@ -391,6 +391,8 @@ async def _docs_authorized(request: Request) -> bool:
 
 
 def _is_loopback_request(request: Request) -> bool:
+    if request.headers.get("x-forwarded-for"):
+        return False
     host = request.client.host if request.client else ""
     return host in {"127.0.0.1", "::1", "localhost", "testclient"}
 

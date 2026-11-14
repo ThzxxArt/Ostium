@@ -263,6 +263,16 @@ async def update_inbound(
     elif "certificate_id" in changes and changes["certificate_id"] is None:
         if kind not in {"hysteria2", "trojan"}:
             raise ApiError(400, "only TLS inbounds accept a certificate", "bad_request")
+        if inbound.enabled:
+            # Clearing only the certificate while leaving the inbound enabled
+            # would silently remove the listener from the next generated
+            # configuration.  Require an explicit disable first, so the
+            # operator sees the outage in the same request.
+            raise ApiError(
+                409,
+                f"{kind} is enabled; disable it before clearing the certificate binding",
+                "certificate_required",
+            )
         inbound.certificate_id = None
     if kind == "vless":
         if payload.reality_server_name:

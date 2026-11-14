@@ -35,12 +35,15 @@ class ClashApi:
             return {"downloadTotal": 0, "uploadTotal": 0, "connections": [], "unavailable": True}
 
     async def close_connection(self, connection_id: str) -> bool:
+        from urllib.parse import quote
+
         try:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(2.0, connect=0.6), trust_env=False
             ) as client:
                 response = await client.delete(
-                    f"{self.base_url}/connections/{connection_id}", headers=self._headers()
+                    f"{self.base_url}/connections/{quote(connection_id, safe='')}",
+                    headers=self._headers(),
                 )
             return response.status_code < 300
         except httpx.HTTPError:

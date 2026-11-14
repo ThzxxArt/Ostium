@@ -7,6 +7,8 @@ and supervises exactly one child process.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -74,9 +76,13 @@ def create_core_app(settings: Settings) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         ensure_core_token(settings.core_token_file)
         await supervisor.start()
+        log_task = asyncio.create_task(_log_maintenance(supervisor), name="ostium-log-limit")
         try:
             yield
         finally:
+            log_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await log_task
             await supervisor.shutdown()
 
     app = FastAPI(
@@ -188,6 +194,17 @@ def create_core_app(settings: Settings) -> FastAPI:
 
 class _AuthError(Exception):
     pass
+
+
+async def _log_maintenance(supervisor: CoreSupervisor, interval: float = 3600.0) -> None:
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            supervisor.enforce_log_limit()
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("core log maintenance failed")
 
 
 def _status_payload(status: Any, settings: Settings) -> dict[str, Any]:

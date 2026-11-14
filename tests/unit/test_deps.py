@@ -61,6 +61,8 @@ def test_client_ip_and_loopback() -> None:
     assert deps.client_ip(unknown) == "unknown"
     assert deps.is_loopback(_request()) is True
     assert deps.is_loopback(_request(client_host="8.8.8.8")) is False
+    # A loopback reverse proxy must not turn a remote request into a local one.
+    assert deps.is_loopback(forwarded) is False
 
 
 def test_get_services_requires_initialization() -> None:

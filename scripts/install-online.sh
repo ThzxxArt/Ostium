@@ -400,7 +400,7 @@ run_platform_installer() {
     export OSTIUM_CORE_TARBALL="$CORE"
     export OSTIUM_RUN_AS_ROOT="$RUN_AS_ROOT"
     export OSTIUM_NO_SERVICE="$NO_SERVICE"
-    [[ "$START" == "false" ]] && export OSTIUM_NO_START=1
+    [[ "$START" == "false" ]] && export OSTIUM_NO_START=true
     chmod +x "$SOURCE_DIR/deploy/launchd/install-macos.sh"
     "$SOURCE_DIR/deploy/launchd/install-macos.sh" client
   fi
@@ -448,6 +448,12 @@ uninstall_ostium() {
   rm -rf "$PREFIX"
   if [[ "$PURGE" == "true" ]]; then
     rm -rf "$DATA" "$CLIENT_DATA" "$CLIENT_UI_DATA" "$CONFIG"
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+      if [[ -n "$user_home" ]]; then
+        rm -rf "$user_home/.local/share/ostium"
+      fi
+    fi
     rm -rf "/Library/Application Support/Ostium" "/Library/Application Support/Ostium UI"
     if id -u ostium >/dev/null 2>&1; then userdel ostium 2>/dev/null || true; fi
     if id -u ostium-core >/dev/null 2>&1; then userdel ostium-core 2>/dev/null || true; fi
