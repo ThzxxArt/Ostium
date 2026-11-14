@@ -3,7 +3,7 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [0.1.1] - 2026-11-13
+## [0.1.1] - 2026-11-14 (pending publication)
 
 ### Security
 
@@ -25,9 +25,11 @@ SemVer.
   loopback/link-local/metadata targets while allowing LAN subscriptions.
 - Rule-set path traversal fixed; rule match/regex/CIDR/reference validation;
   ruleset deletion checks references.
-- Backup plaintext creation requires explicit acknowledgement; restore checks
-  role, SQLite integrity and migrations. Certificate deletion removes key files;
-  manual chains are verified; renewals keep the previous ready certificate.
+- Manual plaintext backup creation requires explicit acknowledgement; automatic
+  daily backups are plaintext, include `master.key`, and are documented as such.
+  Restore checks role, SQLite integrity and migrations. Certificate deletion
+  removes key files after a successful apply; manual chains are verified;
+  renewals keep the previous ready certificate.
 - Windows core data/token/last-good moved to an admin/SYSTEM-only ACL directory;
   uninstall restores proxy/TUN state.
 
@@ -74,9 +76,9 @@ SemVer.
 - Release builds Windows setup, macOS DMG, Linux DEB/AppImage (amd64/arm64),
   Docker, SBOM and checksums from one tag; release publication refuses to
   overwrite existing assets.
-- CI enforces frontend coverage, Playwright/axe/visual checks, shellcheck,
-  PowerShell parsing, mkdocs `--strict`, dependency audits and first-load JS
-  budget.
+- Release verification enforces frontend coverage, Playwright/axe/visual
+  checks, shellcheck, PowerShell parsing, mkdocs `--strict`, dependency audits
+  and the first-load JS budget; pull-request CI runs the Python/frontend gates.
 - Windows/macOS installers are labelled unsigned when no signing certificate is
   configured; macOS notarization is optional and explicit.
 - Documentation, migration guide and security advisory updated for the new
@@ -104,6 +106,39 @@ SemVer.
   webhooks; the update channel is honoured by `ostium update --check`.
 - Localisation and accessibility fixes for login hero, error/empty/QR/chart
   components, command palette, settings navigation and backup labels.
+
+### Review round 4 (pre-release)
+
+- Normalised IPv4-mapped/6to4/Teredo/CGNAT addresses in SSRF checks and rejected
+  HTTPS-to-HTTP redirect downgrades for subscriptions and rule sets.
+- Hardened Linux/macOS installers: service-group creation, home-path validation,
+  upgrade staging/rollback, database snapshots, user-UI restart and mode-switch
+  cleanup. DEB now creates its service group explicitly.
+- Windows core token/runtime ACL now grants only the installing user instead of
+  the built-in Users group; Windows build failures and unsigned installers can
+  no longer be silently published.
+- Certificate deletion applies the new configuration before unlinking TLS
+  material; failed applies retain the files used by the old last-good config.
+- Fixed long proxy-user names overflowing endpoint tags, corrupt credentials
+  breaking the subscriptions overview, rule-set file leaks, unbounded backup
+  restore expansion and statistics epoch loss on failed commits.
+- Frontend: subscription URLs in client setup, multi-condition rule editing,
+  filtered batch selection, dashboard online/certificate/inbound truthfulness,
+  auto endpoint display, i18n/aria/timezone/scroll fixes.
+- Release gates: branch coverage is measured, AppImage architecture/dependencies
+  are correct and fail closed, Docker pushes wait for platform assets, and the
+  release body comes from `RELEASE_NOTES.md`.
+
+### Release status and blockers
+
+- v0.1.1 is **not published yet**: the tag, GitHub Release, PyPI package and
+  GHCR images are created only after the release owner signs off.
+- AppImage is built by the release workflow; it was not produced in the local
+  review environment (missing `file`/`appimagetool`) and is recorded as a local
+  blocker, not as a successful local build.
+- Windows 11, macOS 14, Nginx, Docker runtime, ACME, real TUN/LAN/DNS, 72h
+  soak, performance, five-user usability and code signing remain external
+  blockers; they are not claimed as verified.
 
 ## [0.1.0] - 2026-11-13
 

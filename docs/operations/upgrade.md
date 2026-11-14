@@ -40,7 +40,8 @@ sudo systemctl start ostium
 curl -fsS http://127.0.0.1:8443/readyz
 ```
 
-Ostium 不做静默自动更新。UI 只提供下载链接，不自动执行。
+Ostium 不做静默自动更新，UI 不提供下载/执行按钮；请使用 CLI `ostium update --check`
+查询版本，再按本页命令手动校验并安装。
 
 ## 核心升级
 

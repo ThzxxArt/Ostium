@@ -18,7 +18,8 @@ Ostium 内置 Let's Encrypt ACME HTTP-01 客户端，用于 Hysteria2、Trojan �
 
 ## 续期
 
-Ostium 每天检查一次，剩余不足 30 天时自动续期。续期失败会产生告警，并保留旧证书。
+Ostium 每 6 小时检查一次，剩余不足 30 天时自动续期。续期失败会记录日志并创建
+`certificate_renewal_failed` 告警，同时保留旧证书；证书进入 14 天窗口后还会生成到期告警。
 
 签发任务支持 per-issue `staging` 与 `email` 覆盖；全局 ACME 邮箱/staging 在 Settings 中配置。
 证书必须在线路页绑定到具体 inbound，不存在“任意 ready 证书兜底”。

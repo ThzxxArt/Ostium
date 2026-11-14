@@ -17,7 +17,8 @@
 
 管理 UI 默认只监听 `127.0.0.1:8443`。非回环明文监听必须显式
 `allow_insecure_bind = true`；公网部署优先使用 Nginx TLS 或 Public UI，并在 Settings
-中配置 `ui_allowlist`（CIDR）。Docker 必须由宿主机防火墙限制 8443。
+中配置 `ui_allowlist`（CIDR）。allowlist 只保护管理 UI/API 与静态资源；`/sub/*`、
+`/healthz`、`/readyz` 按设计豁免，便于客户端订阅和探活。Docker 必须由宿主机防火墙限制 8443。
 
 ## 客户端
 

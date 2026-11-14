@@ -6,9 +6,9 @@ a published asset is never replaced.
 ## Before tagging
 
 - [ ] All P0/P1/P2 work items closed or explicitly blocked with owner.
-- [ ] `main` green: ruff, format, mypy, backend coverage gate, frontend coverage,
-      Playwright/axe/visual, shellcheck, PowerShell parse, mkdocs `--strict`,
-      pip-audit, npm audit.
+- [ ] PR/main CI green for Python and frontend gates; release `verify` workflow
+      additionally green for shellcheck, PowerShell parse, mkdocs `--strict`,
+      Playwright/axe/visual, pip-audit and npm audit.
 - [ ] Version audit: `pyproject.toml`, `src/ostium/__init__.py`, installers,
       Inno, Docker/compose, manifest, README/docs.
 - [ ] DEB/AppImage filenames and Debian `Version:` use `0.1.1`, never `v0.1.1`

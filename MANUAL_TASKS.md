@@ -110,4 +110,4 @@ hardware or accounts.
 - [ ] Complete the legal/AUP review for the chosen hosting provider and
       jurisdiction; this project provides no legal advice.
 - [ ] Confirm the final 72h soak, ACME, backup/restore and upgrade/rollback
-      gates before announcing v0.1.0.
+      gates before announcing v0.1.1.

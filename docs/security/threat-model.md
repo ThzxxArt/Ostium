@@ -18,7 +18,7 @@
 - 管理 UI 默认只监听回环；非回环明文必须显式 `allow_insecure_bind`，否则拒绝启动；支持 CIDR allowlist。
 - `/api/docs` 与 `/api/openapi.json` 仅管理员可访问；本地登录 token 一次性。
 - 核心 API 只监听回环，常量时间比较 Bearer，2 MiB 请求体上限，严格 JSON，角色白名单，端口/路径校验和 `sing-box check`。
-- AES-256-GCM 字段加密 + AAD；`master.key` 0600；备份使用 scrypt + AES-256-GCM；明文备份需显式确认。
+- AES-256-GCM 字段加密 + AAD；`master.key` 0600；手动明文备份需显式确认；自动备份是明文且包含 `master.key`，文档已强警告。
 - 日志脱敏 UUID、token、密码、私钥、代理 URI 和 Authorization 头。
 - 订阅 token 哈希查找 + 加密恢复；公开响应设置 `no-referrer`、`no-store`。
 - 服务端默认阻止云元数据、回环、link-local、CGNAT、私有网段和 SMTP 25；即使关闭私有网段阻断，25 仍拒绝。
@@ -42,6 +42,9 @@
 - 控制面停止时配额执行暂停。
 - 核心应用配置会重启子进程，造成短暂断连和采样误差。
 - 同用户的本地恶意软件可以控制 VPN，但默认模式不应获得 root shell。
+- 出站订阅/规则集/Webhook 的 DNS rebinding 仍存在“校验解析地址、连接时再次解析”的
+  TOCTOU 残余风险；已逐跳校验重定向并阻断私网/链路本地/metadata 字面与解析结果，
+  但无法在标准 HTTP 客户端层完全消除。
 - 开启 Allow LAN 后，混合代理对局域网可见且没有认证；必须用防火墙限制来源，只建议在可信网络使用。
 - 未签名 Windows/macOS 构建降低 MITM 抵抗力；请校验 SHA256 或自行构建。
 - 上游 sing-box/依赖 0-day 需要及时更新。

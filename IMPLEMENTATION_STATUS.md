@@ -42,9 +42,15 @@ platform/external validation, `[ ]` not done yet.
       running-core log limits, statistics pending races, release DEB version,
       upgrade health checks, reverse-proxy loopback semantics and frontend
       contract/warning gaps. See `V0.1.1_REVIEW_ROUND3.md`.
-- [x] Local final gates (review round 3): 546 regular backend tests + 10 real
-      sing-box integration tests; 166 frontend tests; 69 Playwright cases;
-      coverage gates green; first-load JS 192.9 KiB gzip.
+- [x] Review round 4 revalidated R1/R2/R3 and fixed additional pre-release
+      findings across SSRF normalisation, installer lifecycle/path safety,
+      DEB/service accounts, Windows token ACLs, AppImage build/architecture,
+      release gating, certificate deletion order, backup resource bounds,
+      frontend setup/rules/dashboard/i18n/session paths and docs truthfulness.
+      See `V0.1.1_REVIEW_ROUND4.md`.
+- [x] Local final gates (review round 4): 585 regular backend tests + 10 real
+      sing-box integration tests; 173 frontend tests; 69 Playwright cases;
+      coverage gates green; first-load JS 193.4 KiB gzip.
 
 ## Delivered in this workspace
 
@@ -140,24 +146,22 @@ platform/external validation, `[ ]` not done yet.
 
 ## Test status
 
-- `ruff check` / `ruff format --check`: pass (137 files).
-- `mypy src/ostium` strict: pass (69 source files).
-- `pytest`: 419 passed, 0 skipped, 0 failed, including real sing-box config
-  checks, core apply/stop/rollback, the custom `with_v2ray_api` core, a live
-  client → Reality → collector traffic test, certificates, jobs, auth, backups,
-  stats, client profiles, rules, ACME challenge server and API flows.
-- Backend coverage: statements 97.67%, branches 94.93%; every module ≥85% and
+- `ruff check` / `ruff format --check`: pass (149 files).
+- `mypy src/ostium` strict: pass (71 source files).
+- `pytest -m "not integration"`: 585 passed, 0 skipped, 0 failed.
+- Real sing-box integration: 10 passed, 0 skipped.
+- Backend coverage: statements 94.95%, branches 91.37%; every module ≥85% and
   `api/core/services/engine` ≥90% (enforced by `scripts/coverage_gate.py`).
 - `npm run lint`, `typecheck`, `test`, `build`, `format:check`: pass.
-- Frontend coverage: statements 91.34%, branches 85.26%, functions 89.06%,
-  lines 92.14% (Vitest v8, thresholds 85).
-- Playwright: 21 passed on desktop 1440, tablet 1024 and mobile 390; login,
-  dashboard, command palette, PWA service worker, axe smoke,
-  no-horizontal-scroll and six dark/light visual baselines pass.
-- `pip-audit` and full `npm audit`: 0 known vulnerabilities after the PWA
-  toolchain replacement and dependency overrides.
+- Frontend coverage: statements 90.72%, branches 85.07%, functions 88.42%,
+  lines 92.00% (Vitest v8, thresholds 85).
+- Playwright: 69 passed on desktop 1440, tablet 1024 and mobile 390; login,
+  dashboard, command palette, PWA service worker, axe, LCP/CLS,
+  no-horizontal-scroll and stable dark/light visual baselines pass.
+- `pip-audit` and full `npm audit`: 0 known vulnerabilities.
 - `mkdocs build --strict`, `shellcheck`, clean-wheel install and serve smoke:
   pass.
+- First-load JS: 193.4 KiB gzip (budget 300 KiB).
 - Real ACME, Windows/macOS TUN, Windows service, macOS launchd, Windows/macOS
   system proxy, 72h soak, usability tests and installer-on-fresh-VM are not
   run in this environment; see `MANUAL_TASKS.md`.

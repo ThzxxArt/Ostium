@@ -35,13 +35,19 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-95.0%25%20statements%20%C2%B7%2091.4%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-556%20backend%20%C2%B7%20166%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20173%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
+> [!IMPORTANT]
+> **Release status: v0.1.1 is not yet published.** The v0.1.1 download links,
+> package names and release badge below take effect after the tag and GitHub Release
+> are created; until then those commands return 404. The current public release is
+> still v0.1.0 (apply the default-bind advisory mitigation first).
+
 > [!TIP]
-> **Current release: v0.1.1.** The easiest install does not require Python:
+> **Target version: v0.1.1.** The easiest install does not require Python:
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
@@ -77,7 +83,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 556 backend tests (546 regular + 10 live sing-box integration), 166 frontend tests and 69 Playwright cases; 95.05% backend statements / 91.36% branches. |
+| 🧪 **Verified** | 595 backend tests (585 regular + 10 live sing-box integration), 173 frontend tests and 69 Playwright cases; 94.95% backend statements / 91.37% branches. |
 
 ---
 
@@ -252,7 +258,7 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` accepts both a source checkout and a flat release-asset directory.
+`--local-dir` expects a flat release-asset directory (wheel, sdist, matching core archive and `SHA256SUMS`); build or download those assets before using a source checkout.
 The installer verifies the sdist first, then extracts `scripts/install.sh` and
 `deploy/` from it; it never executes an unverified source archive.
 
@@ -587,7 +593,7 @@ virtual interface.
 | `ostium cert list/issue` | Certificate management |
 | `ostium service install/uninstall` | systemd units (Linux root) |
 
-Exit codes: `0` success, `1` general, `2` usage, `3` not initialised, `4` service unavailable,
+Exit codes: `0` success, `1` general, `2` usage, `3` configuration saved but not applied (`--allow-degraded` returns 0), `4` service unavailable,
 `5` permission, `6` core error.
 
 ### API and automation
@@ -783,7 +789,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 |---|---|---|
 | Linux server | `/var/lib/ostium`, `/etc/ostium/config.toml` | same |
 | Linux client | `~/.local/share/ostium` (UI data and `config.toml`) | `/var/lib/ostium-core`, `/etc/ostium/client.toml` |
-| Windows | `%ProgramData%\Ostium` (UI data and user-writable config) | `%ProgramFiles%\Ostium\core`, `%ProgramFiles%\Ostium\service\core.toml` (admin/SYSTEM only) |
+| Windows | `%ProgramData%\Ostium` (UI data and user-writable config) | `%ProgramFiles%\Ostium\core` (program/service config), `%ProgramData%\OstiumCore` (database, token, last-good; admin/SYSTEM only) |
 | macOS | `/Library/Application Support/Ostium UI` (UI) | `/Library/Application Support/Ostium` |
 
 Key files: `ostium.db`, `master.key`, `config.toml`, `certs/`, `runtime/last-good.json`,
@@ -841,10 +847,10 @@ npx playwright test
 
 Current results:
 
-- Backend: **546 passed / 0 skipped** (regular suite) + **10 passed / 0 skipped**
-  (live sing-box integration), **95.05%** statements / **91.36%** branches.
-- Frontend: **166 passed**, **90.55%** statements / **85.16%** branches /
-  **88.31%** functions / **91.82%** lines.
+- Backend: **585 passed / 0 skipped** (regular suite) + **10 passed / 0 skipped**
+  (live sing-box integration), **94.95%** statements / **91.37%** branches.
+- Frontend: **173 passed**, **90.72%** statements / **85.07%** branches /
+  **88.42%** functions / **92.00%** lines.
 - Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
   baselines, axe on every core page (serious/critical=0), LCP/CLS performance budgets, PWA
   service-worker registration, navigation and the command palette.

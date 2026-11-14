@@ -124,7 +124,9 @@ sudo ./install.sh --role client \
 
 ## 更新
 
-Ostium 不做静默自动更新。使用 **Settings → Check for updates**，下载签名版本，校验后安装。UI 升级时核心继续运行；核心升级会短暂中断隧道。
+Ostium 不做静默自动更新，UI 也没有下载/安装按钮。使用 CLI
+`ostium update --check` 查询新版本，再按下方命令手动下载、校验和安装。UI 升级时核心继续
+运行；核心升级会短暂中断隧道。
 
 一键升级：
 

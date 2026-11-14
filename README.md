@@ -35,13 +35,18 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-95.0%25%20statements%20%C2%B7%2091.4%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-556%20backend%20%C2%B7%20166%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.9%25%20statements%20%C2%B7%2091.3%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.7%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-595%20backend%20%C2%B7%20173%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
+> [!IMPORTANT]
+> **发布状态：v0.1.1 尚未发布。** 下方 v0.1.1 下载链接、包名和 Release 徽章在创建
+> tag 与 GitHub Release 后生效；发布前这些 v0.1.1 命令会返回 404，当前公开可安装版本
+> 仍为 v0.1.0（请先按默认绑定安全公告缓解）。
+
 > [!TIP]
-> **当前版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
+> **目标版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh \
@@ -70,11 +75,11 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | 🧭 **双端一体** | 服务端和客户端使用同一个包、同一个 SPA、同一个 CLI；学会一次，两端通用。 |
 | 🛡️ **两服务隔离** | `ostium.service` 只跑 Web/API/数据库；`ostium-core.service` 只做校验、启动和监管 sing-box。UI 不接触 root/TUN 权限。 |
 | 📊 **真实流量账本** | 定制 `sing-box` 开启 `with_v2ray_api`，每用户上行/下行、日/月汇总、配额与到期自动禁用。 |
-| 🌐 **全平台客户端** | Windows 11、macOS 14+、Linux；混合代理、系统代理、TUN、URLTest、多订阅。 |
+| 🌐 **全平台客户端** | Windows 10 22H2+ / 11 x64、macOS 14+、Linux；混合代理、系统代理、TUN、URLTest、多订阅。 |
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 556 个后端测试（546 个常规 + 10 个真实 sing-box 集成）、166 个前端测试、69 个 Playwright 用例；后端 95.05% 语句 / 91.36% 分支。 |
+| 🧪 **可验证** | 595 个后端测试（585 个常规 + 10 个真实 sing-box 集成）、173 个前端测试、69 个 Playwright 用例；后端 94.95% 语句 / 91.37% 分支。 |
 
 ---
 
@@ -239,8 +244,9 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 同时支持源码 checkout 和扁平 Release 资产目录；安装器会先校验 sdist，
-再从 sdist 中取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
+`--local-dir` 要求一个扁平的 Release 资产目录（wheel、sdist、对应核心归档和
+`SHA256SUMS`）；源码 checkout 请先构建这些资产。安装器会先校验 sdist，再从 sdist 中
+取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
 
 > 完全隔离的环境还需要预建 wheelhouse 或可访问的内网 PyPI 镜像；wheel 的 Python
 > 依赖不会打进 Release 资产。
@@ -559,7 +565,7 @@ sudo -u ostium ostium cert issue local.example.com --self-signed
 | `ostium cert list/issue` | 证书管理 |
 | `ostium service install/uninstall` | systemd 单元（Linux root） |
 
-退出码：`0` 成功，`1` 一般错误，`2` 用法错误，`3` 未初始化，`4` 服务不可用，`5` 权限不足，`6` 核心错误。
+退出码：`0` 成功，`1` 一般错误，`2` 用法错误，`3` 配置已保存但未应用（可用 `--allow-degraded` 降级为 0），`4` 服务不可用，`5` 权限不足，`6` 核心/绑定错误。
 
 ### API 与自动化
 
@@ -746,7 +752,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 |---|---|---|
 | Linux 服务端 | `/var/lib/ostium`、`/etc/ostium/config.toml` | 同左 |
 | Linux 客户端 | `~/.local/share/ostium`（UI 数据与 `config.toml`） | `/var/lib/ostium-core`、`/etc/ostium/client.toml` |
-| Windows | `%ProgramData%\Ostium`（UI 数据与用户可写配置） | `%ProgramFiles%\Ostium\core`、`%ProgramFiles%\Ostium\service\core.toml`（管理员/SYSTEM 可写） |
+| Windows | `%ProgramData%\Ostium`（UI 数据与用户可写配置） | `%ProgramFiles%\Ostium\core`（程序/服务配置）、`%ProgramData%\OstiumCore`（数据库、token、last-good，管理员/SYSTEM 专属） |
 | macOS | `/Library/Application Support/Ostium UI`（UI） | `/Library/Application Support/Ostium` |
 
 关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。
@@ -803,8 +809,8 @@ npx playwright test
 
 当前结果：
 
-- 后端：**546 passed / 0 skipped**（常规测试）+ **10 passed / 0 skipped**（真实 sing-box 集成），语句 **95.05%**、分支 **91.36%**；
-- 前端：**166 passed**，语句 **90.55%**、分支 **85.16%**、函数 **88.31%**、行 **91.82%**；
+- 后端：**585 passed / 0 skipped**（常规测试）+ **10 passed / 0 skipped**（真实 sing-box 集成），语句 **94.95%**、分支 **91.37%**；
+- 前端：**173 passed**，语句 **90.72%**、分支 **85.07%**、函数 **88.42%**、行 **92.00%**；
 - Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe（serious/critical=0）、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

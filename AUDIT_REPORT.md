@@ -733,3 +733,33 @@ shellcheck + bash -n                                  -> PASS
 - 前端：**166 passed**；语句 **90.55%**、分支 **85.16%**、函数 **88.31%**、行 **91.82%**；首屏 JS **192.9 KiB gzip**。
 - Playwright：**69 passed**；`ruff`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict`/`pip-audit`/`npm audit` 全绿。
 - 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak/签名写成已验证。
+
+## 20. v0.1.1 第四轮发布前全量 Review（2026-11-14）
+
+本轮独立回归 R1-01～R1-34、R2-01～R2-31、R3-101～R3-136，并从发布负责人视角复核代码、
+功能、逻辑、稳定性、链路、安全、视觉、测试、文档、安装/升级/卸载、打包与发布真实性。
+完整台账见 `V0.1.1_REVIEW_ROUND4.md`。
+
+### 20.1 结论
+
+- R1 回归：**34/34 通过**；R2 回归：**31/31 通过**；R3 回归：**36/36 通过**。
+- 新增并修复 **59 项**：P0 2 项、P1 23 项、P2 34 项。
+- 本地自动化与可构建性达到发布候选标准；公开 Release 仍为 **NO-GO**（外部平台/ACME/TUN/soak/性能/签名未实测，AppImage 本机未产出）。
+
+### 20.2 重点根因
+
+1. **安装器 root 路径与生命周期**：裸 home 可作为前缀导致卸载删除 home；升级过早停服务、无 DB 快照/失败恢复；DEB 缺 ostium 组。
+2. **Windows 特权边界**：`Users` 组可读核心 token；构建脚本吞掉原生失败并可能发布空 SPA/缺核心/未签名 setup。
+3. **SSRF 地址形态**：IPv4-mapped IPv6/6to4 绕过 metadata 阻断；HTTPS 可 302 降级到 HTTP。
+4. **证书删除顺序**：先删文件再 apply，失败后旧核心重启失去 TLS。
+5. **发布门禁真实性**：CI 未启用 `--cov-branch`；AppImage 架构名错误且失败被吞；Docker 在平台资产失败时仍推 GHCR。
+6. **前端跨层契约**：客户端 setup 的 URL 被当文本；多条件规则编辑丢条件；批量选择跨过滤保留；Dashboard 状态/证书/在线用户展示不真实。
+
+### 20.3 回归证据
+
+- 后端：**585 passed / 0 skipped**；语句 **94.95%**、分支 **91.37%**；覆盖率门禁通过。
+- 真实 sing-box 集成：**10 passed / 0 skipped**。
+- 前端：**173 passed**；语句 **90.72%**、分支 **85.07%**、函数 **88.42%**、行 **92.00%**；首屏 JS **193.4 KiB gzip**。
+- Playwright：**69 passed**（workers=1）；`ruff`/`ruff format`/`mypy`/`shellcheck`/`bash -n`/`mkdocs --strict` 通过。
+- wheel/sdist/PyInstaller/DEB 0.1.1 成功；DEB 解包 `ostium version` 为 0.1.1；AppImage 本机 blocker，CI 依赖已补齐。
+- 外部验证矩阵未变化；未把 Windows/macOS/Nginx/Docker/ACME/TUN/soak/签名写成已验证。

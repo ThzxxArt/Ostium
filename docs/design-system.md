@@ -57,4 +57,4 @@ ECharts 自定义调色板。2px 线、12% 面积填充、水平虚线网格、�
 
 ## 验证
 
-Playwright 视觉基线覆盖 1440/1024/390 的深色和浅色；axe 检查 serious/critical；首屏 JS < 300 KB gzip；LCP < 2.5s；INP < 200ms；CLS < 0.05。可用性脚本见 `docs/ux.md`。
+Playwright 视觉基线覆盖 1440/1024/390 的深色和浅色；axe 检查 serious/critical；首屏 JS < 300 KB gzip；LCP < 2.5s 与 CLS < 0.05 自动测量。INP < 200ms 是人工交互走查目标，当前 Playwright 未自动采集 INP。可用性脚本见 `docs/ux.md`。

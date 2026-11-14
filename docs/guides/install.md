@@ -109,7 +109,7 @@ Release 同时提供可离线使用的原生包：
 | `--ui-port PORT` | 管理 UI 端口（默认 8443） |
 | `--public-ui` | 已禁用；公网 UI 必须在登录后签发证书、启用 TOTP，再从 Settings 开启 |
 | `--no-start` | 注册服务但不启动 |
-| `--local-dir DIR` | 离线安装：源码 checkout，或包含 wheel/sdist/core/`SHA256SUMS` 的扁平 Release 资产目录 |
+| `--local-dir DIR` | 离线安装：包含 wheel/sdist/core/`SHA256SUMS` 的扁平 Release 资产目录 |
 | `--no-verify` | 跳过 SHA256（仅限本地开发） |
 
 ## 没有 Python 也能装
@@ -195,8 +195,9 @@ sudo bash install-online.sh install \
   --role server --domain vpn.example.com
 ```
 
-`--local-dir` 同时支持源码 checkout 和扁平 Release 资产目录。安装器会先校验 sdist，
-再从 sdist 中取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
+`--local-dir` 要求一个扁平的 Release 资产目录（wheel、sdist、对应核心归档和
+`SHA256SUMS`）。源码 checkout 不能直接使用；请先构建/下载这些 Release 资产。安装器会
+先校验 sdist，再从 sdist 中取出 `scripts/install.sh` 与 `deploy/`，不会执行未校验的源码包。
 
 > 完全隔离的环境还需要预建 wheelhouse 或可访问的内网 PyPI 镜像；wheel 的 Python
 > 依赖不会打进 Release 资产。
