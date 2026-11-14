@@ -41,6 +41,9 @@ NO_SERVICE="false"
 UPGRADE="false"
 UNINSTALL="false"
 PURGE="false"
+UPGRADE_SERVICES_STOPPED="false"
+UPGRADE_ROLLED_BACK="false"
+UPGRADE_SNAPSHOT_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -108,20 +111,29 @@ if [[ -n "$DOMAIN" && ! "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]
   echo "--domain 不是有效域名：$DOMAIN" >&2
   exit 2
 fi
-if [[ -z "$WHEEL" || ! -f "$WHEEL" ]]; then
-  echo "请提供 --wheel /path/to/ostium_ctl-*.whl" >&2
-  exit 2
+if [[ "$UNINSTALL" != "true" ]]; then
+  if [[ -z "$WHEEL" || ! -f "$WHEEL" ]]; then
+    echo "请提供 --wheel /path/to/ostium_ctl-*.whl" >&2
+    exit 2
+  fi
+  if [[ -z "$CORE" || ! -f "$CORE" ]]; then
+    echo "请提供 --core /path/to/ostium-core-*.tar.gz" >&2
+    exit 2
+  fi
+  if [[ -n "$PYTHON_BIN" && ! -x "$PYTHON_BIN" ]]; then
+    echo "--python 不可执行：$PYTHON_BIN" >&2
+    exit 2
+  fi
 fi
-if [[ -z "$CORE" || ! -f "$CORE" ]]; then
-  echo "请提供 --core /path/to/ostium-core-*.tar.gz" >&2
-  exit 2
+PASSWORD_GENERATED="false"
+DB_PREEXISTING="false"
+if [[ -f "$DATA/ostium.db" ]]; then
+  DB_PREEXISTING="true"
 fi
-if [[ -n "$PYTHON_BIN" && ! -x "$PYTHON_BIN" ]]; then
-  echo "--python 不可执行：$PYTHON_BIN" >&2
-  exit 2
-fi
-if [[ -z "$ADMIN_PASSWORD" && "$UPGRADE" != "true" ]]; then
+if [[ -z "$ADMIN_PASSWORD" && "$UPGRADE" != "true" && "$UNINSTALL" != "true" \
+  && "$DB_PREEXISTING" != "true" ]]; then
   ADMIN_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
+  PASSWORD_GENERATED="true"
 fi
 if [[ "$BEHIND_PROXY" == "true" ]]; then
   UI_HOST="127.0.0.1"
@@ -172,11 +184,24 @@ validate_install_path() {
     normalized="$(printf '%s' "$path" | sed 's#//*#/#g; s#/$##')"
   fi
   case "$normalized" in
-    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/usr/local/bin|/usr/local/sbin|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
       echo "拒绝使用系统根目录作为 $label：$normalized" >&2
       exit 2
       ;;
   esac
+  # A bare user home is never an installer-owned directory; deleting it on
+  # uninstall would destroy unrelated files.  A dedicated child directory is
+  # allowed for advanced layouts.
+  local home_rest=""
+  case "$normalized" in
+    /home/*) home_rest="${normalized#/home/}" ;;
+    /Users/*) home_rest="${normalized#/Users/}" ;;
+    /root/*) home_rest="${normalized#/root/}" ;;
+  esac
+  if [[ -n "$home_rest" && "$home_rest" != */* ]]; then
+    echo "拒绝把用户主目录本身作为 $label：$normalized" >&2
+    exit 2
+  fi
   case "/$normalized/" in
     */../*)
       echo "$label 不能包含 ..：$path" >&2
@@ -283,12 +308,83 @@ wait_for_url() {
   return 1
 }
 
+wait_for_core() {
+  # A client with no profile (or a server with nothing applied yet) reports
+  # running=false but is healthy.  Require the core API to answer, not a
+  # running child process.
+  for _ in $(seq 1 20); do
+    if curl -fsS --max-time 2 http://127.0.0.1:8788/v1/health >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+snapshot_upgrade_state() {
+  UPGRADE_SNAPSHOT_DIR="$DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+  install -d -m 0700 "$UPGRADE_SNAPSHOT_DIR"
+  for file in ostium.db ostium.db-wal ostium.db-shm; do
+    if [[ -f "$DATA/$file" ]]; then
+      cp -p "$DATA/$file" "$UPGRADE_SNAPSHOT_DIR/$file"
+    fi
+  done
+  if [[ -f "$CONFIG/config.toml" ]]; then
+    cp -p "$CONFIG/config.toml" "$UPGRADE_SNAPSHOT_DIR/config.toml"
+  fi
+}
+
+restore_upgrade_snapshot() {
+  if [[ -z "$UPGRADE_SNAPSHOT_DIR" || ! -f "$UPGRADE_SNAPSHOT_DIR/ostium.db" ]]; then
+    return
+  fi
+  cp -p "$UPGRADE_SNAPSHOT_DIR/ostium.db" "$DATA/ostium.db"
+  for file in ostium.db-wal ostium.db-shm; do
+    if [[ -f "$UPGRADE_SNAPSHOT_DIR/$file" ]]; then
+      cp -p "$UPGRADE_SNAPSHOT_DIR/$file" "$DATA/$file"
+    else
+      rm -f "$DATA/$file"
+    fi
+  done
+  echo "升级前数据库快照已恢复。" >&2
+}
+
+restore_upgrade_services() {
+  if [[ "$UPGRADE_SERVICES_STOPPED" != "true" || "$UPGRADE_ROLLED_BACK" == "true" ]]; then
+    return
+  fi
+  # A failure between stopping the old UI and switching venv/core must not
+  # leave the operator without a running control plane.
+  if [[ -d "$PREFIX/venv.old" ]]; then
+    rm -rf "$PREFIX/venv.failed"
+    mv "$PREFIX/venv" "$PREFIX/venv.failed" 2>/dev/null || true
+    mv "$PREFIX/venv.old" "$PREFIX/venv" 2>/dev/null || true
+  fi
+  if systemd_available; then
+    systemctl start ostium 2>/dev/null || true
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+        systemctl --user start ostium 2>/dev/null || true
+    fi
+  fi
+}
+
 rollback_control_plane() {
   local reason="$1"
   echo "升级健康检查失败（$reason），回滚到旧控制面……" >&2
+  UPGRADE_ROLLED_BACK="true"
   if systemd_available; then
     systemctl stop ostium 2>/dev/null || true
   fi
+  restore_upgrade_snapshot
+  for old in "$DATA/core/sing-box.old" "$CLIENT_DATA/core/sing-box.old"; do
+    if [[ -f "$old" ]]; then
+      mv -f "$old" "${old%.old}"
+      if systemd_available; then
+        systemctl restart ostium-core 2>/dev/null || true
+      fi
+    fi
+  done
   if [[ -d "$PREFIX/venv.old" ]]; then
     rm -rf "$PREFIX/venv.failed"
     mv "$PREFIX/venv" "$PREFIX/venv.failed" 2>/dev/null || true
@@ -304,11 +400,17 @@ rollback_control_plane() {
 rollback_core() {
   local destination="$1"
   echo "核心启动检查失败，回滚旧核心……" >&2
+  UPGRADE_ROLLED_BACK="true"
   if [[ -f "$destination.old" ]]; then
     mv -f "$destination.old" "$destination"
     if systemd_available; then
       systemctl restart ostium-core 2>/dev/null || true
     fi
+  fi
+  # The new control plane may already have migrated the database.  Restore
+  # the pre-upgrade venv/database as well so both halves are consistent.
+  if [[ -d "$PREFIX/venv.old" ]]; then
+    rollback_control_plane "core health check"
   fi
   echo "旧核心已恢复。" >&2
   exit 1
@@ -385,17 +487,20 @@ EOF
   fi
 }
 
-if [[ "$UPGRADE" == "true" ]]; then
-  stop_services
-fi
-
 export DEBIAN_FRONTEND=noninteractive
+# curl/tar/CA certificates are needed for health checks, core extraction and
+# pip TLS even when the operator supplies an existing --python interpreter.
+if command -v apt-get >/dev/null; then
+  if ! apt-get update; then
+    echo "警告：apt-get update 失败，继续使用现有软件源缓存" >&2
+  fi
+  if ! apt-get install -y --no-install-recommends ca-certificates curl tar; then
+    echo "警告：curl/tar/ca-certificates 安装失败；请确认系统已提供这些命令" >&2
+  fi
+fi
 if [[ -z "$PYTHON_BIN" ]]; then
   if command -v apt-get >/dev/null; then
-    if ! apt-get update; then
-      echo "警告：apt-get update 失败，继续使用现有软件源缓存" >&2
-    fi
-    if ! apt-get install -y --no-install-recommends python3.13 python3.13-venv ca-certificates curl tar; then
+    if ! apt-get install -y --no-install-recommends python3.13 python3.13-venv; then
       echo "警告：系统 Python 3.13 安装失败，将尝试 uv 托管 Python" >&2
     fi
   fi
@@ -420,7 +525,8 @@ if [[ "$ROLE" == "server" ]]; then
     install -d -m 0755 "$DATA" "$DATA/runtime" "$DATA/logs" "$DATA/backups" "$DATA/certs" \
       "$DATA/core" "$DATA/state" "$DATA/rulesets" "$CONFIG"
   else
-    id -u ostium >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin ostium
+    getent group ostium >/dev/null || groupadd --system ostium
+    id -u ostium >/dev/null 2>&1 || useradd --system --gid ostium --home-dir "$DATA" --shell /usr/sbin/nologin ostium
     install -d -m 0750 -o ostium -g ostium "$DATA" "$DATA/runtime" "$DATA/logs" \
       "$DATA/backups" "$DATA/certs" "$DATA/core" "$DATA/state" "$DATA/rulesets"
     install -d -m 0750 -o ostium -g ostium "$CONFIG"
@@ -468,7 +574,16 @@ cleanup_new_venv() {
     rm -rf "$NEW_VENV"
   fi
 }
-trap 'rm -rf "$CORE_TMP"; cleanup_new_venv' EXIT
+cleanup_install() {
+  local status=$?
+  if [[ "$status" -ne 0 ]]; then
+    restore_upgrade_services
+  fi
+  rm -rf "$CORE_TMP"
+  cleanup_new_venv
+  return "$status"
+}
+trap cleanup_install EXIT
 if [[ "$UPGRADE" == "true" ]]; then
   NEW_VENV="$PREFIX/venv.new.$$"
   if ! "$PYTHON_BIN" -m venv "$NEW_VENV"; then
@@ -480,6 +595,11 @@ if [[ "$UPGRADE" == "true" ]]; then
     echo "升级失败，旧虚拟环境保持不变" >&2
     exit 1
   fi
+  # Stop only after the new environment is fully staged.  Failures above
+  # leave the running service untouched.
+  stop_services
+  UPGRADE_SERVICES_STOPPED="true"
+  snapshot_upgrade_state
   if [[ -d "$PREFIX/venv" ]]; then
     rm -rf "$PREFIX/venv.old"
     mv "$PREFIX/venv" "$PREFIX/venv.old"
@@ -587,6 +707,16 @@ EOF
     if [[ -n "$EXISTING_PORT" ]]; then
       UI_PORT="$EXISTING_PORT"
     fi
+    # Preserve an explicit plaintext-bind opt-in across upgrades.  Resetting
+    # it to the CLI default while a custom non-loopback host remains would make
+    # serve fail closed, and the rollback would hit the same invalid config.
+    EXISTING_INSECURE_BIND=false
+    if grep -Eq '^[[:space:]]*allow_insecure_bind[[:space:]]*=[[:space:]]*true' "$CONFIG/config.toml"; then
+      EXISTING_INSECURE_BIND=true
+    fi
+    if [[ "$EXISTING_INSECURE_BIND" == "true" ]]; then
+      ALLOW_INSECURE_BIND="true"
+    fi
     if [[ "$ALLOW_INSECURE_BIND" != "true" && "$PUBLIC_UI" != "true" ]]; then
       if grep -Eq '^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"' "$CONFIG/config.toml"; then
         sed -i 's|^[[:space:]]*host[[:space:]]*=[[:space:]]*"0\.0\.0\.0"|host = "127.0.0.1"|' "$CONFIG/config.toml"
@@ -614,6 +744,9 @@ EOF
     if [[ "$RUN_AS_ROOT" == "true" ]]; then
       write_root_dropin ostium.service
       write_root_dropin ostium-core.service
+    else
+      rm -f "$SYSTEMD_DIR/ostium.service.d/root.conf" \
+        "$SYSTEMD_DIR/ostium-core.service.d/root.conf"
     fi
     systemctl daemon-reload
     systemctl enable ostium-core ostium
@@ -622,9 +755,7 @@ EOF
       systemctl restart ostium
       if [[ "$UPGRADE" == "true" ]]; then
         sleep 1
-        if ! systemctl is-active --quiet ostium-core \
-          || ! curl -fsS --max-time 3 http://127.0.0.1:8788/v1/health 2>/dev/null \
-            | grep -q '"running"[[:space:]]*:[[:space:]]*true'; then
+        if ! systemctl is-active --quiet ostium-core || ! wait_for_core; then
           rollback_core "$DATA/core/sing-box"
         fi
         HEALTH_SCHEME="http"
@@ -635,6 +766,12 @@ EOF
         fi
         rm -rf "$PREFIX/venv.old"
         rm -f "$DATA/core/sing-box.old"
+      else
+        if ! wait_for_url "http://127.0.0.1:$UI_PORT/healthz"; then
+          echo "首次安装健康检查失败：http://127.0.0.1:$UI_PORT/healthz 无响应" >&2
+          systemctl status ostium --no-pager >&2 || true
+          exit 1
+        fi
       fi
     fi
   else
@@ -648,18 +785,31 @@ EOF
   else
     ADMIN_URL="http://127.0.0.1:$UI_PORT  （建议使用 SSH 隧道）"
   fi
+  if [[ "$UPGRADE" == "true" ]]; then
+    ADMIN_PASSWORD_DISPLAY="未更改（升级模式）"
+    PASSWORD_HINT="升级完成，数据与管理员密码保持不变。"
+  elif [[ "$DB_PREEXISTING" == "true" ]]; then
+    ADMIN_PASSWORD_DISPLAY="未更改（已有数据库）"
+    PASSWORD_HINT="检测到已有数据库，管理员密码未被重置；如需重置请使用 ostium CLI 或先备份后删除数据。"
+  elif [[ "$PASSWORD_GENERATED" == "true" ]]; then
+    ADMIN_PASSWORD_DISPLAY="$ADMIN_PASSWORD"
+    PASSWORD_HINT="密码只显示一次，登录后请立即启用 TOTP。"
+  else
+    ADMIN_PASSWORD_DISPLAY="使用 --password 提供（未回显）"
+    PASSWORD_HINT="请妥善保管你提供的密码，登录后请立即启用 TOTP。"
+  fi
   cat <<EOF
 
 Ostium 服务端已安装。
 
-  管理密码：$([[ "$UPGRADE" == "true" ]] && echo "未更改（升级模式）" || echo "$ADMIN_PASSWORD")
+  管理密码：$ADMIN_PASSWORD_DISPLAY
   管理地址：$ADMIN_URL
   数据目录：$DATA
   配置目录：$CONFIG
   运行身份：$([[ "$RUN_AS_ROOT" == "true" ]] && echo root || echo ostium)
 
 防火墙需放行 80/tcp、443/tcp、443/udp；不要默认暴露 8443。
-$([[ "$UPGRADE" == "true" ]] && echo "升级完成，数据与管理员密码保持不变。" || echo "密码只显示一次，登录后请立即启用 TOTP。")
+$PASSWORD_HINT
 EOF
 else
   install_core "$CLIENT_DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium-core:ostium")"
@@ -717,8 +867,13 @@ EOF
       "$SYSTEMD_DIR/ostium-core.service" "$CLIENT_DATA" "$CLIENT_DATA"
     if [[ "$RUN_AS_ROOT" == "true" ]]; then
       write_root_dropin ostium-core.service
+      write_root_dropin ostium.service
       render_unit "$(dirname "$0")/../deploy/systemd/ostium-client-ui.service" \
         "$SYSTEMD_DIR/ostium.service" "$UI_DATA" "$UI_DATA"
+      if [[ -n "${SUDO_USER:-}" ]]; then
+        USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+        rm -f "$USER_HOME/.config/systemd/user/ostium.service"
+      fi
       systemctl daemon-reload
       systemctl enable ostium-core ostium
       if [[ "$START" == "true" ]]; then
@@ -726,6 +881,9 @@ EOF
         systemctl restart ostium
       fi
     else
+      # Switching away from root mode must not leave the old system UI unit
+      # (or its root drop-in) enabled alongside the per-user unit.
+      rm -f "$SYSTEMD_DIR/ostium.service" "$SYSTEMD_DIR/ostium.service.d/root.conf"
       systemctl daemon-reload
       systemctl enable ostium-core
       if [[ "$START" == "true" ]]; then
@@ -734,9 +892,7 @@ EOF
         chmod 0640 "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
         chgrp ostium "$CLIENT_DATA/runtime/core.token" 2>/dev/null || true
         if [[ "$UPGRADE" == "true" ]]; then
-          if ! systemctl is-active --quiet ostium-core \
-            || ! curl -fsS --max-time 3 http://127.0.0.1:8788/v1/health 2>/dev/null \
-              | grep -q '"running"[[:space:]]*:[[:space:]]*true'; then
+          if ! systemctl is-active --quiet ostium-core || ! wait_for_core; then
             rollback_core "$CLIENT_DATA/core/sing-box"
           fi
           rm -rf "$PREFIX/venv.old"
@@ -750,6 +906,12 @@ EOF
           "$USER_HOME/.config/systemd/user/ostium.service" "$UI_DATA" "$UI_DATA"
         sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" systemctl --user daemon-reload || true
         sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" systemctl --user enable ostium.service || true
+        if [[ "$UPGRADE" == "true" && "$START" == "true" ]]; then
+          # stop_services() stopped the user UI before the switch; bring the
+          # upgraded unit back instead of leaving the client offline.
+          sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+            systemctl --user restart ostium.service || true
+        fi
         echo "客户端 UI：注销并重新登录（让 $SUDO_USER 获得 ostium 组），然后运行 systemctl --user start ostium"
       fi
     fi

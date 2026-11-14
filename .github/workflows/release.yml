@@ -25,7 +25,7 @@ jobs:
       - run: uv run ruff format --check src tests scripts
       - run: uv run mypy src/ostium
       - run: >-
-          uv run pytest -m "not integration" --cov=ostium --cov-report=xml
+          uv run pytest -m "not integration" --cov=ostium --cov-branch --cov-report=xml
           --cov-report=json:coverage.json --cov-report=term
       - run: uv run python scripts/coverage_gate.py coverage.json
       - name: Shell scripts
@@ -249,6 +249,10 @@ jobs:
           path: dist
       - run: uv sync
       - run: uv run pyinstaller --noconfirm --clean deploy/pyinstaller/ostium.spec
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y file desktop-file-utils squashfs-tools
       - name: Build DEB and AppImage
         run: |
           chmod +x scripts/build-linux-packages.sh
@@ -261,7 +265,8 @@ jobs:
           path: dist/packages/*
 
   docker:
-    needs: verify
+    # Do not move GHCR tags for a version whose platform artifacts failed.
+    needs: [verify, wheel, windows, macos, linux-packages]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -395,6 +400,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           overwrite_files: false
+          body_path: RELEASE_NOTES.md
           files: |
             dist/release/*.whl
             dist/release/*.tar.gz
@@ -408,4 +414,3 @@ jobs:
             dist/release/*.AppImage
             dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
-          generate_release_notes: true

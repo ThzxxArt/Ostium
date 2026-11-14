@@ -14,8 +14,13 @@ $env:OSTIUM_ROLE = "client"
 $env:OSTIUM_DATA_DIR = $DataDir
 $env:OSTIUM_CONFIG_FILE = "$DataDir\config.toml"
 $ostiumExe = Join-Path $InstallDir "ostium.exe"
+$proxyRestored = $false
 if (Test-Path $ostiumExe) {
     & $ostiumExe proxy off | Out-Null
+    $proxyRestored = ($LASTEXITCODE -eq 0)
+}
+if (-not $proxyRestored) {
+    Write-Warning "Could not confirm the system proxy was restored; check Windows proxy settings."
 }
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
 Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force

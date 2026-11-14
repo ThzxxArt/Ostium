@@ -95,7 +95,8 @@ EOF
   cat >"$root/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
-id -u ostium >/dev/null 2>&1 || adduser --system --home /var/lib/ostium --shell /usr/sbin/nologin ostium
+getent group ostium >/dev/null 2>&1 || groupadd --system ostium
+id -u ostium >/dev/null 2>&1 || adduser --system --ingroup ostium --home /var/lib/ostium --shell /usr/sbin/nologin ostium
 install -d -m 0750 -o ostium -g ostium /var/lib/ostium /var/lib/ostium/runtime \
   /var/lib/ostium/logs /var/lib/ostium/backups /var/lib/ostium/certs \
   /var/lib/ostium/core /var/lib/ostium/state /var/lib/ostium/rulesets /etc/ostium
@@ -152,6 +153,12 @@ build_appimage() {
     echo "skipping AppImage"
     return
   fi
+  # appimagetool's ARCH environment variable uses uname-style names
+  # (x86_64/aarch64), while Ostium's package names use amd64/arm64.  Exporting
+  # the Debian name makes appimagetool reject the build with "unknown arch".
+  local package_arch="$ARCH"
+  local appimage_arch="x86_64"
+  [[ "$package_arch" == "arm64" ]] && appimage_arch="aarch64"
   local tool="$WORK/appimagetool"
   if ! command -v appimagetool >/dev/null 2>&1; then
     local host_arch
@@ -160,8 +167,8 @@ build_appimage() {
     [[ "$host_arch" == "aarch64" || "$host_arch" == "arm64" ]] && tool_arch="aarch64"
     local url="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${tool_arch}.AppImage"
     if ! curl -fsSL --max-time 180 -o "$tool" "$url"; then
-      echo "warning: appimagetool download failed; AppImage not built" >&2
-      return
+      echo "error: appimagetool download failed; AppImage was not built" >&2
+      exit 1
     fi
     chmod +x "$tool"
   else
@@ -200,12 +207,13 @@ Terminal=true
 Categories=Network;
 EOF
   cp "$appdir/ostium.desktop" "$appdir/usr/share/applications/ostium.desktop"
-  export ARCH APPIMAGE_EXTRACT_AND_RUN=1
-  "$tool" --no-appstream "$appdir" "$OUT/Ostium-${VERSION}-linux-${ARCH}.AppImage" || {
-    echo "warning: appimagetool failed; AppImage not built" >&2
-    return
+  export APPIMAGE_EXTRACT_AND_RUN=1
+  ARCH="$appimage_arch" "$tool" --no-appstream "$appdir" \
+    "$OUT/Ostium-${VERSION}-linux-${package_arch}.AppImage" || {
+    echo "error: appimagetool failed; AppImage was not built" >&2
+    exit 1
   }
-  echo "built $OUT/Ostium-${VERSION}-linux-${ARCH}.AppImage"
+  echo "built $OUT/Ostium-${VERSION}-linux-${package_arch}.AppImage"
 }
 
 build_deb

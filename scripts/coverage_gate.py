@@ -49,6 +49,9 @@ def main(path: Path) -> int:
     files = report["files"]
     rows: list[dict[str, object]] = []
     failures: list[str] = []
+    if not files:
+        print("Coverage gate failed: the report contains no files", file=sys.stderr)
+        return 1
 
     for name, info in sorted(files.items()):
         if _is_generated(name):
@@ -91,6 +94,7 @@ def main(path: Path) -> int:
         prefix = f"src/ostium/{package}/"
         package_rows = [row for row in rows if str(row["path"]).startswith(prefix)]
         if not package_rows:
+            failures.append(f"{package}/: no coverage rows found for this required package")
             continue
         result = _module(package_rows)
         if result["statements"] + 1e-9 < CRITICAL_MIN:

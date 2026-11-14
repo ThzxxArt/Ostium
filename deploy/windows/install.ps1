@@ -19,7 +19,8 @@ New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $D
 # The service runs as LocalSystem.  Keep its token, last-good config and
 # database out of the user-writable ProgramData\Ostium tree; only
 # Administrators and SYSTEM may write there.
-icacls $CoreDataDir /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" | Out-Null
+icacls $CoreDataDir /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not lock down $CoreDataDir" }
 # Inno Setup already copied the bundle into $InstallDir before running this
 # script.  Copying a directory onto itself makes PowerShell fail, so only do
 # the copy for the portable/zip workflow where source and destination differ.
@@ -89,6 +90,7 @@ set "OSTIUM_ENGINE_PATH=$CoreDir\sing-box.exe"
 
 # Allow the interactive user to read/write the shared client data.
 $userAccount = if ($env:USERDOMAIN) { "$env:USERDOMAIN\$env:USERNAME" } else { $env:USERNAME }
+if (-not $userAccount) { throw "Could not determine the interactive user account for the core token ACL" }
 icacls $DataDir /grant "${userAccount}:(OI)(CI)M" | Out-Null
 
 # Register the privileged TUN core as a Windows service (LocalSystem).
@@ -102,18 +104,26 @@ if (-not (Test-Path $serviceExe)) {
 if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
     Stop-Service OstiumCore -ErrorAction SilentlyContinue
     & $serviceExe remove
+    if ($LASTEXITCODE -ne 0) { throw "Could not remove the previous OstiumCore service" }
 }
 & $serviceExe --startup auto install
+if ($LASTEXITCODE -ne 0) { throw "Could not install the OstiumCore service" }
 Start-Service OstiumCore -ErrorAction Stop
 
 # The unprivileged UI may read the core token, but must never be able to
 # overwrite it (that would let a local user hijack the privileged API).
 $tokenPath = Join-Path $CoreDataDir "runtime\core.token"
 for ($i = 0; $i -lt 30 -and -not (Test-Path $tokenPath); $i++) { Start-Sleep -Seconds 1 }
-icacls $CoreDataDir /grant "Users:(X)" | Out-Null
-icacls "$CoreDataDir\runtime" /grant "Users:(RX)" | Out-Null
+# Only the installing interactive user gets access.  Granting the built-in
+# Users group would let every local account read the bearer token and control
+# the LocalSystem core.
+icacls $CoreDataDir /grant "${userAccount}:(X)" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not grant $userAccount traverse access to $CoreDataDir" }
+icacls "$CoreDataDir\runtime" /grant "${userAccount}:(RX)" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not grant $userAccount read access to the core runtime" }
 if (Test-Path $tokenPath) {
-    icacls $tokenPath /inheritance:r /grant:r "SYSTEM:R" "Administrators:F" "Users:R" | Out-Null
+    icacls $tokenPath /inheritance:r /grant:r "*S-1-5-18:R" "*S-1-5-32-544:F" "${userAccount}:R" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not secure the core token ACL" }
 } else {
     Write-Warning "Core token not created yet; the UI may fail to authenticate until it is."
 }

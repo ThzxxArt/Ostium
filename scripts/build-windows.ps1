@@ -17,9 +17,18 @@ function Copy-IfDifferent([string]$Source, [string]$Destination) {
     }
 }
 
+if (-not $CoreBinary -or -not (Test-Path $CoreBinary)) {
+    throw "CoreBinary is required and must exist: $CoreBinary"
+}
+if (-not $WintunDll -or -not (Test-Path $WintunDll)) {
+    throw "WintunDll is required and must exist: $WintunDll"
+}
+
 Push-Location web
 npm ci --no-audit --no-fund
+if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
 npm run build
+if ($LASTEXITCODE -ne 0) { throw "web build failed" }
 Pop-Location
 
 # Bake the release version into the PyInstaller bundle instead of relying on
@@ -35,7 +44,9 @@ if ($WintunDll) {
 }
 
 uv run pyinstaller --noconfirm --clean deploy\pyinstaller\ostium.spec
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for the UI bundle" }
 uv run pyinstaller --noconfirm --clean deploy\pyinstaller\ostium-service.spec
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for the service bundle" }
 
 if ($env:OSTIUM_SIGN_THUMBPRINT) {
     $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
@@ -65,9 +76,17 @@ foreach ($doc in @("LICENSE", "SBOM.txt")) {
     if (Test-Path "dist\core\$doc") { Copy-Item "dist\core\$doc" "$out\core\" -Force }
 }
 
-if (Get-Command ISCC.exe -ErrorAction SilentlyContinue) {
-    ISCC.exe deploy\windows\ostium.iss /DAppVersion=$Version
-    Write-Host "Installer written to dist\windows"
-} else {
-    Write-Warning "Inno Setup (ISCC.exe) not found; the portable bundle is in $out"
+if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+    throw "Inno Setup (ISCC.exe) is required to build the release installer"
 }
+ISCC.exe deploy\windows\ostium.iss /DAppVersion=$Version
+if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+$setup = Get-ChildItem "dist\windows\*-setup.exe" | Select-Object -First 1
+if (-not $setup) { throw "Inno Setup did not produce a setup executable" }
+if ($env:OSTIUM_SIGN_THUMBPRINT) {
+    $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    if (-not $signtool) { throw "signtool.exe is required when OSTIUM_SIGN_THUMBPRINT is set" }
+    & $signtool.Source sign /sha1 $env:OSTIUM_SIGN_THUMBPRINT /tr http://timestamp.digicert.com /td sha256 /fd sha256 $setup.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $($setup.FullName)" }
+}
+Write-Host "Installer written to dist\windows"

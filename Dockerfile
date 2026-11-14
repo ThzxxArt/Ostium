@@ -58,5 +58,5 @@ USER ostium
 EXPOSE 443/tcp 443/udp 8388/tcp 8388/udp 8443/tcp 80/tcp
 VOLUME ["/var/lib/ostium", "/etc/ostium"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8443/healthz || exit 1
+  CMD sh -c 'port="${OSTIUM_PORT:-8443}"; curl -fsSk "https://127.0.0.1:$port/healthz" >/dev/null 2>&1 || curl -fsS "http://127.0.0.1:$port/healthz"'
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]

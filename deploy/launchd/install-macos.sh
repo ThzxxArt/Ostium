@@ -43,11 +43,21 @@ validate_prefix() {
   esac
   normalized="$(cd / && realpath -m "$path" 2>/dev/null || echo "$path")"
   case "$normalized" in
-    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/private|/private/etc|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|/var/lib|/Library|/System|/Users|/Applications)
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/private|/private/etc|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/usr/local/bin|/usr/local/sbin|/var|/var/lib|/Library|/System|/Users|/Applications)
       echo "refusing to use system root as OSTIUM_PREFIX: $normalized" >&2
       exit 2
       ;;
   esac
+  local home_rest=""
+  case "$normalized" in
+    /Users/*) home_rest="${normalized#/Users/}" ;;
+    /home/*) home_rest="${normalized#/home/}" ;;
+    /root/*) home_rest="${normalized#/root/}" ;;
+  esac
+  if [[ -n "$home_rest" && "$home_rest" != */* ]]; then
+    echo "refusing to use a user home as OSTIUM_PREFIX: $normalized" >&2
+    exit 2
+  fi
   case "/$normalized/" in
     */../*)
       echo "OSTIUM_PREFIX must not contain ..: $path" >&2
@@ -60,6 +70,12 @@ validate_prefix "$PREFIX"
 if [[ "$ROLE" == "uninstall" ]]; then
   launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
   launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    launchctl asuser "$(id -u "$SUDO_USER")" launchctl unload -w \
+      /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+  else
+    launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
+  fi
   if [[ -n "${SUDO_USER:-}" ]] && [[ -x /usr/local/bin/ostium ]]; then
     sudo -u "$SUDO_USER" /usr/local/bin/ostium proxy off >/dev/null 2>&1 || true
   fi
@@ -118,8 +134,19 @@ render_plist() {
 }
 
 wait_for_ui() {
+  local port="${1:-8787}"
   for _ in $(seq 1 20); do
-    if curl -fsS --max-time 2 http://127.0.0.1:8787/healthz >/dev/null 2>&1; then
+    if curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+wait_for_core() {
+  for _ in $(seq 1 20); do
+    if curl -fsS --max-time 2 http://127.0.0.1:8788/v1/health >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -148,8 +175,12 @@ if [[ -n "$OLD_VENV" ]]; then
 fi
 ln -sfn "$PREFIX/venv/bin/ostium" /usr/local/bin/ostium
 
-install -m 0755 "$CORE_DIR/sing-box" "$PREFIX/sing-box"
-install -m 0755 "$CORE_DIR/sing-box" "$DATA/core/sing-box"
+for target in "$PREFIX/sing-box" "$DATA/core/sing-box"; do
+  if [[ -f "$target" ]]; then
+    cp -p "$target" "$target.old"
+  fi
+  install -m 0755 "$CORE_DIR/sing-box" "$target"
+done
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 for doc in LICENSE NOTICE; do
   if [[ -f "$ROOT_DIR/$doc" ]]; then
@@ -221,6 +252,14 @@ chown -R "$UI_OWNER" "$UI_DATA"
 chmod 0750 "$UI_DATA"
 [[ -f "$UI_DATA/config.toml" ]] && chmod 0600 "$UI_DATA/config.toml"
 
+# An upgraded installation may have changed the UI port in its own config.
+# Probe the listener that will actually start rather than the default 8787.
+UI_PORT=8787
+if [[ -f "$UI_DATA/config.toml" ]]; then
+  UI_PORT="$(sed -n 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$UI_DATA/config.toml" | head -1)"
+  [[ -n "$UI_PORT" ]] || UI_PORT=8787
+fi
+
 if [[ "$NO_SERVICE" == "true" ]]; then
   cat <<EOF
 
@@ -264,8 +303,26 @@ else
   rm -f /Library/LaunchDaemons/com.ostium.ui.plist
 fi
 
+rollback_core_binary() {
+  for target in "$PREFIX/sing-box" "$DATA/core/sing-box"; do
+    if [[ -f "$target.old" ]]; then
+      mv -f "$target.old" "$target"
+    fi
+  done
+  launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
+  launchctl load -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || true
+}
+
 if [[ "$NO_START" != "true" ]]; then
   launchctl load -w /Library/LaunchDaemons/com.ostium.core.plist
+  if [[ -n "$OLD_VENV" ]] && ! wait_for_core; then
+    echo "升级后核心健康检查失败，回滚核心……" >&2
+    rollback_core_binary
+    rm -rf "$PREFIX/venv.failed"
+    mv "$VENV" "$PREFIX/venv.failed" 2>/dev/null || true
+    mv "$OLD_VENV" "$VENV"
+    exit 1
+  fi
   if [[ "$RUN_AS_ROOT" == "true" ]]; then
     launchctl load -w /Library/LaunchDaemons/com.ostium.ui.plist
   elif [[ -n "${SUDO_USER:-}" ]]; then
@@ -274,13 +331,14 @@ if [[ "$NO_START" != "true" ]]; then
     launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
   fi
   if [[ -n "$OLD_VENV" ]]; then
-    if ! wait_for_ui; then
+    if ! wait_for_ui "$UI_PORT"; then
       echo "升级健康检查失败，回滚旧虚拟环境……" >&2
       launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
       launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
       rm -rf "$PREFIX/venv.failed"
       mv "$VENV" "$PREFIX/venv.failed" 2>/dev/null || true
       mv "$OLD_VENV" "$VENV"
+      rollback_core_binary
       if [[ "$RUN_AS_ROOT" == "true" ]]; then
         launchctl load -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
       elif [[ -n "${SUDO_USER:-}" ]]; then
@@ -289,6 +347,7 @@ if [[ "$NO_START" != "true" ]]; then
       exit 1
     fi
     rm -rf "$OLD_VENV"
+    rm -f "$PREFIX/sing-box.old" "$DATA/core/sing-box.old"
   fi
 fi
 

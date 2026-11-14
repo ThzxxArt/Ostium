@@ -24,8 +24,10 @@ VERSION="${OSTIUM_VERSION:-0.1.1}"
 CORE_VERSION="${OSTIUM_CORE_VERSION:-1.14.4-ostium.1}"
 UV_VERSION="${OSTIUM_UV_VERSION:-0.11.14}"
 ROLE="server"
+ROLE_EXPLICIT="false"
 DOMAIN=""
 PASSWORD=""
+PASSWORD_GENERATED="false"
 PREFIX="${OSTIUM_PREFIX:-/opt/ostium}"
 DATA="${OSTIUM_DATA_DIR:-/var/lib/ostium}"
 CONFIG="${OSTIUM_CONFIG_DIR:-/etc/ostium}"
@@ -117,10 +119,19 @@ validate_install_path() {
     normalized="$(printf '%s' "$path" | sed 's#//*#/#g; s#/$##')"
   fi
   case "$normalized" in
-    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/usr/local/bin|/usr/local/sbin|/var|/var/lib|/var/log|/Library|/System|/Users|/Applications)
       die "拒绝使用系统根目录作为 $label：$normalized"
       ;;
   esac
+  local home_rest=""
+  case "$normalized" in
+    /home/*) home_rest="${normalized#/home/}" ;;
+    /Users/*) home_rest="${normalized#/Users/}" ;;
+    /root/*) home_rest="${normalized#/root/}" ;;
+  esac
+  if [[ -n "$home_rest" && "$home_rest" != */* ]]; then
+    die "拒绝把用户主目录本身作为 $label：$normalized"
+  fi
   case "/$normalized/" in
     */../*) die "$label 不能包含 ..：$path" ;;
   esac
@@ -195,6 +206,18 @@ detect_platform() {
   if [[ "$OS" == "darwin" && "$ROLE" == "server" \
     && "$ACTION" != "status" && "$ACTION" != "uninstall" ]]; then
     die "macOS 仅支持客户端；服务端请使用 Linux"
+  fi
+}
+
+detect_existing_role() {
+  # Documented upgrade commands omit --role.  Switching a client install to
+  # the server layout stops the UI and then fails on the missing server config.
+  [[ "$ROLE_EXPLICIT" == "true" ]] && return
+  if [[ -f "$CONFIG/client.toml" && ! -f "$CONFIG/config.toml" ]]; then
+    ROLE="client"
+  elif [[ -f "/Library/Application Support/Ostium/config.toml" \
+    && ! -f "/Library/Application Support/Ostium UI/config.toml" ]]; then
+    ROLE="client"
   fi
 }
 
@@ -324,14 +347,13 @@ bootstrap_python() {
     local archive="$WORK_DIR/uv.tar.gz"
     fetch_file "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_target}.tar.gz" "$archive"
     local checksum="$WORK_DIR/uv.tar.gz.sha256"
-    if fetch_file "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_target}.tar.gz.sha256" "$checksum" 2>/dev/null; then
-      local expected actual
-      expected="$(awk '{print $1; exit}' "$checksum")"
-      actual="$(sha256_file "$archive")"
-      [[ "$expected" == "$actual" ]] || die "uv 校验失败"
-    else
-      warn "未能获取 uv 校验文件，继续安装"
+    if ! fetch_file "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_target}.tar.gz.sha256" "$checksum" 2>/dev/null; then
+      die "未能获取 uv 校验文件；拒绝安装未校验的 uv"
     fi
+    local expected actual
+    expected="$(awk '{print $1; exit}' "$checksum")"
+    actual="$(sha256_file "$archive")"
+    [[ "$expected" == "$actual" ]] || die "uv 校验失败"
     install -d -m 0755 "$PREFIX/uv"
     tar -xzf "$archive" -C "$PREFIX/uv" --strip-components=1 --no-same-owner
   fi
@@ -427,7 +449,10 @@ uninstall_ostium() {
     if [[ -n "${SUDO_USER:-}" ]]; then
       local home
       home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
-      rm -f "$home/.config/systemd/user/ostium.service"
+      sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+        systemctl --user disable --now ostium 2>/dev/null || true
+      rm -f "$home/.config/systemd/user/ostium.service" \
+        "$home/.config/systemd/user/default.target.wants/ostium.service"
       sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
         systemctl --user daemon-reload 2>/dev/null || true
     fi
@@ -455,8 +480,8 @@ uninstall_ostium() {
       fi
     fi
     rm -rf "/Library/Application Support/Ostium" "/Library/Application Support/Ostium UI"
-    if id -u ostium >/dev/null 2>&1; then userdel ostium 2>/dev/null || true; fi
-    if id -u ostium-core >/dev/null 2>&1; then userdel ostium-core 2>/dev/null || true; fi
+    # Leave service accounts alone: the installer reuses a pre-existing
+    # ostium account and cannot prove it created it.
     say "已删除程序和全部数据"
   else
     say "已移除程序；数据与配置保留（使用 --purge 可一并删除）"
@@ -489,7 +514,7 @@ esac
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --role) ROLE="$2"; shift 2 ;;
+    --role) ROLE="$2"; ROLE_EXPLICIT="true"; shift 2 ;;
     --domain) DOMAIN="$2"; shift 2 ;;
     --password) PASSWORD="$2"; shift 2 ;;
     --version) VERSION="$2"; shift 2 ;;
@@ -527,6 +552,7 @@ if [[ "$ACTION" == "status" ]]; then
   exit 0
 fi
 need_root
+detect_existing_role
 detect_platform
 validate_install_path "$PREFIX" "安装目录"
 validate_install_path "$DATA" "数据目录"
@@ -546,6 +572,7 @@ if [[ "$ACTION" == "upgrade" && -z "$LOCAL_DIR" ]]; then
 fi
 if [[ -z "$PASSWORD" && "$ACTION" == "install" && "$ROLE" == "server" ]]; then
   PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
+  PASSWORD_GENERATED="true"
 fi
 
 ensure_tools
@@ -567,12 +594,12 @@ if [[ "$ACTION" == "install" && -n "$PASSWORD" && "$ROLE" == "server" ]]; then
 Ostium 安装完成
 ============================================================
   管理地址：$ADMIN_URL
-  管理密码：$PASSWORD
+  管理密码：$([[ "$PASSWORD_GENERATED" == "true" ]] && echo "$PASSWORD" || echo "使用 --password 提供（未回显）")
   安装目录：$PREFIX
   运行身份：$([[ "$RUN_AS_ROOT" == "true" ]] && echo root || echo "无特权服务用户")
   服务管理：$([[ "$NO_SERVICE" == "true" ]] && echo "未注册，交给你的进程管理器" || echo systemd/launchd)
 ============================================================
-密码只显示一次。登录后请立即修改密码并启用 TOTP。
+$([[ "$PASSWORD_GENERATED" == "true" ]] && echo "密码只显示一次。登录后请立即修改密码并启用 TOTP。" || echo "请妥善保管你提供的密码，登录后请立即启用 TOTP。")
 EOF
 elif [[ "$ACTION" == "install" && "$ROLE" == "client" ]]; then
   cat <<EOF

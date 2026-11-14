@@ -60,6 +60,13 @@ def test_release_publishes_every_checksummed_asset() -> None:
         assert asset in files
 
 
+def test_release_notes_are_not_generated_from_an_empty_template() -> None:
+    publish = _release()["jobs"]["publish"]["steps"]
+    release = next(step for step in publish if step.get("uses", "").startswith("softprops/"))
+    assert release["with"]["body_path"] == "RELEASE_NOTES.md"
+    assert (ROOT / "RELEASE_NOTES.md").is_file()
+
+
 def test_release_windows_wintun_is_checked_and_located() -> None:
     windows = _release()["jobs"]["windows"]
     prepare = next(
@@ -71,12 +78,31 @@ def test_release_windows_wintun_is_checked_and_located() -> None:
     assert "dist/wintun/bin/amd64/wintun.dll" not in script
 
 
+def test_linux_package_job_installs_appimage_build_dependencies() -> None:
+    job = _release()["jobs"]["linux-packages"]
+    runs = "\n".join(str(step.get("run", "")) for step in job["steps"] if isinstance(step, dict))
+    assert "desktop-file-utils" in runs
+    assert "squashfs-tools" in runs
+    assert "install -y file" in runs
+
+
 def test_linux_package_version_is_normalised_from_the_git_tag() -> None:
     script = (ROOT / "scripts" / "build-linux-packages.sh").read_text(encoding="utf-8")
     assert 'VERSION="${VERSION#v}"' in script
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert "build-linux-packages.sh" in workflow
     assert '--version "${{ github.ref_name }}"' in workflow
+
+
+def test_docker_push_waits_for_platform_artifacts() -> None:
+    docker = _release()["jobs"]["docker"]
+    assert set(docker["needs"]) >= {
+        "verify",
+        "wheel",
+        "windows",
+        "macos",
+        "linux-packages",
+    }
 
 
 def test_release_publishes_both_docker_version_tags() -> None:
