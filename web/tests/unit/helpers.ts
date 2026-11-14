@@ -846,7 +846,14 @@ export async function mountPage(
                 h(NDialogProvider, null, {
                   default: () =>
                     h(NNotificationProvider, null, {
-                      default: () => h(NMessageProvider, null, { default: () => h(Page) }),
+                      default: () =>
+                        h(
+                          NMessageProvider,
+                          // Auto-dismiss timers can fire after jsdom teardown and
+                          // surface as an unhandled "window is not defined".
+                          { duration: 0 },
+                          { default: () => h(Page) },
+                        ),
                     }),
                 }),
             }),
