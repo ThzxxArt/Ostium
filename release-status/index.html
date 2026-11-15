@@ -1665,8 +1665,8 @@ before the status update. Replacing them would rewrite published artifacts;
 <h2 id="012-verification-status">0.1.2 verification status<a class="headerlink" href="#012-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Backend unit and in-process integration tests: 704 passed / 10 deselected;
-  94.26% statements / 90.38% branches; <code>coverage_gate.py</code> passes.</li>
+<li>Backend unit and in-process integration tests: 707 passed / 10 deselected;
+  94.29% statements / 90.44% branches; <code>coverage_gate.py</code> passes.</li>
 <li>Real sing-box integration tests with the pinned <code>1.14.4-ostium.1</code> core: 10 passed.</li>
 <li>Frontend typecheck, lint, unit tests, production build and formatting: 203
   passed; 90.82/85.91/88.54/92.37.</li>
@@ -1693,12 +1693,12 @@ before the status update. Replacing them would rewrite published artifacts;
   current backend with one worker (1440/1024/390, dark/light, core-page axe,
   LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
   frozen and every API path they render is mocked.</li>
-<li>Final pre-release review round: 9 regressions found and fixed with tests that
-  fail on <code>683ebf3</code> (core artifact body limit, split-user client watchdog,
+<li>Final pre-release review round: 13 P1 findings and one P2 fixed with tests
+  that fail on <code>683ebf3</code> (core artifact body limit, split-user client watchdog,
   CLI disable/delete tombstones, export certificate resolution, certificate
   replacement recovery, subscription-refresh error persistence, installer
-  reinstall and upgrade snapshots on Linux/macOS). See
-  <code>V0.1.2_REVIEW_ROUND4.md</code>.</li>
+  reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
+  serialization, coverage-gate stability). See <code>V0.1.2_REVIEW_ROUND4.md</code>.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace">Not verified in this workspace<a class="headerlink" href="#not-verified-in-this-workspace" title="Permanent link">&para;</a></h3>
 <p>These items require external hardware, accounts, runners or time. They are
@@ -1736,7 +1736,7 @@ evidence is in <code>V0.1.2_RC_REPORT.md</code>:</p>
   recovery; publication is not atomic.</li>
 <li><strong>D-112</strong> Control-plane/core service isolation remains a 0.2.0 item.</li>
 <li><strong>D-113</strong> The unit-only 75/65 coverage target is deferred; the repository and
-  package gate at 94.26/90.38 is the release gate.</li>
+  package gate at 94.29/90.44 is the release gate.</li>
 <li><strong>D-114</strong> Linux is Tier 1; Windows/macOS are Tier 2 and published unsigned
   unless signing credentials are supplied.</li>
 <li><strong>D-115</strong> Push, tag and publication require explicit release-owner approval.</li>
