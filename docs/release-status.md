@@ -10,7 +10,12 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.2** |
 | Status | **Published** |
-| Previous release | `v0.1.1`, published 2026-11-14 (23 assets, immutable) |
+| Tag | `v0.1.2` (annotated, commit `7f9ea6a`) |
+| Assets | GitHub Release `v0.1.2` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.2` (wheel + sdist) |
+| GHCR | `0.1.2`, `v0.1.2`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `43682022358` — success |
+| Previous release | `v0.1.1`, published 2026-11-14 (23 assets, unchanged) |
 | Release type | State convergence and release integrity; no new protocols |
 | Source branch | `main` (`release/0.1.2` merged at `683ebf3`) |
 
@@ -60,6 +65,11 @@ before the status update. Replacing them would rewrite published artifacts;
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See `V0.1.2_REVIEW_ROUND4.md`.
+- Publication verification: `scripts/verify-release.sh --version 0.1.2`
+  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  `ostium-ctl==0.1.2`. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.
 
 ### Not verified in this workspace
 
