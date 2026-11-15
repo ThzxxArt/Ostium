@@ -12,7 +12,7 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 | Status | **Preparing; not tagged or published** |
 | Previous release | `v0.1.1`, published 2026-11-14 (23 assets, immutable) |
 | Release type | State convergence and release integrity; no new protocols |
-| Source branch | `release/0.1.2` |
+| Source branch | `main` (`release/0.1.2` merged at `683ebf3`) |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.
@@ -26,8 +26,8 @@ before the status update. Replacing them would rewrite published artifacts;
 
 ### Verified locally
 
-- Backend unit and in-process integration tests: 700 passed / 10 deselected;
-  94.24% statements / 90.40% branches; `coverage_gate.py` passes.
+- Backend unit and in-process integration tests: 704 passed / 10 deselected;
+  94.26% statements / 90.38% branches; `coverage_gate.py` passes.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
 - Frontend typecheck, lint, unit tests, production build and formatting: 203
   passed; 90.82/85.91/88.54/92.37.
@@ -54,6 +54,12 @@ before the status update. Replacing them would rewrite published artifacts;
   current backend with one worker (1440/1024/390, dark/light, core-page axe,
   LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
   frozen and every API path they render is mocked.
+- Final pre-release review round: 9 regressions found and fixed with tests that
+  fail on `683ebf3` (core artifact body limit, split-user client watchdog,
+  CLI disable/delete tombstones, export certificate resolution, certificate
+  replacement recovery, subscription-refresh error persistence, installer
+  reinstall and upgrade snapshots on Linux/macOS). See
+  `V0.1.2_REVIEW_ROUND4.md`.
 
 ### Not verified in this workspace
 
@@ -96,7 +102,7 @@ evidence is in `V0.1.2_RC_REPORT.md`:
   recovery; publication is not atomic.
 - **D-112** Control-plane/core service isolation remains a 0.2.0 item.
 - **D-113** The unit-only 75/65 coverage target is deferred; the repository and
-  package gate at 94.19/90.52 is the release gate.
+  package gate at 94.26/90.38 is the release gate.
 - **D-114** Linux is Tier 1; Windows/macOS are Tier 2 and published unsigned
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
