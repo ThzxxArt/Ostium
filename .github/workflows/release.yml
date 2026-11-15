@@ -181,9 +181,9 @@ jobs:
           echo "OSTIUM_INSTALL_E2E_CORE=$core" >> "$GITHUB_ENV"
       - run: uv sync --locked
       - name: Upgrade a real 0.1.1 installation
-        run: ./scripts/upgrade-e2e.sh
+        run: bash ./scripts/upgrade-e2e.sh
       - name: Install, reinstall and uninstall the real package
-        run: sudo --preserve-env=OSTIUM_INSTALL_E2E_CORE ./scripts/install-e2e.sh
+        run: sudo --preserve-env=OSTIUM_INSTALL_E2E_CORE bash ./scripts/install-e2e.sh
 
   windows:
     needs: [wheel, core]
