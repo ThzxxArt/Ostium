@@ -58,6 +58,7 @@ def test_release_e2e_scripts_are_executable_and_invoked_with_bash() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert "bash ./scripts/upgrade-e2e.sh" in workflow
     assert "bash ./scripts/install-e2e.sh" in workflow
+    assert "sudo --preserve-env=OSTIUM_INSTALL_E2E_CORE,PATH" in workflow
 
 
 def test_core_manifest_points_at_the_ostium_release_tag(tmp_path: Path) -> None:
