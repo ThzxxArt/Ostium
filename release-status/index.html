@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../operations/upgrade-0.1.2-to-0.1.3/">
+        <link rel="prev" href="../operations/upgrade-0.1.3-to-0.1.4/">
       
       
         <link rel="next" href="../operations/release-checklist/">
@@ -1019,6 +1019,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.3-to-0.1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.3 → 0.1.4 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1093,15 +1121,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#013-verification-status" class="md-nav__link">
+  <a href="#014-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.3 verification status
+        0.1.4 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.3 verification status">
+    <nav class="md-nav" aria-label="0.1.4 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1154,10 +1182,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-013" class="md-nav__link">
+  <a href="#release-gates-for-014" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.3
+        Release gates for 0.1.4
       
     </span>
   </a>
@@ -1547,15 +1575,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#013-verification-status" class="md-nav__link">
+  <a href="#014-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.3 verification status
+        0.1.4 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.3 verification status">
+    <nav class="md-nav" aria-label="0.1.4 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1608,10 +1636,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-013" class="md-nav__link">
+  <a href="#release-gates-for-014" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.3
+        Release gates for 0.1.4
       
     </span>
   </a>
@@ -1664,39 +1692,19 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 <tbody>
 <tr>
 <td>Version</td>
-<td><strong>0.1.3</strong></td>
+<td><strong>0.1.4</strong></td>
 </tr>
 <tr>
 <td>Status</td>
 <td><strong>Published</strong></td>
 </tr>
 <tr>
-<td>Tag</td>
-<td><code>v0.1.3</code> (annotated, commit <code>3f2b65c</code>)</td>
-</tr>
-<tr>
-<td>Assets</td>
-<td>GitHub Release <code>v0.1.3</code> — 23 assets, marked Latest</td>
-</tr>
-<tr>
-<td>PyPI</td>
-<td><code>ostium-ctl==0.1.3</code> (wheel + sdist)</td>
-</tr>
-<tr>
-<td>GHCR</td>
-<td><code>0.1.3</code>, <code>v0.1.3</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
-</tr>
-<tr>
-<td>Release workflow</td>
-<td>run <code>43718972338</code> — success</td>
-</tr>
-<tr>
 <td>Previous release</td>
-<td><code>v0.1.2</code>, published 2026-11-15 (23 assets, unchanged)</td>
+<td><code>v0.1.3</code>, published 2026-11-15 (23 assets, unchanged)</td>
 </tr>
 <tr>
 <td>Release type</td>
-<td>Deployment reliability patch; no new protocols or UI redesign</td>
+<td>Subscriptions layout patch; no new protocols or UI redesign</td>
 </tr>
 <tr>
 <td>Source branch</td>
@@ -1709,9 +1717,9 @@ are published artifacts. They are never replaced or moved by this release.</p>
 <p>Known limitation: the <code>v0.1.1</code> tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.3 continues to fix the status at its own tag instead of rewriting published
+0.1.4 continues to fix the status at its own tag instead of rewriting published
 artifacts.</p>
-<h2 id="013-verification-status">0.1.3 verification status<a class="headerlink" href="#013-verification-status" title="Permanent link">&para;</a></h2>
+<h2 id="014-verification-status">0.1.4 verification status<a class="headerlink" href="#014-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Backend unit and in-process integration tests: 710 passed / 10 deselected;
@@ -1719,8 +1727,8 @@ artifacts.</p>
 <li>Real sing-box integration tests with the pinned <code>1.14.4-ostium.1</code> core: 10 passed.</li>
 <li>Frontend typecheck, lint, unit tests, production build and formatting: 203
   passed; 90.82/85.91/88.54/92.37.</li>
-<li><code>0.1.2 -&gt; 0.1.3</code> upgrade script: user, password material, subscription
-  token, database, backup and <code>master.key</code> survive; a 0.1.2 backup restores.</li>
+<li><code>0.1.3 -&gt; 0.1.4</code> upgrade script: user, password material, subscription
+  token, database, backup and <code>master.key</code> survive; a 0.1.3 backup restores.</li>
 <li>Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.</li>
 <li>Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -1738,7 +1746,7 @@ artifacts.</p>
   <code>versions/V0.1.2_REVIEW_ROUND2.md</code>.</li>
 <li>Release workflow ordering tests: draft release first, PyPI before GHCR/draft
   publication.</li>
-<li>Playwright/axe/visual regression: 70 passed against the built SPA and the
+<li>Playwright/axe/visual regression: 73 passed against the built SPA and the
   current backend with one worker (1440/1024/390, dark/light, core-page axe,
   LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
   frozen and every API path they render is mocked.</li>
@@ -1748,17 +1756,19 @@ artifacts.</p>
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See <code>versions/V0.1.2_REVIEW_ROUND4.md</code>.</li>
-<li>0.1.3 deployment and UI fixes: <code>/api/v1/system/info</code> survives
+<li>0.1.4 subscription layout fix: long URLs truncate inside the format cards
+  using shrinkable grid tracks and a block-level URL element; a Playwright
+  regression covers a 160-character token on desktop, tablet and mobile.</li>
+<li>0.1.3 deployment and UI fixes (included): <code>/api/v1/system/info</code> survives
   <code>psutil.net_if_addrs()</code> raising <code>EAFNOSUPPORT</code> on VPS/container network
   stacks; first-install readiness uses the unauthenticated <code>/v1/health</code>
   endpoint; the collapsed sidebar header no longer overlaps the expand button;
   the Logs level filter keeps its width; release e2e scripts are executable and
   the sudo step preserves <code>PATH</code>. Added regression tests for these behaviors.</li>
-<li>Publication verification: <code>scripts/verify-release.sh --version 0.1.3</code>
-  downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  <code>ostium-ctl==0.1.3</code>. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.</li>
+<li>0.1.3 publication verification (historical): <code>scripts/verify-release.sh
+  --version 0.1.3</code> downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed,
+  all five core platforms were present, build attestations verified, and PyPI
+  reported <code>ostium-ctl==0.1.3</code>.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace">Not verified in this workspace<a class="headerlink" href="#not-verified-in-this-workspace" title="Permanent link">&para;</a></h3>
 <p>These items require external hardware, accounts, runners or time. They are
@@ -1801,11 +1811,11 @@ evidence is in <code>versions/V0.1.2_RC_REPORT.md</code>:</p>
   unless signing credentials are supplied.</li>
 <li><strong>D-115</strong> Push, tag and publication require explicit release-owner approval.</li>
 </ul>
-<h2 id="release-gates-for-013">Release gates for 0.1.3<a class="headerlink" href="#release-gates-for-013" title="Permanent link">&para;</a></h2>
+<h2 id="release-gates-for-014">Release gates for 0.1.4<a class="headerlink" href="#release-gates-for-014" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Code and automation</strong>: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.</li>
-<li><strong>Upgrade and data</strong>: <code>0.1.2 -&gt; 0.1.3</code> upgrade plus backup restore;
+<li><strong>Upgrade and data</strong>: <code>0.1.3 -&gt; 0.1.4</code> upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.</li>
 <li><strong>Platform evidence</strong>: record only what was actually executed; unexecuted
