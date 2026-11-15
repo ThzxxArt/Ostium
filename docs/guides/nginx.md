@@ -9,7 +9,7 @@ Ostium 和 Nginx 装在同一台服务器时，先分清三类流量：
 | Hysteria2 | QUIC（UDP） | ❌ HTTP 反代不适用 |
 | Shadowsocks 2022 | TCP/UDP | ❌ 不能 HTTP 反代 |
 
-这是**可选架构**，只适用于 443/tcp 已被 Nginx 占用、且你明确选择由 Nginx 终止 TLS 的部署。默认主方案是 Ostium Public UI 直接在 8443/tcp 提供 HTTPS；两者二选一，不要同时启用。
+这是**可选架构**，只适用于 443/tcp 已被 Nginx 占用、且你明确选择由 Nginx 终止 TLS 的部署。推荐的生产方案是 Ostium Public UI 直接在 8443/tcp 提供 HTTPS（默认监听仍是 `127.0.0.1`，需显式开启）；两者二选一，不要同时启用。
 
 采用 Nginx 时：
 

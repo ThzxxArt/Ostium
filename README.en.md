@@ -37,7 +37,7 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-661%20backend%20%C2%B7%20192%20frontend-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-710%20backend%20%C2%B7%20203%20frontend-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -78,13 +78,13 @@ and auditable private-network console.
 | | Capability |
 |---|---|
 | 🧭 **One app, two roles** | Server and client share one package, one SPA and one CLI. Learn once, use both. |
-| 🛡️ **Two-service isolation** | `ostium.service` runs the Web/API/database. `ostium-core.service` only validates, starts and supervises sing-box. The UI never holds root/TUN privileges. |
+| 🛡️ **Two-process split** | `ostium.service` runs the Web/API/database. `ostium-core.service` only validates, starts and supervises sing-box. Both still run as the same service user; full isolation is a 0.2.0 item (D-112). |
 | 📊 **Real traffic accounting** | A custom `sing-box` build with `with_v2ray_api` tracks per-user up/down, daily/monthly totals, quotas and expiry. |
 | 🌐 **A real desktop client** | Windows 10 22H2+ / 11 x64, macOS 14+ arm64 (x64 from source), and Linux x64/arm64 with mixed proxy, system proxy, TUN, URLTest and multiple subscriptions. |
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 661 backend tests (651 regular + 10 live sing-box integration) and 192 frontend tests; Playwright is rerun before publication (see release status). |
+| 🧪 **Verified** | 710 backend tests (700 regular + 10 live sing-box integration), 203 frontend tests and 69 Playwright cases; all executed locally in this round (see release status). |
 
 ---
 
@@ -851,10 +851,10 @@ npx playwright test
 
 Current results:
 
-- Backend: **651 passed** (regular suite) + **10 passed**
-  (live sing-box integration), **94.07%** statements / **90.38%** branches.
-- Frontend: **192 passed**, **90.69%** statements / **85.13%** branches /
-  **88.08%** functions / **92.17%** lines.
+- Backend: **700 passed** (regular suite) + **10 passed**
+  (live sing-box integration), **94.24%** statements / **90.40%** branches.
+- Frontend: **203 passed**, **90.82%** statements / **85.91%** branches /
+  **88.54%** functions / **92.37%** lines.
 - Playwright: **69 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
   baselines, axe on every core page, LCP/CLS performance budgets, PWA service-worker
   registration, navigation and the command palette.

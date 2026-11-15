@@ -15,10 +15,11 @@ a published asset is never replaced.
       (the build script strips the tag prefix).
 - [ ] README.md, README.en.md, SECURITY.md, CHANGELOG.md and RELEASE_NOTES.md
       describe `vX.Y.Z` as the release being published; no "not yet published"
-      or "pending publication" text remains, and the release-docs test passes.
-      Update this status before tagging so the tagged tree never advertises the
-      release as unpublished after assets go live. If publication fails before
-      any asset exists, revert the status text before retrying.
+      or "pending publication" text remains, and `release-preflight.sh` reports
+      no stale release-status text. Update this status before tagging so the
+      tagged tree never advertises the release as unpublished after assets go
+      live. If publication fails before any asset exists, revert the status
+      text before retrying.
 - [ ] `CHANGELOG.md`, migration guide and release notes drafted.
 - [ ] Clean install on Linux, Windows and macOS evidence archived.
 - [ ] Nginx/Docker/ACME/TUN/soak/performance/5-user evidence archived.

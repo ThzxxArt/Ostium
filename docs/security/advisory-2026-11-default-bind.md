@@ -31,8 +31,9 @@ certificates and the sing-box core.
   `allow_insecure_bind = true` (or `--allow-insecure-bind`) is set explicitly.
 - Legacy `0.0.0.0` configurations without the opt-in are migrated to `127.0.0.1`
   on first load and written back.
-- The Docker image sets `OSTIUM_ALLOW_INSECURE_BIND=true` inside the container, and
-  the compose file/documentation require a host firewall or TLS reverse proxy.
+- The Docker image now defaults to `OSTIUM_HOST=127.0.0.1` and
+  `OSTIUM_ALLOW_INSECURE_BIND=false`; exposing the console still requires an
+  explicit opt-in and a host firewall or TLS reverse proxy.
 - Public UI still requires a ready TLS certificate and confirmed TOTP.
 
 ## Mitigation for 0.1.0 installations

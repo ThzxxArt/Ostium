@@ -26,11 +26,11 @@ before the status update. Replacing them would rewrite published artifacts;
 
 ### Verified locally
 
-- Backend unit and in-process integration tests: 668 passed / 10 deselected;
-  94.19% statements / 90.52% branches; `coverage_gate.py` passes.
+- Backend unit and in-process integration tests: 700 passed / 10 deselected;
+  94.24% statements / 90.40% branches; `coverage_gate.py` passes.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
-- Frontend typecheck, lint, unit tests, production build and formatting: 199
-  passed; 91.01/85.70/88.32/92.47.
+- Frontend typecheck, lint, unit tests, production build and formatting: 203
+  passed; 90.82/85.91/88.54/92.37.
 - `0.1.1 -> 0.1.2` upgrade script: user, password material, subscription
   token, database, backup and `master.key` survive; a 0.1.1 backup restores.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
@@ -80,8 +80,12 @@ listed as **unsigned** in the release notes. Checksums and GitHub build
 provenance are not a substitute for platform code signing.
 
 The release workflow expects a protected GitHub environment named
-`release-signing` with required reviewers for the Windows/macOS jobs. Create it
-before tagging; otherwise those jobs will not start.
+`release-signing` with required reviewers for the Windows/macOS jobs. Create and
+configure it (required reviewers, deployment branches) before tagging. GitHub
+creates a missing referenced environment automatically **without** protection
+rules, so the jobs would start unsigned rather than being blocked. The `pypi`
+environment must be protected the same way; a `v*` tag push must not be able to
+publish without release-owner approval (D-115).
 
 ## Release decisions for 0.1.2
 

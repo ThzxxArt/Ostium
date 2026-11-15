@@ -37,7 +37,7 @@
 <p align="center">
   <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-661%20backend%20%C2%B7%20192%20frontend-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-710%20backend%20%C2%B7%20203%20frontend-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
@@ -74,13 +74,13 @@ Ostium 不是又一个代理脚本，而是一套**可安装、可升级、可�
 | | 能力 |
 |---|---|
 | 🧭 **双端一体** | 服务端和客户端使用同一个包、同一个 SPA、同一个 CLI；学会一次，两端通用。 |
-| 🛡️ **两服务隔离** | `ostium.service` 只跑 Web/API/数据库；`ostium-core.service` 只做校验、启动和监管 sing-box。UI 不接触 root/TUN 权限。 |
+| 🛡️ **双进程拆分** | `ostium.service` 只跑 Web/API/数据库；`ostium-core.service` 只做校验、启动和监管 sing-box。当前两者仍以同一服务用户运行（完整隔离是 0.2.0 项，见 D-112）。 |
 | 📊 **真实流量账本** | 定制 `sing-box` 开启 `with_v2ray_api`，每用户上行/下行、日/月汇总、配额与到期自动禁用。 |
 | 🌐 **全平台客户端** | Windows 10 22H2+ / 11 x64、macOS 14+ arm64（x64 需从源码安装）、Linux x64/arm64；混合代理、系统代理、TUN、URLTest、多订阅。 |
 | 🎨 **Aurora Console** | 深色优先、响应式、可安装 PWA，带命令面板、快捷键、实时连接/日志/任务中心。 |
 | 📦 **可交付** | systemd / launchd / Windows 服务 / Docker / Windows setup / macOS DMG / Linux DEB+AppImage；安装、升级、回滚与卸载脚本齐全。 |
 | 🔐 **默认安全** | Argon2id、TOTP、CSRF、Origin/Host 校验、AES-256-GCM 字段加密、诊断包脱敏、登录限速。 |
-| 🧪 **可验证** | 661 个后端测试（651 个常规 + 10 个真实 sing-box 集成）、192 个前端测试；Playwright 用例留待发布前重跑（见发布状态）。 |
+| 🧪 **可验证** | 710 个后端测试（700 个常规 + 10 个真实 sing-box 集成）、203 个前端测试、69 个 Playwright 用例；全部在本轮本地执行（见发布状态）。 |
 
 ---
 
@@ -815,8 +815,8 @@ npx playwright test
 
 当前结果：
 
-- 后端：**651 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；语句 **94.07%**、分支 **90.38%**；
-- 前端：**192 passed**，语句 **90.69%**、分支 **85.13%**、函数 **88.08%**、行 **92.17%**；
+- 后端：**700 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；语句 **94.24%**、分支 **90.40%**；
+- 前端：**203 passed**，语句 **90.82%**、分支 **85.91%**、函数 **88.54%**、行 **92.37%**；
 - Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。

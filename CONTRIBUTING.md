@@ -50,8 +50,11 @@ V2Ray stats require the Ostium custom build from `scripts/build-core.sh`.
   built from that tag; `SHA256SUMS` and attestations cover every published file.
 - Published release assets are immutable. Do not replace, hotfix or re-upload a
   file after publication. Any fix ships in the next patch release.
-- The GitHub release workflow uses `overwrite_files: false`; a failed publication
-  is retried as a new version, never by editing the old release.
+- The GitHub release workflow uses `overwrite_files: false` and deletes only an
+  unpublished draft before a retry. A failure before PyPI is retried from the
+  same tag; a failure after PyPI re-runs with `skip-existing`, and a genuinely
+  broken published release is yanked and replaced by a patch version. Published
+  assets are never edited or re-uploaded (D-111).
 - Unsigned Windows/macOS artifacts must be labelled unsigned in the release
   notes. Never claim Authenticode/notarization without `signtool`/`spctl`
   evidence.

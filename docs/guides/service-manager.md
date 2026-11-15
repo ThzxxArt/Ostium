@@ -16,6 +16,8 @@ Ostium 不绑定某一种 init 系统。默认安装器在 Linux 使用 systemd�
 | supervisord | ✅（`--no-service`） | 提供示例配置 |
 | 手动 / tmux | ✅（`--no-service`） | 适合调试，不建议长期生产 |
 
+> “✅”表示单元文件/脚本已实现并纳入静态检查，不代表已在对应实机完成运行验证。Windows 11、macOS 14、Docker 运行时与非 systemd 实机的证据状态见 `docs/release-status.md`（D-114）。
+
 ## systemd（默认）
 
 安装：
