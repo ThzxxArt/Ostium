@@ -39,8 +39,15 @@ router = APIRouter(tags=["system"])
 def _lan_addresses() -> list[str]:
     """Return private, non-loopback IPv4 addresses for the LAN sharing hint."""
 
+    try:
+        interfaces = psutil.net_if_addrs()
+    except OSError:
+        # Some VPS/container network stacks do not expose every address family
+        # through psutil (for example AF_PACKET may be unavailable).  LAN hints
+        # are optional; they must not take down the dashboard.
+        return []
     addresses: set[str] = set()
-    for entries in psutil.net_if_addrs().values():
+    for entries in interfaces.values():
         for entry in entries:
             if entry.family != socket.AF_INET:
                 continue

@@ -160,6 +160,23 @@ def test_server_system_info_doctor_and_diagnostics(
         assert json.loads(archive.extractfile(member).read())["version"]
 
 
+def test_system_info_survives_an_unsupported_address_family(
+    api_client: TestClient,
+    session_token: str,
+    fake_proxy: FakeProxy,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ostium.api import routes_system
+
+    def unavailable() -> dict:
+        raise OSError(97, "Address family not supported by protocol")
+
+    monkeypatch.setattr(routes_system.psutil, "net_if_addrs", unavailable)
+    response = api_client.get("/api/v1/system/info")
+    assert response.status_code == 200, response.text
+    assert response.json()["lan_addresses"] == []
+
+
 def test_system_info_and_doctor_core_failures(
     api_client: TestClient, settings: Settings, fake_proxy: FakeProxy
 ) -> None:
