@@ -2,6 +2,9 @@
 
 Updated: 2026-11-14
 
+> Historical snapshot for the v0.1.1 line. Current v0.1.2 release facts,
+> test counts and blockers live in `docs/release-status.md`.
+
 Legend: `[x]` implemented and exercised locally, `[~]` implemented but needs
 platform/external validation, `[ ]` not done yet.
 
