@@ -407,13 +407,15 @@ def test_installers_do_not_echo_a_user_supplied_admin_password() -> None:
 def test_readme_marks_the_current_release_status() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
-    assert "v0.1.1 已于" in readme
-    assert "v0.1.2 正在准备" in readme
-    assert "v0.1.2 已于" not in readme
-    assert "v0.1.1 尚未发布" not in readme
-    assert "release status: v0.1.1 was published" in readme_en.lower()
-    assert "v0.1.2 is in" in readme_en.lower()
-    assert "v0.1.2 was published" not in readme_en.lower()
+    status = (ROOT / "docs" / "release-status.md").read_text(encoding="utf-8")
+    assert "v0.1.2 已于" in readme
+    assert "v0.1.1 已于" not in readme
+    assert "正在准备" not in readme
+    assert "尚未发布" not in readme
+    assert "release status: v0.1.2 was published" in readme_en.lower()
+    assert "not published yet" not in readme_en.lower()
+    assert "| Status | **Published** |" in status
+    assert "Preparing; not tagged or published" not in status
 
 
 def test_setup_overview_does_not_break_on_a_corrupt_user(
