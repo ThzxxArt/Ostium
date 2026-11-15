@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatDuration,
   formatRate,
+  formatTime,
   initials,
   percentOf,
   statusTone,
@@ -39,5 +40,19 @@ describe('format utilities', () => {
     expect(statusTone('warning')).toBe('warning')
     expect(statusTone('failed')).toBe('danger')
     expect(statusTone('disabled')).toBe('neutral')
+  })
+})
+
+describe('formatTime', () => {
+  it('renders a UTC timestamp in the viewer timezone', () => {
+    const value = '2026-11-15T00:30:00Z'
+    const rendered = formatTime(value, 'en-US')
+    const expected = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(new Date(value))
+    expect(rendered).toBe(expected)
+    expect(rendered).toContain(":")
   })
 })

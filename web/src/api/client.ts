@@ -1,3 +1,5 @@
+import { i18n } from '@/locales'
+
 export interface ApiProblem {
   type?: string
   title?: string
@@ -68,14 +70,29 @@ async function request<T>(
     if (token) headers.set('X-CSRF-Token', token)
   }
   const timeout = MUTATING.has(method) ? MUTATION_TIMEOUT_MS : READ_TIMEOUT_MS
-  const response = await fetch(path, {
-    ...init,
-    method,
-    headers,
-    credentials: 'same-origin',
-    signal: init?.signal ?? AbortSignal.timeout(timeout),
-    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetch(path, {
+      ...init,
+      method,
+      headers,
+      credentials: 'same-origin',
+      signal: init?.signal ?? AbortSignal.timeout(timeout),
+      body:
+        body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
+    })
+  } catch (err) {
+    // ``AbortSignal.timeout`` rejects with a DOMException.  For a mutation the
+    // server may have committed after the browser gave up, so an opaque
+    // "signal timed out" must not invite a blind retry that creates a second
+    // user or rotates a token twice.
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      const problem: ApiProblem = { status: 408, code: 'timeout_uncertain' }
+      problem.detail = i18n.global.t('errors.timeout_uncertain')
+      throw new ApiError(408, problem)
+    }
+    throw err
+  }
   const contentType = response.headers.get('content-type') || ''
   // RFC 9457 errors use application/problem+json; match any JSON media type
   // so `code` and `detail` survive instead of being collapsed into text.

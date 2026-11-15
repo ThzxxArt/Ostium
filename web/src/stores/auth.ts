@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api'
 import type { AuthStatus, Me } from '@/api/types'
+import { useAppStore } from './app'
+import { useEventStore } from './events'
 
 export type AuthState = 'idle' | 'ready' | 'error'
 
@@ -102,12 +104,25 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function clearSessionCaches(): void {
+    // Components outside RouterView (palette, job drawer) survive the logout
+    // navigation.  Leaving their data in place shows the previous account's
+    // users and jobs to the next person at the browser.
+    const app = useAppStore()
+    const events = useEventStore()
+    app.jobDrawerOpen = false
+    app.commandOpen = false
+    app.mobileNavOpen = false
+    events.reset()
+  }
+
   async function logout() {
     try {
       await api.auth.logout()
     } finally {
       status.value = status.value ? { ...status.value, authenticated: false } : null
       me.value = null
+      clearSessionCaches()
     }
   }
 
@@ -117,6 +132,7 @@ export const useAuthStore = defineStore('auth', () => {
     // flag and immediately sends the user back to the protected page.
     status.value = status.value ? { ...status.value, authenticated: false } : null
     me.value = null
+    clearSessionCaches()
   }
 
   return {

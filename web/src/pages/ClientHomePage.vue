@@ -150,6 +150,18 @@ async function toggleConnection() {
       await api.system.disconnect()
       message.success(t('home.disconnected'))
     } else {
+      // The selector is a UI choice until ``activate`` persists it.  Without
+      // this the core falls back to *all* enabled profiles when nothing is
+      // active, so traffic could leave through a server the user never picked.
+      if (selectedProfileId.value && selectedProfileId.value !== activeProfileId.value) {
+        const activated = await api.profiles.activate(selectedProfileId.value)
+        if (activated.warning) message.warning(activated.warning)
+        if (activated.applied === false) {
+          await load()
+          return
+        }
+        activeProfileId.value = selectedProfileId.value
+      }
       await api.system.connect()
       message.success(t('home.connected'))
     }
@@ -192,8 +204,13 @@ async function selectEndpoint(tag: string | null) {
   if (!profile) return
   const selected = tag || null
   try {
-    await api.profiles.update(profile.id, { selected_endpoint: selected })
+    const result = await api.profiles.update(profile.id, { selected_endpoint: selected })
     profile.selected_endpoint = selected
+    if (result.warning) message.warning(result.warning)
+    if (result.applied === false) {
+      await load()
+      return
+    }
     if (connected.value) await api.system.connect()
     message.success(t('profiles.selected'))
     await load()

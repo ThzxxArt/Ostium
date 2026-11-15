@@ -39,6 +39,17 @@ export function formatDate(value: string | null | undefined, locale = 'zh-CN'): 
   }).format(date)
 }
 
+export function formatTime(value: string | null | undefined, locale = 'zh-CN'): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date)
+}
+
 export function formatDay(value: string, locale = 'zh-CN'): string {
   // Traffic buckets are calendar dates without a timezone.  Parsing a bare
   // YYYY-MM-DD as UTC midnight and formatting it in a western timezone shifts

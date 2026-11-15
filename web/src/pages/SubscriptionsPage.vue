@@ -102,7 +102,12 @@ function confirmRotate() {
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
       try {
-        subscription.value = await api.users.rotateSubscription(selectedUser.value!.id)
+        const result = await api.users.rotateSubscription(selectedUser.value!.id)
+        // Invalidate any reveal that was already in flight: its response
+        // carries the token that this rotation just revoked.
+        subscriptionRequest += 1
+        loadingSub.value = false
+        subscription.value = result
         revealed.value = true
         message.success(t('subscriptions.rotate'))
       } catch (err) {

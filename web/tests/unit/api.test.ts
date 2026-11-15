@@ -203,3 +203,21 @@ describe('api client', () => {
     expect(calls.some((call) => call.search.includes('user_id=user-1'))).toBe(true)
   })
 })
+
+describe('api client mutation timeouts', () => {
+  it('reports a timed-out mutation as possibly applied', async () => {
+    document.cookie = 'ostium_csrf=token; path=/'
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError')),
+    )
+    const error = (await http
+      .post('/api/v1/users', { name: 'alice' })
+      .catch((err) => err)) as ApiError
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.code).toBe('timeout_uncertain')
+    expect(error.message).toMatch(/may already have applied/i)
+  })
+})

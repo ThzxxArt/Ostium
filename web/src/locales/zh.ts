@@ -783,6 +783,7 @@ export default {
     browser_denied: '浏览器通知权限被拒绝',
   },
   errors: {
+    timeout_uncertain: '请求超时。服务器可能已经执行成功，请先刷新确认后再重试。',
     network: '无法连接 Ostium 服务，请确认服务正在运行。',
     unauthorized: '登录已过期，请重新登录',
     forbidden: '没有权限执行此操作',

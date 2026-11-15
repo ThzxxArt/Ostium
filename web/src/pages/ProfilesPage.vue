@@ -150,8 +150,13 @@ async function refresh(profile: Profile) {
 
 async function selectEndpoint(profile: Profile, tag: string) {
   try {
-    await api.profiles.update(profile.id, { selected_endpoint: tag })
+    const result = await api.profiles.update(profile.id, { selected_endpoint: tag })
     profile.selected_endpoint = tag
+    if (result.warning) message.warning(result.warning)
+    if (result.applied === false) {
+      await load()
+      return
+    }
     message.success(t('profiles.selected'))
   } catch (err) {
     message.error((err as Error).message)

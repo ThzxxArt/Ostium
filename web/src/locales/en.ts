@@ -800,8 +800,9 @@ export default {
     browser_denied: 'Browser notification permission was denied',
   },
   errors: {
-    network: 'Cannot reach Ostium. Check that the service is running.',
-    unauthorized: 'Your session expired; please sign in again',
+    timeout_uncertain:
+      'The request timed out. The server may already have applied it — refresh before retrying.',
+    network: 'Cannot reach Ostium. Check that the service is running.',    unauthorized: 'Your session expired; please sign in again',
     forbidden: 'You do not have permission to do that',
     not_found: 'The requested item does not exist',
     validation: 'The submitted data is invalid; check the form',

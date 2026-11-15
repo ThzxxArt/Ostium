@@ -88,5 +88,25 @@ export const useEventStore = defineStore('events', () => {
     connected.value = false
   }
 
-  return { connected, frames, lastLog, lastJob, lastAlert, lastEngine, connect, disconnect }
+  function reset() {
+    disconnect()
+    frames.value = []
+    lastLog.value = null
+    lastJob.value = null
+    lastAlert.value = null
+    lastEngine.value = null
+    retry = 0
+  }
+
+  return {
+    connected,
+    frames,
+    lastLog,
+    lastJob,
+    lastAlert,
+    lastEngine,
+    connect,
+    disconnect,
+    reset,
+  }
 })

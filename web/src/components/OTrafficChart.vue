@@ -24,7 +24,7 @@ const props = withDefaults(
 )
 
 const app = useAppStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const option = computed<EChartsOption>(() => {
   const text = app.isDark ? '#6F819B' : '#64748B'
@@ -59,7 +59,7 @@ const option = computed<EChartsOption>(() => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: props.series.map((point) => formatDay(point.day)),
+      data: props.series.map((point) => formatDay(point.day, locale.value)),
       axisLine: { lineStyle: { color: grid } },
       axisTick: { show: false },
       axisLabel: { color: text, fontSize: 10.5, margin: 10 },

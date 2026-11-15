@@ -34,6 +34,18 @@ const loadingUsers = ref(false)
 let usersLoadedAt = 0
 const inputRef = ref<InstanceType<typeof NInput> | null>(null)
 
+watch(
+  () => auth.authenticated,
+  (authenticated) => {
+    if (!authenticated) {
+      // The palette is mounted outside RouterView and survives logout.
+      users.value = []
+      usersLoadedAt = 0
+      query.value = ''
+    }
+  },
+)
+
 interface PaletteItem {
   id: string
   label: string

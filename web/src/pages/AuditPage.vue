@@ -8,7 +8,7 @@ import OEmptyState from '@/components/OEmptyState.vue'
 import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
 import type { AuditEntry } from '@/api/types'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatTime } from '@/utils/format'
 
 const { t, locale } = useI18n()
 const entries = ref<AuditEntry[]>([])
@@ -78,7 +78,7 @@ onMounted(load)
               <span>· {{ formatDate(entry.created_at, locale) }}</span>
             </div>
           </div>
-          <span class="time o-micro o-subtle">{{ entry.created_at.slice(11, 19) }}</span>
+          <span class="time o-micro o-subtle">{{ formatTime(entry.created_at, locale) }}</span>
         </div>
       </div>
     </div>

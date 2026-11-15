@@ -20,6 +20,7 @@ const importText = ref('')
 const profile = ref<Profile | null>(null)
 const loading = ref(false)
 const testing = ref(false)
+const testError = ref('')
 const testResults = ref<
   Array<{ tag: string; name: string; delay_ms: number | null; error: string | null }>
 >([])
@@ -58,11 +59,14 @@ async function importProfile() {
 async function testProfile() {
   if (!profile.value) return
   testing.value = true
+  testError.value = ''
   try {
     const result = await api.profiles.test(profile.value.id)
     testResults.value = result.results
-  } catch {
+  } catch (err) {
+    // A failed test is not the same as "the subscription has no endpoints".
     testResults.value = []
+    testError.value = (err as Error).message
   } finally {
     testing.value = false
   }
@@ -168,7 +172,8 @@ function skip() {
               size="sm"
             />
           </div>
-          <p v-if="!testResults.length && !testing" class="o-small o-subtle">
+          <p v-if="testError" class="o-small o-subtle">{{ testError }}</p>
+          <p v-else-if="!testResults.length && !testing" class="o-small o-subtle">
             {{ t('onboarding.no_endpoints') }}
           </p>
         </div>
@@ -178,9 +183,7 @@ function skip() {
             {{ t('common.back') }}
           </NButton>
           <div class="spacer" />
-          <NButton secondary :loading="testing" @click="testProfile">{{
-            t('onboarding.skip_test')
-          }}</NButton>
+          <NButton secondary @click="step = 2">{{ t('onboarding.skip_test') }}</NButton>
           <NButton type="primary" size="large" @click="step = 2">
             {{ t('common.next') }}
             <template #icon><ArrowRight :size="16" /></template>

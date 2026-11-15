@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import ClientHomePage from '@/pages/ClientHomePage.vue'
+import OnboardingPage from '@/pages/OnboardingPage.vue'
 import ProfilesPage from '@/pages/ProfilesPage.vue'
 import RoutingPage from '@/pages/RoutingPage.vue'
 import NetworkPage from '@/pages/NetworkPage.vue'
@@ -155,5 +156,59 @@ describe('client pages', () => {
     )
     await settle()
     expect(wrapper.text()).toContain('Home')
+  })
+})
+
+describe('client review round 3 regressions', () => {
+  beforeEach(() => {
+    document.cookie = 'ostium_csrf=token; path=/'
+    localStorage.clear()
+  })
+  afterEach(() => cleanupPage())
+
+  it('Onboarding "skip test" advances without running a test', async () => {
+    installFetchMock()
+    const test = vi.spyOn(api.profiles, 'test')
+    const { wrapper } = await mountPage(OnboardingPage)
+    await settle()
+    const state = stateOf(wrapper, OnboardingPage)
+    state.profile = fixtures.profile
+    state.step = 1
+    state.testing = false
+    state.testResults = []
+    await settle()
+    const buttons = wrapper.findAll('button')
+    await buttons[1].trigger('click')
+    await settle()
+    expect(state.step).toBe(2)
+    expect(test).not.toHaveBeenCalled()
+  })
+
+  it('ClientHomePage activates the visible profile before connecting', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': {
+          ...fixtures.systemInfo,
+          core: { ...fixtures.systemInfo.core, running: false },
+        },
+        '/api/v1/profiles': {
+          profiles: [fixtures.profile],
+          active_profile_id: null,
+        },
+      },
+    })
+    const activate = vi.spyOn(api.profiles, 'activate').mockResolvedValue({
+      profile: fixtures.profile,
+      applied: true,
+    })
+    const connect = vi.spyOn(api.system, 'connect').mockResolvedValue({} as never)
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    const state = stateOf(wrapper, ClientHomePage)
+    await state.toggleConnection()
+    await settle()
+    expect(activate).toHaveBeenCalledWith(fixtures.profile.id)
+    expect(connect).toHaveBeenCalled()
   })
 })
