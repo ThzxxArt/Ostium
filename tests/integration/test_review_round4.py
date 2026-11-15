@@ -405,14 +405,14 @@ def test_installers_do_not_echo_a_user_supplied_admin_password() -> None:
 
 
 def test_readme_marks_the_current_release_status() -> None:
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     status = (ROOT / "docs" / "release-status.md").read_text(encoding="utf-8")
-    assert "v0.1.3 已于" in readme
-    assert "v0.1.2 已于" not in readme
+    assert f"v{version} 已于" in readme
     assert "正在准备" not in readme
     assert "尚未发布" not in readme
-    assert "release status: v0.1.3 was published" in readme_en.lower()
+    assert f"release status: v{version} was published" in readme_en.lower()
     assert "not published yet" not in readme_en.lower()
     assert "| Status | **Published** |" in status
     assert "Preparing; not tagged or published" not in status
