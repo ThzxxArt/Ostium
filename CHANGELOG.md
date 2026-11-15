@@ -3,6 +3,31 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [0.1.3] - 2026-11-15
+
+### Fixed
+
+- The collapsed sidebar no longer places the expand button on top of the brand
+  mark; the logo and toggle stack vertically inside the 76 px rail.
+- The Logs page level filter keeps a stable 130 px width instead of shrinking
+  to a single visible letter in the toolbar flex row.
+- The dashboard no longer returns `500 internal server error` on VPS or
+  container network stacks where `psutil.net_if_addrs()` raises
+  `EAFNOSUPPORT`. LAN address hints are optional and no longer take down
+  `/api/v1/system/info`.
+- A fresh server install no longer reports "core is not running" when the core
+  is healthy. The readiness check uses the unauthenticated `/v1/health`
+  endpoint instead of the bearer-token-protected `/v1/status`.
+- Release e2e scripts are committed with the executable bit and invoked through
+  `bash`; the sudo install step preserves `PATH` so `uv` remains available.
+
+### Documentation
+
+- Version-iteration plans, decisions, audits and review ledgers moved to
+  `versions/`; README, CHANGELOG, RELEASE_NOTES and SECURITY remain at the
+  repository root for the release workflow and preflight.
+- Release status, badges and upgrade notes updated for 0.1.3.
+
 ## [0.1.2] - 2026-11-15
 
 ### Fixed

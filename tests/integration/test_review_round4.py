@@ -408,11 +408,11 @@ def test_readme_marks_the_current_release_status() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     status = (ROOT / "docs" / "release-status.md").read_text(encoding="utf-8")
-    assert "v0.1.2 已于" in readme
-    assert "v0.1.1 已于" not in readme
+    assert "v0.1.3 已于" in readme
+    assert "v0.1.2 已于" not in readme
     assert "正在准备" not in readme
     assert "尚未发布" not in readme
-    assert "release status: v0.1.2 was published" in readme_en.lower()
+    assert "release status: v0.1.3 was published" in readme_en.lower()
     assert "not published yet" not in readme_en.lower()
     assert "| Status | **Published** |" in status
     assert "Preparing; not tagged or published" not in status

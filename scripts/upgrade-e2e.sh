@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Exercise a real installed 0.1.1 -> current wheel upgrade without systemd.
+# Exercise a real installed 0.1.2 -> current wheel upgrade without systemd.
 #
 # The installer upgrades the same files this script does: a fresh virtualenv,
-# the published 0.1.1 wheel, then the locally built wheel.  It verifies that the
-# database migrates, users and the master key survive, and that a backup taken
-# by 0.1.1 can still be restored.
+# the published previous wheel, then the locally built wheel.  It verifies that
+# the database migrates, users and the master key survive, and that an encrypted
+# backup taken by the previous release can still be restored.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.1}"
+FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.2}"
 WORK="${OSTIUM_E2E_DIR:-$(mktemp -d -t ostium-upgrade-XXXXXX)}"
 KEEP="${OSTIUM_E2E_KEEP:-false}"
 
@@ -49,19 +49,18 @@ init_rc=$?
 set -e
 # Exit 3 means "configuration saved but the core token/service is absent";
 # that is the expected developer-checkout state, not an upgrade failure.
-[[ "$init_rc" -eq 0 || "$init_rc" -eq 3 ]] || fail "0.1.1 init exited $init_rc"
-[[ -f "$DATA/ostium.db" ]] || fail "0.1.1 init did not create a database"
+[[ "$init_rc" -eq 0 || "$init_rc" -eq 3 ]] || fail "previous init exited $init_rc"
+[[ -f "$DATA/ostium.db" ]] || fail "previous init did not create a database"
 
 set +e
 "$WORK/old/bin/ostium" user add alice --quota 1G --note 'upgrade fixture' --json \
   > "$WORK/old-user.json"
 user_rc=$?
 set -e
-[[ "$user_rc" -eq 0 || "$user_rc" -eq 3 ]] || fail "0.1.1 user add exited $user_rc"
-grep -q '"user": "alice"' "$WORK/old-user.json" || fail "0.1.1 user creation failed"
-# 0.1.1 lacks the newer --acknowledge-plaintext flag; this fixture is created
-# by the published old CLI intentionally, then restored by current code.
-"$WORK/old/bin/ostium" backup create --output "$WORK/from-0.1.1.tar.gz" >/dev/null
+[[ "$user_rc" -eq 0 || "$user_rc" -eq 3 ]] || fail "previous user add exited $user_rc"
+grep -q '"user": "alice"' "$WORK/old-user.json" || fail "previous user creation failed"
+"$WORK/old/bin/ostium" backup create --password 'backup-passphrase' \
+  --output "$WORK/from-previous.ostb" >/dev/null
 
 OLD_KEY="$(sha256sum "$DATA/master.key" | awk '{print $1}')"
 OLD_TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["token"])' "$WORK/old-user.json")"
@@ -100,8 +99,9 @@ if not version:
 print(f"database integrity ok, alembic revision {version[0]}")
 PY
 
-say "restoring the 0.1.1 backup with current code"
-"$WORK/new/bin/ostium" backup restore "$WORK/from-0.1.1.tar.gz" --yes >/dev/null
+say "restoring the previous-release backup with current code"
+"$WORK/new/bin/ostium" backup restore "$WORK/from-previous.ostb" \
+  --password 'backup-passphrase' --yes >/dev/null
 "$WORK/new/bin/ostium" user list --json > "$WORK/restored-users.json"
 grep -q '"alice"' "$WORK/restored-users.json" || fail "restored backup lost user alice"
 [[ "$(sha256sum "$DATA/master.key" | awk '{print $1}')" == "$OLD_KEY" ]] \
