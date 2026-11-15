@@ -1643,8 +1643,28 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 <td><strong>Published</strong></td>
 </tr>
 <tr>
+<td>Tag</td>
+<td><code>v0.1.2</code> (annotated, commit <code>7f9ea6a</code>)</td>
+</tr>
+<tr>
+<td>Assets</td>
+<td>GitHub Release <code>v0.1.2</code> — 23 assets, marked Latest</td>
+</tr>
+<tr>
+<td>PyPI</td>
+<td><code>ostium-ctl==0.1.2</code> (wheel + sdist)</td>
+</tr>
+<tr>
+<td>GHCR</td>
+<td><code>0.1.2</code>, <code>v0.1.2</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
+</tr>
+<tr>
+<td>Release workflow</td>
+<td>run <code>43682022358</code> — success</td>
+</tr>
+<tr>
 <td>Previous release</td>
-<td><code>v0.1.1</code>, published 2026-11-14 (23 assets, immutable)</td>
+<td><code>v0.1.1</code>, published 2026-11-14 (23 assets, unchanged)</td>
 </tr>
 <tr>
 <td>Release type</td>
@@ -1699,6 +1719,11 @@ before the status update. Replacing them would rewrite published artifacts;
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See <code>V0.1.2_REVIEW_ROUND4.md</code>.</li>
+<li>Publication verification: <code>scripts/verify-release.sh --version 0.1.2</code>
+  downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  <code>ostium-ctl==0.1.2</code>. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace">Not verified in this workspace<a class="headerlink" href="#not-verified-in-this-workspace" title="Permanent link">&para;</a></h3>
 <p>These items require external hardware, accounts, runners or time. They are
