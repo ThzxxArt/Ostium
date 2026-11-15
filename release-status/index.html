@@ -1699,14 +1699,14 @@ before the status update. Replacing them would rewrite published artifacts;
 <li>First full review round: 40 findings closed, including commit-before-response,
   stats-outage quota enforcement, certificate path traversal, webhook secret
   encryption, Public UI recovery and release-workflow/Docker defaults. See
-  <code>V0.1.2_REVIEW_ROUND1.md</code>.</li>
+  <code>versions/V0.1.2_REVIEW_ROUND1.md</code>.</li>
 <li>Second full review round: 19 additional findings closed, including an
   apply-failure path that un-approved a committed inbound port, blocking DNS
   resolution on the event loop, a non-Public-UI certificate renewal switching
   the plaintext control plane to HTTPS, Public UI cookies without <code>Secure</code>,
   one-time credentials lost on a post-commit apply error, and release-checklist
   wording that still claimed no post-PyPI half-publication. See
-  <code>V0.1.2_REVIEW_ROUND2.md</code>.</li>
+  <code>versions/V0.1.2_REVIEW_ROUND2.md</code>.</li>
 <li>Release workflow ordering tests: draft release first, PyPI before GHCR/draft
   publication.</li>
 <li>Playwright/axe/visual regression: 69 passed against the built SPA and the
@@ -1718,7 +1718,7 @@ before the status update. Replacing them would rewrite published artifacts;
   CLI disable/delete tombstones, export certificate resolution, certificate
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
-  serialization, coverage-gate stability). See <code>V0.1.2_REVIEW_ROUND4.md</code>.</li>
+  serialization, coverage-gate stability). See <code>versions/V0.1.2_REVIEW_ROUND4.md</code>.</li>
 <li>Publication verification: <code>scripts/verify-release.sh --version 0.1.2</code>
   downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
   platforms are present, build attestations verified, and PyPI reports
@@ -1754,8 +1754,8 @@ rules, so the jobs would start unsigned rather than being blocked. The <code>pyp
 environment must be protected the same way; a <code>v*</code> tag push must not be able to
 publish without release-owner approval (D-115).</p>
 <h2 id="release-decisions-for-012">Release decisions for 0.1.2<a class="headerlink" href="#release-decisions-for-012" title="Permanent link">&para;</a></h2>
-<p>The release owner accepted the following in <code>V0.1.2_DECISIONS.md</code>; the RC
-evidence is in <code>V0.1.2_RC_REPORT.md</code>:</p>
+<p>The release owner accepted the following in <code>versions/V0.1.2_DECISIONS.md</code>; the RC
+evidence is in <code>versions/V0.1.2_RC_REPORT.md</code>:</p>
 <ul>
 <li><strong>D-111</strong> PyPI-first ordering is accepted with the documented retry/yank/patch
   recovery; publication is not atomic.</li>
