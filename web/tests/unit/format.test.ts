@@ -53,6 +53,6 @@ describe('formatTime', () => {
       second: '2-digit',
     }).format(new Date(value))
     expect(rendered).toBe(expected)
-    expect(rendered).toContain(":")
+    expect(rendered).toContain(':')
   })
 })

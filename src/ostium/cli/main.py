@@ -1299,6 +1299,12 @@ def _set_user_enabled(name: str, enabled: bool) -> None:
                     user.disabled_reason = None
                 await _audit(session, "user.enabled" if enabled else "user.disabled", name)
                 await session.commit()
+                # The CLI is a separate process from the service.  Persist the
+                # tombstone before applying so a failed apply plus a core
+                # restart cannot resurrect a user disabled here.
+                from ostium.services.enforcement import persist_enforcement
+
+                await persist_enforcement(session, settings.paths.enforcement_path)
         finally:
             await engine.dispose()
 
@@ -1369,6 +1375,9 @@ def user_remove(name: str, yes: bool = typer.Option(False, "--yes")) -> None:
                 await session.delete(user)
                 await _audit(session, "user.deleted", name)
                 await session.commit()
+                from ostium.services.enforcement import persist_enforcement
+
+                await persist_enforcement(session, settings.paths.enforcement_path, revoked=(name,))
         finally:
             await engine.dispose()
 

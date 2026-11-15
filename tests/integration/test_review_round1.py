@@ -364,10 +364,14 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
         def __init__(self) -> None:
             self.reconciled = 0
             self.running = False
+            self.revision: str | None = None
+            self.last_error: str | None = None
+            self.unreachable = False
 
         async def reconcile_client(self, session, *, force: bool = False):
             self.reconciled += 1
             self.running = True
+            self.revision = "r1"
             return True
 
     class Client:
@@ -375,7 +379,13 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
             self.engine = engine
 
         async def status(self):
-            return {"running": self.engine.running}
+            if self.engine.unreachable:
+                raise RuntimeError("core service is unreachable")
+            return {
+                "running": self.engine.running,
+                "revision": self.engine.revision,
+                "last_error": self.engine.last_error,
+            }
 
     class Session:
         async def __aenter__(self):
@@ -399,12 +409,15 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
         client_paused=False,
     )
     settings.auto_reconnect = True
+    settings.paths.last_good_path.unlink(missing_ok=True)
 
-    # No last-good configuration yet: do not touch the core.
+    # No configuration has ever been applied: do not touch the core.
     asyncio.run(_watchdog_tick(services))
     assert engine.reconciled == 0
 
-    settings.paths.last_good_path.write_text("{}", encoding="utf-8")
+    # Default split-user client install: the core owns last-good, so the UI has
+    # no local file.  The revision reported by the core must be enough.
+    engine.revision = "r1"
     asyncio.run(_watchdog_tick(services))
     assert engine.reconciled == 1
 
@@ -421,6 +434,26 @@ def test_core_watchdog_reloads_only_when_needed(settings) -> None:  # type: igno
     settings.auto_reconnect = False
     asyncio.run(_watchdog_tick(services))
     assert engine.reconciled == 1
+
+    # A rejected/corrupt core last-good reports last_error instead of a
+    # revision; that is still a configuration the reconciler must replace.
+    settings.auto_reconnect = True
+    engine.revision = None
+    engine.last_error = "last-good config rejected"
+    asyncio.run(_watchdog_tick(services))
+    assert engine.reconciled == 2
+
+    # Unreachable core: keep the legacy single-directory signal working, but
+    # do not spam applies when nothing proves a configuration exists.
+    engine.running = False
+    engine.revision = None
+    engine.last_error = None
+    engine.unreachable = True
+    asyncio.run(_watchdog_tick(services))
+    assert engine.reconciled == 2
+    settings.paths.last_good_path.write_text("{}", encoding="utf-8")
+    asyncio.run(_watchdog_tick(services))
+    assert engine.reconciled == 3
 
 
 def test_automatic_backup_is_listed_and_restorable(api_client: TestClient) -> None:

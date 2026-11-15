@@ -35,3 +35,9 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert 'Join-Path $InstallDir "service\\ostium-service.exe"' in uninstall
     assert "$proxyRestored" in uninstall
     assert "Could not confirm the system proxy was restored" in uninstall
+
+    setup = (ROOT / "deploy" / "windows" / "ostium.iss").read_text(encoding="utf-8")
+    # The client database is in the UI data directory, not the core's
+    # ProgramData\OstiumCore tree; snapshotting the wrong tree loses rollback.
+    assert "Join-Path $env:ProgramData ''Ostium''" in setup
+    assert "Join-Path $env:ProgramData ''OstiumCore''; if(Test-Path (Join-Path $d ''ostium.db'')" not in setup

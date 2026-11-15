@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from ostium import __version__
 from ostium.config import Role, Settings
 from ostium.engine.singbox.supervisor import (
+    MAX_ARTIFACTS_TOTAL_BYTES,
     CoreError,
     CoreSupervisor,
     ensure_core_token,
@@ -31,7 +32,16 @@ from ostium.engine.singbox.supervisor import (
 from ostium.engine.singbox.validate import ConfigRejected
 from ostium.util.redact import redact
 
-MAX_BODY_BYTES = 2 * 1024 * 1024
+# The apply payload carries rule-set bytes as base64, so the JSON body is larger
+# than the raw artifacts.  A fixed 2 MiB cap made the artifact protocol
+# unreachable for any rule set above ~1.5 MiB even though the supervisor accepts
+# up to MAX_ARTIFACTS_TOTAL_BYTES.  Size the transport limit from the policy
+# limit instead of keeping two unrelated constants.
+_ARTIFACT_BASE64_EXPANSION = 4 / 3
+_APPLY_JSON_OVERHEAD_BYTES = 4 * 1024 * 1024
+MAX_BODY_BYTES = int(MAX_ARTIFACTS_TOTAL_BYTES * _ARTIFACT_BASE64_EXPANSION) + (
+    _APPLY_JSON_OVERHEAD_BYTES
+)
 logger = logging.getLogger(__name__)
 
 

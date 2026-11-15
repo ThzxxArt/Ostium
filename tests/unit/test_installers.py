@@ -26,6 +26,21 @@ def test_reinstall_over_an_existing_database_does_not_print_a_new_password() -> 
     assert 'DB_PREEXISTING="false"' in install
     assert 'elif [[ "$DB_PREEXISTING" == "true" ]]; then' in install
     assert 'ADMIN_PASSWORD_DISPLAY="未更改（已有数据库）"' in install
+    # The CLI rejects an explicitly empty --password, so a reinstall must omit
+    # the flag instead of forwarding the empty generated-password variable.
+    assert '--no-input --password "$ADMIN_PASSWORD"' not in install
+    assert '[[ -n "$ADMIN_PASSWORD" ]] && INIT_ARGS+=(--password "$ADMIN_PASSWORD")' in install
+    online = (ROOT / "scripts" / "install-online.sh").read_text(encoding="utf-8")
+    assert '! -f "$DATA/ostium.db"' in online
+    assert 'ADMIN_PASSWORD_DISPLAY="未更改（已有数据库）"' in online
+
+
+def test_upgrade_snapshot_covers_the_client_ui_database_and_key() -> None:
+    install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+    assert 'state_dir="$UI_DATA"' in install
+    assert 'cp -p "$state_dir/master.key"' in install
+    assert 'cp -p "$UPGRADE_SNAPSHOT_DIR/master.key"' in install
+    assert "config-*.toml" in install
 
 
 def test_service_accounts_create_or_reuse_a_real_group() -> None:
@@ -113,6 +128,10 @@ def test_macos_upgrade_checks_and_rolls_back_the_core_and_user_agent() -> None:
     assert 'if [[ -n "$OLD_VENV" ]] && ! wait_for_core; then' in script
     assert 'launchctl asuser "$(id -u "$SUDO_USER")" launchctl unload -w' in script
     assert 'cp -p "$target" "$target.old"' in script
+    # The client database lives in the UI data directory; snapshotting $DATA
+    # produced an empty rollback set.
+    assert 'DB_SNAPSHOT="$UI_DATA/pre-upgrade-' in script
+    assert 'cp -p "$UI_DATA/$file" "$DB_SNAPSHOT/$file"' in script
 
 
 def test_mode_switch_removes_stale_root_and_opposite_units() -> None:

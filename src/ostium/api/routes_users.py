@@ -116,15 +116,11 @@ async def _persist_enforcement(
     credential when the core restarts while the control plane is down.
     """
 
-    from ostium.services.enforcement import read_enforcement, write_enforcement
+    from ostium.services.enforcement import persist_enforcement
 
-    path = services.settings.paths.enforcement_path
-    rows = (await session.execute(select(ProxyUser.name, ProxyUser.enabled))).all()
-    enabled = {name for name, is_enabled in rows if is_enabled}
-    names = {name for name, is_enabled in rows if not is_enabled}
-    names.update(str(name) for name in revoked)
-    names |= read_enforcement(path) - enabled
-    write_enforcement(path, names - enabled)
+    await persist_enforcement(
+        session, services.settings.paths.enforcement_path, revoked=tuple(revoked)
+    )
 
 
 async def _apply_server(
@@ -452,7 +448,11 @@ async def export_user(
 ) -> dict[str, Any]:
     user = await _get_user(session, user_id)
     endpoints = await endpoints_for_user(
-        session, services.store, user, server_host=await server_hostname(session)
+        session,
+        services.store,
+        user,
+        server_host=await server_hostname(session),
+        settings=services.settings,
     )
     document = ProfileDocument(name=user.name, generated_at=iso(utcnow()), endpoints=endpoints)
     await audit(
@@ -509,7 +509,11 @@ async def bulk_users(
         exports = []
         for user in users:
             endpoints = await endpoints_for_user(
-                session, services.store, user, server_host=await server_hostname(session)
+                session,
+                services.store,
+                user,
+                server_host=await server_hostname(session),
+                settings=services.settings,
             )
             exports.append(
                 {

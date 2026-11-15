@@ -74,6 +74,35 @@ as_root bash "$ROOT/scripts/install.sh" \
   --core "$CORE" \
   --run-as-root --no-service --no-start >/dev/null
 
+say "installing and reinstalling the server role over an existing database"
+SERVER_DATA="$WORK/server-data"
+SERVER_CONFIG="$WORK/server-config"
+SAVED_DATA="${OSTIUM_DATA_DIR:-}"
+SAVED_CONFIG="${OSTIUM_CONFIG_DIR:-}"
+export OSTIUM_DATA_DIR="$SERVER_DATA" OSTIUM_CONFIG_DIR="$SERVER_CONFIG"
+as_root bash "$ROOT/scripts/install.sh" \
+  --role server --wheel "$WHEEL" --core "$CORE" \
+  --run-as-root --no-service --no-start --password 'verysecret123' >/dev/null
+# A repair/reinstall has an existing database and therefore no generated
+# password.  The installer must not pass an empty --password (the CLI rejects
+# it), and init must keep the existing administrator.
+as_root bash "$ROOT/scripts/install.sh" \
+  --role server --wheel "$WHEEL" --core "$CORE" \
+  --run-as-root --no-service --no-start >/dev/null
+OSTIUM_ROLE=server OSTIUM_DATA_DIR="$SERVER_DATA" OSTIUM_CONFIG_DIR="$SERVER_CONFIG" \
+  "$PREFIX/venv/bin/ostium" user list --json >/dev/null
+python3 - "$SERVER_DATA/ostium.db" <<'PY'
+import sqlite3
+import sys
+
+with sqlite3.connect(sys.argv[1]) as connection:
+    admins = connection.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0]
+if admins != 1:
+    raise SystemExit(f"expected one administrator after reinstall, found {admins}")
+print("server reinstall kept exactly one administrator")
+PY
+export OSTIUM_DATA_DIR="$SAVED_DATA" OSTIUM_CONFIG_DIR="$SAVED_CONFIG"
+
 say "uninstalling with purge"
 as_root bash "$ROOT/scripts/install.sh" \
   --role client \

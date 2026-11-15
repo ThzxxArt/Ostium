@@ -51,7 +51,7 @@ sudo -u ostium ostium doctor
 - 旧证书续期后浏览器使用新证书；
 - `ostium-core` 没有继续运行旧的安全策略配置。
 
-安装器在停止服务后会生成 `pre-upgrade-<时间>` 快照，包含 `ostium.db`、WAL/SHM 与 `master.key`：Linux 位于数据目录，macOS 位于 `/Library/Application Support/Ostium`，Windows 位于 `%ProgramData%\OstiumCore`。Linux 与 macOS 会在健康检查失败时自动恢复该快照；Windows 安装器只保留快照，需要手工恢复后再回到 0.1.1。
+安装器在停止服务后会生成 `pre-upgrade-<时间>` 快照，包含 `ostium.db`、WAL/SHM 与 `master.key`（Linux 安装器还会保存配置文件副本）：Linux 服务端位于 `/var/lib/ostium`，Linux 客户端位于 UI 数据目录（默认 `~/.local/share/ostium`），macOS 位于 `/Library/Application Support/Ostium UI`，Windows 位于 `%ProgramData%\Ostium`。Linux 与 macOS 会在健康检查失败时自动恢复该快照；Windows 安装器只保留快照，需要手工恢复后再回到 0.1.1。
 
 如果启动失败：
 

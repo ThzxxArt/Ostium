@@ -188,9 +188,25 @@ def test_inbound_assignment_and_deletion(settings: Settings) -> None:
             assert not resolve_path(settings, certificate.cert_path).exists()
             assert not resolve_path(settings, certificate.key_path).exists()
             rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
-            assert rows["hysteria2"].enabled is False
-            assert rows["trojan"].enabled is False
+            # The binding is removed, which is what keeps the deleted files out
+            # of the next configuration (a TLS inbound without a certificate is
+            # omitted by the builder).  The operator's enabled choice is kept so
+            # uploading a replacement certificate restores the listener without
+            # a second, easy-to-miss manual step.
+            assert rows["hysteria2"].enabled is True
+            assert rows["trojan"].enabled is True
             assert rows["hysteria2"].certificate_id is None
+            assert rows["trojan"].certificate_id is None
+
+            replacement = await cert_service.create_self_signed(
+                session, settings, domain="vpn2.example.com"
+            )
+            await cert_service.use_for_unbound(session, replacement, settings=settings)
+            await session.commit()
+            rows = {row.kind: row for row in (await session.execute(select(Inbound))).scalars()}
+            assert rows["hysteria2"].certificate_id == replacement.id
+            assert rows["trojan"].certificate_id == replacement.id
+            assert rows["hysteria2"].enabled is True
         await engine.dispose()
 
     asyncio.run(_run())

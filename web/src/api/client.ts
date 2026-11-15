@@ -78,8 +78,7 @@ async function request<T>(
       headers,
       credentials: 'same-origin',
       signal: init?.signal ?? AbortSignal.timeout(timeout),
-      body:
-        body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     })
   } catch (err) {
     // ``AbortSignal.timeout`` rejects with a DOMException.  For a mutation the

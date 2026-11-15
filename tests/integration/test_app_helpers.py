@@ -543,6 +543,14 @@ def test_profile_refresh_loop(tmp_path: Path, monkeypatch) -> None:
         logs = [item["message"] for item in services.bus.logs()]
         assert "subscription refreshed" in logs
         assert any("subscription refresh failed" in item for item in logs)
+        # The loop rolls the failed transaction back.  The diagnostic must be
+        # written by a separate transaction; otherwise the UI keeps showing the
+        # previous error (or none) until the next manual refresh.
+        with sqlite3.connect(settings.paths.db_path) as connection:
+            stored = connection.execute(
+                "SELECT last_refresh_error FROM profiles WHERE id = 'bad'"
+            ).fetchone()
+        assert stored is not None and "refresh failed" in (stored[0] or "")
 
 
 def test_cert_renewal_and_profile_refresh_outer_errors(tmp_path: Path, monkeypatch) -> None:

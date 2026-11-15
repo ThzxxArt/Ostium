@@ -209,9 +209,7 @@ describe('api client mutation timeouts', () => {
     document.cookie = 'ostium_csrf=token; path=/'
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError')),
+      vi.fn().mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError')),
     )
     const error = (await http
       .post('/api/v1/users', { name: 'alice' })

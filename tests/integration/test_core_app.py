@@ -122,7 +122,10 @@ def test_core_body_limits_and_content_type(tmp_path: Path) -> None:
         too_large = client.post(
             "/v1/apply",
             content=b"{}",
-            headers={**headers, "content-length": str(3 * 1024 * 1024)},
+            headers={
+                **headers,
+                "content-length": str(core_app_module.MAX_BODY_BYTES + 1),
+            },
         )
         assert too_large.status_code == 413
         assert too_large.json()["code"] == "body_too_large"
@@ -131,7 +134,7 @@ def test_core_body_limits_and_content_type(tmp_path: Path) -> None:
         # guard after the body is read.
         actual_large = client.post(
             "/v1/apply",
-            content=b"x" * (2 * 1024 * 1024 + 1),
+            content=b"x" * (core_app_module.MAX_BODY_BYTES + 1),
             headers={
                 **headers,
                 "content-type": "application/json",
@@ -153,6 +156,44 @@ def test_core_body_limits_and_content_type(tmp_path: Path) -> None:
             headers={**headers, "content-type": "application/json"},
         )
         assert invalid_json.status_code == 422
+
+
+def test_core_accepts_rule_set_artifacts_above_the_old_two_megabyte_cap(
+    tmp_path: Path,
+) -> None:
+    """The transport limit must cover the artifact policy, not 2 MiB.
+
+    A client rule set is uploaded as base64 inside the apply payload.  The
+    supervisor accepts up to 32 MiB of raw artifacts, which is ~43 MiB once
+    encoded; the old fixed body cap rejected that request before the artifact
+    validation could even run.
+    """
+
+    settings = _settings(tmp_path)
+    app = create_core_app(settings)
+    captured: dict[str, object] = {}
+
+    async def fake_apply(config, sha256, **kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return _status()
+
+    app.state.supervisor.apply = fake_apply  # type: ignore[method-assign]
+    artifact_path = "/home/user/.local/share/ostium/rulesets/geosite-ads.srs"
+    artifacts = {artifact_path: "A" * (3 * 1024 * 1024)}
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/apply",
+            json={
+                "config": {"route": {"rule_set": [{"path": artifact_path}]}},
+                "sha256": "0" * 64,
+                "role": "server",
+                "artifacts": artifacts,
+            },
+            headers=_headers(settings),
+        )
+    assert response.status_code == 200, response.text
+    assert captured["artifacts"] == artifacts
+    assert len(json.dumps(artifacts).encode()) < core_app_module.MAX_BODY_BYTES
 
 
 def test_core_reload_stop_logs_config_and_errors(tmp_path: Path, monkeypatch) -> None:

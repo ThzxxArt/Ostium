@@ -71,6 +71,29 @@ def read_enforcement(path: Path, *, strict: bool = False) -> set[str]:
     return {str(item) for item in users if isinstance(item, str) and item}
 
 
+async def persist_enforcement(
+    session: Any, path: Path, *, revoked: list[str] | tuple[str, ...] = ()
+) -> None:
+    """Rewrite the tombstone file from the current database state.
+
+    Every mutation path (web UI, bulk actions and CLI) must use the same rule:
+    disabled rows plus explicitly revoked names, minus anybody currently
+    enabled.  Keeping this in one place prevents a CLI ``user disable`` from
+    leaving no tombstone while the API writes one.
+    """
+
+    from sqlalchemy import select
+
+    from ostium.db.models import ProxyUser
+
+    rows = (await session.execute(select(ProxyUser.name, ProxyUser.enabled))).all()
+    enabled = {str(name) for name, is_enabled in rows if is_enabled}
+    names = {str(name) for name, is_enabled in rows if not is_enabled}
+    names.update(str(name) for name in revoked)
+    names |= read_enforcement(path) - enabled
+    write_enforcement(path, names - enabled)
+
+
 def strip_disabled_users(config: dict[str, Any], disabled: set[str]) -> tuple[dict[str, Any], bool]:
     """Return a copy of a server config without revoked users.
 

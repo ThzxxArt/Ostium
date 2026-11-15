@@ -421,7 +421,11 @@ async def delete_certificate(
         .all()
     )
     for inbound in inbounds:
-        inbound.enabled = False
+        # Detach the binding only.  The configuration builder omits a TLS
+        # inbound without a certificate, so the deleted files cannot leak into
+        # the next apply.  Disabling the row as well left the listener down even
+        # after a replacement certificate was uploaded (use_for_unbound binds
+        # cert-less inbounds but does not re-enable them).
         inbound.certificate_id = None
     if settings is not None:
         cert_path = resolve_path(settings, certificate.cert_path)

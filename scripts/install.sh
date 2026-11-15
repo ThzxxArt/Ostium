@@ -44,6 +44,7 @@ PURGE="false"
 UPGRADE_SERVICES_STOPPED="false"
 UPGRADE_ROLLED_BACK="false"
 UPGRADE_SNAPSHOT_DIR=""
+UPGRADE_SNAPSHOT_DATA=""
 
 usage() {
   cat <<'EOF'
@@ -337,31 +338,65 @@ wait_for_core_ready() {
 }
 
 snapshot_upgrade_state() {
-  UPGRADE_SNAPSHOT_DIR="$DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+  # The default client runs its UI from the desktop user's data directory, not
+  # from $DATA.  Snapshotting $DATA/ostium.db there produced an empty snapshot,
+  # so a failed client upgrade had no database to roll back to.
+  local state_dir="$DATA"
+  local config_files=("$CONFIG/config.toml")
+  if [[ "$ROLE" == "client" ]]; then
+    state_dir="$UI_DATA"
+    config_files=("$UI_CONFIG" "$CLIENT_CONFIG")
+  fi
+  UPGRADE_SNAPSHOT_DATA="$state_dir"
+  UPGRADE_SNAPSHOT_DIR="$state_dir/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
   install -d -m 0700 "$UPGRADE_SNAPSHOT_DIR"
   for file in ostium.db ostium.db-wal ostium.db-shm; do
-    if [[ -f "$DATA/$file" ]]; then
-      cp -p "$DATA/$file" "$UPGRADE_SNAPSHOT_DIR/$file"
+    if [[ -f "$state_dir/$file" ]]; then
+      cp -p "$state_dir/$file" "$UPGRADE_SNAPSHOT_DIR/$file"
     fi
   done
-  if [[ -f "$CONFIG/config.toml" ]]; then
-    cp -p "$CONFIG/config.toml" "$UPGRADE_SNAPSHOT_DIR/config.toml"
+  if [[ -f "$state_dir/master.key" ]]; then
+    # The upgrade does not rotate the key, but a rollback that restores the
+    # database without its key would be unusable.  Keep the pair together.
+    cp -p "$state_dir/master.key" "$UPGRADE_SNAPSHOT_DIR/master.key"
   fi
+  local index=0
+  for config_file in "${config_files[@]}"; do
+    if [[ -f "$config_file" ]]; then
+      cp -p "$config_file" "$UPGRADE_SNAPSHOT_DIR/config-$index.toml"
+      printf '%s\n' "$config_file" >"$UPGRADE_SNAPSHOT_DIR/config-$index.path"
+    fi
+    index=$((index + 1))
+  done
 }
 
 restore_upgrade_snapshot() {
   if [[ -z "$UPGRADE_SNAPSHOT_DIR" || ! -f "$UPGRADE_SNAPSHOT_DIR/ostium.db" ]]; then
     return
   fi
-  cp -p "$UPGRADE_SNAPSHOT_DIR/ostium.db" "$DATA/ostium.db"
+  cp -p "$UPGRADE_SNAPSHOT_DIR/ostium.db" "$UPGRADE_SNAPSHOT_DATA/ostium.db"
   for file in ostium.db-wal ostium.db-shm; do
     if [[ -f "$UPGRADE_SNAPSHOT_DIR/$file" ]]; then
-      cp -p "$UPGRADE_SNAPSHOT_DIR/$file" "$DATA/$file"
+      cp -p "$UPGRADE_SNAPSHOT_DIR/$file" "$UPGRADE_SNAPSHOT_DATA/$file"
     else
-      rm -f "$DATA/$file"
+      rm -f "$UPGRADE_SNAPSHOT_DATA/$file"
     fi
   done
-  echo "升级前数据库快照已恢复。" >&2
+  if [[ -f "$UPGRADE_SNAPSHOT_DIR/master.key" ]]; then
+    cp -p "$UPGRADE_SNAPSHOT_DIR/master.key" "$UPGRADE_SNAPSHOT_DATA/master.key"
+  fi
+  # The upgrade path may have edited the listener/allow_insecure_bind policy in
+  # place.  Put the snapshot back so the rollback restores the whole control
+  # plane, not only the database.
+  for snapshot_config in "$UPGRADE_SNAPSHOT_DIR"/config-*.toml; do
+    [[ -f "$snapshot_config" ]] || continue
+    local path_file="${snapshot_config%.toml}.path"
+    [[ -f "$path_file" ]] || continue
+    local target
+    target="$(cat "$path_file")"
+    cp -p "$snapshot_config" "$target"
+  done
+  echo "升级前数据库与配置快照已恢复。" >&2
 }
 
 restore_upgrade_services() {
@@ -710,7 +745,12 @@ EOF
     echo "检测到已有配置，保留 $CONFIG/config.toml"
   fi
   if [[ "$UPGRADE" != "true" ]]; then
-    INIT_ARGS=(init --role server --no-input --password "$ADMIN_PASSWORD" --host "$UI_HOST" --port "$UI_PORT")
+    INIT_ARGS=(init --role server --no-input --host "$UI_HOST" --port "$UI_PORT")
+    # A reinstall over an existing database deliberately has no password: the
+    # CLI rejects an explicitly empty --password, which broke the documented
+    # repair/reinstall path.  Omit the flag and let init keep the existing
+    # administrator.
+    [[ -n "$ADMIN_PASSWORD" ]] && INIT_ARGS+=(--password "$ADMIN_PASSWORD")
     [[ -n "$DOMAIN" ]] && INIT_ARGS+=(--domain "$DOMAIN")
     [[ "$PUBLIC_UI" == "true" ]] && INIT_ARGS+=(--public-ui)
     [[ "$ALLOW_INSECURE_BIND" == "true" ]] && INIT_ARGS+=(--allow-insecure-bind)

@@ -791,8 +791,12 @@ async def _profile_refresh(
                     .scalars()
                     .all()
                 )
+                # Capture the identity before the loop: a rollback expires every
+                # ORM instance, so reading profile.name in the error path could
+                # itself fail (or trigger an unwanted lazy load).
+                targets = [(profile.id, profile.name, profile) for profile in profiles]
                 refreshed = False
-                for profile in profiles:
+                for profile_id, profile_name, profile in targets:
                     try:
                         await refresh_profile(session, services.store, profile)
                         # Commit each profile before the next network fetch.
@@ -802,13 +806,29 @@ async def _profile_refresh(
                         # busy timeout expired.
                         await session.commit()
                         refreshed = True
-                        services.bus.log("info", "subscription refreshed", profile=profile.name)
+                        services.bus.log("info", "subscription refreshed", profile=profile_name)
                     except Exception as exc:
                         await session.rollback()
+                        # refresh_profile flushed last_refresh_error inside the
+                        # transaction that was just rolled back.  Persist the
+                        # diagnostic in its own short transaction so the UI can
+                        # explain why the profile is stale.
+                        try:
+                            async with services.session_factory() as error_session:
+                                row = await error_session.get(Profile, profile_id)
+                                if row is not None:
+                                    row.last_refresh_error = str(exc)[:500]
+                                    await error_session.commit()
+                        except Exception:
+                            services.bus.log(
+                                "warning",
+                                "could not record the subscription refresh error",
+                                profile=profile_name,
+                            )
                         services.bus.log(
                             "warning",
                             "subscription refresh failed",
-                            profile=profile.name,
+                            profile=profile_name,
                             error=str(exc),
                         )
                 await session.commit()
@@ -837,14 +857,26 @@ async def _watchdog_tick(services: Services) -> None:
         or services.client_paused
     ):
         return
-    if not services.settings.paths.last_good_path.is_file():
-        return
+    status: dict[str, object] = {}
+    reachable = False
     try:
         status = await services.engine.client.status()
+        reachable = True
         if status.get("running"):
             return
     except Exception:
-        pass
+        status = {}
+    # The UI and a packaged client core can run from different data
+    # directories.  Requiring the UI's own last-good file made auto-reconnect
+    # dead code on the default split-user install.  The core reports its
+    # last-good revision (and a rejected-file error) over the API, so use that
+    # as the evidence that a configuration exists.  Fall back to the local file
+    # only when the core itself is unreachable.
+    has_configuration = bool(status.get("revision")) or bool(status.get("last_error"))
+    if not reachable and services.settings.paths.last_good_path.is_file():
+        has_configuration = True
+    if not has_configuration:
+        return
     try:
         # Regenerate from the database instead of replaying a possibly stale
         # last-good file.  This also picks up a subscription refreshed while

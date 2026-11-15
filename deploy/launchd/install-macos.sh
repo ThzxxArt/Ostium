@@ -296,14 +296,15 @@ unload_agent /Library/LaunchAgents/com.ostium.ui.plist
 
 # The new control plane runs Alembic on first start.  If the health check
 # fails and the old venv is restored, the old build refuses to open a newer
-# schema.  Snapshot the database (and the key that decrypts it) while both
-# services are stopped.
+# schema.  The client database and its key live in the unprivileged UI data
+# directory, not next to the core binary.  Snapshot that directory while both
+# services are stopped; snapshotting $DATA produced an empty rollback set.
 DB_SNAPSHOT=""
-if [[ -n "$OLD_VENV" && -f "$DATA/ostium.db" ]]; then
-  DB_SNAPSHOT="$DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+if [[ -n "$OLD_VENV" && -f "$UI_DATA/ostium.db" ]]; then
+  DB_SNAPSHOT="$UI_DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
   install -d -m 0700 "$DB_SNAPSHOT"
   for file in ostium.db ostium.db-wal ostium.db-shm master.key; do
-    [[ -f "$DATA/$file" ]] && cp -p "$DATA/$file" "$DB_SNAPSHOT/$file"
+    [[ -f "$UI_DATA/$file" ]] && cp -p "$UI_DATA/$file" "$DB_SNAPSHOT/$file"
   done
 fi
 
@@ -311,7 +312,7 @@ restore_db_snapshot() {
   [[ -n "$DB_SNAPSHOT" && -d "$DB_SNAPSHOT" ]] || return 0
   for file in ostium.db ostium.db-wal ostium.db-shm master.key; do
     if [[ -f "$DB_SNAPSHOT/$file" ]]; then
-      cp -p "$DB_SNAPSHOT/$file" "$DATA/$file"
+      cp -p "$DB_SNAPSHOT/$file" "$UI_DATA/$file"
     fi
   done
   echo "已从 $DB_SNAPSHOT 恢复升级前的数据库与密钥。" >&2

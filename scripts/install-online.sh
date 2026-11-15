@@ -570,7 +570,8 @@ fi
 if [[ "$ACTION" == "upgrade" && -z "$LOCAL_DIR" ]]; then
   [[ -d "$PREFIX" ]] || die "未发现 $PREFIX，无法升级；请先安装"
 fi
-if [[ -z "$PASSWORD" && "$ACTION" == "install" && "$ROLE" == "server" ]]; then
+if [[ -z "$PASSWORD" && "$ACTION" == "install" && "$ROLE" == "server" \
+  && ! -f "$DATA/ostium.db" ]]; then
   PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
   PASSWORD_GENERATED="true"
 fi
@@ -582,11 +583,23 @@ bootstrap_python
 detect_existing_mode
 run_platform_installer
 
-if [[ "$ACTION" == "install" && -n "$PASSWORD" && "$ROLE" == "server" ]]; then
+if [[ "$ACTION" == "install" && "$ROLE" == "server" ]]; then
   if [[ "$BEHIND_PROXY" == "true" ]]; then
     ADMIN_URL="https://${DOMAIN:-your-domain} （Nginx/Caddy 反代到 127.0.0.1:${UI_PORT:-8443}）"
   else
     ADMIN_URL="http://127.0.0.1:${UI_PORT:-8443} （建议 SSH 隧道）"
+  fi
+  if [[ "$PASSWORD_GENERATED" == "true" ]]; then
+    ADMIN_PASSWORD_DISPLAY="$PASSWORD"
+    PASSWORD_HINT="密码只显示一次。登录后请立即修改密码并启用 TOTP。"
+  elif [[ -n "$PASSWORD" ]]; then
+    ADMIN_PASSWORD_DISPLAY="使用 --password 提供（未回显）"
+    PASSWORD_HINT="请妥善保管你提供的密码，登录后请立即启用 TOTP。"
+  else
+    # Reinstall over an existing database: install.sh keeps the current
+    # administrator, so do not print a password that was never applied.
+    ADMIN_PASSWORD_DISPLAY="未更改（已有数据库）"
+    PASSWORD_HINT="检测到已有数据库，管理员密码保持不变。"
   fi
   cat <<EOF
 
@@ -594,12 +607,12 @@ if [[ "$ACTION" == "install" && -n "$PASSWORD" && "$ROLE" == "server" ]]; then
 Ostium 安装完成
 ============================================================
   管理地址：$ADMIN_URL
-  管理密码：$([[ "$PASSWORD_GENERATED" == "true" ]] && echo "$PASSWORD" || echo "使用 --password 提供（未回显）")
+  管理密码：$ADMIN_PASSWORD_DISPLAY
   安装目录：$PREFIX
   运行身份：$([[ "$RUN_AS_ROOT" == "true" ]] && echo root || echo "无特权服务用户")
   服务管理：$([[ "$NO_SERVICE" == "true" ]] && echo "未注册，交给你的进程管理器" || echo systemd/launchd)
 ============================================================
-$([[ "$PASSWORD_GENERATED" == "true" ]] && echo "密码只显示一次。登录后请立即修改密码并启用 TOTP。" || echo "请妥善保管你提供的密码，登录后请立即启用 TOTP。")
+$PASSWORD_HINT
 EOF
 elif [[ "$ACTION" == "install" && "$ROLE" == "client" ]]; then
   cat <<EOF

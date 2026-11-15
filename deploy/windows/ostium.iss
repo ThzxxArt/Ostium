@@ -44,9 +44,11 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   { The new UI migrates the database on first start.  Keep a quiescent copy
     (including WAL and the master key) so an operator can roll back to the
-    previous release without hitting a newer-schema error. }
+    previous release without hitting a newer-schema error.  The client
+    database lives in the user-writable UI data directory, not in the
+    privileged core's ProgramData\OstiumCore tree. }
   Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "$d=Join-Path $env:ProgramData ''OstiumCore''; if(Test-Path (Join-Path $d ''ostium.db'')){$s=Join-Path $d (''pre-upgrade-''+(Get-Date -Format ''yyyyMMdd-HHmmss'')); New-Item -ItemType Directory -Force -Path $s | Out-Null; foreach($f in @(''ostium.db'',''ostium.db-wal'',''ostium.db-shm'',''master.key'')){$p=Join-Path $d $f; if(Test-Path $p){Copy-Item $p $s}}}"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "$d=Join-Path $env:ProgramData ''Ostium''; if(Test-Path (Join-Path $d ''ostium.db'')){$s=Join-Path $d (''pre-upgrade-''+(Get-Date -Format ''yyyyMMdd-HHmmss'')); New-Item -ItemType Directory -Force -Path $s | Out-Null; foreach($f in @(''ostium.db'',''ostium.db-wal'',''ostium.db-shm'',''master.key'')){$p=Join-Path $d $f; if(Test-Path $p){Copy-Item $p $s}}}"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;
