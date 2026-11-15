@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="$(cat "$ROOT/VERSION" 2>/dev/null || echo 0.1.3)"
+VERSION="$(cat "$ROOT/VERSION" 2>/dev/null || echo 0.1.4)"
 ARCH="amd64"
 CORE=""
 OUT="$ROOT/dist/packages"
@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2 ;;
     --skip-appimage) SKIP_APPIMAGE="true"; shift ;;
     -h|--help)
-      echo "usage: $0 --version 0.1.3 --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
+      echo "usage: $0 --version 0.1.4 --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;

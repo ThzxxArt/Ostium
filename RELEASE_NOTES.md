@@ -1,29 +1,20 @@
-# Ostium v0.1.3
+# Ostium v0.1.4
 
-This is a patch release for deployment reliability. It does not add a proxy
-protocol, change the role model, or redesign the UI.
+This is a one-fix patch release for the Subscriptions page. It does not add a
+proxy protocol, change the role model, or redesign the UI.
 
 ## Fixed
 
-- The collapsed sidebar no longer overlaps the expand button with the brand
-  mark; both stack inside the 76 px rail.
-- The Logs page level filter keeps a stable 130 px width instead of collapsing
-  to one visible letter.
-- The dashboard no longer returns `500 internal server error` on VPS or
-  container network stacks where `psutil.net_if_addrs()` raises
-  `EAFNOSUPPORT`. LAN address hints are optional and no longer take down
-  `/api/v1/system/info`.
-- A fresh server install no longer reports "core is not running" when the core
-  is healthy. The installer readiness check uses the unauthenticated
-  `/v1/health` endpoint instead of the bearer-token-protected `/v1/status`.
-- Release e2e scripts carry the executable bit and are invoked through `bash`;
-  the sudo install step preserves `PATH` so `uv` remains available.
+- Long subscription URLs no longer overflow the format cards. The two-column
+  grid now uses shrinkable tracks, the URL is a block element so ellipsis
+  applies, and card headers truncate long names. A Playwright layout regression
+  covers a 160-character token on desktop, tablet and mobile.
 
 ## Upgrade notes
 
 - Back up the database, configuration, certificates, rule sets and
   `master.key` before upgrading.
-- `0.1.2 -> 0.1.3` keeps the database, users, credentials, subscription tokens,
+- `0.1.3 -> 0.1.4` keeps the database, users, credentials, subscription tokens,
   certificates, backups and master key. The upgrade path is covered by the
   release workflow.
 - A backup without `master.key` is rejected when the database contains
@@ -60,6 +51,6 @@ staged backup for retry and restores the previous database on error.
 ## Documentation
 
 - `docs/release-status.md`
-- `docs/operations/upgrade-0.1.2-to-0.1.3.md`
+- `docs/operations/upgrade-0.1.3-to-0.1.4.md`
 - `docs/operations/backup.md`
 - `docs/guides/nginx.md`

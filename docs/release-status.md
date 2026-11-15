@@ -8,15 +8,10 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.3** |
+| Version | **0.1.4** |
 | Status | **Published** |
-| Tag | `v0.1.3` (annotated, commit `3f2b65c`) |
-| Assets | GitHub Release `v0.1.3` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.3` (wheel + sdist) |
-| GHCR | `0.1.3`, `v0.1.3`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `43718972338` — success |
-| Previous release | `v0.1.2`, published 2026-11-15 (23 assets, unchanged) |
-| Release type | Deployment reliability patch; no new protocols or UI redesign |
+| Previous release | `v0.1.3`, published 2026-11-15 (23 assets, unchanged) |
+| Release type | Subscriptions layout patch; no new protocols or UI redesign |
 | Source branch | `main` |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
@@ -25,10 +20,10 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.3 continues to fix the status at its own tag instead of rewriting published
+0.1.4 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
-## 0.1.3 verification status
+## 0.1.4 verification status
 
 ### Verified locally
 
@@ -37,8 +32,8 @@ artifacts.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
 - Frontend typecheck, lint, unit tests, production build and formatting: 203
   passed; 90.82/85.91/88.54/92.37.
-- `0.1.2 -> 0.1.3` upgrade script: user, password material, subscription
-  token, database, backup and `master.key` survive; a 0.1.2 backup restores.
+- `0.1.3 -> 0.1.4` upgrade script: user, password material, subscription
+  token, database, backup and `master.key` survive; a 0.1.3 backup restores.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -56,7 +51,7 @@ artifacts.
   `versions/V0.1.2_REVIEW_ROUND2.md`.
 - Release workflow ordering tests: draft release first, PyPI before GHCR/draft
   publication.
-- Playwright/axe/visual regression: 70 passed against the built SPA and the
+- Playwright/axe/visual regression: 73 passed against the built SPA and the
   current backend with one worker (1440/1024/390, dark/light, core-page axe,
   LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
   frozen and every API path they render is mocked.
@@ -66,17 +61,19 @@ artifacts.
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See `versions/V0.1.2_REVIEW_ROUND4.md`.
-- 0.1.3 deployment and UI fixes: `/api/v1/system/info` survives
+- 0.1.4 subscription layout fix: long URLs truncate inside the format cards
+  using shrinkable grid tracks and a block-level URL element; a Playwright
+  regression covers a 160-character token on desktop, tablet and mobile.
+- 0.1.3 deployment and UI fixes (included): `/api/v1/system/info` survives
   `psutil.net_if_addrs()` raising `EAFNOSUPPORT` on VPS/container network
   stacks; first-install readiness uses the unauthenticated `/v1/health`
   endpoint; the collapsed sidebar header no longer overlaps the expand button;
   the Logs level filter keeps its width; release e2e scripts are executable and
   the sudo step preserves `PATH`. Added regression tests for these behaviors.
-- Publication verification: `scripts/verify-release.sh --version 0.1.3`
-  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  `ostium-ctl==0.1.3`. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.
+- 0.1.3 publication verification (historical): `scripts/verify-release.sh
+  --version 0.1.3` downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed,
+  all five core platforms were present, build attestations verified, and PyPI
+  reported `ostium-ctl==0.1.3`.
 
 ### Not verified in this workspace
 
@@ -124,11 +121,11 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.3
+## Release gates for 0.1.4
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.2 -> 0.1.3` upgrade plus backup restore;
+2. **Upgrade and data**: `0.1.3 -> 0.1.4` upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted

@@ -3,6 +3,16 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [0.1.4] - 2026-11-15
+
+### Fixed
+
+- Long subscription URLs no longer overflow the format cards on the
+  Subscriptions page. The two-column grid now uses shrinkable tracks, the URL
+  is a block element so ellipsis applies, and card headers truncate long names.
+  A Playwright layout regression covers a 160-character token on desktop,
+  tablet and mobile.
+
 ## [0.1.3] - 2026-11-15
 
 ### Fixed
