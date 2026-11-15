@@ -36,8 +36,9 @@ a published asset is never replaced.
       publishes PyPI.
 - [ ] Only after PyPI succeeds are GHCR tags `X.Y.Z`/`vX.Y.Z`/`latest`
       promoted from the verified digest, and the draft is made public.
-- [ ] A failed run leaves a draft and staging image only; no public version tag
-      or PyPI version is half-published.
+- [ ] A failed run before PyPI leaves a draft and staging image only. PyPI is
+      the first irreversible public step: a later GHCR/draft failure keeps the
+      draft for retry and requires yanking the PyPI version or shipping a patch.
 
 ## Read-only verification
 

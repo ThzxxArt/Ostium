@@ -26,11 +26,11 @@ before the status update. Replacing them would rewrite published artifacts;
 
 ### Verified locally
 
-- Backend unit and in-process integration tests: 651 passed / 10 deselected;
-  94.07% statements / 90.38% branches; `coverage_gate.py` passes.
+- Backend unit and in-process integration tests: 668 passed / 10 deselected;
+  94.17% statements / 90.45% branches; `coverage_gate.py` passes.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
-- Frontend typecheck, lint, unit tests, production build and formatting: 192
-  passed; 90.69/85.13/88.08/92.17.
+- Frontend typecheck, lint, unit tests, production build and formatting: 199
+  passed; 91.01/85.70/88.32/92.47.
 - `0.1.1 -> 0.1.2` upgrade script: user, password material, subscription
   token, database, backup and `master.key` survive; a 0.1.1 backup restores.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
@@ -41,10 +41,19 @@ before the status update. Replacing them would rewrite published artifacts;
   stats-outage quota enforcement, certificate path traversal, webhook secret
   encryption, Public UI recovery and release-workflow/Docker defaults. See
   `V0.1.2_REVIEW_ROUND1.md`.
+- Second full review round: 19 additional findings closed, including an
+  apply-failure path that un-approved a committed inbound port, blocking DNS
+  resolution on the event loop, a non-Public-UI certificate renewal switching
+  the plaintext control plane to HTTPS, Public UI cookies without `Secure`,
+  one-time credentials lost on a post-commit apply error, and release-checklist
+  wording that still claimed no post-PyPI half-publication. See
+  `V0.1.2_REVIEW_ROUND2.md`.
 - Release workflow ordering tests: draft release first, PyPI before GHCR/draft
   publication.
-- Playwright/axe/visual regression: 69 passed after the review changes
-  (1440/1024/390, dark/light, core-page axe, LCP/CLS and PWA checks).
+- Playwright/axe/visual regression: 69 passed against the built SPA and the
+  current backend with one worker (1440/1024/390, dark/light, core-page axe,
+  LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
+  frozen and every API path they render is mocked.
 
 ### Not verified in this workspace
 
@@ -78,8 +87,9 @@ before tagging; otherwise those jobs will not start.
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.1 -> 0.1.2` upgrade and rollback; backup restore;
-   missing-key and corruption rejection.
+2. **Upgrade and data**: `0.1.1 -> 0.1.2` upgrade plus backup restore;
+   missing-key and corruption rejection. The installer's staged rollback files
+   and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted
    items stay blockers.
 4. **Publication ordering**: draft release verified first, PyPI published only
