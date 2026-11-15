@@ -27,7 +27,7 @@ before the status update. Replacing them would rewrite published artifacts;
 ### Verified locally
 
 - Backend unit and in-process integration tests: 668 passed / 10 deselected;
-  94.17% statements / 90.45% branches; `coverage_gate.py` passes.
+  94.19% statements / 90.52% branches; `coverage_gate.py` passes.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
 - Frontend typecheck, lint, unit tests, production build and formatting: 199
   passed; 91.01/85.70/88.32/92.47.
@@ -82,6 +82,20 @@ provenance are not a substitute for platform code signing.
 The release workflow expects a protected GitHub environment named
 `release-signing` with required reviewers for the Windows/macOS jobs. Create it
 before tagging; otherwise those jobs will not start.
+
+## Release decisions for 0.1.2
+
+The release owner accepted the following in `V0.1.2_DECISIONS.md`; the RC
+evidence is in `V0.1.2_RC_REPORT.md`:
+
+- **D-111** PyPI-first ordering is accepted with the documented retry/yank/patch
+  recovery; publication is not atomic.
+- **D-112** Control-plane/core service isolation remains a 0.2.0 item.
+- **D-113** The unit-only 75/65 coverage target is deferred; the repository and
+  package gate at 94.19/90.52 is the release gate.
+- **D-114** Linux is Tier 1; Windows/macOS are Tier 2 and published unsigned
+  unless signing credentials are supplied.
+- **D-115** Push, tag and publication require explicit release-owner approval.
 
 ## Release gates for 0.1.2
 
