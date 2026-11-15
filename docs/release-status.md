@@ -10,6 +10,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.3** |
 | Status | **Published** |
+| Tag | `v0.1.3` (annotated, commit `3f2b65c`) |
+| Assets | GitHub Release `v0.1.3` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.3` (wheel + sdist) |
+| GHCR | `0.1.3`, `v0.1.3`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `43718972338` — success |
 | Previous release | `v0.1.2`, published 2026-11-15 (23 assets, unchanged) |
 | Release type | Deployment reliability patch; no new protocols or UI redesign |
 | Source branch | `main` |
@@ -67,10 +72,11 @@ artifacts.
   endpoint; the collapsed sidebar header no longer overlaps the expand button;
   the Logs level filter keeps its width; release e2e scripts are executable and
   the sudo step preserves `PATH`. Added regression tests for these behaviors.
-- 0.1.2 publication verification (historical): `scripts/verify-release.sh
-  --version 0.1.2` downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed,
-  all five core platforms were present, build attestations verified, and PyPI
-  reported `ostium-ctl==0.1.2`.
+- Publication verification: `scripts/verify-release.sh --version 0.1.3`
+  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  `ostium-ctl==0.1.3`. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.
 
 ### Not verified in this workspace
 
