@@ -35,9 +35,9 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.26%25%20statements%20%C2%B7%2090.38%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.29%25%20statements%20%C2%B7%2090.44%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.82%25%20statements%20%C2%B7%2085.91%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-704%20backend%20%C2%B7%20203%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-707%20backend%20%C2%B7%20203%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]

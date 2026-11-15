@@ -194,3 +194,52 @@ def test_csrf_route_without_token() -> None:
         assert error.value.status_code == 500
 
     asyncio.run(entrypoint())
+
+
+def test_ensure_cli_token_repairs_an_empty_file(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from ostium.config import Role, Settings
+
+    settings = Settings(
+        role=Role.SERVER,
+        data_dir=tmp_path / "data",
+        config_dir=tmp_path / "config",
+        state_dir=tmp_path / "state",
+        core_token_file=tmp_path / "data" / "runtime" / "core.token",
+        dev=True,
+    )
+    settings.paths.ensure()
+    token_path = settings.paths.runtime_dir / "cli.token"
+    token_path.write_text("", encoding="utf-8")
+
+    token = deps.ensure_cli_token(settings)
+
+    assert token
+    assert token_path.read_text(encoding="utf-8").strip() == token
+
+
+def test_event_allowlist_ignores_invalid_entries() -> None:
+    from ostium.api.routes_events import _ip_allowed
+
+    # One malformed CIDR must not widen or break the allowlist.
+    assert _ip_allowed("10.1.2.3", ["not-a-cidr", "10.0.0.0/8"]) is True
+    assert _ip_allowed("10.1.2.3", ["not-a-cidr"]) is False
+
+
+def test_validation_details_are_json_safe() -> None:
+    from ostium.api.app import _json_safe
+
+    assert _json_safe(None) is None
+    assert _json_safe(True) is True
+    assert _json_safe(7) == 7
+    assert _json_safe("ok") == "ok"
+    assert _json_safe({"ctx": {"error": ValueError("bad")}}) == {"ctx": {"error": "bad"}}
+    assert _json_safe([ValueError("x"), (1, 2)]) == ["x", [1, 2]]
+
+    deep: dict[str, object] = {}
+    cursor: dict[str, object] = deep
+    for _ in range(12):
+        child: dict[str, object] = {}
+        cursor["child"] = child
+        cursor = child
+    encoded = _json_safe(deep)
+    assert isinstance(encoded, dict)

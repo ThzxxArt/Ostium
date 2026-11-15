@@ -268,6 +268,19 @@ def test_api_tokens(api_client: TestClient) -> None:
     )
     assert created.status_code == 201
     assert created.json()["token"].startswith("ost_")
+
+    naive_expiry = api_client.post(
+        "/api/v1/api-tokens",
+        json={
+            "name": "naive",
+            "scopes": ["read"],
+            "expires_at": "2027-01-01T00:00:00",
+        },
+        headers=headers,
+    )
+    assert naive_expiry.status_code == 422
+    assert "timezone" in naive_expiry.text
+
     listing = api_client.get("/api/v1/api-tokens").json()["tokens"]
     assert listing[0]["name"] == "ci"
     assert listing[0]["revoked"] is False

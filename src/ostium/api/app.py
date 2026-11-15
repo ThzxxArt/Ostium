@@ -67,6 +67,27 @@ class BodyTooLarge(Exception):
     """The request body exceeded the configured streaming limit."""
 
 
+def _json_safe(value: object, depth: int = 0) -> object:
+    """Make Pydantic validation details JSON-serialisable.
+
+    ``exc.errors()`` includes a ``ctx`` mapping whose ``error`` entry is the
+    original ``ValueError`` raised by a custom validator.  Passing that object
+    to ``JSONResponse`` raised ``TypeError`` and turned every such 422 into a
+    500.  Keep the useful fields and stringify anything that is not a JSON
+    primitive.
+    """
+
+    if depth > 8:
+        return str(value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(child, depth + 1) for key, child in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(child, depth + 1) for child in value]
+    return str(value)
+
+
 def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.load()
 
@@ -312,7 +333,10 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         return problem_response(
             request,
             ApiError(
-                422, "request validation failed", "validation_error", extra={"errors": exc.errors()}
+                422,
+                "request validation failed",
+                "validation_error",
+                extra={"errors": _json_safe(exc.errors())},
             ),
         )
 

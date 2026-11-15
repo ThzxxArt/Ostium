@@ -26,8 +26,8 @@ before the status update. Replacing them would rewrite published artifacts;
 
 ### Verified locally
 
-- Backend unit and in-process integration tests: 704 passed / 10 deselected;
-  94.26% statements / 90.38% branches; `coverage_gate.py` passes.
+- Backend unit and in-process integration tests: 707 passed / 10 deselected;
+  94.29% statements / 90.44% branches; `coverage_gate.py` passes.
 - Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
 - Frontend typecheck, lint, unit tests, production build and formatting: 203
   passed; 90.82/85.91/88.54/92.37.
@@ -54,12 +54,12 @@ before the status update. Replacing them would rewrite published artifacts;
   current backend with one worker (1440/1024/390, dark/light, core-page axe,
   LCP/CLS and PWA checks). The visual snapshots are deterministic: the clock is
   frozen and every API path they render is mocked.
-- Final pre-release review round: 9 regressions found and fixed with tests that
-  fail on `683ebf3` (core artifact body limit, split-user client watchdog,
+- Final pre-release review round: 13 P1 findings and one P2 fixed with tests
+  that fail on `683ebf3` (core artifact body limit, split-user client watchdog,
   CLI disable/delete tombstones, export certificate resolution, certificate
   replacement recovery, subscription-refresh error persistence, installer
-  reinstall and upgrade snapshots on Linux/macOS). See
-  `V0.1.2_REVIEW_ROUND4.md`.
+  reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
+  serialization, coverage-gate stability). See `V0.1.2_REVIEW_ROUND4.md`.
 
 ### Not verified in this workspace
 
@@ -102,7 +102,7 @@ evidence is in `V0.1.2_RC_REPORT.md`:
   recovery; publication is not atomic.
 - **D-112** Control-plane/core service isolation remains a 0.2.0 item.
 - **D-113** The unit-only 75/65 coverage target is deferred; the repository and
-  package gate at 94.26/90.38 is the release gate.
+  package gate at 94.29/90.44 is the release gate.
 - **D-114** Linux is Tier 1; Windows/macOS are Tier 2 and published unsigned
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
