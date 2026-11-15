@@ -58,6 +58,8 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
+      - run: node ../scripts/check-web-budget.mjs
+        working-directory: web
       - run: npm run format:check
         working-directory: web
       - name: Playwright browser
@@ -460,6 +462,18 @@ jobs:
             dist/release/*.AppImage
             dist/release/ostium-sbom.cdx.json
             dist/release/SHA256SUMS
+      - name: Remove a stale draft for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A retry rebuilds artifacts, so draft assets from the failed run are
+          # stale.  Deleting an unpublished draft keeps the verified checksums
+          # and the PyPI files identical.  A published release is never
+          # touched: its assets are immutable.
+          tag="${{ github.ref_name }}"
+          if gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx true; then
+            gh release delete "$tag" --yes --cleanup-tag=false
+          fi
       - name: Create draft release with every artifact
         uses: softprops/action-gh-release@v3
         with:
@@ -506,6 +520,11 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/pypi
+          # PyPI is immutable.  A retry after a post-PyPI failure must continue
+          # with the files already published instead of aborting with
+          # "file already exists"; a genuinely broken release is yanked and
+          # replaced by a patch version (D-111).
+          skip-existing: true
       - name: Promote the verified staging image
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

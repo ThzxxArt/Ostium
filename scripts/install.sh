@@ -321,6 +321,21 @@ wait_for_core() {
   return 1
 }
 
+wait_for_core_ready() {
+  # A reachable core API is not enough: sing-box may have failed to bind a
+  # port or load the generated configuration.  The installer must not report
+  # success while the proxy is down.
+  for _ in $(seq 1 30); do
+    body="$(curl -fsS --max-time 2 http://127.0.0.1:8788/v1/status 2>/dev/null || true)"
+    body="${body// /}"
+    if [[ "$body" == *'"running":true'* ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 snapshot_upgrade_state() {
   UPGRADE_SNAPSHOT_DIR="$DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
   install -d -m 0700 "$UPGRADE_SNAPSHOT_DIR"
@@ -665,7 +680,11 @@ install_license() {
 if [[ "$ROLE" == "server" ]]; then
   install_core "$DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium:ostium")"
   install_license "$PREFIX"
-  if [[ "$UPGRADE" != "true" ]]; then
+  if [[ "$UPGRADE" == "true" && ! -f "$CONFIG/config.toml" ]]; then
+    echo "升级模式需要已有配置：$CONFIG/config.toml" >&2
+    exit 1
+  fi
+  if [[ ! -f "$CONFIG/config.toml" ]]; then
     cat >"$CONFIG/config.toml" <<EOF
 role = "server"
 host = "$UI_HOST"
@@ -685,15 +704,18 @@ EOF
     if [[ "$RUN_AS_ROOT" != "true" ]]; then
       chown ostium:ostium "$CONFIG/config.toml"
     fi
+  else
+    # Re-running the installer must not reset the listener, Public UI or
+    # trusted hosts that the operator configured after the first install.
+    echo "检测到已有配置，保留 $CONFIG/config.toml"
+  fi
+  if [[ "$UPGRADE" != "true" ]]; then
     INIT_ARGS=(init --role server --no-input --password "$ADMIN_PASSWORD" --host "$UI_HOST" --port "$UI_PORT")
     [[ -n "$DOMAIN" ]] && INIT_ARGS+=(--domain "$DOMAIN")
     [[ "$PUBLIC_UI" == "true" ]] && INIT_ARGS+=(--public-ui)
     [[ "$ALLOW_INSECURE_BIND" == "true" ]] && INIT_ARGS+=(--allow-insecure-bind)
     OSTIUM_ROLE=server OSTIUM_DATA_DIR="$DATA" OSTIUM_CONFIG_FILE="$CONFIG/config.toml" \
       "$PREFIX/venv/bin/ostium" "${INIT_ARGS[@]}"
-  elif [[ ! -f "$CONFIG/config.toml" ]]; then
-    echo "升级模式需要已有配置：$CONFIG/config.toml" >&2
-    exit 1
   fi
   if [[ "$UPGRADE" == "true" && -f "$CONFIG/config.toml" ]]; then
     # The health check must target the listener that already exists.  Without
@@ -776,6 +798,11 @@ EOF
         rm -rf "$PREFIX/venv.old"
         rm -f "$DATA/core/sing-box.old"
       else
+        if ! wait_for_core_ready; then
+          echo "首次安装失败：核心服务未运行 sing-box，请检查 $DATA/logs/core.log" >&2
+          systemctl status ostium-core --no-pager >&2 || true
+          exit 1
+        fi
         if ! wait_for_url "http://127.0.0.1:$UI_PORT/healthz"; then
           echo "首次安装健康检查失败：http://127.0.0.1:$UI_PORT/healthz 无响应" >&2
           systemctl status ostium --no-pager >&2 || true
@@ -823,7 +850,11 @@ EOF
 else
   install_core "$CLIENT_DATA/core/sing-box" "$([[ "$RUN_AS_ROOT" == "true" ]] && echo "" || echo "ostium-core:ostium")"
   install_license "$PREFIX"
-  if [[ "$UPGRADE" != "true" ]]; then
+  if [[ "$UPGRADE" == "true" && ! -f "$CLIENT_CONFIG" ]]; then
+    echo "升级模式需要已有配置：$CLIENT_CONFIG" >&2
+    exit 1
+  fi
+  if [[ ! -f "$CLIENT_CONFIG" ]]; then
     cat >"$CLIENT_CONFIG" <<EOF
 role = "client"
 host = "127.0.0.1"
@@ -840,9 +871,8 @@ EOF
     if [[ "$RUN_AS_ROOT" != "true" ]]; then
       chown root:ostium "$CLIENT_CONFIG"
     fi
-  elif [[ ! -f "$CLIENT_CONFIG" ]]; then
-    echo "升级模式需要已有配置：$CLIENT_CONFIG" >&2
-    exit 1
+  else
+    echo "检测到已有客户端配置，保留 $CLIENT_CONFIG"
   fi
   # The UI user only needs read access to the privileged core config; group
   # write would let the UI rewrite engine_path before the core starts.

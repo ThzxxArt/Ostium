@@ -65,6 +65,10 @@ check_contains scripts/build-sbom.py "app_version = \"$VERSION\""
 check_contains scripts/build-core-manifest.py "\"$VERSION\""
 check_contains README.md "$VERSION"
 check_contains CHANGELOG.md "## [$VERSION]"
+if grep -q "^## \[$VERSION\] - Unreleased" "$ROOT/CHANGELOG.md"; then
+  echo "CHANGELOG.md still marks $VERSION as Unreleased" >&2
+  exit 1
+fi
 check_contains RELEASE_NOTES.md "$VERSION"
 check_contains docs/release-status.md "$VERSION"
 
