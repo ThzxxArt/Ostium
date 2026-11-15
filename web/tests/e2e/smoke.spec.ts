@@ -234,6 +234,76 @@ test('login and dashboard are usable', async ({ page }) => {
   await expect(page.getByText(/Server pulse|服务脉搏/)).toBeVisible()
 })
 
+test('long subscription URLs stay inside the card', async ({ page }) => {
+  await login(page)
+  const longToken = 'A'.repeat(160)
+  const longUrl = `https://ostium.example.com:8443/sub/${longToken}?format=ostium`
+  await page.route(/\/api\/v1\/subscriptions$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ subscriptions: [], base_url: 'https://ostium.example.com:8443' }),
+    }),
+  )
+  await page.route(/\/api\/v1\/users$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        users: [
+          {
+            id: 'user-1',
+            name: 'alice',
+            enabled: true,
+            online: false,
+            used_bytes: 0,
+            last_seen_at: null,
+          },
+        ],
+        total: 1,
+      }),
+    }),
+  )
+  await page.route(/\/api\/v1\/users\/user-1\/subscription(\?.*)?$/, (route) => {
+    const reveal = new URL(route.request().url()).searchParams.get('reveal') === 'true'
+    const body = reveal
+      ? {
+          token: 'A'.repeat(160),
+          user: { id: 'user-1', name: 'alice' },
+          formats: [{ id: 'ostium', name: 'Ostium Profile v1', url: longUrl }],
+          links: [longUrl],
+        }
+      : {
+          user: 'alice',
+          has_token: true,
+          token_hint: 'AAAAAA…AAAA',
+          reveal_required: true,
+          status: 'active',
+        }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+  })
+
+  await page.goto('/subscriptions')
+  await expect(page.locator('.user-item').first()).toBeVisible()
+  await page.locator('.locked button').click()
+  await expect(page.locator('.format-card').first()).toBeVisible()
+
+  const detail = page.locator('.detail')
+  const card = page.locator('.format-card').first()
+  const detailBox = await detail.boundingBox()
+  const cardBox = await card.boundingBox()
+  if (!detailBox || !cardBox) throw new Error('subscription card is not rendered')
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(detailBox.x + detailBox.width + 1)
+  const overflows = await detail.evaluate(
+    (element) => element.scrollWidth > element.clientWidth + 1,
+  )
+  expect(overflows).toBe(false)
+})
+
 test('collapsed sidebar and log level filter keep their layout', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'collapsed sidebar is a desktop layout')
   await login(page)

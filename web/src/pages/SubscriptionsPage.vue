@@ -320,6 +320,9 @@ onMounted(load)
   color: var(--text-3);
   font-size: 11.5px;
 }
+.detail-head p code {
+  overflow-wrap: anywhere;
+}
 .detail {
   padding: 22px;
   min-height: 520px;
@@ -359,7 +362,7 @@ onMounted(load)
 .formats {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .locked {
@@ -382,15 +385,29 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 .format-head {
   display: flex;
   align-items: center;
   gap: 9px;
+  min-width: 0;
+}
+.format-head > div {
+  min-width: 0;
+}
+.format-head strong,
+.format-head .o-micro {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .format-icon {
   width: 34px;
   height: 34px;
+  flex: none;
   display: grid;
   place-items: center;
   border-radius: 9px;
@@ -402,6 +419,11 @@ onMounted(load)
   font-size: 12px;
 }
 .url {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-3);
