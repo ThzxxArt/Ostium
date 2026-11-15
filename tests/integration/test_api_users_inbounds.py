@@ -203,8 +203,12 @@ def test_user_not_found_and_engine_errors(api_client: TestClient) -> None:
 
     api_client.app.state.services.engine.apply_server = rejected  # type: ignore[method-assign]
     failed = api_client.post("/api/v1/users", json={"name": "carol"}, headers=headers)
-    assert failed.status_code == 422
-    assert failed.json()["code"] == "engine_check_failed"
+    # The row is committed before the core is contacted, so a non-retryable
+    # apply error must not destroy the only copy of the generated password.
+    assert failed.status_code == 201, failed.text
+    assert failed.json()["applied"] is False
+    assert failed.json()["password_once"]
+    assert "bad config" in failed.json()["warning"]
 
 
 def test_subscription_rate_limit(api_client: TestClient, monkeypatch) -> None:

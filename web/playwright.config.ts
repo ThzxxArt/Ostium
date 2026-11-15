@@ -7,10 +7,11 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
-  // Performance budgets are measured in the same run as visual/axe tests.
-  // CPU contention from parallel workers made LCP exceed 2.5s on a loaded
-  // local/CI machine; run one worker in CI instead of masking it with retries.
-  workers: process.env.CI ? 1 : undefined,
+  // Every test shares one control-plane database and one admin account.
+  // Running the three viewport projects concurrently made auth-status probes
+  // and the LCP budget race under load.  Use one worker everywhere so local
+  // evidence matches the release workflow.
+  workers: 1,
   retries: 0,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
   use: {

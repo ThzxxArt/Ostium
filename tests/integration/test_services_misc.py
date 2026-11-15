@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 
 import httpx
@@ -234,7 +235,12 @@ def test_audit_helpers_and_webhooks(tmp_path: Path) -> None:
                     message="token=abc " + "x" * 600,
                 )
                 await session.commit()
-                await asyncio.sleep(0.05)
+                # The delivery task resolves DNS in a worker thread; a fixed
+                # 50 ms sleep is a race on a loaded runner.  Wait for the
+                # observable effect instead.
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and not route.called:
+                    await asyncio.sleep(0.02)
                 assert route.called
                 assert "X-Ostium-Signature" not in route.calls[0].request.headers
             assert alert.message.startswith("token=[REDACTED]")

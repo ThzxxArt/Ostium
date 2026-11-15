@@ -395,10 +395,24 @@ async def public_ui(
             )
     else:
         candidate.public_ui = False
-        candidate.secure_cookies = bool(server_info.pop("public_ui_previous_secure_cookies", False))
+        # Fall back to the current policy when the marker is missing (a
+        # legacy/CLI-enabled Public UI).  Forcing False downgraded an
+        # Nginx-fronted deployment's Secure-cookie policy.
+        candidate.secure_cookies = bool(
+            server_info.pop("public_ui_previous_secure_cookies", candidate.secure_cookies)
+        )
         auto_host = bool(server_info.pop("public_ui_auto_host", False))
         if auto_host and candidate.host == "0.0.0.0":
             candidate.host = "127.0.0.1"
+        from ostium.config import is_loopback_host
+
+        if not candidate.allow_insecure_bind and not is_loopback_host(candidate.host):
+            # A legacy Public UI configuration (host=0.0.0.0, no marker) would
+            # otherwise be persisted as a plaintext public bind that
+            # ``validate_bind`` rejects on the next restart.  Converge to the
+            # documented loopback default instead of bricking the service.
+            candidate.host = "127.0.0.1"
+            server_info["public_ui_host_reset"] = True
         server_info["public_ui"] = False
         await set_setting(session, "server", server_info)
     try:

@@ -196,6 +196,19 @@ def validate_remote_url(url: str, *, allow_private: bool = False) -> str:
     return resolve_remote_url(url, allow_private=allow_private).url
 
 
+async def resolve_remote_url_async(url: str, *, allow_private: bool = False) -> ResolvedTarget:
+    """Resolve a URL in a worker thread.
+
+    ``socket.getaddrinfo`` is blocking and has no asyncio-native equivalent in
+    the standard library.  Calling it directly from a request handler stalls
+    the whole control plane (dashboard, WebSocket fan-out and health checks)
+    for the resolver timeout, which can be several seconds on a broken DNS
+    path.  Resolution is cheap enough that one thread hop is the right price.
+    """
+
+    return await asyncio.to_thread(resolve_remote_url, url, allow_private=allow_private)
+
+
 MAX_REDIRECTS = 5
 
 
@@ -241,7 +254,7 @@ async def post_limited(
     response body is irrelevant, so it is drained only up to a small bound.
     """
 
-    target = resolve_remote_url(url, allow_private=allow_private)
+    target = await resolve_remote_url_async(url, allow_private=allow_private)
     async with _DNS_PIN_LOCK:
         with _pin_dns(target.host, target.addresses):
             async with (
@@ -279,7 +292,7 @@ async def fetch_limited(
     if max_bytes <= 0:
         raise ValueError("max_bytes must be positive")
     async with _DNS_PIN_LOCK:
-        current = resolve_remote_url(url, allow_private=allow_private)
+        current = await resolve_remote_url_async(url, allow_private=allow_private)
         require_https = urlparse(current.url).scheme.lower() == "https"
         for _hop in range(MAX_REDIRECTS + 1):
             with _pin_dns(current.host, current.addresses):
@@ -295,7 +308,7 @@ async def fetch_limited(
                         location = response.headers.get("location", "")
                         if not location:
                             raise UnsafeUrlError("redirect response did not include a Location")
-                        target = resolve_remote_url(
+                        target = await resolve_remote_url_async(
                             urljoin(current.url, location), allow_private=allow_private
                         )
                         if require_https and urlparse(target.url).scheme.lower() != "https":

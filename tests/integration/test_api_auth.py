@@ -372,9 +372,12 @@ def test_csrf_cookie_is_set_and_matches(api_client: TestClient) -> None:
 
 def test_secure_cookies_enable_hsts(api_client: TestClient, settings: Settings) -> None:
     settings.secure_cookies = True
+    api_client.cookies.clear()
     response = api_client.get("/healthz")
     assert "Strict-Transport-Security" in response.headers
-    assert api_client.cookies.get("ostium_csrf") is None or True
     cookie_header = response.headers.get("set-cookie", "")
-    if cookie_header:
-        assert "Secure" in cookie_header
+    # The CSRF cookie is intentionally readable by JS, but it must never be
+    # sent over plaintext once the deployment is HTTPS-only.
+    assert "ostium_csrf=" in cookie_header
+    assert "Secure" in cookie_header
+    assert "HttpOnly" not in cookie_header

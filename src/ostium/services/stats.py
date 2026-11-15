@@ -220,6 +220,12 @@ class StatsCollector:
         now = time.monotonic()
         if self._stats_down_since is None:
             self._stats_down_since = now
+        if now - self._stats_down_since >= 60.0:
+            # No sample means liveness cannot be proven.  Leaving the last
+            # snapshot marked online forever made the dashboard claim active
+            # sessions during a multi-hour collector outage.
+            for usage in self.usage.values():
+                usage.online = False
         if self._stats_alerted or now - self._stats_down_since < STATS_UNAVAILABLE_ALERT_SECONDS:
             return
         self._stats_alerted = True

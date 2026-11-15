@@ -15,7 +15,7 @@ withDefaults(
 
 <template>
   <section class="section-card" :class="[`padding-${padding}`]">
-    <header v-if="title || $slots.header || $slots.actions" class="header">
+    <header v-if="title || description || $slots.header || $slots.actions" class="header">
       <div class="heading">
         <span v-if="icon" class="icon"
           ><component :is="icon" :size="18" :stroke-width="1.6"

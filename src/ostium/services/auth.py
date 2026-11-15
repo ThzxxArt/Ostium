@@ -136,9 +136,11 @@ async def authenticate(
     LIMITER.check(ip, username)
     admin = await get_admin(session)
     if admin is None or admin.username.lower() != username.strip().lower():
+        _burn_password_check(password)
         LIMITER.fail(ip, username)
         raise AuthError("invalid username or password")
     if admin.disabled:
+        _burn_password_check(password)
         LIMITER.fail(ip, username)
         raise AuthError("this account is disabled", "account_disabled", 403)
     if admin.locked_until is not None and as_utc(admin.locked_until) > utcnow():
@@ -177,6 +179,22 @@ def _decrypt_totp(admin: AdminUser, settings: Settings) -> str:
     return store.decrypt(
         admin.totp_secret_enc, table="admin_users", record_id=admin.id, field="totp_secret"
     )
+
+
+_DUMMY_PASSWORD_HASH: str | None = None
+
+
+def _burn_password_check(password: str) -> None:
+    """Spend the same Argon2 time as a real verification.
+
+    Returning immediately for an unknown username or a disabled account made
+    the login endpoint a username/state oracle through response timing.
+    """
+
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password("ostium-timing-equalizer")
+    verify_password(password, _DUMMY_PASSWORD_HASH)
 
 
 async def create_session(

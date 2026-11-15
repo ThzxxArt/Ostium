@@ -11,6 +11,7 @@ import shutil
 import sys
 import tarfile
 import webbrowser
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
@@ -275,7 +276,15 @@ def init(
     )
     settings.host = configured_host
     settings.port = port or (8443 if role_value is Role.SERVER else 8787)
+    previous_secure_cookies = settings.secure_cookies
     settings.public_ui = public_ui and role_value is Role.SERVER
+    if settings.public_ui:
+        # The Public UI terminates TLS itself.  A session or CSRF cookie
+        # without ``Secure`` would be replayable over plaintext if the port is
+        # ever reachable through another path, so enabling the listener always
+        # enables the flag.  Remember the previous value so disabling it from
+        # the UI restores the operator's reverse-proxy policy.
+        settings.secure_cookies = True
     settings.allow_insecure_bind = configured_allow and role_value is Role.SERVER
     if (
         role_value is Role.SERVER
@@ -349,6 +358,10 @@ def init(
                     if domain
                     else bool(previous_server.get("public_ui", settings.public_ui)),
                 }
+                if settings.public_ui:
+                    server_info["public_ui_previous_secure_cookies"] = previous_server.get(
+                        "public_ui_previous_secure_cookies", previous_secure_cookies
+                    )
                 await set_setting(session, "server", server_info)
                 if effective_domain:
                     from ostium.services.public_url import base_url_for_domain
@@ -425,6 +438,71 @@ async def _public_ui_certificate(settings: Settings) -> tuple[str, str] | None:
         await engine.dispose()
 
 
+def _tls_reload_plan(*, tls_active: bool, recovery: bool, found: tuple[str, str] | None) -> str:
+    """Decide what a certificate-change marker means for the UI listener.
+
+    ``reload-ui`` is written for every renewed ACME certificate, including one
+    that only serves hysteria2/trojan.  A plaintext control plane behind Nginx
+    or an SSH tunnel must never be converted into an HTTPS listener just
+    because an inbound certificate was renewed.
+    """
+
+    if found is None:
+        return "recover" if recovery else "skip"
+    if recovery:
+        return "recover"
+    if tls_active:
+        return "reload"
+    return "skip"
+
+
+@dataclass(frozen=True)
+class _TlsReloadDecision:
+    skip: bool
+    certfile: str | None
+    keyfile: str | None
+    restore_recovery: bool
+    message: str | None
+
+
+def _plan_tls_reload(
+    *,
+    ssl_certfile: str | None,
+    ssl_keyfile: str | None,
+    recovery: tuple[str, bool, bool] | None,
+    found: tuple[str, str] | None,
+) -> _TlsReloadDecision:
+    plan = _tls_reload_plan(
+        tls_active=ssl_certfile is not None, recovery=recovery is not None, found=found
+    )
+    if plan == "skip":
+        return _TlsReloadDecision(True, ssl_certfile, ssl_keyfile, False, None)
+    if plan == "recover" and found is None:
+        message = (
+            "[yellow]certificate is not ready yet; the recovery console stays active[/yellow]"
+            if recovery is not None
+            else None
+        )
+        return _TlsReloadDecision(True, ssl_certfile, ssl_keyfile, False, message)
+    assert found is not None
+    certfile, keyfile = found
+    if plan == "recover":
+        return _TlsReloadDecision(
+            False,
+            certfile,
+            keyfile,
+            True,
+            "[green]certificate recovered; public UI listener restored[/green]",
+        )
+    return _TlsReloadDecision(
+        False,
+        certfile,
+        keyfile,
+        False,
+        "[green]certificate changed; TLS listener reloaded[/green]",
+    )
+
+
 def _serve_with_cert_reload(
     settings: Settings,
     ssl_certfile: str | None,
@@ -496,19 +574,27 @@ def _serve_with_cert_reload(
         if not requested.is_set():
             return
         found = _run(_public_ui_certificate(settings))
-        if found is not None:
-            ssl_certfile, ssl_keyfile = found
-            if recovery is not None:
-                # The recovery console intentionally ran on plaintext loopback.
-                # Once a usable certificate exists, restore the operator's
-                # original public listener and cookie policy as well as the TLS
-                # context; otherwise the process would stay unreachable on
-                # 127.0.0.1 until a manual restart.
-                settings.host, settings.public_ui, settings.secure_cookies = recovery
-                err_console.print(
-                    "[green]certificate recovered; public UI listener restored[/green]"
-                )
-        err_console.print("[green]certificate changed; TLS listener reloaded[/green]")
+        decision = _plan_tls_reload(
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+            recovery=recovery,
+            found=found,
+        )
+        if decision.message:
+            err_console.print(decision.message)
+        if decision.skip:
+            # The control plane is plaintext (Nginx/SSH tunnel) or the renewed
+            # certificate is not usable yet.  Keep the current listener.
+            continue
+        ssl_certfile, ssl_keyfile = decision.certfile, decision.keyfile
+        if decision.restore_recovery:
+            # The recovery console intentionally ran on plaintext loopback.
+            # Once a usable certificate exists, restore the operator's original
+            # public listener and cookie policy as well as the TLS context;
+            # otherwise the process would stay unreachable on 127.0.0.1 until a
+            # manual restart.
+            assert recovery is not None
+            settings.host, settings.public_ui, settings.secure_cookies = recovery
 
 
 @app.command()

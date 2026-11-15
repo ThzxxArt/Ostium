@@ -68,7 +68,10 @@ def _set_session_cookie(response: Response, token: str, settings: Settings) -> N
         max_age=auth_service.SESSION_ABSOLUTE_SECONDS,
         httponly=True,
         samesite="strict",
-        secure=settings.secure_cookies,
+        # Public UI is HTTPS-only, so a legacy config with public_ui=true and
+        # secure_cookies=false must still not emit a plaintext-replayable
+        # session cookie.
+        secure=settings.secure_cookies or settings.public_ui,
         path="/",
     )
 
@@ -80,7 +83,11 @@ async def csrf(request: Request, response: Response) -> dict[str, str]:
         raise ApiError(500, "CSRF token could not be initialised", "csrf_unavailable")
     app = getattr(request, "app", None)
     services = getattr(getattr(app, "state", None), "services", None)
-    secure = bool(getattr(getattr(services, "settings", None), "secure_cookies", False))
+    service_settings = getattr(services, "settings", None)
+    secure = bool(
+        getattr(service_settings, "secure_cookies", False)
+        or getattr(service_settings, "public_ui", False)
+    )
     response.set_cookie(
         CSRF_COOKIE,
         token,

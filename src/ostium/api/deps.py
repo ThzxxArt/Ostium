@@ -44,10 +44,17 @@ class Services:
     # Persisted form of the same intent.  A control-plane or machine restart
     # must not resurrect last-good after the operator explicitly disconnected.
     client_paused: bool = False
+    # Constructed on first use and cached.  ``system_proxy()`` probes the
+    # desktop session with subprocess calls (gsettings/kreadconfig); callers
+    # must evaluate this property inside ``asyncio.to_thread`` so a missing
+    # session bus cannot stall the event loop.
+    proxy_manager: Any = field(default=None, repr=False)
 
     @property
     def proxy(self) -> Any:
-        return system_proxy(self.settings)
+        if self.proxy_manager is None:
+            self.proxy_manager = system_proxy(self.settings)
+        return self.proxy_manager
 
     def cli_token(self) -> str:
         return ensure_cli_token(self.settings)

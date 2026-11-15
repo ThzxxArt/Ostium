@@ -322,16 +322,12 @@ async def update_inbound(
                 f"could not persist the approved proxy port: {exc}",
                 "settings_write_failed",
             ) from exc
-    try:
-        applied = await _apply_server(services, session)
-    except Exception:
-        if ports_changed:
-            services.settings.proxy_ports = original_proxy_ports
-            try:
-                services.settings.save()
-            except OSError:
-                pass
-        raise
+    # ``_apply_server`` commits the database before touching the core.  A
+    # rollback of the approved proxy-port list here would therefore leave the
+    # committed inbound on a port the core validator no longer accepts, and
+    # every later reconcile would fail with ``port_not_allowed`` forever.
+    # Keep the operator's explicit approval; the desired state stays retryable.
+    applied = await _apply_server(services, session)
     await audit(
         session,
         actor=admin.username,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from typing import Any
 
 import httpx
@@ -18,6 +19,25 @@ from ostium.util.time import iso, utcnow
 # the service module avoids threading a store through every create_alert call
 # site while still allowing webhook secrets to be encrypted at rest.
 _SECRET_DECRYPTER: Any = None
+
+# asyncio keeps only a weak reference to a running task.  Fire-and-forget
+# webhook deliveries must hold a strong reference until they finish, otherwise
+# a GC pass can cancel a delivery mid-flight.
+_BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
+
+
+def _spawn(coro: Coroutine[Any, Any, None]) -> None:
+    task = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_discard_task)
+
+
+def _discard_task(task: asyncio.Task[None]) -> None:
+    _BACKGROUND_TASKS.discard(task)
+    if not task.cancelled():
+        # Retrieve the exception so a failed delivery cannot surface as an
+        # "exception was never retrieved" warning at shutdown.
+        task.exception()
 
 
 def set_webhook_secret_decrypter(decrypter: Any) -> None:
@@ -148,7 +168,7 @@ async def create_alert(
             if not delivered:
                 bus.log("warning", "webhook delivery failed", code=code)
 
-        asyncio.create_task(_deliver())
+        _spawn(_deliver())
     return alert
 
 

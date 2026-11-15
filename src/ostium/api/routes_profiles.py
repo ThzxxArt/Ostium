@@ -124,11 +124,13 @@ async def add_profile(
     text = payload.text
     subscription_url = payload.url
     if subscription_url:
-        from ostium.services.netguard import UnsafeUrlError, validate_remote_url
+        from ostium.services.netguard import UnsafeUrlError, resolve_remote_url_async
         from ostium.services.profiles import MAX_SUBSCRIPTION_BYTES
 
         try:
-            subscription_url = validate_remote_url(subscription_url, allow_private=True)
+            subscription_url = (
+                await resolve_remote_url_async(subscription_url, allow_private=True)
+            ).url
         except UnsafeUrlError as exc:
             raise ApiError(400, str(exc), "unsafe_url") from exc
     if subscription_url and not text:

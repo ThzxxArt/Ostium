@@ -198,6 +198,9 @@ async function mockVisualDashboard(page: Page) {
       '/api/v1/users': { users: visualUsers, total: visualUsers.length },
       '/api/v1/settings': visualSettings,
       '/api/v1/backups': { backups: [] },
+      '/api/v1/api-tokens': { tokens: [] },
+      '/api/v1/subscriptions': { subscriptions: [], base_url: 'https://vpn.example.com' },
+      '/api/v1/jobs': { jobs: [] },
     }
     const payload = payloads[path]
     if (payload === undefined) {
@@ -330,6 +333,9 @@ for (const theme of ['dark', 'light'] as const) {
 for (const theme of ['dark', 'light'] as const) {
   for (const path of ['/users', '/settings'] as const) {
     test(`visual ${path} ${theme} @visual`, async ({ page }) => {
+      // Relative timestamps and "days remaining" text depend on the wall
+      // clock; freeze it so a snapshot does not change days later.
+      await page.clock.install({ time: new Date('2026-11-12T10:00:00Z') })
       await page.addInitScript((value) => {
         localStorage.setItem('ostium.theme', value)
       }, theme)
@@ -337,6 +343,15 @@ for (const theme of ['dark', 'light'] as const) {
       await login(page)
       await page.goto(path)
       await page.waitForLoadState('networkidle')
+      // Wait for the data-driven page, not only for the network: a failed
+      // request renders a shorter error layout that would silently replace
+      // the intended screenshot.
+      await expect(
+        page.getByRole('heading', {
+          level: 1,
+          name: path === '/users' ? /Users|用户/ : /Settings|设置/,
+        }),
+      ).toBeVisible()
       await page.addStyleTag({ content: '.mobile-nav { display: none !important; }' })
       await page.waitForTimeout(300)
       await expect(page).toHaveScreenshot(`${path.replace('/', '')}-${theme}.png`, {

@@ -43,6 +43,14 @@ export async function ensureCsrf(): Promise<void> {
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
+// A mutating request can trigger ``sing-box check`` plus a supervised restart
+// on the server (up to ~45s for the core HTTP call alone).  Aborting the
+// browser request at 30s made a successful change look like a failure while
+// the server kept going and committed it.  Reads stay short so a hung
+// dashboard cannot pin a tab for two minutes.
+export const READ_TIMEOUT_MS = 30_000
+export const MUTATION_TIMEOUT_MS = 120_000
+
 async function request<T>(
   method: string,
   path: string,
@@ -59,12 +67,13 @@ async function request<T>(
     const token = csrfToken()
     if (token) headers.set('X-CSRF-Token', token)
   }
+  const timeout = MUTATING.has(method) ? MUTATION_TIMEOUT_MS : READ_TIMEOUT_MS
   const response = await fetch(path, {
     ...init,
     method,
     headers,
     credentials: 'same-origin',
-    signal: init?.signal ?? AbortSignal.timeout(30000),
+    signal: init?.signal ?? AbortSignal.timeout(timeout),
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   })
   const contentType = response.headers.get('content-type') || ''

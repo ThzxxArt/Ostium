@@ -170,7 +170,14 @@ async def add_user(
         token=token,
         settings=services.settings,
     )
-    applied = await _apply_server(services, session)
+    try:
+        applied = await _apply_server(services, session)
+    except ApiError as exc:
+        # ``_apply_server`` commits before contacting the core.  A validation
+        # or startup failure therefore leaves this user durable while the only
+        # copy of the generated password is in this response.  Report the
+        # partial success instead of a 5xx that would destroy the credential.
+        applied = {"applied": False, "warning": str(exc)}
     await audit(
         session,
         actor=admin.username,
@@ -270,7 +277,12 @@ async def rotate_user(
     token = None
     if payload.rotate_subscription:
         token = await rotate_subscription(session, services.store, user)
-    applied = await _apply_server(services, session)
+    try:
+        applied = await _apply_server(services, session)
+    except ApiError as exc:
+        # The rotation is already committed; the new subscription token below
+        # is the only copy returned to the caller.
+        applied = {"applied": False, "warning": str(exc)}
     await audit(
         session,
         actor=admin.username,

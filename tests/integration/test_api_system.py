@@ -56,9 +56,15 @@ class FakeProxy:
 
 
 @pytest.fixture
-def fake_proxy(monkeypatch) -> FakeProxy:  # type: ignore[no-untyped-def]
+def fake_proxy(request, monkeypatch) -> FakeProxy:  # type: ignore[no-untyped-def]
     proxy = FakeProxy()
     monkeypatch.setattr("ostium.api.deps.system_proxy", lambda settings: proxy)
+    # ``build_app`` constructs and caches the manager during startup, before
+    # this fixture can patch the factory.  Attach the fake to the already-built
+    # app when the test requested one.
+    for name in ("api_client", "client_api"):
+        if name in request.fixturenames:
+            request.getfixturevalue(name).app.state.services.proxy_manager = proxy
     return proxy
 
 

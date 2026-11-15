@@ -109,7 +109,7 @@ async def info(
         "mixed_port": services.settings.mixed_port,
         "lan_addresses": _lan_addresses(),
         "lan_port": services.settings.mixed_port,
-        "proxy": services.proxy.status(),
+        "proxy": await asyncio.to_thread(lambda: services.proxy.status()),
         "tun": {
             "enabled": services.settings.tun_enabled,
             "interface": services.settings.tun_interface,
@@ -153,7 +153,7 @@ async def doctor(
         add("engine", "pass", f"core binary found at {engine}")
     else:
         add("engine", "fail", f"core binary missing at {engine}", "run `ostium core install`")
-    proxy = services.proxy.status()
+    proxy = await asyncio.to_thread(lambda: services.proxy.status())
     proxy_message = (
         f"system proxy: {'enabled' if proxy.get('enabled') else 'disabled'} "
         f"({proxy.get('platform')})"
@@ -213,7 +213,7 @@ async def toggle_proxy(
             )
         try:
             result = await asyncio.to_thread(
-                services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+                lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
             )
         except Exception as exc:
             raise ApiError(500, f"could not enable system proxy: {exc}", "proxy_failed") from exc
@@ -224,7 +224,7 @@ async def toggle_proxy(
         services.client_paused = False
     else:
         try:
-            result = await asyncio.to_thread(services.proxy.disable)
+            result = await asyncio.to_thread(lambda: services.proxy.disable())
         except Exception as exc:
             raise ApiError(500, f"could not disable system proxy: {exc}", "proxy_failed") from exc
         if services.settings.mode is Mode.SYSTEM_PROXY and not services.settings.tun_enabled:
@@ -234,7 +234,7 @@ async def toggle_proxy(
     except OSError as exc:
         if payload.enabled:
             try:
-                await asyncio.to_thread(services.proxy.disable)
+                await asyncio.to_thread(lambda: services.proxy.disable())
             except Exception:
                 pass
         raise ApiError(
@@ -263,7 +263,7 @@ async def toggle_tun(
         raise ApiError(400, "TUN is a client feature", "role_mismatch")
     previous_tun = services.settings.tun_enabled
     previous_mode = services.settings.mode
-    proxy_status = await asyncio.to_thread(services.proxy.status)
+    proxy_status = await asyncio.to_thread(lambda: services.proxy.status())
     proxy_was_enabled = bool(proxy_status.get("enabled"))
     if payload.enabled:
         if services.settings.allow_lan:
@@ -274,7 +274,7 @@ async def toggle_tun(
             )
         if proxy_was_enabled:
             try:
-                await asyncio.to_thread(services.proxy.disable)
+                await asyncio.to_thread(lambda: services.proxy.disable())
             except Exception as exc:
                 raise ApiError(
                     500, f"could not disable the system proxy: {exc}", "proxy_failed"
@@ -289,7 +289,7 @@ async def toggle_tun(
             if proxy_was_enabled:
                 try:
                     await asyncio.to_thread(
-                        services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+                        lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
                     )
                 except Exception:
                     pass
@@ -350,7 +350,7 @@ async def set_mode(
         return {"mode": "tun", **result}
     if services.settings.tun_enabled:
         await toggle_tun(TunToggle(enabled=False), request, admin, services, session)
-    proxy_enabled = bool((await asyncio.to_thread(services.proxy.status)).get("enabled"))
+    proxy_enabled = bool((await asyncio.to_thread(lambda: services.proxy.status())).get("enabled"))
     if mode is Mode.SYSTEM_PROXY:
         if not proxy_enabled:
             await toggle_proxy(ProxyToggle(enabled=True), request, admin, services, session)
@@ -394,7 +394,7 @@ async def connect(
     if services.settings.mode is Mode.SYSTEM_PROXY:
         try:
             await asyncio.to_thread(
-                services.proxy.enable, "127.0.0.1", services.settings.mixed_port
+                lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
             )
         except Exception as exc:
             raise ApiError(
@@ -424,13 +424,19 @@ async def disconnect(
     # Disconnect, even if stopping the core then fails.
     await set_setting(session, "client_paused", True)
     await session.commit()
-    if (await asyncio.to_thread(services.proxy.status)).get("enabled"):
+    if (await asyncio.to_thread(lambda: services.proxy.status())).get("enabled"):
         try:
-            await asyncio.to_thread(services.proxy.disable)
+            await asyncio.to_thread(lambda: services.proxy.disable())
         except Exception as exc:
             # Leave the core running: stopping it with a still-active OS proxy
-            # would silently break all system traffic.
+            # would silently break all system traffic.  The operation failed,
+            # so the persisted intent must go back to "connected" as well;
+            # otherwise a later restart would suppress auto-connect while the
+            # OS proxy still points at the running core.
             services.watchdog_suspended = False
+            services.client_paused = False
+            await set_setting(session, "client_paused", False)
+            await session.commit()
             raise ApiError(
                 502,
                 f"could not restore the system proxy; core left running: {exc}",

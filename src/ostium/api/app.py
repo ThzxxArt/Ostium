@@ -165,7 +165,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             except Exception as exc:
                 bus.log("warning", "auto-connect skipped", error=str(exc))
         with contextlib.suppress(Exception):
-            await asyncio.to_thread(services.proxy.recover_if_stale)
+            await asyncio.to_thread(lambda: services.proxy.recover_if_stale())
         if stats is not None:
             await stats.start()
         services.tasks = [
@@ -202,7 +202,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 await stats.stop()
             await jobs.shutdown()
             with contextlib.suppress(Exception):
-                await asyncio.to_thread(services.proxy.disable)
+                await asyncio.to_thread(lambda: services.proxy.disable())
             await engine.dispose()
 
     app = FastAPI(
@@ -287,7 +287,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             "connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; "
             "form-action 'self'"
         )
-        if settings.secure_cookies:
+        if settings.secure_cookies or settings.public_ui:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         if not request.cookies.get(CSRF_COOKIE):
             response.set_cookie(
@@ -295,7 +295,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 request.state.csrf_token,
                 httponly=False,
                 samesite="strict",
-                secure=settings.secure_cookies,
+                secure=settings.secure_cookies or settings.public_ui,
                 path="/",
             )
         return response

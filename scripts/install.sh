@@ -762,7 +762,16 @@ EOF
         [[ "$PUBLIC_UI" == "true" ]] && HEALTH_SCHEME="https"
         if ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz" \
           || ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/readyz"; then
-          rollback_control_plane "control plane health/readiness check"
+          # An expired Public UI certificate intentionally starts a plaintext
+          # loopback recovery console.  Rolling the upgrade back would leave the
+          # operator on the older release and still locked out; accept the
+          # recovery listener and let the renewal loop repair TLS.
+          if [[ "$HEALTH_SCHEME" == "https" ]] \
+            && wait_for_url "http://127.0.0.1:$UI_PORT/readyz"; then
+            echo "警告：Public UI 证书不可用，当前运行回环恢复台；升级继续，请在恢复台完成续期。" >&2
+          else
+            rollback_control_plane "control plane health/readiness check"
+          fi
         fi
         rm -rf "$PREFIX/venv.old"
         rm -f "$DATA/core/sing-box.old"
