@@ -12,7 +12,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ostium.config import Role, Settings
 from ostium.engine.singbox.config import CONFIG_POLICY_VERSION, config_digest
@@ -177,7 +177,7 @@ class CoreSupervisor:
                     temporary.chmod(0o600)
                 temporary.replace(target)
             replacements[original] = str(target)
-        return _replace_strings(config, replacements)
+        return cast(dict[str, Any], _replace_strings(config, replacements))
 
     def _normalise_cache_path(self, config: dict[str, Any]) -> dict[str, Any]:
         """Point the optional sing-box cache at the core's own data directory.
