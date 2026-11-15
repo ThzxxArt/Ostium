@@ -234,6 +234,31 @@ test('login and dashboard are usable', async ({ page }) => {
   await expect(page.getByText(/Server pulse|服务脉搏/)).toBeVisible()
 })
 
+test('collapsed sidebar and log level filter keep their layout', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'collapsed sidebar is a desktop layout')
+  await login(page)
+  await page.locator('.collapse-btn').click()
+  await page.waitForTimeout(400)
+
+  const brand = await page.locator('.brand-link').boundingBox()
+  const toggle = await page.locator('.collapse-btn').boundingBox()
+  if (!brand || !toggle) throw new Error('sidebar header controls are not rendered')
+  const overlaps =
+    brand.x < toggle.x + toggle.width &&
+    toggle.x < brand.x + brand.width &&
+    brand.y < toggle.y + toggle.height &&
+    toggle.y < brand.y + brand.height
+  expect(overlaps).toBe(false)
+
+  await page.goto('/logs')
+  await expect(page.locator('.toolbar .source-tabs')).toBeVisible()
+  const levelWidth = await page
+    .locator('.toolbar .level')
+    .first()
+    .evaluate((element) => element.getBoundingClientRect().width)
+  expect(levelWidth).toBeGreaterThanOrEqual(120)
+})
+
 test('command palette opens and navigates', async ({ page }) => {
   await login(page)
   await page.keyboard.press('Control+k')

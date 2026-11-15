@@ -527,6 +527,21 @@ onBeforeUnmount(() => {
   padding: 0 14px 0 20px;
   gap: 8px;
 }
+.collapsed .sidebar-head {
+  /* 76px is narrower than logo + toggle + horizontal padding.  Stack them so
+     the expand button never sits on top of the brand mark. */
+  height: auto;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 0 8px;
+  gap: 6px;
+}
+.collapsed .brand-link {
+  justify-content: center;
+}
+.collapsed .collapse-btn {
+  opacity: 0.7;
+}
 .brand-link {
   display: inline-flex;
   min-width: 0;

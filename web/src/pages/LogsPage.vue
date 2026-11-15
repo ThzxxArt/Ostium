@@ -283,9 +283,14 @@ onBeforeUnmount(() => {
 }
 .level {
   width: 130px;
+  min-width: 130px;
+  flex: 0 0 130px;
 }
 .search {
   width: 220px;
+  min-width: 180px;
+  flex: 1 1 220px;
+  max-width: 320px;
 }
 .spacer {
   flex: 1;
