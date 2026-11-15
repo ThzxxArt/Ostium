@@ -47,6 +47,10 @@ class RenewRequest(BaseModel):
 
 async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
     await session.commit()
+    if cert_service.signal_ui_reload(services.settings):
+        services.bus.log("info", "signalled the UI listener to reload its certificate")
+    else:
+        services.bus.log("warning", "could not signal the UI listener to reload its certificate")
     try:
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
@@ -172,6 +176,10 @@ async def issue_certificate(
                         job_session, cert, settings=services.settings
                     )
                 await job_session.commit()
+                if not cert_service.signal_ui_reload(services.settings):
+                    services.bus.log(
+                        "warning", "could not signal the UI listener to reload its certificate"
+                    )
                 try:
                     await services.engine.apply_server(job_session)
                 except Exception as exc:
@@ -275,6 +283,10 @@ async def renew_certificate(
                     source="acme",
                 )
                 await job_session.commit()
+                if not cert_service.signal_ui_reload(services.settings):
+                    services.bus.log(
+                        "warning", "could not signal the UI listener to reload its certificate"
+                    )
                 try:
                     await services.engine.apply_server(job_session)
                 except Exception as exc:

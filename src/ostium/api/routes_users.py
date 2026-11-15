@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ostium.api.deps import (
     Services,
     client_ip,
+    ensure_scope,
     get_current_admin,
     get_services,
     get_session,
@@ -105,12 +106,43 @@ async def _get_user(session: AsyncSession, user_id: str) -> ProxyUser:
     return user
 
 
-async def _apply_server(services: Services, session: AsyncSession) -> dict[str, Any]:
+async def _persist_enforcement(
+    services: Services, session: AsyncSession, revoked: list[str] | tuple[str, ...]
+) -> None:
+    """Record every user the core must never serve, including tombstones.
+
+    The statistics loop can only see rows that still exist.  A deleted user is
+    preserved here by name so an older ``last-good.json`` cannot resurrect the
+    credential when the core restarts while the control plane is down.
+    """
+
+    from ostium.services.enforcement import read_enforcement, write_enforcement
+
+    path = services.settings.paths.enforcement_path
+    rows = (await session.execute(select(ProxyUser.name, ProxyUser.enabled))).all()
+    enabled = {name for name, is_enabled in rows if is_enabled}
+    names = {name for name, is_enabled in rows if not is_enabled}
+    names.update(str(name) for name in revoked)
+    names |= read_enforcement(path) - enabled
+    write_enforcement(path, names - enabled)
+
+
+async def _apply_server(
+    services: Services, session: AsyncSession, *, revoked: list[str] | tuple[str, ...] = ()
+) -> dict[str, Any]:
     # Commit the desired state first.  If this fails the core is untouched and
     # the client receives a 5xx; if the core apply fails the reconciler retries
     # from the committed database instead of the database rolling back after a
     # successful apply.
     await session.commit()
+    try:
+        await _persist_enforcement(services, session, revoked)
+    except OSError as exc:
+        # The apply below still removes the user from the running core; the
+        # next statistics tick rewrites the file.  Do not lose the response.
+        services.bus.log(
+            "error", "could not persist the disabled-user enforcement policy", error=str(exc)
+        )
     try:
         result = await services.engine.apply_server(session)
         return {"applied": True, "revision": result["status"].get("revision")}
@@ -256,7 +288,7 @@ async def delete_user(
     name = user.name
     await session.delete(user)
     await session.flush()
-    applied = await _apply_server(services, session)
+    applied = await _apply_server(services, session, revoked=[name])
     await audit(
         session, actor=admin.username, action="user.deleted", target=name, ip=client_ip(request)
     )
@@ -414,7 +446,7 @@ async def export_user(
     user_id: str,
     request: Request,
     admin: AdminUser = Depends(get_current_admin),
-    _scope: None = Depends(require_scope("user:read")),
+    _scope: None = Depends(require_scope("subscription:read")),
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
@@ -442,6 +474,10 @@ async def bulk_users(
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
+    if payload.action == "export":
+        # A bulk export carries the same endpoint credentials as the single
+        # export endpoint, so it needs the same narrow read scope.
+        ensure_scope(request, "subscription:read")
     users = (
         (await session.execute(select(ProxyUser).where(ProxyUser.id.in_(payload.ids))))
         .scalars()
@@ -450,6 +486,7 @@ async def bulk_users(
     if not users:
         raise ApiError(404, "no matching users", "not_found")
     touched: list[str] = []
+    deleted: list[str] = []
     for user in users:
         touched.append(user.name)
         if payload.action == "enable":
@@ -459,12 +496,13 @@ async def bulk_users(
             user.enabled = False
             user.disabled_reason = "disabled"
         elif payload.action == "delete":
+            deleted.append(user.name)
             await session.delete(user)
         elif payload.action == "rotate":
             await rotate_credentials(session, services.store, user)
     if payload.action != "export":
         await session.flush()
-        applied = await _apply_server(services, session)
+        applied = await _apply_server(services, session, revoked=deleted)
         exports: list[dict[str, Any]] = []
     else:
         applied = {}

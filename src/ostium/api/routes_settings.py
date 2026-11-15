@@ -387,9 +387,18 @@ async def public_ui(
             }
         )
         await set_setting(session, "server", server_info)
-        if not await get_setting(session, "public_base_url"):
-            from ostium.services.public_url import base_url_for_domain
+        from ostium.services.public_url import base_url_for_domain
 
+        current_base = await get_setting(session, "public_base_url")
+        default_base = f"https://{payload.domain.strip().lower()}"
+        # ``ostium init --domain`` stores the default 443 URL before Public UI
+        # is enabled.  Leaving it untouched produced subscription links
+        # without the 8443 port even though the listener had moved.  Only the
+        # derived default is rewritten; an explicit operator URL is kept.
+        derived_default = not isinstance(current_base, str) or not current_base.strip()
+        if isinstance(current_base, str):
+            derived_default = current_base.strip().rstrip("/") == default_base
+        if derived_default:
             await set_setting(
                 session, "public_base_url", base_url_for_domain(candidate, payload.domain)
             )

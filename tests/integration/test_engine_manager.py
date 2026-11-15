@@ -46,7 +46,7 @@ def test_server_and_client_preview(settings: Settings, tmp_path: Path) -> None:
             assert client["inbounds"][0]["type"] == "mixed"
             assert profile.id
 
-            async def fake_apply(config, digest, role):  # type: ignore[no-untyped-def]
+            async def fake_apply(config, digest, role, *, artifacts=None):  # type: ignore[no-untyped-def]
                 return {"running": True, "revision": digest[:16], "role": role}
 
             manager.client.apply = fake_apply  # type: ignore[method-assign]

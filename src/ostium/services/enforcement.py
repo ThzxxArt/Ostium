@@ -23,6 +23,10 @@ ENFORCEMENT_VERSION = 1
 DISABLED_REASONS = frozenset({"quota_exceeded", "expired"})
 
 
+class EnforcementError(RuntimeError):
+    """The persisted revocation policy is present but unusable."""
+
+
 def write_enforcement(path: Path, names: set[str] | list[str]) -> None:
     """Atomically persist the set of users that must never be served."""
 
@@ -38,17 +42,31 @@ def write_enforcement(path: Path, names: set[str] | list[str]) -> None:
     temporary.replace(path)
 
 
-def read_enforcement(path: Path) -> set[str]:
-    """Read the persisted policy; a missing/corrupt file means "no overrides"."""
+def read_enforcement(path: Path, *, strict: bool = False) -> set[str]:
+    """Read the persisted policy.
 
+    A missing file means "no overrides".  A file that exists but cannot be
+    parsed is different: silently treating it as empty resurrects every
+    revoked user after a crash or a disk fault.  The core reads the file in
+    strict mode and refuses to start instead.
+    """
+
+    if not path.exists():
+        return set()
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        if strict:
+            raise EnforcementError(f"enforcement policy is unreadable: {exc}") from exc
         return set()
     if not isinstance(payload, dict) or payload.get("version") != ENFORCEMENT_VERSION:
+        if strict:
+            raise EnforcementError("enforcement policy has an unsupported version")
         return set()
     users = payload.get("users")
     if not isinstance(users, list):
+        if strict:
+            raise EnforcementError("enforcement policy has an invalid user list")
         return set()
     return {str(item) for item in users if isinstance(item, str) and item}
 

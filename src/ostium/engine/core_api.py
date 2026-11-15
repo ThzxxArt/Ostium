@@ -94,7 +94,25 @@ class CoreClient:
     async def status(self) -> dict[str, Any]:
         return dict(await self._request("GET", "/v1/status"))
 
-    async def apply(self, config: dict[str, Any], sha256: str, role: str) -> dict[str, Any]:
+    async def apply(
+        self,
+        config: dict[str, Any],
+        sha256: str,
+        role: str,
+        *,
+        artifacts: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "config": config,
+            "sha256": sha256,
+            "role": role,
+            # The core runs with a separate settings file on clients;
+            # send the UI's explicit LAN policy with each apply so the
+            # privileged validator does not have to guess it.
+            "allow_lan": self.settings.allow_lan,
+        }
+        if artifacts:
+            payload["artifacts"] = artifacts
         return dict(
             await self._request(
                 "POST",
@@ -103,15 +121,7 @@ class CoreClient:
                 # A 5-second HTTP timeout reported "unreachable" while the
                 # core was still applying the same request.
                 timeout=max(self.timeout, 45.0),
-                json={
-                    "config": config,
-                    "sha256": sha256,
-                    "role": role,
-                    # The core runs with a separate settings file on clients;
-                    # send the UI's explicit LAN policy with each apply so the
-                    # privileged validator does not have to guess it.
-                    "allow_lan": self.settings.allow_lan,
-                },
+                json=payload,
             )
         )
 

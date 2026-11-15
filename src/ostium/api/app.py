@@ -178,6 +178,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             services.tasks.append(
                 asyncio.create_task(_server_reconcile(services), name="ostium-server-reconcile")
             )
+            services.tasks.append(
+                asyncio.create_task(_server_watchdog(services), name="ostium-server-watchdog")
+            )
         else:
             services.tasks.append(
                 asyncio.create_task(_profile_refresh(services), name="ostium-profile-refresh")
@@ -725,6 +728,46 @@ async def _server_reconcile(
             )
 
 
+async def _server_watchdog(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    """Restart a server core whose sing-box child disappeared.
+
+    ``apply`` only observes the child for 0.9 seconds.  Without an ongoing
+    liveness check a crash after that grace period leaves the server serving
+    nothing until an unrelated database change happens to run an apply.
+    """
+
+    delay = 30.0
+    while True:
+        try:
+            await sleep(delay)
+            try:
+                status = await services.engine.client.status()
+            except Exception:
+                # The reconciler already backs off while the core is
+                # unreachable; do not force an apply storm from here.
+                delay = 30.0
+                continue
+            if status.get("running"):
+                delay = 30.0
+                continue
+            async with services.session_factory() as session:
+                await services.engine.reconcile_server(session, force=True)
+            services.bus.log("warning", "server core was not running; configuration reapplied")
+            delay = 30.0
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            delay = min(delay * 2, 300.0)
+            services.bus.log(
+                "error",
+                "server watchdog could not restart the core",
+                error=str(exc),
+                retry_in=delay,
+            )
+
+
 async def _profile_refresh(
     services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
 ) -> None:
@@ -752,9 +795,16 @@ async def _profile_refresh(
                 for profile in profiles:
                     try:
                         await refresh_profile(session, services.store, profile)
+                        # Commit each profile before the next network fetch.
+                        # A single transaction around the loop held the SQLite
+                        # write lock for up to 20s per profile, blocking every
+                        # other writer (stats flush, admin changes) until the
+                        # busy timeout expired.
+                        await session.commit()
                         refreshed = True
                         services.bus.log("info", "subscription refreshed", profile=profile.name)
                     except Exception as exc:
+                        await session.rollback()
                         services.bus.log(
                             "warning",
                             "subscription refresh failed",

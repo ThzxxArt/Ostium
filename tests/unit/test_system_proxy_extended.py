@@ -441,3 +441,18 @@ def test_env_hint() -> None:
     hint = env_hint(7890)
     assert "http://127.0.0.1:7890" in hint
     assert "socks5://127.0.0.1:7890" in hint
+
+
+def test_proxy_state_write_is_atomic(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "state" / "system-proxy.json"
+    proxy_module._write_state(path, {"system_proxy": {"enabled": True}})
+    original = path.read_text(encoding="utf-8")
+
+    def fail_chmod(self, mode):  # type: ignore[no-untyped-def]
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "chmod", fail_chmod)
+    with pytest.raises(OSError):
+        proxy_module._write_state(path, {"system_proxy": {"enabled": False}})
+    # The original document must survive a failure during the replacement.
+    assert path.read_text(encoding="utf-8") == original

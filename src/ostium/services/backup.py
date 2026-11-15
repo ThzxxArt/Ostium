@@ -15,6 +15,7 @@ import shutil
 import sqlite3
 import tarfile
 import tempfile
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -344,6 +345,48 @@ def _clear_runtime_configuration(paths: Any) -> None:
         pass
 
 
+def _restore_config(source: Path, settings: Settings) -> None:
+    """Restore operator settings without importing another machine's paths.
+
+    The archive was created on a host where the data, config and state
+    directories (and the engine binary) may have lived elsewhere.  Copying its
+    ``config.toml`` verbatim makes the next start read the old ``data_dir``:
+    the database that was just restored into the current directory is ignored
+    and a new empty one is created next to the old path.
+    """
+
+    import tomli_w
+
+    try:
+        with source.open("rb") as handle:
+            payload = tomllib.load(handle)
+    except (OSError, ValueError) as exc:
+        raise BackupError(f"backup configuration is invalid: {exc}", "invalid_archive") from exc
+    payload.update(
+        {
+            "role": settings.role.value,
+            "data_dir": str(settings.data_dir),
+            "config_dir": str(settings.config_dir),
+            "state_dir": str(settings.state_dir),
+            "core_token_file": str(settings.core_token_file),
+        }
+    )
+    if settings.engine_path:
+        payload["engine_path"] = str(settings.engine_path)
+    target = settings.config_file
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            tomli_w.dump(payload, handle)
+        if os.name == "posix":
+            temporary.chmod(0o600)
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _prepare_archive(backup_path: Path, password: str | None, workdir: Path) -> Path:
     """Return a plaintext tar path, streaming-decrypting OSTB2 when needed."""
 
@@ -500,8 +543,7 @@ def restore_backup(
                     paths.master_key_path.chmod(0o600)
             if (staging / "config.toml").is_file():
                 remember(settings.config_file)
-                settings.config_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(staging / "config.toml", settings.config_file)
+                _restore_config(staging / "config.toml", settings)
             for directory_name in BACKUP_DIRECTORIES:
                 source_root = staging / directory_name
                 if not source_root.is_dir():

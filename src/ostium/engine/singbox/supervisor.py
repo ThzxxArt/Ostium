@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -14,12 +17,59 @@ from typing import Any
 from ostium.config import Role, Settings
 from ostium.engine.singbox.config import CONFIG_POLICY_VERSION, config_digest
 from ostium.engine.singbox.validate import validate_config
-from ostium.services.enforcement import read_enforcement, strip_disabled_users
+from ostium.services.enforcement import EnforcementError, read_enforcement, strip_disabled_users
 from ostium.util.redact import redact
 from ostium.util.time import iso, utcnow
 
 MAX_LOG_BYTES = 10 * 1024 * 1024
 MAX_LOG_READ_BYTES = 2 * 1024 * 1024
+
+# A client install runs the control plane and the privileged core as different
+# users with different data directories.  Rule-set files therefore cannot be
+# left in the UI data directory: the core cannot read it and its path
+# allow-list rejects it.  The UI uploads the bytes with the apply request and
+# the core materialises them inside its own runtime directory.
+MAX_ARTIFACT_BYTES = 16 * 1024 * 1024
+MAX_ARTIFACTS_TOTAL_BYTES = 32 * 1024 * 1024
+MAX_ARTIFACTS = 32
+_ARTIFACT_SUFFIXES = {".json", ".srs", ".db", ".txt", ".yaml", ".yml", ".mmdb"}
+
+_PATH_KEYS = {
+    "certificate_path",
+    "key_path",
+    "path",
+    "client_certificate_path",
+    "client_key_path",
+}
+
+
+def _collect_path_strings(value: Any, found: set[str], depth: int = 0) -> None:
+    if depth > 40:
+        return
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if isinstance(key, str) and isinstance(child, str):
+                path_like = key.endswith(("_path", "_file")) and child.startswith("/")
+                if key in _PATH_KEYS or path_like:
+                    found.add(child)
+            _collect_path_strings(child, found, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_path_strings(child, found, depth + 1)
+
+
+def _replace_strings(value: Any, replacements: dict[str, str], depth: int = 0) -> Any:
+    if depth > 40:
+        return value
+    if isinstance(value, dict):
+        return {
+            key: _replace_strings(child, replacements, depth + 1) for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [_replace_strings(child, replacements, depth + 1) for child in value]
+    if isinstance(value, str) and value in replacements:
+        return replacements[value]
+    return value
 
 
 class CoreError(Exception):
@@ -77,9 +127,100 @@ class CoreSupervisor:
         self._started_at: datetime | None = None
         self._running_config_sha: str | None = None
 
+    def _materialise_artifacts(
+        self, config: dict[str, Any], artifacts: dict[str, str] | None
+    ) -> dict[str, Any]:
+        """Write UI-supplied rule-set bytes into the core's private data dir.
+
+        The original (UI-side) path is used only as a lookup key.  Every file
+        is stored under a content hash, so a compromised control plane cannot
+        choose the destination path or overwrite an arbitrary file.
+        """
+
+        if not artifacts:
+            return config
+        if len(artifacts) > MAX_ARTIFACTS:
+            raise EngineCheckFailed("too many configuration artifacts", "artifact_rejected")
+        referenced: set[str] = set()
+        _collect_path_strings(config, referenced)
+        directory = self.paths.runtime_dir / "artifacts"
+        replacements: dict[str, str] = {}
+        total = 0
+        for original, encoded in artifacts.items():
+            if original not in referenced:
+                raise EngineCheckFailed(
+                    "configuration artifact is not referenced by the payload", "artifact_rejected"
+                )
+            if not isinstance(encoded, str):
+                raise EngineCheckFailed(
+                    "configuration artifact is not a string", "artifact_rejected"
+                )
+            try:
+                data = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError) as exc:
+                raise EngineCheckFailed(
+                    "configuration artifact is not valid base64", "artifact_rejected"
+                ) from exc
+            total += len(data)
+            if len(data) > MAX_ARTIFACT_BYTES or total > MAX_ARTIFACTS_TOTAL_BYTES:
+                raise EngineCheckFailed("configuration artifact is too large", "artifact_too_large")
+            digest = hashlib.sha256(data).hexdigest()
+            suffix = Path(original).suffix.lower()
+            if suffix not in _ARTIFACT_SUFFIXES:
+                suffix = ".bin"
+            directory.mkdir(parents=True, exist_ok=True)
+            target = directory / f"{digest[:32]}{suffix}"
+            if not target.is_file() or target.stat().st_size != len(data):
+                temporary = directory / f".{digest[:32]}.tmp"
+                temporary.write_bytes(data)
+                if os.name == "posix":
+                    temporary.chmod(0o600)
+                temporary.replace(target)
+            replacements[original] = str(target)
+        return _replace_strings(config, replacements)
+
+    def _normalise_cache_path(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Point the optional sing-box cache at the core's own data directory.
+
+        The UI may be a different user; its data directory is neither readable
+        nor writable by the core.  The cache is disposable state, so the core
+        owns its location regardless of what the control plane requested.
+        """
+
+        experimental = config.get("experimental")
+        if not isinstance(experimental, dict):
+            return config
+        cache = experimental.get("cache_file")
+        if not isinstance(cache, dict) or not cache.get("enabled"):
+            return config
+        desired = str(self.paths.data_dir / "cache.db")
+        if cache.get("path") == desired:
+            return config
+        updated_cache = {**cache, "path": desired}
+        updated_experimental = {**experimental, "cache_file": updated_cache}
+        return {**config, **{"experimental": updated_experimental}}
+
+    def _prune_artifacts(self, config: dict[str, Any]) -> None:
+        directory = self.paths.runtime_dir / "artifacts"
+        if not directory.is_dir():
+            return
+        referenced: set[str] = set()
+        _collect_path_strings(config, referenced)
+        keep = {Path(item).name for item in referenced}
+        for item in directory.iterdir():
+            if not item.is_file() or item.name in keep:
+                continue
+            with contextlib.suppress(OSError):
+                item.unlink()
+
     async def start(self) -> None:
         self.paths.ensure()
         self._rotate_logs()
+        # A core upgrade or crash can leave a sing-box child holding the old
+        # ports.  Clean it up before any early return below; otherwise an
+        # invalid or stale last-good file leaves the orphan running and the
+        # next apply fails on a port conflict.
+        self._cleanup_orphan()
         if not self.last_good.is_file():
             return
         if self.settings.role is Role.SERVER:
@@ -99,7 +240,7 @@ class CoreSupervisor:
         try:
             raw = self.last_good.read_bytes()
             config = json.loads(raw)
-            disabled = read_enforcement(self.paths.enforcement_path)
+            disabled = read_enforcement(self.paths.enforcement_path, strict=True)
             config, stripped = strip_disabled_users(config, disabled)
             if stripped:
                 # Persist the sanitized configuration so a later core restart
@@ -134,6 +275,7 @@ class CoreSupervisor:
         *,
         allow_lan: bool = False,
         allowed_ports: set[int] | None = None,
+        artifacts: dict[str, str] | None = None,
     ) -> SupervisorStatus:
         if not self.engine.is_file():
             raise EngineUnavailable(
@@ -146,15 +288,20 @@ class CoreSupervisor:
             )
         if allowed_ports is None:
             allowed_ports = set(self.settings.proxy_ports)
-        validate_config(
-            config,
-            role=self.settings.role,
-            allowed_ports=allowed_ports,
-            allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
-            tun_interface=self.settings.tun_interface,
-            allow_lan=allow_lan,
-        )
         async with self._lock:
+            # The digest binds the bytes the control plane generated.  Any
+            # normalisation below happens inside the privileged core and is
+            # re-validated before it can reach sing-box.
+            config = self._materialise_artifacts(config, artifacts)
+            config = self._normalise_cache_path(config)
+            validate_config(
+                config,
+                role=self.settings.role,
+                allowed_ports=allowed_ports,
+                allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
+                tun_interface=self.settings.tun_interface,
+                allow_lan=allow_lan,
+            )
             temp = self.last_good.with_suffix(".json.tmp")
             temp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
             if os.name == "posix":
@@ -179,8 +326,9 @@ class CoreSupervisor:
                     await self._reload_running()
                 else:
                     await self._spawn()
-                self._running_config_sha = actual
+                self._running_config_sha = config_digest(config)
                 self._last_error = None
+                self._prune_artifacts(config)
             except CoreError:
                 temp.unlink(missing_ok=True)
                 if replaced:
@@ -203,10 +351,43 @@ class CoreSupervisor:
         if not self.engine.is_file():
             raise EngineUnavailable(f"sing-box was not found at {self.engine}")
         async with self._lock:
+            # ``reload`` restarts from a file, so it must re-run the same
+            # policy and path validation as ``apply``.  Trusting the file
+            # would let a stale policy (or a compromised control plane) start
+            # a configuration that ``apply`` would have rejected.
+            try:
+                config = json.loads(self.last_good.read_bytes())
+            except (OSError, ValueError) as exc:
+                raise EngineCheckFailed("last-good configuration is not valid JSON") from exc
+            if not isinstance(config, dict):
+                raise EngineCheckFailed("last-good configuration is not an object")
+            if self.settings.role is Role.SERVER:
+                meta = self._read_meta()
+                if meta.get("policy_version") != CONFIG_POLICY_VERSION:
+                    raise EngineCheckFailed(
+                        "last-good configuration predates the current security policy",
+                        "policy_stale",
+                    )
+            try:
+                disabled = read_enforcement(self.paths.enforcement_path, strict=True)
+            except EnforcementError as exc:
+                raise EngineCheckFailed(str(exc), "enforcement_invalid") from exc
+            config, stripped = strip_disabled_users(config, disabled)
+            if stripped:
+                self._write_last_good(config)
+            validate_config(
+                config,
+                role=self.settings.role,
+                allowed_ports=set(self.settings.proxy_ports),
+                allowed_paths=[self.paths.data_dir, self.paths.certs_dir],
+                tun_interface=self.settings.tun_interface,
+                allow_lan=self._read_persisted_allow_lan(),
+            )
             if self._process is not None and self._process.returncode is None:
                 await self._reload_running()
             else:
                 await self._spawn()
+            self._running_config_sha = config_digest(config)
             self._write_state()
         return self.status()
 
@@ -298,6 +479,13 @@ class CoreSupervisor:
         except FileNotFoundError as exc:
             raise EngineUnavailable(f"sing-box was not found at {self.engine}") from exc
         except TimeoutError as exc:
+            # ``wait_for`` cancels the wait, not the child process.  Leaving
+            # ``sing-box check`` running accumulates CPU and file descriptors
+            # across failed applies and can hold the temporary config open.
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            with contextlib.suppress(Exception):
+                await process.wait()
             raise EngineCheckFailed("sing-box check timed out") from exc
         if process.returncode != 0:
             detail = (stderr or stdout).decode("utf-8", errors="replace").strip()

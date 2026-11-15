@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -132,14 +134,52 @@ class EngineManager:
                 selected=selected,
                 routing_mode=routing_mode,
             )
+            artifacts = self._client_artifacts(config)
             digest = config_digest(config)
             try:
-                result = await self.client.apply(config, digest, Role.CLIENT.value)
+                result = await self.client.apply(
+                    config, digest, Role.CLIENT.value, artifacts=artifacts
+                )
             except CoreApiError as exc:
                 raise EngineError(exc.detail, exc.code, exc.status_code) from exc
             self._last_applied["client"] = digest
             await self._publish_applied("client", digest, result)
             return {"config": config, "status": result, "sha256": digest}
+
+    def _client_artifacts(self, config: dict[str, Any]) -> dict[str, str]:
+        """Upload rule-set bytes that the privileged core cannot read.
+
+        On a default client install the UI runs as the desktop user while the
+        core runs as ``ostium-core`` with its own private data directory.  The
+        generated config references rule-set files in the UI data directory;
+        without transferring the bytes the core rejects those paths.
+        """
+
+        artifacts: dict[str, str] = {}
+        route = config.get("route")
+        if not isinstance(route, dict):
+            return artifacts
+        entries = route.get("rule_set")
+        if not isinstance(entries, list):
+            return artifacts
+        total = 0
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            raw = entry.get("path")
+            if not isinstance(raw, str) or not raw:
+                continue
+            try:
+                data = Path(raw).read_bytes()
+            except OSError as exc:
+                raise EngineError(
+                    f"rule set file is not readable: {raw}", "rule_set_unreadable", 400
+                ) from exc
+            total += len(data)
+            if len(data) > 16 * 1024 * 1024 or total > 32 * 1024 * 1024:
+                raise EngineError("rule set file is too large", "rule_set_too_large", 413)
+            artifacts[raw] = base64.b64encode(data).decode("ascii")
+        return artifacts
 
     async def reconcile_client(self, session: AsyncSession, *, force: bool = False) -> bool:
         config = await self.client_preview(session)

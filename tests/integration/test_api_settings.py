@@ -306,3 +306,106 @@ def test_api_tokens(api_client: TestClient) -> None:
 
     missing = api_client.delete("/api/v1/api-tokens/missing", headers=headers)
     assert missing.status_code == 404
+
+
+def test_public_ui_enable_repairs_the_default_subscription_port(
+    api_client: TestClient, settings: Settings
+) -> None:
+    token = setup_admin(api_client)
+    headers = _headers(token)
+    _enable_totp(api_client, headers)
+    headers = _headers(csrf(api_client))
+    assert (
+        api_client.post(
+            "/api/v1/certificates/issue",
+            json={"domain": "ui.example.com", "method": "self-signed"},
+            headers=headers,
+        ).status_code
+        == 202
+    )
+    # ``ostium init --domain`` records the 443 form before Public UI exists.
+    stored = api_client.patch(
+        "/api/v1/settings",
+        json={"public_base_url": "https://ui.example.com"},
+        headers=headers,
+    )
+    assert stored.status_code == 200, stored.text
+
+    enabled = api_client.post(
+        "/api/v1/settings/public-ui",
+        json={"enabled": True, "domain": "ui.example.com"},
+        headers=headers,
+    )
+    assert enabled.status_code == 200, enabled.text
+    general = api_client.get("/api/v1/settings").json()["general"]
+    assert general["public_base_url"] == f"https://ui.example.com:{settings.port}"
+
+
+def test_public_ui_enable_keeps_an_explicit_base_url(
+    api_client: TestClient, settings: Settings
+) -> None:
+    token = setup_admin(api_client)
+    headers = _headers(token)
+    _enable_totp(api_client, headers)
+    headers = _headers(csrf(api_client))
+    assert (
+        api_client.post(
+            "/api/v1/certificates/issue",
+            json={"domain": "ui.example.com", "method": "self-signed"},
+            headers=headers,
+        ).status_code
+        == 202
+    )
+    explicit = "https://edge.example.net:9443"
+    api_client.patch("/api/v1/settings", json={"public_base_url": explicit}, headers=headers)
+    enabled = api_client.post(
+        "/api/v1/settings/public-ui",
+        json={"enabled": True, "domain": "ui.example.com"},
+        headers=headers,
+    )
+    assert enabled.status_code == 200, enabled.text
+    general = api_client.get("/api/v1/settings").json()["general"]
+    assert general["public_base_url"] == explicit
+
+
+def test_public_ui_certificate_cannot_be_deleted_while_in_use(
+    api_client: TestClient, settings: Settings
+) -> None:
+    token = setup_admin(api_client)
+    headers = _headers(token)
+    _enable_totp(api_client, headers)
+    headers = _headers(csrf(api_client))
+    assert (
+        api_client.post(
+            "/api/v1/certificates/issue",
+            json={"domain": "ui.example.com", "method": "self-signed"},
+            headers=headers,
+        ).status_code
+        == 202
+    )
+    enabled = api_client.post(
+        "/api/v1/settings/public-ui",
+        json={"enabled": True, "domain": "ui.example.com"},
+        headers=headers,
+    )
+    assert enabled.status_code == 200, enabled.text
+    certificates = api_client.get("/api/v1/certificates").json()["certificates"]
+    certificate_id = next(item["id"] for item in certificates if item["domain"] == "ui.example.com")
+    blocked = api_client.delete(f"/api/v1/certificates/{certificate_id}", headers=headers)
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["code"] == "certificate_in_use"
+
+    # A certificate that is not serving the Public UI can still be deleted.
+    assert (
+        api_client.post(
+            "/api/v1/certificates/issue",
+            json={"domain": "other.example.com", "method": "self-signed"},
+            headers=headers,
+        ).status_code
+        == 202
+    )
+    certificates = api_client.get("/api/v1/certificates").json()["certificates"]
+    other_id = next(item["id"] for item in certificates if item["domain"] == "other.example.com")
+    deleted = api_client.delete(f"/api/v1/certificates/{other_id}", headers=headers)
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["deleted"] is True

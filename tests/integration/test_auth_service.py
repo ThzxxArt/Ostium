@@ -147,3 +147,39 @@ def test_password_and_recovery_helpers(settings: Settings) -> None:
         await engine.dispose()
 
     asyncio.run(_run())
+
+
+def test_password_verification_is_moved_off_the_event_loop(settings: Settings, monkeypatch) -> None:
+    """Argon2id must not block health checks and WebSocket fan-out."""
+
+    import threading
+
+    caller = threading.get_ident()
+    seen: list[int] = []
+
+    def slow_verify(password: str, hashed: str) -> bool:
+        seen.append(threading.get_ident())
+        return False
+
+    monkeypatch.setattr(auth_service, "verify_password", slow_verify)
+
+    async def _run() -> None:
+        engine = create_engine(settings.paths.db_path)
+        await create_schema(engine)
+        factory = create_session_factory(engine)
+        async with factory() as session:
+            await auth_service.create_admin(session, username="admin", password="verysecret123")
+            await session.commit()
+            with pytest.raises(auth_service.AuthError):
+                await auth_service.authenticate(
+                    session,
+                    settings,
+                    username="admin",
+                    password="wrong-password",
+                    totp_code=None,
+                    ip="127.0.0.1",
+                )
+        await engine.dispose()
+
+    asyncio.run(_run())
+    assert seen and seen[0] != caller

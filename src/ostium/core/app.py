@@ -67,6 +67,9 @@ class ApplyRequest(BaseModel):
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     role: Role
     allow_lan: bool = False
+    # Rule-set files owned by a client control plane that runs as a different
+    # user.  Keys are the UI-side paths referenced by ``config``.
+    artifacts: dict[str, str] | None = None
 
 
 def create_core_app(settings: Settings) -> FastAPI:
@@ -167,6 +170,7 @@ def create_core_app(settings: Settings) -> FastAPI:
             request.sha256,
             allow_lan=request.allow_lan,
             allowed_ports=set(current.proxy_ports),
+            artifacts=request.artifacts,
         )
         return _status_payload(result, settings)
 

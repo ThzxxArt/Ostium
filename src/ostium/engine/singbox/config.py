@@ -564,20 +564,28 @@ def namespace_endpoint_tags(
     for _group_key, _label, endpoints in groups:
         for endpoint in endpoints:
             counts[endpoint.tag] = counts.get(endpoint.tag, 0) + 1
+    # Generated outbounds own these tags.  An endpoint called "proxy" or
+    # "direct" would make the whole configuration fail validation.  Endpoint
+    # tags that are already unique are reserved up front so a renamed
+    # duplicate can never steal another profile's tag.
+    reserved = {"auto", "proxy", "direct"}
+    keep = {tag for tag, count in counts.items() if count == 1 and tag not in reserved}
+    used = set(keep) | reserved
     flattened: list[Endpoint] = []
     mapping: dict[tuple[str, str], str] = {}
     for group_key, label, endpoints in groups:
         for endpoint in endpoints:
             effective = endpoint.tag
-            if counts.get(endpoint.tag, 0) > 1:
+            if effective not in keep:
                 prefix = _tag_slug(label)
-                effective = f"{prefix}-{endpoint.tag}"[:64]
-                candidate = effective
+                base = f"{prefix}-{endpoint.tag}"[:64]
+                candidate = base
                 suffix = 2
-                while any(item.tag == candidate for item in flattened):
-                    candidate = f"{effective[:58]}-{suffix}"
+                while candidate in used:
+                    candidate = f"{base[:58]}-{suffix}"
                     suffix += 1
                 effective = candidate
+                used.add(candidate)
             mapping[(group_key, endpoint.tag)] = effective
             flattened.append(
                 endpoint

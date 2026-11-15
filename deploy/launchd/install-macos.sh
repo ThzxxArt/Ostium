@@ -294,6 +294,29 @@ launchctl unload -w /Library/LaunchDaemons/com.ostium.core.plist 2>/dev/null || 
 launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
 unload_agent /Library/LaunchAgents/com.ostium.ui.plist
 
+# The new control plane runs Alembic on first start.  If the health check
+# fails and the old venv is restored, the old build refuses to open a newer
+# schema.  Snapshot the database (and the key that decrypts it) while both
+# services are stopped.
+DB_SNAPSHOT=""
+if [[ -n "$OLD_VENV" && -f "$DATA/ostium.db" ]]; then
+  DB_SNAPSHOT="$DATA/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+  install -d -m 0700 "$DB_SNAPSHOT"
+  for file in ostium.db ostium.db-wal ostium.db-shm master.key; do
+    [[ -f "$DATA/$file" ]] && cp -p "$DATA/$file" "$DB_SNAPSHOT/$file"
+  done
+fi
+
+restore_db_snapshot() {
+  [[ -n "$DB_SNAPSHOT" && -d "$DB_SNAPSHOT" ]] || return 0
+  for file in ostium.db ostium.db-wal ostium.db-shm master.key; do
+    if [[ -f "$DB_SNAPSHOT/$file" ]]; then
+      cp -p "$DB_SNAPSHOT/$file" "$DATA/$file"
+    fi
+  done
+  echo "已从 $DB_SNAPSHOT 恢复升级前的数据库与密钥。" >&2
+}
+
 render_plist "$SCRIPT_DIR/com.ostium.core.plist" /Library/LaunchDaemons/com.ostium.core.plist
 if [[ "$RUN_AS_ROOT" == "true" ]]; then
   render_plist "$SCRIPT_DIR/com.ostium.ui.root.plist" /Library/LaunchDaemons/com.ostium.ui.plist
@@ -318,6 +341,7 @@ if [[ "$NO_START" != "true" ]]; then
   if [[ -n "$OLD_VENV" ]] && ! wait_for_core; then
     echo "升级后核心健康检查失败，回滚核心……" >&2
     rollback_core_binary
+    restore_db_snapshot
     rm -rf "$PREFIX/venv.failed"
     mv "$VENV" "$PREFIX/venv.failed" 2>/dev/null || true
     mv "$OLD_VENV" "$VENV"
@@ -339,6 +363,7 @@ if [[ "$NO_START" != "true" ]]; then
       mv "$VENV" "$PREFIX/venv.failed" 2>/dev/null || true
       mv "$OLD_VENV" "$VENV"
       rollback_core_binary
+      restore_db_snapshot
       if [[ "$RUN_AS_ROOT" == "true" ]]; then
         launchctl load -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
       elif [[ -n "${SUDO_USER:-}" ]]; then

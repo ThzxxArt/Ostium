@@ -133,6 +133,24 @@ async def create_self_signed(
     )
 
 
+def signal_ui_reload(settings: Settings) -> bool:
+    """Ask ``ostium serve`` to rebuild its TLS context.
+
+    The listener is constructed once at process start, so a certificate that
+    is issued, uploaded or renewed through the API is otherwise not served
+    until the control plane is restarted.  The CLI watcher decides whether the
+    marker means "reload", "recover" or "ignore" based on the listener state.
+    """
+
+    marker = settings.paths.runtime_dir / "reload-ui"
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+        return True
+    except OSError:
+        return False
+
+
 async def import_manual(
     session: AsyncSession,
     settings: Settings,

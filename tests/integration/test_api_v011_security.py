@@ -46,9 +46,23 @@ def test_read_api_token_cannot_export_plaintext_credentials(api_client: TestClie
         headers=_headers(token),
     )
     assert scoped_token.status_code == 201, scoped_token.text
-    allowed = api_client.get(
+    # ``user:read`` lists accounts but must not disclose endpoint credentials.
+    still_denied = api_client.get(
         f"/api/v1/users/{user_id}/export",
         headers={"Authorization": f"Bearer {scoped_token.json()['token']}"},
+    )
+    assert still_denied.status_code == 403
+    assert still_denied.json()["code"] == "insufficient_scope"
+
+    subscription_token = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "subscriptions", "scopes": ["read", "subscription:read"]},
+        headers=_headers(token),
+    )
+    assert subscription_token.status_code == 201, subscription_token.text
+    allowed = api_client.get(
+        f"/api/v1/users/{user_id}/export",
+        headers={"Authorization": f"Bearer {subscription_token.json()['token']}"},
     )
     assert allowed.status_code == 200, allowed.text
 
@@ -459,3 +473,26 @@ def test_certificate_renewal_failure_keeps_ready_status(
     )
     assert after["status"] == "ready"
     assert "ACME down" in (after["last_error"] or "")
+
+
+def test_narrow_write_scope_only_authorises_its_own_route(api_client: TestClient) -> None:
+    token = setup_admin(api_client)
+    created = api_client.post("/api/v1/users", json={"name": "bob"}, headers=_headers(token))
+    assert created.status_code == 201, created.text
+    user_id = created.json()["user"]["id"]
+
+    scoped = api_client.post(
+        "/api/v1/api-tokens",
+        json={"name": "rotation", "scopes": ["read", "subscription:write"]},
+        headers=_headers(token),
+    )
+    assert scoped.status_code == 201, scoped.text
+    bearer = {"Authorization": f"Bearer {scoped.json()['token']}"}
+
+    rotated = api_client.post(f"/api/v1/users/{user_id}/subscription/rotate", headers=bearer)
+    assert rotated.status_code == 200, rotated.text
+
+    created_with_narrow = api_client.post("/api/v1/users", json={"name": "mallory"}, headers=bearer)
+    assert created_with_narrow.status_code == 403
+    renamed = api_client.patch(f"/api/v1/users/{user_id}", json={"note": "x"}, headers=bearer)
+    assert renamed.status_code == 403

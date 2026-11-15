@@ -230,3 +230,65 @@ def test_v1_manifest_still_restores(tmp_path: Path) -> None:
         assert restore_backup(target, legacy)["restored"] is True
 
     asyncio.run(_run())
+
+
+def test_restored_config_keeps_target_paths_and_operator_settings(tmp_path: Path) -> None:
+    """A restore must not point the next start at the source machine's data dir."""
+
+    async def _run() -> None:
+        source = _settings(tmp_path, "source")
+        await _seed(source)
+        source.public_ui = True
+        source.secure_cookies = True
+        source.port = 9443
+        source.save()
+        created = create_backup(source)
+
+        target = _settings(tmp_path, "target")
+        restore_backup(target, Path(created["path"]))
+
+        restored = Settings.load(config_file=target.config_file)
+        assert restored.data_dir == target.data_dir
+        assert restored.config_dir == target.config_dir
+        assert restored.state_dir == target.state_dir
+        assert restored.core_token_file == target.core_token_file
+        # Operator-facing choices from the backup are still honoured.
+        assert restored.public_ui is True
+        assert restored.secure_cookies is True
+        assert restored.port == 9443
+
+    asyncio.run(_run())
+
+
+def test_restore_rejects_an_invalid_config_document(tmp_path: Path) -> None:
+    from ostium.services.backup import _restore_config
+
+    source = tmp_path / "config.toml"
+    source.write_text("role = [", encoding="utf-8")
+    settings = _settings(tmp_path, "invalid-config")
+    with pytest.raises(BackupError) as excinfo:
+        _restore_config(source, settings)
+    assert excinfo.value.code == "invalid_archive"
+    assert not settings.config_file.exists()
+
+
+def test_restore_config_without_a_configured_engine(tmp_path: Path) -> None:
+    from ostium.services.backup import _restore_config
+
+    source = tmp_path / "config.toml"
+    source.write_text('role = "server"\nport = 9443\n', encoding="utf-8")
+    settings = _settings(tmp_path, "no-engine")
+    settings.engine_path = None
+    _restore_config(source, settings)
+    restored = Settings.load(config_file=settings.config_file)
+    assert restored.port == 9443
+    assert restored.data_dir == settings.data_dir
+
+
+def test_database_without_ostium_tables_needs_no_master_key(tmp_path: Path) -> None:
+    from ostium.services.backup import _database_requires_master_key
+
+    database = tmp_path / "empty.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE unrelated (id INTEGER)")
+    assert _database_requires_master_key(database) is False

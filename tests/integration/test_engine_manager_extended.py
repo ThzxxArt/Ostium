@@ -205,10 +205,10 @@ def test_client_spec_selection_rules_and_errors(tmp_path: Path) -> None:
             config = await manager.client_preview(session)
             assert any(item["type"] == "tun" for item in config["inbounds"])
 
-            async def ok(config, digest, role):  # type: ignore[no-untyped-def]
+            async def ok(config, digest, role, *, artifacts=None):  # type: ignore[no-untyped-def]
                 return {"running": True, "revision": digest[:16], "role": role}
 
-            async def fail(config, digest, role):  # type: ignore[no-untyped-def]
+            async def fail(config, digest, role, *, artifacts=None):  # type: ignore[no-untyped-def]
                 raise CoreApiError(422, "bad config", "engine_check_failed")
 
             manager.client.apply = ok  # type: ignore[method-assign]

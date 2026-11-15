@@ -1388,3 +1388,32 @@ def test_human_bytes_and_parse_bytes() -> None:
     assert cli._parse_bytes("1G") == 1024**3
     assert cli._parse_bytes("500m") == 500 * 1024**2
     assert cli._parse_bytes("1024") == 1024
+
+
+def test_init_rejects_weak_password_and_empty_username(tmp_path: Path, monkeypatch) -> None:
+    data = tmp_path / "data"
+    config = tmp_path / "config"
+    monkeypatch.setenv("OSTIUM_DATA_DIR", str(data))
+    monkeypatch.setenv("OSTIUM_CONFIG_DIR", str(config))
+    monkeypatch.setenv("OSTIUM_ROLE", "server")
+    runner = CliRunner()
+    base = [
+        "init",
+        "--role",
+        "server",
+        "--no-input",
+        "--data-dir",
+        str(data),
+        "--config-dir",
+        str(config),
+        "--dev",
+    ]
+
+    weak = runner.invoke(app, [*base, "--password", "x"])
+    assert weak.exit_code == 2
+    assert "10 and 200" in weak.output
+
+    empty = runner.invoke(app, [*base, "--username", "   ", "--password", "verysecret123"])
+    assert empty.exit_code == 2
+    assert "username" in empty.output
+    assert not (data / "ostium.db").exists()

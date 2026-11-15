@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
@@ -116,6 +117,26 @@ def is_loopback(request: Request) -> bool:
     return host in {"127.0.0.1", "::1", "localhost", "testclient"}
 
 
+_NARROW_WRITE_ROUTES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("subscription:write", re.compile(r"^/api/v1/users/[^/]+/subscription/rotate$")),
+)
+
+
+def _narrow_write_scope_for(path: str, scopes: set[str]) -> str | None:
+    """Return the narrow write scope that authorises this exact mutation.
+
+    A token with ``subscription:write`` must not be able to POST ``/users``;
+    the generic method gate only accepts the narrow scope on the route that
+    the scope was designed for.  The endpoint's own ``require_scope`` still
+    runs, so both checks must agree.
+    """
+
+    for scope, pattern in _NARROW_WRITE_ROUTES:
+        if scope in scopes and pattern.match(path):
+            return scope
+    return None
+
+
 async def get_current_admin(
     request: Request,
     services: Services = Depends(get_services),
@@ -143,8 +164,10 @@ async def get_current_admin(
             request.state.api_token_scopes = scopes
             if not scopes.intersection({"read", "write"}):
                 raise ApiError(403, "API token has no usable scope", "insufficient_scope")
-            if request.method not in {"GET", "HEAD", "OPTIONS"} and "write" not in scopes:
-                raise ApiError(403, "API token lacks the write scope", "insufficient_scope")
+            if request.method not in {"GET", "HEAD", "OPTIONS"}:
+                narrowed = _narrow_write_scope_for(request.url.path, scopes)
+                if "write" not in scopes and narrowed is None:
+                    raise ApiError(403, "API token lacks the write scope", "insufficient_scope")
             admin = await get_admin(session)
             if admin is not None:
                 return admin
@@ -181,6 +204,19 @@ def require_scope(scope: str) -> Callable[[Request], Awaitable[None]]:
         )
 
     return dependency
+
+
+def ensure_scope(request: Request, scope: str) -> None:
+    """Enforce a narrow scope from inside a handler with a conditional path."""
+
+    from ostium.api.errors import ApiError
+
+    scopes = getattr(request.state, "api_token_scopes", None)
+    if scopes is None:
+        return
+    if "write" in scopes or scope in scopes:
+        return
+    raise ApiError(403, f"API token lacks the {scope} scope", "insufficient_scope")
 
 
 def actor_name(admin: AdminUser) -> str:

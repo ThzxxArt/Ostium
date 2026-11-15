@@ -53,10 +53,24 @@ def _read_state(path: Path) -> dict[str, Any]:
 
 
 def _write_state(path: Path, state: dict[str, Any]) -> None:
+    import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
-    if os.name == "posix":
-        path.chmod(0o600)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, indent=2)
+            handle.flush()
+            # Without fsync a power loss can leave a truncated file; the next
+            # start then cannot tell that the OS proxy is still enabled and
+            # never restores it, blackholing all traffic.
+            os.fsync(handle.fileno())
+        if os.name == "posix":
+            temporary.chmod(0o600)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 class BaseProxy:

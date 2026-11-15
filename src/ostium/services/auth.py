@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
 import secrets
+import threading
 import time
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -38,6 +40,24 @@ SESSION_IDLE_SECONDS = 12 * 3600
 SESSION_ABSOLUTE_SECONDS = 7 * 24 * 3600
 MAX_FAILURES = 5
 LOCK_SECONDS = 15 * 60
+
+# Argon2id at the configured cost needs ~64 MiB per verification.  Without a
+# gate, unauthenticated login attempts (including unknown usernames, which
+# still burn a hash for timing equalisation) can allocate gigabytes and
+# exhaust CPU.  A thread-level gate also works across the short-lived event
+# loops used by tests and the CLI.
+_HASH_GATE = threading.BoundedSemaphore(2)
+
+
+def _verify_password_bounded(password: str, hashed: str) -> bool:
+    with _HASH_GATE:
+        return verify_password(password, hashed)
+
+
+def _burn_password_check_bounded(password: str) -> None:
+    with _HASH_GATE:
+        _burn_password_check(password)
+
 
 # In-process activity clock.  Session last_seen is persisted at login; keeping
 # subsequent activity in memory avoids a write on every API request, which is
@@ -136,16 +156,16 @@ async def authenticate(
     LIMITER.check(ip, username)
     admin = await get_admin(session)
     if admin is None or admin.username.lower() != username.strip().lower():
-        _burn_password_check(password)
+        await asyncio.to_thread(_burn_password_check_bounded, password)
         LIMITER.fail(ip, username)
         raise AuthError("invalid username or password")
     if admin.disabled:
-        _burn_password_check(password)
+        await asyncio.to_thread(_burn_password_check_bounded, password)
         LIMITER.fail(ip, username)
         raise AuthError("this account is disabled", "account_disabled", 403)
     if admin.locked_until is not None and as_utc(admin.locked_until) > utcnow():
         raise AuthError("account temporarily locked", "account_locked", 423)
-    if not verify_password(password, admin.password_hash):
+    if not await asyncio.to_thread(_verify_password_bounded, password, admin.password_hash):
         admin.failed_attempts += 1
         if admin.failed_attempts >= MAX_FAILURES:
             admin.locked_until = utcnow() + timedelta(seconds=LOCK_SECONDS)

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ostium.config import Settings
 from ostium.db.models import ProxyUser, StatsEpoch, TrafficDaily
 from ostium.engine.singbox.v2ray_stats import StatsUnavailable, V2RayStatsClient
-from ostium.services.enforcement import DISABLED_REASONS, write_enforcement
+from ostium.services.enforcement import read_enforcement, write_enforcement
 from ostium.services.events import EventBus
 from ostium.util.time import as_utc, iso, utcnow
 
@@ -456,11 +456,14 @@ class StatsCollector:
             # Only now is the startup recovery decision durable.  If the
             # commit failed, the next tick must still seed pending disables.
             self._first_enforce = False
-            disabled_names = {
-                user.name
-                for user in users
-                if not user.enabled and user.disabled_reason in DISABLED_REASONS
-            }
+            enabled_names = {user.name for user in users if user.enabled}
+            disabled_names = {user.name for user in users if not user.enabled}
+            # Keep tombstones for deleted users and drop names that have been
+            # re-enabled since the file was written.  Restricting this set to
+            # quota/expiry revocations let a manual disable or a deleted user
+            # reappear whenever the core restarted from an older last-good
+            # configuration.
+            disabled_names |= read_enforcement(self.settings.paths.enforcement_path) - enabled_names
             # Persist the revocation policy before applying it to the running
             # core.  The privileged core reads this file on every start, so a
             # crash between the database commit and the apply can no longer

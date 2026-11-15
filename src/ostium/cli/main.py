@@ -237,6 +237,14 @@ def init(
         role_value = Role(role)
     except ValueError:
         _fail("--role must be server or client", 2)
+    username = username.strip()
+    if not username or len(username) > 64:
+        _fail("--username must be between 1 and 64 characters", 2)
+    if password is not None and not 10 <= len(password) <= 200:
+        # The API enforces this; the CLI used to accept a one-character
+        # password and could create an administrator that could never log in
+        # through the documented interface.
+        _fail("--password must be between 10 and 200 characters", 2)
     try:
         settings = Settings.load()
     except Exception:
