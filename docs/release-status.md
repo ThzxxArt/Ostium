@@ -9,7 +9,7 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 | Field | Value |
 |---|---|
 | Version | **0.1.2** |
-| Status | **Preparing; not tagged or published** |
+| Status | **Published** |
 | Previous release | `v0.1.1`, published 2026-11-14 (23 assets, immutable) |
 | Release type | State convergence and release integrity; no new protocols |
 | Source branch | `main` (`release/0.1.2` merged at `683ebf3`) |

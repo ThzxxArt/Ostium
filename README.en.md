@@ -35,20 +35,18 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-710%20backend%20%C2%B7%20203%20frontend-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.26%25%20statements%20%C2%B7%2090.38%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.82%25%20statements%20%C2%B7%2085.91%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-704%20backend%20%C2%B7%20203%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **Release status: v0.1.1 was published on 2026-11-14; v0.1.2 is in
-> preparation and is not published yet.** The current public release is still
-> v0.1.1. See [release status](docs/release-status.md) for verified and
-> unverified items; do not treat 0.1.2 package names on this page as existing
-> assets until the tag is published.
+> **Release status: v0.1.2 was published on 2026-11-15.** The previous release
+> is v0.1.1 (2026-11-14). See [release status](docs/release-status.md) for
+> verified and unverified items.
 
 > [!TIP]
-> **Current public version: v0.1.1.** The easiest install does not require Python:
+> **Current public version: v0.1.2.** The easiest install does not require Python:
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
@@ -276,7 +274,7 @@ installer from the extracted sdist:
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
-Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.1 before 0.1.2 is published; v0.1.2 afterwards)
+Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.2)
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -423,7 +421,7 @@ uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
 # or pin the release
-uv tool install ostium-ctl    # pin "ostium-ctl==0.1.2" after 0.1.2 is published
+uv tool install ostium-ctl    # pin "ostium-ctl==0.1.2"
 ```
 
 Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
@@ -650,7 +648,7 @@ A failed renewal keeps the previous ready certificate and does not downgrade the
 ```bash
 sudo bash install-online.sh upgrade
 # pin a version
-# pin a version (available after 0.1.2 is published): sudo bash install-online.sh upgrade --version 0.1.2
+# pin a version: sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 The upgrade keeps the database, `master.key`, configuration, certificates, users and

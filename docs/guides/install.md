@@ -98,7 +98,7 @@ Release 同时提供可离线使用的原生包：
 |---|---|
 | `--role server\|client` | 角色；默认 server |
 | `--domain vpn.example.com` | 服务端域名（Reality 可省略） |
-| `--version <version>` | 指定 Release 版本；`latest` 自动解析（0.1.2 发布前不要固定 0.1.2） |
+| `--version <version>` | 指定 Release 版本；`latest` 自动解析 |
 | `--password '...'` | 初始管理员密码；省略则随机生成 |
 | `--prefix /opt/ostium` | 安装目录 |
 | `--run-as-root` | 不创建用户，两个服务都用 root 运行 |
@@ -185,8 +185,7 @@ release/
 └── SHA256SUMS
 ```
 
-> 以上文件名以 0.1.2 为例；在 0.1.2 正式发布前，请使用 v0.1.1 的同名资产。
-> 在线命令默认使用 `latest`，不会请求未发布的版本。
+> 以上文件名以 0.1.2 为例。在线命令默认使用 `latest`。
 
 然后：
 

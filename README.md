@@ -35,19 +35,17 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.1%25%20statements%20%C2%B7%2090.4%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.6%25%20statements%20%C2%B7%2085.1%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-710%20backend%20%C2%B7%20203%20frontend-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.26%25%20statements%20%C2%B7%2090.38%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.82%25%20statements%20%C2%B7%2085.91%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-704%20backend%20%C2%B7%20203%20frontend%20%C2%B7%2069%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **发布状态：v0.1.1 已于 2026-11-14 发布；v0.1.2 正在准备，尚未发布。**
-> 当前公开可安装版本仍是 v0.1.1。0.1.2 的已验证/未验证项见
-> [发布状态](docs/release-status.md)；在 0.1.2 正式发布前，请勿把本页的 0.1.2
-> 包名当作已存在的下载资产。
+> **发布状态：v0.1.2 已于 2026-11-15 发布。** 上一版本为 v0.1.1
+> （2026-11-14）。0.1.2 的已验证/未验证项见 [发布状态](docs/release-status.md)。
 
 > [!TIP]
-> **当前公开版本：v0.1.1。** 最省事的安装方式不需要预装 Python：
+> **当前公开版本：v0.1.2。** 最省事的安装方式不需要预装 Python：
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
@@ -262,7 +260,7 @@ sudo bash install-online.sh install \
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
-下载入口：<https://github.com/ThzxxArt/Ostium/releases>（0.1.2 发布前请选择 v0.1.1；发布后选择 v0.1.2）
+下载入口：<https://github.com/ThzxxArt/Ostium/releases>（选择 v0.1.2）
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
@@ -402,14 +400,14 @@ uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
 # 或指定版本
-uv tool install ostium-ctl    # 0.1.2 发布后可 pin "ostium-ctl==0.1.2"
+uv tool install ostium-ctl    # 可 pin "ostium-ctl==0.1.2"
 ```
 
 服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install ostium-ctl    # 0.1.2 发布后可 pin ==0.1.2
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # 可 pin ==0.1.2
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -621,7 +619,7 @@ sudo systemctl start ostium-core ostium
 ```bash
 sudo bash install-online.sh upgrade
 # 指定版本
-# 固定版本（0.1.2 发布后可用）：sudo bash install-online.sh upgrade --version 0.1.2
+# 固定版本：sudo bash install-online.sh upgrade --version 0.1.2
 ```
 
 升级会保留数据库、`master.key`、配置、证书、用户和订阅，只替换 venv 与核心二进制；如果原来是 root 模式，会自动保持。
