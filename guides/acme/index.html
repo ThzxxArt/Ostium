@@ -1090,6 +1090,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.1-to-0.1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.1 → 0.1.2 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/release-checklist/" class="md-nav__link">
         
   
@@ -1545,7 +1601,7 @@
 <li>输入域名，选择 <strong>ACME HTTP-01</strong>。</li>
 <li>默认使用生产目录；测试时勾选 <strong>staging</strong>。</li>
 <li>在 <strong>Jobs</strong> 查看进度。挑战服务器只在订单期间绑定 80，并且只提供一个 key authorization。</li>
-<li>成功后证书保存到 <code>/var/lib/ostium/certs/&lt;domain&gt;/fullchain.pem</code> 和 <code>privkey.pem</code>（0600），并只自动分配给尚未绑定证书的 Hysteria2/Trojan；已有显式绑定不会被覆盖。</li>
+<li>成功后证书保存为 <code>/var/lib/ostium/certs/&lt;domain&gt;/fullchain-&lt;generation&gt;.pem</code> 和 <code>privkey-&lt;generation&gt;.pem</code>（私钥 0600），数据库记录具体 generation；续期生成新 generation，成功后旧文件会被清理。证书只自动分配给尚未绑定证书的 Hysteria2/Trojan；已有显式绑定不会被覆盖。</li>
 </ol>
 <h2 id="_3">续期<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>Ostium 每 6 小时检查一次，剩余不足 30 天时自动续期。续期失败会记录日志并创建

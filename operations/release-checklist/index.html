@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../upgrade-0.1.0-to-0.1.1/">
+        <link rel="prev" href="../../release-status/">
       
       
         <link rel="next" href="../troubleshooting/">
@@ -963,6 +963,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../upgrade-0.1.1-to-0.1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.1 → 0.1.2 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1452,16 +1508,17 @@ a published asset is never replaced.</p>
 <li>[ ] PR/main CI green for Python and frontend gates; release <code>verify</code> workflow
       additionally green for shellcheck, PowerShell parse, mkdocs <code>--strict</code>,
       Playwright/axe/visual, pip-audit and npm audit.</li>
-<li>[ ] Version audit: <code>pyproject.toml</code>, <code>src/ostium/__init__.py</code>, installers,
-      Inno, Docker/compose, manifest, README/docs.</li>
+<li>[ ] Version preflight passes: <code>scripts/release-preflight.sh --tag vX.Y.Z</code>.
+      It checks <code>VERSION</code>, Python/web/Docker/installer defaults and README/docs.</li>
 <li>[ ] DEB/AppImage filenames and Debian <code>Version:</code> use <code>X.Y.Z</code>, never <code>vX.Y.Z</code>
       (the build script strips the tag prefix).</li>
 <li>[ ] README.md, README.en.md, SECURITY.md, CHANGELOG.md and RELEASE_NOTES.md
       describe <code>vX.Y.Z</code> as the release being published; no "not yet published"
-      or "pending publication" text remains, and the release-docs test passes.
-      Update this status before tagging so the tagged tree never advertises the
-      release as unpublished after assets go live. If publication fails before
-      any asset exists, revert the status text before retrying.</li>
+      or "pending publication" text remains, and <code>release-preflight.sh</code> reports
+      no stale release-status text. Update this status before tagging so the
+      tagged tree never advertises the release as unpublished after assets go
+      live. If publication fails before any asset exists, revert the status
+      text before retrying.</li>
 <li>[ ] <code>CHANGELOG.md</code>, migration guide and release notes drafted.</li>
 <li>[ ] Clean install on Linux, Windows and macOS evidence archived.</li>
 <li>[ ] Nginx/Docker/ACME/TUN/soak/performance/5-user evidence archived.</li>
@@ -1472,12 +1529,16 @@ a published asset is never replaced.</p>
 <ul>
 <li>[ ] Create exactly one annotated <code>vX.Y.Z</code> tag on the final commit; push once.</li>
 <li>[ ] Release workflow builds wheel/sdist, five core archives, Windows setup,
-      macOS DMG, Linux DEB/AppImage, Docker, installers, manifest, SBOM and
-      <code>SHA256SUMS</code> from that tag.</li>
-<li>[ ] Confirm <code>overwrite_files: false</code>; never re-run publication to replace an
-      existing asset.</li>
-<li>[ ] PyPI <code>ostium-ctl==X.Y.Z</code> and GHCR tags <code>X.Y.Z</code>/<code>vX.Y.Z</code>/<code>latest</code>
-      published.</li>
+      macOS DMG, Linux DEB/AppImage, Docker staging image, installers, manifest,
+      SBOM and <code>SHA256SUMS</code> from that tag.</li>
+<li>[ ] The workflow creates a <strong>draft</strong> release, verifies its checksum manifest,
+      runs real-core integration and <code>0.1.1 -&gt; current</code> upgrade e2e, then
+      publishes PyPI.</li>
+<li>[ ] Only after PyPI succeeds are GHCR tags <code>X.Y.Z</code>/<code>vX.Y.Z</code>/<code>latest</code>
+      promoted from the verified digest, and the draft is made public.</li>
+<li>[ ] A failed run before PyPI leaves a draft and staging image only. PyPI is
+      the first irreversible public step: a later GHCR/draft failure keeps the
+      draft for retry and requires yanking the PyPI version or shipping a patch.</li>
 </ul>
 <h2 id="read-only-verification">Read-only verification<a class="headerlink" href="#read-only-verification" title="Permanent link">&para;</a></h2>
 <ul>

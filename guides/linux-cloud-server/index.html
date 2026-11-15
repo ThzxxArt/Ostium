@@ -1650,6 +1650,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.1-to-0.1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.1 → 0.1.2 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/release-checklist/" class="md-nav__link">
         
   
@@ -2660,7 +2716,7 @@
 <li>Alpine / OpenRC 等非 systemd 发行版使用 <code>--no-service</code> + supervisord，见第 4.4 节</li>
 </ul>
 <blockquote>
-<p><strong>兼容性说明</strong>：Ostium 0.1.1 的发布验证矩阵是 Ubuntu 24.04 / Debian 13，其他发行版没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。</p>
+<p><strong>兼容性说明</strong>：Ubuntu 24.04 / Debian 13 是 0.1.2 的目标平台；截至本文撰写时，0.1.2 尚未在这些平台完成实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。</p>
 </blockquote>
 <h2 id="1">1. 主方案与端口规划<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
 <p>本文<strong>不把 Nginx 作为默认方案</strong>。主方案由 Ostium 自己终止 TLS：</p>
@@ -2763,7 +2819,7 @@
 <p>Nginx 方案见本文附录，不作为主路径。</p>
 <h2 id="2-ip">2. 首次能用公网 IP 打开网页吗？<a class="headerlink" href="#2-ip" title="Permanent link">&para;</a></h2>
 <p><strong>默认不能。</strong></p>
-<p>Ostium 0.1.1 默认把管理 UI 绑定在 <code>127.0.0.1:8443</code>，只允许本机访问。这是安全设计，不是安装失败。默认安装后：</p>
+<p>Ostium 0.1.2 默认把管理 UI 绑定在 <code>127.0.0.1:8443</code>，只允许本机访问。这是安全设计，不是安装失败。默认安装后：</p>
 <ul>
 <li><code>http://公网IP:8443</code> 连接不上；</li>
 <li><code>https://公网IP:8443</code> 也连接不上；</li>
@@ -2801,11 +2857,11 @@
 <p>公网 IP 仍然只建议用于客户端连接代理入口，不建议作为管理 UI 地址。</p>
 <h3 id="23-ip">2.3 如果只是临时验证公网 IP<a class="headerlink" href="#23-ip" title="Permanent link">&para;</a></h3>
 <p>仅在隔离测试环境、且明确接受风险时，可以临时这样做：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--version<span class="w"> </span><span class="m">0</span>.1.1<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>--version<span class="w"> </span>latest<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--ui-host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--allow-insecure-bind
 </code></pre></div>
@@ -2894,18 +2950,18 @@ timedatectl<span class="w"> </span>status
 <h2 id="4-ostium">4. 安装 Ostium<a class="headerlink" href="#4-ostium" title="Permanent link">&para;</a></h2>
 <h3 id="41-root-root">4.1 root 登录 + 默认非 root 运行<a class="headerlink" href="#41-root-root" title="Permanent link">&para;</a></h3>
 <p>这是推荐组合：安装器以 root 运行，服务以无特权 <code>ostium</code> 用户运行。</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--version<span class="w"> </span><span class="m">0</span>.1.1
+<span class="w">      </span>--version<span class="w"> </span>latest
 </code></pre></div>
 <h3 id="42-sudo-root">4.2 普通 sudo 用户 + 默认非 root 运行<a class="headerlink" href="#42-sudo-root" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--version<span class="w"> </span><span class="m">0</span>.1.1
+<span class="w">      </span>--version<span class="w"> </span>latest
 </code></pre></div>
 <p>安装器会：</p>
 <ul>
@@ -2916,7 +2972,7 @@ timedatectl<span class="w"> </span>status
 <li>注册并启动 <code>ostium-core.service</code>、<code>ostium.service</code>；</li>
 <li>打印一次性管理员密码。</li>
 </ul>
-<p>不要把 <code>--public-ui</code> 加到首次安装命令里。0.1.1 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。</p>
+<p>不要把 <code>--public-ui</code> 加到首次安装命令里。0.1.2 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。</p>
 <p>安装完成后检查：</p>
 <div class="highlight"><pre><span></span><code>systemctl<span class="w"> </span>status<span class="w"> </span>ostium-core<span class="w"> </span>ostium<span class="w"> </span>--no-pager
 systemctl<span class="w"> </span>show<span class="w"> </span>-p<span class="w"> </span>User<span class="w"> </span>-p<span class="w"> </span>Group<span class="w"> </span>ostium<span class="w"> </span>ostium-core
@@ -2929,11 +2985,11 @@ sudo<span class="w"> </span>ss<span class="w"> </span>-lntup<span class="w"> </s
 <li>Reality 监听 <code>0.0.0.0:443</code>。</li>
 </ul>
 <h3 id="43-root">4.3 root 运行模式（可选，不推荐生产）<a class="headerlink" href="#43-root" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--version<span class="w"> </span><span class="m">0</span>.1.1<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>--version<span class="w"> </span>latest<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--run-as-root
 </code></pre></div>
 <p>行为：</p>
@@ -2949,11 +3005,11 @@ systemctl<span class="w"> </span>cat<span class="w"> </span>ostium<span class="w
 <p>root 模式取消控制面与 root 的隔离，只建议单用户测试机、临时环境，或已经用容器/虚拟机隔离风险的环境。</p>
 <h3 id="44-systemd-no-service-supervisord">4.4 非 systemd：<code>--no-service</code> + supervisord<a class="headerlink" href="#44-systemd-no-service-supervisord" title="Permanent link">&para;</a></h3>
 <p>安装文件但不注册 systemd：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--role<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--version<span class="w"> </span><span class="m">0</span>.1.1<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>--version<span class="w"> </span>latest<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>--no-service
 </code></pre></div>
 <p>安装器仍会创建 <code>ostium</code> 用户并把数据和配置交给它。</p>
@@ -3391,8 +3447,8 @@ sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </s
 <p>订阅 URL 是敏感信息，等同于账号密码。</p>
 <p>客户端：</p>
 <ul>
-<li>Windows：<code>Ostium-0.1.1-windows-x64-setup.exe</code></li>
-<li>macOS：<code>Ostium-0.1.1-macos-arm64.dmg</code></li>
+<li>Windows：<code>Ostium-0.1.2-windows-x64-setup.exe</code></li>
+<li>macOS：<code>Ostium-0.1.2-macos-arm64.dmg</code></li>
 <li>Linux：在线安装器 <code>install --role client</code>，或 DEB/AppImage</li>
 <li>也可以用 Clash/sing-box/v2rayN 等兼容客户端导入订阅</li>
 </ul>
@@ -3517,27 +3573,27 @@ tail<span class="w"> </span>-f<span class="w"> </span>/var/log/ostium/core.log
 <p>升级前一定先备份。</p>
 <h3 id="115">11.5 升级<a class="headerlink" href="#115" title="Permanent link">&para;</a></h3>
 <p>systemd：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>upgrade
 </code></pre></div>
 <p>指定版本：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.1.2
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span>latest
 </code></pre></div>
 <p>root 模式安装器会自动识别 drop-in 并保持 root；如果没识别，显式加 <code>--run-as-root</code>。</p>
 <p>非 systemd：</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>supervisorctl<span class="w"> </span>stop<span class="w"> </span>ostium<span class="w"> </span>ostium-core
-curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>upgrade<span class="w"> </span>--no-service
 sudo<span class="w"> </span>supervisorctl<span class="w"> </span>start<span class="w"> </span>ostium-core<span class="w"> </span>ostium
 </code></pre></div>
 <h3 id="116">11.6 卸载<a class="headerlink" href="#116" title="Permanent link">&para;</a></h3>
 <p>保留数据：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>uninstall
 </code></pre></div>
 <p>同时删除数据/配置/证书（不可恢复）：</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>uninstall<span class="w"> </span>--purge
 </code></pre></div>
 <p>非 systemd 还要删除 <code>/etc/supervisor/conf.d/ostium.conf</code> 并执行 <code>sudo supervisorctl update</code>。</p>
@@ -3665,8 +3721,8 @@ sudo<span class="w"> </span>sysctl<span class="w"> </span>--system
 <h2 id="14">14. 最短命令清单（主方案）<a class="headerlink" href="#14" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="c1"># 1. DNS 灰云，证书路径确认</span>
 <span class="c1"># 2. 安装（root 登录去掉 sudo）</span>
-curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/download/v0.1.1/install-online.sh<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.1.1
+curl<span class="w"> </span>-fsSL<span class="w"> </span>https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>install<span class="w"> </span>--role<span class="w"> </span>server<span class="w"> </span>--domain<span class="w"> </span>vpn.example.com<span class="w"> </span>--version<span class="w"> </span>latest
 
 <span class="c1"># 3. SSH 隧道登录</span>
 ssh<span class="w"> </span>-N<span class="w"> </span>-L<span class="w"> </span><span class="m">8443</span>:127.0.0.1:8443<span class="w"> </span>root@SERVER_IP

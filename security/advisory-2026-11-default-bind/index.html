@@ -964,6 +964,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.1-to-0.1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.1 → 0.1.2 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    发布状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/release-checklist/" class="md-nav__link">
         
   
@@ -1514,8 +1570,9 @@ certificates and the sing-box core.</p>
   <code>allow_insecure_bind = true</code> (or <code>--allow-insecure-bind</code>) is set explicitly.</li>
 <li>Legacy <code>0.0.0.0</code> configurations without the opt-in are migrated to <code>127.0.0.1</code>
   on first load and written back.</li>
-<li>The Docker image sets <code>OSTIUM_ALLOW_INSECURE_BIND=true</code> inside the container, and
-  the compose file/documentation require a host firewall or TLS reverse proxy.</li>
+<li>The Docker image now defaults to <code>OSTIUM_HOST=127.0.0.1</code> and
+  <code>OSTIUM_ALLOW_INSECURE_BIND=false</code>; exposing the console still requires an
+  explicit opt-in and a host firewall or TLS reverse proxy.</li>
 <li>Public UI still requires a ready TLS certificate and confirmed TOTP.</li>
 </ul>
 <h2 id="mitigation-for-010-installations">Mitigation for 0.1.0 installations<a class="headerlink" href="#mitigation-for-010-installations" title="Permanent link">&para;</a></h2>
