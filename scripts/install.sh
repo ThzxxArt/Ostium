@@ -327,7 +327,9 @@ wait_for_core_ready() {
   # port or load the generated configuration.  The installer must not report
   # success while the proxy is down.
   for _ in $(seq 1 30); do
-    body="$(curl -fsS --max-time 2 http://127.0.0.1:8788/v1/status 2>/dev/null || true)"
+    # /v1/status requires the core bearer token; /v1/health is the
+    # unauthenticated liveness endpoint and reports the child process state.
+    body="$(curl -fsS --max-time 2 http://127.0.0.1:8788/v1/health 2>/dev/null || true)"
     body="${body// /}"
     if [[ "$body" == *'"running":true'* ]]; then
       return 0

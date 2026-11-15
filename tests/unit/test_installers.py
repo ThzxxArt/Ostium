@@ -183,6 +183,16 @@ def test_upgrade_preserves_an_existing_insecure_bind_opt_in() -> None:
     assert 'if [[ "$EXISTING_INSECURE_BIND" == "true" ]]; then' in install
 
 
+def test_installer_core_readiness_uses_the_unauthenticated_health_endpoint() -> None:
+    install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+    ready = install.split("wait_for_core_ready()", 1)[1].split("\n}", 1)[0]
+    # /v1/status needs the core token; the installer has no token and treated
+    # the resulting 401 as "core is down", failing a healthy first install.
+    assert "http://127.0.0.1:8788/v1/health" in ready
+    assert "curl -fsS --max-time 2 http://127.0.0.1:8788/v1/status" not in ready
+    assert '"running":true' in ready
+
+
 def test_installers_default_to_loopback_and_require_insecure_opt_in() -> None:
     install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
     online = (ROOT / "scripts" / "install-online.sh").read_text(encoding="utf-8")
