@@ -28,7 +28,7 @@ Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包
 
 ## 当前 0.1.x 范围
 
-锁定范围见 [`PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/PLAN.md)：
+锁定范围见 [`PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/versions/PLAN.md)：
 
 - 服务端：Reality、Hysteria2、Trojan、Shadowsocks 2022
 - 每用户配额、到期禁用、流量统计

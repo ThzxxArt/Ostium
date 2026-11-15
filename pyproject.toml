@@ -133,8 +133,8 @@ include = [
   "/LICENSE",
   "/NOTICE",
   "/CHANGELOG.md",
-  "/PLAN.md",
-  "/AUDIT_REPORT.md",
+  "/versions/PLAN.md",
+  "/versions/AUDIT_REPORT.md",
 ]
 
 [tool.hatch.build.targets.sdist.force-include]

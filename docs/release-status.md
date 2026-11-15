@@ -45,14 +45,14 @@ before the status update. Replacing them would rewrite published artifacts;
 - First full review round: 40 findings closed, including commit-before-response,
   stats-outage quota enforcement, certificate path traversal, webhook secret
   encryption, Public UI recovery and release-workflow/Docker defaults. See
-  `V0.1.2_REVIEW_ROUND1.md`.
+  `versions/V0.1.2_REVIEW_ROUND1.md`.
 - Second full review round: 19 additional findings closed, including an
   apply-failure path that un-approved a committed inbound port, blocking DNS
   resolution on the event loop, a non-Public-UI certificate renewal switching
   the plaintext control plane to HTTPS, Public UI cookies without `Secure`,
   one-time credentials lost on a post-commit apply error, and release-checklist
   wording that still claimed no post-PyPI half-publication. See
-  `V0.1.2_REVIEW_ROUND2.md`.
+  `versions/V0.1.2_REVIEW_ROUND2.md`.
 - Release workflow ordering tests: draft release first, PyPI before GHCR/draft
   publication.
 - Playwright/axe/visual regression: 69 passed against the built SPA and the
@@ -64,7 +64,7 @@ before the status update. Replacing them would rewrite published artifacts;
   CLI disable/delete tombstones, export certificate resolution, certificate
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
-  serialization, coverage-gate stability). See `V0.1.2_REVIEW_ROUND4.md`.
+  serialization, coverage-gate stability). See `versions/V0.1.2_REVIEW_ROUND4.md`.
 - Publication verification: `scripts/verify-release.sh --version 0.1.2`
   downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
   platforms are present, build attestations verified, and PyPI reports
@@ -105,8 +105,8 @@ publish without release-owner approval (D-115).
 
 ## Release decisions for 0.1.2
 
-The release owner accepted the following in `V0.1.2_DECISIONS.md`; the RC
-evidence is in `V0.1.2_RC_REPORT.md`:
+The release owner accepted the following in `versions/V0.1.2_DECISIONS.md`; the RC
+evidence is in `versions/V0.1.2_RC_REPORT.md`:
 
 - **D-111** PyPI-first ordering is accepted with the documented retry/yank/patch
   recovery; publication is not atomic.

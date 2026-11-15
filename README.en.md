@@ -811,7 +811,7 @@ Key files: `ostium.db`, `master.key`, `config.toml`, `certs/`, `runtime/last-goo
 | TUN fails | Requires root/CAP_NET_ADMIN; verify `/dev/net/tun` or Wintun is installed |
 | System proxy not restored | `ostium proxy off`; inspect `runtime/system-proxy.json` and the platform commands |
 | ACME fails | Is 80/tcp reachable? Does DNS point to this host? Check `last_error` on the certificate |
-| Broken after upgrade | Check `/readyz`; roll back the wheel/database; see `AUDIT_REPORT.md` |
+| Broken after upgrade | Check `/readyz`; roll back the wheel/database; see `versions/AUDIT_REPORT.md` |
 
 Export diagnostics:
 
@@ -858,7 +858,7 @@ Current results:
   registration, navigation and the command palette.
 - `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev
   toolchain audit is also clean after breaking upgrades/overrides.
-- Full evidence and per-file audit: [`AUDIT_REPORT.md`](AUDIT_REPORT.md).
+- Full evidence and per-file audit: [`AUDIT_REPORT.md`](versions/AUDIT_REPORT.md).
 
 ---
 

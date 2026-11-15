@@ -25,7 +25,7 @@ Only the latest v0.1.x release receives security fixes during the v0.1 series.
 v0.1.1 is the current release and fixes the default admin bind issue documented in
 [`docs/security/advisory-2026-11-default-bind.md`](docs/security/advisory-2026-11-default-bind.md).
 Operators still on v0.1.0 should upgrade as soon as possible; until then, apply
-the mitigation in `V0.1.1_PLAN.md` §2: bind the UI to `127.0.0.1`, do not
+the mitigation in `versions/V0.1.1_PLAN.md` §2: bind the UI to `127.0.0.1`, do not
 expose 8443, and enable TOTP plus a valid certificate before public access.
 
 ## Scope notes

@@ -2,7 +2,7 @@
 
 - 状态：已接受
 - 日期：2026-11-12
-- 背景：PLAN.md 锁定 TypeScript 7.0.2 和 vue-tsc 3.1.0。
+- 背景：versions/PLAN.md 锁定 TypeScript 7.0.2 和 vue-tsc 3.1.0。
 
 ## 问题
 

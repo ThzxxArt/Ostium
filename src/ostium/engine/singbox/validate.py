@@ -2,7 +2,7 @@
 
 The core service is privileged on clients (TUN) and binds public ports on
 servers, so it must never trust the UI process.  This module enforces the
-role-separated whitelist from PLAN.md §3.6 and §10.3 before ``sing-box check``.
+role-separated whitelist from versions/PLAN.md §3.6 and §10.3 before ``sing-box check``.
 """
 
 from __future__ import annotations

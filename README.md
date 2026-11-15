@@ -775,7 +775,7 @@ docker compose -f deploy/docker/docker-compose.yml down
 | TUN 启动失败 | 需要 root/CAP_NET_ADMIN；确认 `/dev/net/tun` 与 Wintun 已安装 |
 | 系统代理未恢复 | `ostium proxy off`；检查 `runtime/system-proxy.json` 与平台命令 |
 | ACME 失败 | 80/tcp 是否可达；域名是否解析到本机；查看 Certificates 的 `last_error` |
-| 升级后异常 | 检查 `/readyz`；回滚 wheel/数据库；查看 `AUDIT_REPORT.md` 的兼容性说明 |
+| 升级后异常 | 检查 `/readyz`；回滚 wheel/数据库；查看 `versions/AUDIT_REPORT.md` 的兼容性说明 |
 
 生成诊断包：
 
@@ -817,7 +817,7 @@ npx playwright test
 - 前端：**203 passed**，语句 **90.82%**、分支 **85.91%**、函数 **88.54%**、行 **92.37%**；
 - Playwright：**69 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
 - `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
-- 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](AUDIT_REPORT.md)。
+- 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](versions/AUDIT_REPORT.md)。
 
 ---
 

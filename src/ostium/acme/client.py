@@ -1,6 +1,6 @@
 """Built-in ACME HTTP-01 client.
 
-Only HTTP-01 is implemented by design (see PLAN.md §2.4).  The challenge server
+Only HTTP-01 is implemented by design (see versions/PLAN.md §2.4).  The challenge server
 binds port 80 for the duration of issuance and serves exactly the requested key
 authorizations, then shuts down.
 """
