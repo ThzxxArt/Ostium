@@ -31,9 +31,7 @@ const totp = ref('')
 const recoveryCode = ref('')
 const useRecovery = ref(false)
 const totpRequired = ref(false)
-const showTotp = computed(
-  () => totpRequired.value || auth.status?.login_totp_required === true,
-)
+const showTotp = computed(() => totpRequired.value || auth.status?.login_totp_required === true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const version = computed(() => auth.status?.version || '—')

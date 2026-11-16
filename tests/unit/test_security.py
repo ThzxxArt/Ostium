@@ -92,6 +92,7 @@ def test_totp_and_recovery_codes() -> None:
     code = pyotp.TOTP(secret).now()
     assert verify_totp(secret, code)
     assert not verify_totp(secret, code)  # replay inside the validity window
+    assert not verify_totp(secret, "")
     assert not verify_totp(secret, "000000")
 
     setup_secret = generate_totp_secret()
