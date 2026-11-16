@@ -219,6 +219,10 @@ if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
         Write-Warning "Could not remove the previous OstiumCore service; continuing with the UI install."
     }
 }
+# A failed uninstall can leave the old service or its sing-box child running;
+# it would keep port 8788 occupied and make the new service exit immediately.
+Get-Process ostium-service, sing-box -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
 Write-InstallLog "installing OstiumCore service"
 & $serviceExe --startup auto install
 if ($LASTEXITCODE -ne 0) {

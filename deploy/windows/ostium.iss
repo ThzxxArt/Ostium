@@ -41,7 +41,7 @@ begin
     executables are locked while running; the UI holds ostium.exe open even
     when the service is already stopped. }
   Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue; Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue; Get-Process ostium,ostium-service,sing-box -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   { The new UI migrates the database on first start.  Keep a quiescent copy
     (including WAL and the master key) so an operator can roll back to the

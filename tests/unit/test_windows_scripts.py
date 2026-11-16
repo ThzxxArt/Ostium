@@ -59,8 +59,9 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
         "Join-Path $env:ProgramData ''OstiumCore''; if(Test-Path (Join-Path $d ''ostium.db'')"
         not in setup
     )
-    assert "Get-Process ostium" in setup
+    assert "Get-Process ostium,ostium-service,sing-box" in setup
     assert 'Filename: "http://127.0.0.1:8787"' in setup
+    assert "Get-Process ostium-service, sing-box" in install
     assert r"SetupIconFile=..\..\assets\brand\ostium.ico" in setup
 
     service_spec = (ROOT / "deploy" / "pyinstaller" / "ostium-service.spec").read_text(
