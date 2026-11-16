@@ -176,8 +176,19 @@ async def authenticate(
     secret = None
     if admin.totp_secret_enc:
         secret = _decrypt_totp(admin, settings)
-    if secret and not verify_totp(secret, totp_code or ""):
-        if not recovery_code or not consume_recovery_code(admin, recovery_code):
+    if secret:
+        code = (totp_code or "").strip()
+        recovery = (recovery_code or "").strip()
+        # A password-only request is the normal first step of a two-step
+        # login.  It must not consume a failure slot or lock the account:
+        # the client may not even know yet that a second factor is required.
+        # Only a supplied-but-wrong code is a failed authentication.
+        if not code and not recovery:
+            raise AuthError("a valid TOTP code is required", "totp_required", 401)
+        valid = bool(code and verify_totp(secret, code))
+        if not valid and recovery:
+            valid = consume_recovery_code(admin, recovery)
+        if not valid:
             admin.failed_attempts += 1
             if admin.failed_attempts >= MAX_FAILURES:
                 admin.locked_until = utcnow() + timedelta(seconds=LOCK_SECONDS)

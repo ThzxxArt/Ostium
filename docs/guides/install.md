@@ -54,7 +54,12 @@ irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.p
 
 - `OstiumCore` 服务以 LocalSystem 运行 TUN 核心；
 - 核心数据、token、last-good 配置在 `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写）；
-- Web UI 在当前用户登录时启动，数据在 `%ProgramData%\Ostium`。
+- Web UI 在当前用户登录时启动，数据在 `%ProgramData%\Ostium`；
+- 安装器会等待 `http://127.0.0.1:8787/healthz` 返回成功后才报告完成；失败时
+  会显示计划任务状态和 `%ProgramData%\Ostium\logs\ui.log` 的末尾内容；
+- 安装目录 `%ProgramFiles%\Ostium` 会加入机器级 `PATH`。已打开的终端需要
+  重新打开才能直接运行 `ostium`；也可以用完整路径
+  `& "$env:ProgramFiles\Ostium\ostium.exe" version`。
 
 需要连 UI 也以 SYSTEM 运行时：
 

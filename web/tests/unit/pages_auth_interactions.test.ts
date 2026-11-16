@@ -112,6 +112,28 @@ describe('auth page interactions', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('pre-shows the TOTP field before the first login attempt', async () => {
+    const { calls } = installFetchMock()
+    const { wrapper } = await mountPage(LoginPage, {}, (pinia) => {
+      const auth = useAuthStore(pinia)
+      auth.ready = true
+      auth.status = {
+        ...status('server'),
+        initialized: true,
+        has_admin: true,
+        login_totp_required: true,
+      }
+    })
+    await settle()
+
+    expect(document.querySelector('input[placeholder="123456"]')).toBeTruthy()
+    await fillInputs({ Username: 'admin', Password: 'verysecret123', '123456': '123456' })
+    await clickByText('Sign in')
+    const login = calls.find((call) => call.path === '/api/v1/auth/login')
+    expect(login?.body?.totp).toBe('123456')
+    expect(wrapper.html()).toBeTruthy()
+  })
+
   it('shows TOTP and rate-limit errors', async () => {
     const responses = [
       {

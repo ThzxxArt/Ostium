@@ -28,6 +28,27 @@ token 时仍一次性返回完整 token。
 
 第三方客户端：导出 Base64 或 Clash 格式。URL 中包含标准 VLESS/Hysteria2/Trojan/SS2022 参数。
 
+## Clash 导入排查
+
+导入 `?format=clash` 的订阅后，如果只有 GitHub 能访问，而 Google、YouTube、
+Hugging Face 打不开，按以下顺序检查：
+
+1. **重新拉取订阅**。当前生成的 Clash 配置包含 `dns.enhanced-mode: fake-ip`，
+   并只保留 `GEOIP,CN,DIRECT,no-resolve`。旧缓存里的
+   `GEOIP,CN,DIRECT` 会用被污染的系统 DNS 结果把国外域名误判为国内直连。
+2. **确认客户端支持 Clash Meta / Mihomo**。推荐 Clash Verge Rev、Mihomo
+   或较新的 Clash Meta 内核；很旧的 Clash Premium 可能不支持 fake-IP。
+3. **看客户端日志**。如果日志里目标域名被 `GEOIP,CN` 或 `DIRECT` 命中，
+   说明订阅还是旧配置；如果全部走 `Ostium` 仍失败，检查节点握手和服务器
+   出站，而不是 DNS。
+4. **系统代理不接管 QUIC**。YouTube/Google 会优先尝试 UDP 443；系统代理
+   只接管 TCP，QUIC 可能直连失败。可在浏览器关闭 QUIC，或改用 TUN 模式。
+   本项目订阅已设置 `ipv6: false`，避免 IPv6 绕过代理。
+5. **不要在开启代理前拉订阅**。如果 Clash 通过系统代理拉取订阅，先确认
+   `127.0.0.1:7890` 已监听，或把订阅 URL 加入直连规则。
+
+订阅 token 是凭据：排查时不要贴出完整 URL、二维码或节点密码。
+
 ## 轮换
 
 在 **Subscriptions** 或用户抽屉中轮换订阅 token。旧 URL 立即失效。轮换凭据（UUID/密码）是另一个操作，会断开活跃会话。

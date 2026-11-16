@@ -114,6 +114,13 @@ async def status(
     authenticated = False
     must_change = False
     totp_enabled = False
+    # The login page needs to know that a second factor will be required
+    # before the first password-only request.  Without this hint the field can
+    # only appear after a failed 401, which is both confusing and counts as a
+    # failed attempt against the account.  This reveals no secret: the
+    # unauthenticated status endpoint already exposes whether an administrator
+    # exists.
+    login_totp_required = bool(admin is not None and admin.totp_secret_enc)
     cookie = request.cookies.get(SESSION_COOKIE)
     if cookie:
         resolved = await auth_service.resolve_session(session, cookie)
@@ -127,6 +134,7 @@ async def status(
         "authenticated": authenticated,
         "must_change_password": must_change,
         "totp_enabled": totp_enabled,
+        "login_totp_required": login_totp_required,
         "role": services.settings.role.value,
         "version": __version__,
         "public_ui": services.settings.public_ui,
@@ -242,10 +250,20 @@ async def login(
             ip=ip,
         )
     except auth_service.AuthError as exc:
+        # A password-only request for an account with TOTP is a challenge, not
+        # a failed login: it must not appear in lockout/failure dashboards.
+        missing_second_factor = not (
+            (payload.totp or "").strip() or (payload.recovery_code or "").strip()
+        )
+        action = (
+            "auth.totp_challenge"
+            if exc.code == "totp_required" and missing_second_factor
+            else "auth.login_failed"
+        )
         await audit(
             session,
             actor=payload.username[:100],
-            action="auth.login_failed",
+            action=action,
             ip=ip,
             user_agent=request.headers.get("user-agent", ""),
             detail={"code": exc.code},

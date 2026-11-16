@@ -246,6 +246,88 @@ def test_totp_lifecycle_password_and_logout(api_client: TestClient, settings: Se
     assert client.post("/api/v1/auth/logout", headers=headers).status_code == 200
 
 
+def test_totp_is_advertised_before_login_and_missing_code_does_not_lock(
+    api_client: TestClient, settings: Settings
+) -> None:
+    client = api_client
+    token = setup_admin(client)
+    headers = _headers(token)
+    assert client.get("/api/v1/auth/status").json()["login_totp_required"] is False
+
+    start = client.post("/api/v1/auth/totp/start", headers=headers)
+    assert start.status_code == 200, start.text
+    payload = start.json()
+    confirm = client.post(
+        "/api/v1/auth/totp/confirm",
+        json={"code": pyotp.TOTP(payload["secret"]).now()},
+        headers=headers,
+    )
+    assert confirm.status_code == 200, confirm.text
+    client.post("/api/v1/auth/logout", headers=headers)
+
+    status = client.get("/api/v1/auth/status").json()
+    assert status["login_totp_required"] is True
+    assert status["totp_enabled"] is False
+
+    # A password-only login is the expected first step, not a failed attempt.
+    for _ in range(6):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "verysecret123"},
+        )
+        assert response.status_code == 401
+        assert response.json()["code"] == "totp_required"
+
+    with sqlite3.connect(settings.paths.db_path) as connection:
+        row = connection.execute(
+            "SELECT failed_attempts, locked_until FROM admin_users WHERE username='admin'"
+        ).fetchone()
+    assert row == (0, None)
+
+    ok = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "admin",
+            "password": "verysecret123",
+            "totp": pyotp.TOTP(payload["secret"]).now(),
+        },
+    )
+    assert ok.status_code == 200, ok.text
+
+
+def test_wrong_totp_still_counts_as_a_failed_attempt(
+    api_client: TestClient, settings: Settings
+) -> None:
+    client = api_client
+    token = setup_admin(client)
+    headers = _headers(token)
+    start = client.post("/api/v1/auth/totp/start", headers=headers)
+    payload = start.json()
+    client.post(
+        "/api/v1/auth/totp/confirm",
+        json={"code": pyotp.TOTP(payload["secret"]).now()},
+        headers=headers,
+    )
+    client.post("/api/v1/auth/logout", headers=headers)
+
+    valid = pyotp.TOTP(payload["secret"]).now()
+    wrong = f"{(int(valid) + 1) % 1_000_000:06d}"
+    for _ in range(5):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "verysecret123", "totp": wrong},
+        )
+        assert response.status_code == 401
+        assert response.json()["code"] == "totp_required"
+
+    with sqlite3.connect(settings.paths.db_path) as connection:
+        row = connection.execute(
+            "SELECT failed_attempts, locked_until FROM admin_users WHERE username='admin'"
+        ).fetchone()
+    assert row[0] == 0
+    assert row[1] is not None
+
+
 def test_totp_confirm_requires_started_setup(api_client: TestClient) -> None:
     token = setup_admin(api_client)
     response = api_client.post(

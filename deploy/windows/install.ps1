@@ -3,13 +3,61 @@ param(
     [string]$InstallDir = "$env:ProgramFiles\Ostium",
     [string]$DataDir = "$env:ProgramData\Ostium",
     [string]$CoreDataDir = "$env:ProgramData\OstiumCore",
-    [switch]$RunAsSystem
+    [switch]$RunAsSystem,
+    [switch]$SkipPathUpdate
 )
 
 $ErrorActionPreference = "Stop"
 if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Run this script as Administrator."
+}
+
+function Update-MachineEnvironment {
+    # Explorer and new shells cache the machine environment.  Broadcast the
+    # documented WM_SETTINGCHANGE message so a freshly opened terminal can
+    # resolve `ostium` without requiring a reboot or sign-out.
+    if (-not ([System.Management.Automation.PSTypeName]'Ostium.NativeEnvironment').Type) {
+        Add-Type -Namespace Ostium -Name NativeEnvironment -MemberDefinition @'
+[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+'@
+    }
+    $result = [UIntPtr]::Zero
+    [void][Ostium.NativeEnvironment]::SendMessageTimeout(
+        [IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result
+    )
+}
+
+function Add-MachinePathEntry {
+    param([Parameter(Mandatory = $true)][string]$Directory)
+    $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+        'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', $true
+    )
+    if (-not $key) { throw "Could not open the machine PATH registry key" }
+    try {
+        $current = [string]$key.GetValue(
+            'Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+        )
+        $entry = $Directory.TrimEnd([char[]]'\')
+        $parts = @($current -split ';' | Where-Object { $_ -and $_.Trim() })
+        $present = $false
+        foreach ($part in $parts) {
+            if ($part.Trim().TrimEnd([char[]]'\') -ieq $entry) { $present = $true; break }
+        }
+        if (-not $present) {
+            $parts += $entry
+            $kind = $key.GetValueKind('Path')
+            $key.SetValue('Path', ($parts -join ';'), $kind)
+        }
+    } finally {
+        $key.Close()
+    }
+    $pathParts = @($env:Path -split ';' | Where-Object { $_ -and $_.Trim() })
+    if (-not ($pathParts | Where-Object { $_.Trim().TrimEnd([char[]]'\') -ieq $Directory.TrimEnd([char[]]'\') })) {
+        $env:Path = "$($env:Path);$Directory"
+    }
+    Update-MachineEnvironment
 }
 
 $Source = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -76,17 +124,54 @@ $env:OSTIUM_ROLE = "client"
 $env:OSTIUM_DATA_DIR = $DataDir
 $env:OSTIUM_CONFIG_FILE = "$DataDir\config.toml"
 
-# The UI runs as a normal user (or SYSTEM with -RunAsSystem). The wrapper
-# makes the machine-wide ProgramData layout explicit.
+# The UI runs as a normal user (or SYSTEM with -RunAsSystem). The wrappers
+# make the machine-wide ProgramData layout explicit.  Keep a log next to the
+# database: a scheduled task has no visible console, so a startup failure was
+# previously indistinguishable from the server simply not being installed.
 $uiCmd = "$InstallDir\ostium-ui.cmd"
-@"
+$uiScript = "$InstallDir\ostium-ui.ps1"
+$uiLog = "$DataDir\logs\ui.log"
+$uiCmdContent = @"
 @echo off
 set "OSTIUM_ROLE=client"
 set "OSTIUM_DATA_DIR=$DataDir"
 set "OSTIUM_CONFIG_FILE=$DataDir\config.toml"
 set "OSTIUM_ENGINE_PATH=$CoreDir\sing-box.exe"
-"$InstallDir\ostium.exe" serve
-"@ | Set-Content -LiteralPath $uiCmd -Encoding ascii
+echo [%DATE% %TIME%] starting Ostium UI>> "$uiLog"
+"$InstallDir\ostium.exe" serve >> "$uiLog" 2>&1
+echo [%DATE% %TIME%] Ostium UI exited with code %ERRORLEVEL%>> "$uiLog"
+"@
+Set-Content -LiteralPath $uiCmd -Value $uiCmdContent -Encoding ascii
+
+# Task Scheduler must launch the UI through a real executable.  A .cmd file is
+# not a valid CreateProcess image on every Windows version, which left the
+# task registered but never started the server.  PowerShell also keeps the
+# console window hidden for a logon task.
+$uiScriptTemplate = @'
+$ErrorActionPreference = "Stop"
+$env:OSTIUM_ROLE = "client"
+$env:OSTIUM_DATA_DIR = "__DATA_DIR__"
+$env:OSTIUM_CONFIG_FILE = "__DATA_DIR__\config.toml"
+$env:OSTIUM_ENGINE_PATH = "__INSTALL_DIR__\core\sing-box.exe"
+$log = "__DATA_DIR__\logs\ui.log"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $log) | Out-Null
+"[$(Get-Date -Format o)] starting Ostium UI" | Out-File -LiteralPath $log -Append -Encoding utf8
+try {
+    & "__INSTALL_DIR__\ostium.exe" serve *>> $log
+    $code = $LASTEXITCODE
+} catch {
+    $_ | Out-String | Out-File -LiteralPath $log -Append -Encoding utf8
+    $code = 1
+}
+"[$(Get-Date -Format o)] Ostium UI exited with code $code" | Out-File -LiteralPath $log -Append -Encoding utf8
+exit $code
+'@
+$uiScriptContent = $uiScriptTemplate.Replace('__DATA_DIR__', $DataDir).Replace('__INSTALL_DIR__', $InstallDir)
+[IO.File]::WriteAllText($uiScript, $uiScriptContent, (New-Object System.Text.UTF8Encoding($false)))
+
+if (-not $SkipPathUpdate) {
+    Add-MachinePathEntry -Directory $InstallDir
+}
 
 # Allow only SYSTEM, Administrators and the interactive user to read/write the
 # shared client data.  Without /inheritance:r ProgramData's default inherited
@@ -136,17 +221,58 @@ if (Test-Path $tokenPath) {
 
 # Start the console at logon (default) or at boot as SYSTEM.
 if ($RunAsSystem) {
-    $action = New-ScheduledTaskAction -Execute $uiCmd
     $trigger = New-ScheduledTaskTrigger -AtStartup
     $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 }
 else {
-    $action = New-ScheduledTaskAction -Execute $uiCmd
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 }
+$powerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+$action = New-ScheduledTaskAction `
+    -Execute $powerShell `
+    -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$uiScript`"" `
+    -WorkingDirectory $InstallDir
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName "Ostium" -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName "Ostium"
 
+# Do not report success before the UI actually answers.  The old installer
+# returned immediately, so a broken scheduled task or a missing web bundle
+# looked like a successful install and the browser showed a connection error.
+$healthUrl = "http://127.0.0.1:8787/healthz"
+$ready = $false
+for ($i = 0; $i -lt 60; $i++) {
+    Start-Sleep -Seconds 1
+    try {
+        # Bypass any stale system proxy: a previous install may have pointed
+        # WinINET at a core that is currently stopped, which would make the
+        # loopback health check fail through no fault of the new UI.
+        $request = [System.Net.WebRequest]::Create($healthUrl)
+        $request.Proxy = $null
+        $request.Timeout = 2000
+        $response = [System.Net.HttpWebResponse]$request.GetResponse()
+        try {
+            $ready = $response.StatusCode -eq [System.Net.HttpStatusCode]::OK
+        } finally {
+            $response.Close()
+        }
+        if ($ready) { break }
+    } catch {
+        # The task may still be starting; retry until the deadline.
+    }
+}
+if (-not $ready) {
+    $task = Get-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
+    $info = Get-ScheduledTaskInfo -TaskName "Ostium" -ErrorAction SilentlyContinue
+    $tail = ""
+    if (Test-Path $uiLog) {
+        $lines = Get-Content -LiteralPath $uiLog -Tail 20 -ErrorAction SilentlyContinue
+        if ($lines) { $tail = $lines -join [Environment]::NewLine }
+    }
+    throw "Ostium UI did not become ready at $healthUrl. Task state: $($task.State); last result: $($info.LastTaskResult). Log: $uiLog`n$tail"
+}
+
 Write-Host "Ostium installed. Open http://127.0.0.1:8787" -ForegroundColor Green
+Write-Host "CLI: ostium (open a new terminal so PATH picks up $InstallDir)" -ForegroundColor Green
+Write-Host "Startup log: $uiLog" -ForegroundColor Green

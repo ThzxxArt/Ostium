@@ -92,6 +92,36 @@ def _render_clash(name: str, endpoints: list[Endpoint]) -> str:
         "allow-lan": False,
         "mode": "rule",
         "log-level": "info",
+        # A system proxy cannot capture QUIC, and IPv6 often bypasses a
+        # mixed-port listener.  Keep both off by default so browsers fall back
+        # to proxied TCP instead of racing a direct UDP/QUIC path.
+        "ipv6": False,
+        # Without a fake-IP resolver Clash uses the system DNS answer.  In a
+        # polluted network Google/YouTube/Hugging Face can resolve to a
+        # mainland IP, match GEOIP,CN and be sent DIRECT even though the proxy
+        # is healthy.  Fake-IP keeps the domain name on the proxy path; an
+        # encrypted domestic resolver only supplies the synthetic address.
+        "dns": {
+            "enable": True,
+            "ipv6": False,
+            "enhanced-mode": "fake-ip",
+            "fake-ip-range": "198.18.0.1/16",
+            "fake-ip-filter": ["*.lan", "*.local", "localhost.ptlogin2.qq.com"],
+            "default-nameserver": ["223.5.5.5", "119.29.29.29"],
+            "nameserver": [
+                "https://dns.alidns.com/dns-query",
+                "https://doh.pub/dns-query",
+            ],
+            "fallback": [
+                "https://1.1.1.1/dns-query",
+                "https://8.8.8.8/dns-query",
+            ],
+            "fallback-filter": {
+                "geoip": True,
+                "geoip-code": "CN",
+                "ipcidr": ["240.0.0.0/4"],
+            },
+        },
         "proxies": proxies,
         "proxy-groups": [
             {
@@ -106,7 +136,11 @@ def _render_clash(name: str, endpoints: list[Endpoint]) -> str:
             "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
             "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
             "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-            "GEOIP,CN,DIRECT",
+            # Fake-IP domains never match GEOIP; this rule only handles
+            # literal/direct IP connections.  Do not resolve here, otherwise
+            # a poisoned A record would recreate the original DIRECT bug.
+            "DOMAIN-SUFFIX,cn,DIRECT",
+            "GEOIP,CN,DIRECT,no-resolve",
             "MATCH,Ostium",
         ],
     }

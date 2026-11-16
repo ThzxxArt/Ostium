@@ -8,6 +8,7 @@ export interface AuthStatus {
   authenticated: boolean
   must_change_password: boolean
   totp_enabled: boolean
+  login_totp_required?: boolean
   role: Role
   version: string
   public_ui: boolean

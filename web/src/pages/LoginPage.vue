@@ -30,7 +30,10 @@ const password = ref('')
 const totp = ref('')
 const recoveryCode = ref('')
 const useRecovery = ref(false)
-const needsTotp = ref(false)
+const totpRequired = ref(false)
+const showTotp = computed(
+  () => totpRequired.value || auth.status?.login_totp_required === true,
+)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const version = computed(() => auth.status?.version || '—')
@@ -51,18 +54,20 @@ async function submit() {
   }
   loading.value = true
   error.value = null
+  const code = totp.value.trim()
+  const recovery = recoveryCode.value.trim()
   try {
     await auth.login(
       username.value,
       password.value,
-      needsTotp.value && !useRecovery.value ? totp.value : undefined,
-      needsTotp.value && useRecovery.value ? recoveryCode.value : undefined,
+      showTotp.value && !useRecovery.value && code ? code : undefined,
+      showTotp.value && useRecovery.value && recovery ? recovery : undefined,
     )
     const next = typeof route.query.next === 'string' ? route.query.next : '/'
     await router.replace(next)
   } catch (err) {
     if (err instanceof ApiError && err.code === 'totp_required') {
-      needsTotp.value = true
+      totpRequired.value = true
       error.value = useRecovery.value ? t('auth.recovery_invalid') : t('auth.totp_hint')
     } else if (err instanceof ApiError && err.code === 'rate_limited') {
       error.value = t('auth.invalid')
@@ -179,7 +184,7 @@ async function submit() {
             </NInput>
           </NFormItem>
           <NFormItem
-            v-if="needsTotp"
+            v-if="showTotp"
             :label="useRecovery ? t('auth.recovery_code') : t('auth.totp')"
             :show-feedback="false"
           >
@@ -200,7 +205,7 @@ async function submit() {
               :placeholder="t('auth.recovery_code_placeholder')"
             />
           </NFormItem>
-          <button v-if="needsTotp" type="button" class="recovery-toggle" @click="toggleRecovery">
+          <button v-if="showTotp" type="button" class="recovery-toggle" @click="toggleRecovery">
             {{ useRecovery ? t('auth.use_totp') : t('auth.use_recovery') }}
           </button>
           <p v-if="error" class="error" role="alert">{{ error }}</p>

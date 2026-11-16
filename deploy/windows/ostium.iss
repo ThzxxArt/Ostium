@@ -36,11 +36,11 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
-  { The service executable is locked while OstiumCore runs.  Stop it before
-    Inno copies the new bundle, otherwise the upgrade fails halfway through
-    and can leave a mixed old/new installation. }
+  { Stop the service and the UI before Inno copies the new bundle.  Both
+    executables are locked while running; the UI holds ostium.exe open even
+    when the service is already stopped. }
   Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue; Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   { The new UI migrates the database on first start.  Keep a quiescent copy
     (including WAL and the master key) so an operator can roll back to the
@@ -55,10 +55,12 @@ end;
 
 [Icons]
 Name: "{group}\Ostium"; Filename: "{app}\ostium.exe"; Parameters: "open"
+Name: "{group}\Ostium Console"; Filename: "http://127.0.0.1:8787"
 Name: "{group}\Uninstall Ostium"; Filename: "{uninstallexe}"
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing Ostium services..."
+Filename: "http://127.0.0.1:8787"; Description: "Open Ostium"; Flags: postinstall shellexec nowait skipifsilent
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\uninstall.ps1"" -InstallDir ""{app}"""; Flags: runhidden waituntilterminated

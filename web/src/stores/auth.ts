@@ -71,6 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
       authenticated: true,
       must_change_password: false,
       totp_enabled: status.value?.totp_enabled ?? false,
+      login_totp_required: status.value?.login_totp_required ?? false,
       role: status.value?.role ?? 'server',
       version: status.value?.version ?? '',
       public_ui: status.value?.public_ui ?? false,

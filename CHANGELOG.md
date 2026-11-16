@@ -3,6 +3,25 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- The login page now reads `login_totp_required` from the unauthenticated
+  `/api/v1/auth/status` response and shows the verification-code field on the
+  first render. A password-only login no longer consumes a failed-attempt slot
+  or counts toward the account lockout; only a supplied-but-wrong TOTP or
+  recovery code does.
+- The Windows installer starts the UI through a hidden PowerShell wrapper
+  instead of handing a `.cmd` file to Task Scheduler, writes startup output to
+  `%ProgramData%\Ostium\logs\ui.log`, waits for `/healthz` on port 8787 before
+  reporting success, and adds the install directory to the machine `PATH` so
+  `ostium` works in a new terminal. Uninstall removes the PATH entry.
+- Third-party Clash subscriptions now use a fake-IP DNS resolver and a
+  `no-resolve` GEOIP rule. This prevents a polluted system DNS answer from
+  matching `GEOIP,CN` and sending Google, YouTube or Hugging Face DIRECT while
+  GitHub happens to resolve to a non-CN address.
+
 ## [0.1.4] - 2026-11-15
 
 ### Fixed

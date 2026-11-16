@@ -30,11 +30,21 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert '"${userAccount}:R"' in install
     assert '"Could not secure the core token ACL"' in install
     assert '"Could not install the OstiumCore service"' in install
+    # Task Scheduler cannot reliably start a .cmd as its image; launch the
+    # hidden PowerShell wrapper and wait for the UI's health endpoint.
+    assert '$uiScript = "$InstallDir\\ostium-ui.ps1"' in install
+    assert "New-ScheduledTaskAction -Execute $uiCmd" not in install
+    assert "-WindowStyle Hidden" in install
+    assert "-WorkingDirectory $InstallDir" in install
+    assert "Add-MachinePathEntry -Directory $InstallDir" in install
+    assert '$healthUrl = "http://127.0.0.1:8787/healthz"' in install
+    assert 'throw "Ostium UI did not become ready' in install
 
     uninstall = (ROOT / "deploy" / "windows" / "uninstall.ps1").read_text(encoding="utf-8")
     assert 'Join-Path $InstallDir "service\\ostium-service.exe"' in uninstall
     assert "$proxyRestored" in uninstall
     assert "Could not confirm the system proxy was restored" in uninstall
+    assert "Remove-MachinePathEntry -Directory $InstallDir" in uninstall
 
     setup = (ROOT / "deploy" / "windows" / "ostium.iss").read_text(encoding="utf-8")
     # The client database is in the UI data directory, not the core's
@@ -44,3 +54,5 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
         "Join-Path $env:ProgramData ''OstiumCore''; if(Test-Path (Join-Path $d ''ostium.db'')"
         not in setup
     )
+    assert "Get-Process ostium" in setup
+    assert 'Filename: "http://127.0.0.1:8787"' in setup

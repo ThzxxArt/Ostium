@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from sqlalchemy import select
 
 from ostium.config import Role, Settings
@@ -70,6 +71,18 @@ def test_render_all_formats_and_errors(tmp_path: Path) -> None:
             clash, media = await render_subscription(session, store, user, "clash")
             assert media.startswith("text/yaml")
             assert "proxies:" in clash
+            clash_doc = yaml.safe_load(clash)
+            assert clash_doc["dns"]["enable"] is True
+            assert clash_doc["dns"]["enhanced-mode"] == "fake-ip"
+            assert clash_doc["dns"]["ipv6"] is False
+            assert clash_doc["ipv6"] is False
+            rules = clash_doc["rules"]
+            # A bare GEOIP,CN rule resolves domains with the polluted system
+            # DNS and sends foreign sites DIRECT.  Only the no-resolve form is
+            # allowed, after fake-IP has kept domains on the proxy path.
+            assert "GEOIP,CN,DIRECT" not in rules
+            assert "GEOIP,CN,DIRECT,no-resolve" in rules
+            assert rules[-1] == "MATCH,Ostium"
 
             singbox, media = await render_subscription(session, store, user, "sing-box")
             assert media.startswith("application/json")
