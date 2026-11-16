@@ -30,7 +30,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 
 从 GitHub Release 下载：
 
-- `ostium_ctl-0.1.7-py3-none-any.whl`
+- `ostium_ctl-0.1.8-py3-none-any.whl`
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 - 源码包或包含 `scripts/`、`deploy/` 的目录
@@ -38,7 +38,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
 sudo ./install.sh --role server \
-  --wheel ./ostium_ctl-0.1.7-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.8-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```

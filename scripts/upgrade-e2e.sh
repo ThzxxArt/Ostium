@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise a real installed 0.1.6 -> current wheel upgrade without systemd.
+# Exercise a real installed 0.1.7 -> current wheel upgrade without systemd.
 #
 # The installer upgrades the same files this script does: a fresh virtualenv,
 # the published previous wheel, then the locally built wheel.  It verifies that
@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.6}"
+FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.7}"
 WORK="${OSTIUM_E2E_DIR:-$(mktemp -d -t ostium-upgrade-XXXXXX)}"
 KEEP="${OSTIUM_E2E_KEEP:-false}"
 

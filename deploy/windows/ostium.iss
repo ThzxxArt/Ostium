@@ -1,7 +1,7 @@
 ; Inno Setup 6 script for the Ostium Windows x64 client.
-; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.7
+; Build with: ISCC.exe deploy\windows\ostium.iss /DAppVersion=0.1.8
 #ifndef AppVersion
-  #define AppVersion "0.1.7"
+  #define AppVersion "0.1.8"
 #endif
 
 [Setup]
