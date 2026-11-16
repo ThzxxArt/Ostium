@@ -3,6 +3,16 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- The frozen Windows service now enters `StartServiceCtrlDispatcher` when SCM
+  starts it with no arguments. Previously `win32serviceutil.HandleCommandLine`
+  treated the empty argument list as a usage request and exited, so SCM waited
+  for a dispatcher and reported error 1053. Interactive commands such as
+  `debug`, `install` and `remove` still use `HandleCommandLine`.
+
 ## [0.1.6] - 2026-11-16
 
 ### Fixed

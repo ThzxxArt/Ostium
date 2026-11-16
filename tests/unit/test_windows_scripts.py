@@ -80,6 +80,12 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     icon = (ROOT / "assets" / "brand" / "ostium.ico").read_bytes()
     assert icon.startswith(b"\x00\x00\x01\x00")
 
+    service_source = (ROOT / "src" / "ostium" / "system" / "windows_service.py").read_text(
+        encoding="utf-8"
+    )
+    assert "if len(sys.argv) == 1" in service_source
+    assert "servicemanager.StartServiceCtrlDispatcher()" in service_source
+
     online = (ROOT / "scripts" / "install-online.ps1").read_text(encoding="utf-8")
     assert "OstiumCore 服务未运行；UI 仍已安装" in online
     assert "ostium-ui.ps1" in online

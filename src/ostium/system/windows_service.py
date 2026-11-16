@@ -160,4 +160,15 @@ else:  # pragma: no cover - exercised on Windows
                         pass
 
     def main() -> None:
-        win32serviceutil.HandleCommandLine(OstiumCoreService)
+        # SCM starts a frozen service with no arguments.  HandleCommandLine
+        # treats that as "print usage" and exits, which makes SCM wait for the
+        # dispatcher and eventually report error 1053.  A frozen/custom-hosted
+        # service must enter the dispatcher itself; only interactive commands
+        # (install/remove/debug) go through HandleCommandLine.
+        if len(sys.argv) == 1:
+            _service_log("starting service control dispatcher")
+            servicemanager.Initialize()
+            servicemanager.PrepareToHostSingle(OstiumCoreService)
+            servicemanager.StartServiceCtrlDispatcher()
+        else:
+            win32serviceutil.HandleCommandLine(OstiumCoreService)
