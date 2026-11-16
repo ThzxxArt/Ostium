@@ -101,14 +101,21 @@ function Install-Ostium([string]$ResolvedVersion) {
         $installDir = Join-Path $env:ProgramFiles "Ostium"
         $service = Get-Service OstiumCore -ErrorAction SilentlyContinue
         if (-not $service -or $service.Status -ne "Running") {
-            throw "OstiumCore 服务未运行；请检查 ProgramData\OstiumCore\logs 和 Windows 服务日志。"
+            # The UI is deliberately installed even when the privileged core
+            # fails, so the operator can open the console and read diagnostics.
+            Write-Warning "OstiumCore 服务未运行；UI 仍已安装。请检查 $env:ProgramData\Ostium\logs\install.log 和 $env:ProgramData\OstiumCore\logs\service.log。"
         }
 
         if ($RunAsSystem) {
             Write-Step "将控制面也切换为 SYSTEM（取消用户级隔离）"
             Stop-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
             Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction SilentlyContinue
-            $action = New-ScheduledTaskAction -Execute (Join-Path $installDir "ostium-ui.cmd")
+            $uiScript = Join-Path $installDir "ostium-ui.ps1"
+            $powerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+            $action = New-ScheduledTaskAction `
+                -Execute $powerShell `
+                -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$uiScript`"" `
+                -WorkingDirectory $installDir
             $trigger = New-ScheduledTaskTrigger -AtStartup
             $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
             Register-ScheduledTask -TaskName "Ostium" -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null

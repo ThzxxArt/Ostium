@@ -1,15 +1,18 @@
 # PyInstaller spec for the Ostium console (Windows/macOS/Linux).
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).parent.parent
+ICON = str(ROOT / "assets" / "brand" / "ostium.ico") if sys.platform == "win32" else None
 datas = [
     (str(ROOT / "web" / "dist"), "ostium/web/dist"),
     (str(ROOT / "alembic"), "ostium/db/alembic"),
 ]
 hiddenimports = (
     collect_submodules("uvicorn")
+    + collect_submodules("websockets")
     + collect_submodules("grpc")
     + collect_submodules("acme")
     + collect_submodules("josepy")
@@ -33,6 +36,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="ostium",
+    icon=ICON,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

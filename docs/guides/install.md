@@ -61,6 +61,19 @@ irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.p
   重新打开才能直接运行 `ostium`；也可以用完整路径
   `& "$env:ProgramFiles\Ostium\ostium.exe" version`。
 
+如果 `OstiumCore` 服务没有启动，安装器仍会完成 UI 安装并启动
+<http://127.0.0.1:8787>，不会在注册登录任务之前中止。诊断顺序：
+
+1. 查看 `%ProgramData%\Ostium\logs\install.log` 和
+   `%ProgramData%\OstiumCore\logs\service.log`；
+2. 以管理员 PowerShell 运行
+   `& "$env:ProgramFiles\Ostium\service\ostium-service.exe" debug`，
+   服务会以前台模式启动并把异常打印出来；
+3. 运行 `sc.exe qc OstiumCore` 和 `sc.exe query OstiumCore` 检查服务路径和状态。
+
+UI 能用但不代表 TUN 核心正常；服务未运行时只能先做系统代理/诊断，TUN 需要
+服务修复后再启用。
+
 需要连 UI 也以 SYSTEM 运行时：
 
 ```powershell

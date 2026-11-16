@@ -3,6 +3,21 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- The Windows installer no longer aborts UI setup when `OstiumCore` fails to
+  start. It registers and starts the UI task anyway, writes the service failure
+  and `sc.exe qc` output to `%ProgramData%\Ostium\logs\install.log`, and reports
+  the core as degraded. This keeps `http://127.0.0.1:8787` reachable for
+  diagnostics instead of leaving a connection-refused page.
+- The Windows service writes startup/exception details to
+  `%ProgramData%\OstiumCore\logs\service.log` and redirects uvicorn output
+  there, so a service that stops immediately leaves a trace instead of only a
+  generic SCM error.
+- The Windows setup and both executables now embed the Ostium app icon.
+
 ## [0.1.5] - 2026-11-16
 
 ### Fixed

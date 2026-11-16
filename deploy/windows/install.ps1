@@ -64,6 +64,18 @@ $Source = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ServiceDir = Join-Path $InstallDir "service"
 $CoreDir = Join-Path $InstallDir "core"
 New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $DataDir, "$DataDir\runtime", "$DataDir\logs", $CoreDataDir, "$CoreDataDir\runtime", "$CoreDataDir\logs" | Out-Null
+$installLog = "$DataDir\logs\install.log"
+function Write-InstallLog {
+    param([string]$Message)
+    try {
+        "[$(Get-Date -Format o)] $Message" |
+            Out-File -LiteralPath $installLog -Append -Encoding utf8
+    } catch {
+        # Diagnostics are best-effort and must not fail the install.
+    }
+}
+Write-InstallLog "install.ps1 started for $InstallDir"
+
 # The service runs as LocalSystem.  Keep its token, last-good config and
 # database out of the user-writable ProgramData\Ostium tree; only
 # Administrators and SYSTEM may write there.
@@ -198,19 +210,56 @@ if (-not (Test-Path $serviceExe)) {
 # Re-running the installer must be idempotent.  Remove the old service
 # registration before installing the new one; user data lives outside the
 # service definition and is preserved.
+$serviceStarted = $false
 if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
     Stop-Service OstiumCore -ErrorAction SilentlyContinue
     & $serviceExe remove
-    if ($LASTEXITCODE -ne 0) { throw "Could not remove the previous OstiumCore service" }
+    if ($LASTEXITCODE -ne 0) {
+        Write-InstallLog "Could not remove the previous OstiumCore service (exit $LASTEXITCODE)"
+        Write-Warning "Could not remove the previous OstiumCore service; continuing with the UI install."
+    }
 }
+Write-InstallLog "installing OstiumCore service"
 & $serviceExe --startup auto install
-if ($LASTEXITCODE -ne 0) { throw "Could not install the OstiumCore service" }
-Start-Service OstiumCore -ErrorAction Stop
+if ($LASTEXITCODE -ne 0) {
+    Write-InstallLog "Could not install the OstiumCore service (exit $LASTEXITCODE)"
+    Write-Warning "Could not install the OstiumCore service; the UI will still be installed."
+} else {
+    try {
+        Start-Service OstiumCore -ErrorAction Stop
+        $serviceStarted = $true
+        Write-InstallLog "OstiumCore service running"
+    } catch {
+        # The UI is still useful without TUN: it can show first-run setup and
+        # diagnostics.  Do not abort before registering the UI task, otherwise
+        # the browser gets a generic connection-refused error with no way to
+        # inspect the failure.
+        $failure = $_.Exception.Message
+        Write-InstallLog "OstiumCore failed to start: $failure"
+        try {
+            $service = Get-Service -Name OstiumCore -ErrorAction SilentlyContinue
+            Write-InstallLog "OstiumCore state: $($service.Status)"
+        } catch {}
+        try {
+            $serviceConfig = & sc.exe qc OstiumCore 2>&1 | Out-String
+            Write-InstallLog "sc qc OstiumCore: $serviceConfig"
+        } catch {}
+        $serviceLog = Join-Path $CoreDataDir "logs\service.log"
+        if (Test-Path $serviceLog) {
+            try {
+                $serviceTail = (Get-Content -LiteralPath $serviceLog -Tail 40) -join [Environment]::NewLine
+                Write-InstallLog "service.log tail:`n$serviceTail"
+            } catch {}
+        }
+        Write-Warning "OstiumCore service did not start; the UI will still be installed. See $installLog"
+    }
+}
 
 # The unprivileged UI may read the core token, but must never be able to
 # overwrite it (that would let a local user hijack the privileged API).
 $tokenPath = Join-Path $CoreDataDir "runtime\core.token"
-for ($i = 0; $i -lt 30 -and -not (Test-Path $tokenPath); $i++) { Start-Sleep -Seconds 1 }
+$tokenWait = if ($serviceStarted) { 30 } else { 2 }
+for ($i = 0; $i -lt $tokenWait -and -not (Test-Path $tokenPath); $i++) { Start-Sleep -Seconds 1 }
 # Only the installing interactive user gets access.  Granting the built-in
 # Users group would let every local account read the bearer token and control
 # the LocalSystem core.
@@ -269,6 +318,7 @@ for ($i = 0; $i -lt 60; $i++) {
     }
 }
 if (-not $ready) {
+    Write-InstallLog "UI health check failed at $healthUrl"
     $task = Get-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
     $info = Get-ScheduledTaskInfo -TaskName "Ostium" -ErrorAction SilentlyContinue
     $tail = ""
@@ -278,7 +328,12 @@ if (-not $ready) {
     }
     throw "Ostium UI did not become ready at $healthUrl. Task state: $($task.State); last result: $($info.LastTaskResult). Log: $uiLog`n$tail"
 }
+Write-InstallLog "UI health check passed"
 
 Write-Host "Ostium installed. Open http://127.0.0.1:8787" -ForegroundColor Green
 Write-Host "CLI: ostium (open a new terminal so PATH picks up $InstallDir)" -ForegroundColor Green
 Write-Host "Startup log: $uiLog" -ForegroundColor Green
+Write-Host "Install log: $installLog" -ForegroundColor Green
+if (-not $serviceStarted) {
+    Write-Host "Warning: OstiumCore is not running; TUN/core features are unavailable. See $installLog" -ForegroundColor Yellow
+}

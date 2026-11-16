@@ -13,6 +13,7 @@ AppPublisherURL=https://github.com/ThzxxArt/Ostium
 AppSupportURL=https://github.com/ThzxxArt/Ostium/issues
 DefaultDirName={autopf}\Ostium
 DefaultGroupName=Ostium
+SetupIconFile=..\..\assets\brand\ostium.ico
 OutputDir=..\..\dist\windows
 OutputBaseFilename=Ostium-{#AppVersion}-windows-x64-setup
 LicenseFile=..\..\LICENSE
