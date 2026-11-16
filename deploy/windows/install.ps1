@@ -164,7 +164,10 @@ Set-Content -LiteralPath $uiCmd -Value $uiCmdContent -Encoding ascii
 # task registered but never started the server.  PowerShell also keeps the
 # console window hidden for a logon task.
 $uiScriptTemplate = @'
-$ErrorActionPreference = "Stop"
+# Native tools write progress to stderr.  With ErrorActionPreference=Stop,
+# PowerShell turns uvicorn's normal INFO lines into a terminating error and
+# kills the UI child.  Keep Continue here; the exit code is checked below.
+$ErrorActionPreference = "Continue"
 $env:OSTIUM_ROLE = "client"
 $env:OSTIUM_DATA_DIR = "__DATA_DIR__"
 $env:OSTIUM_CONFIG_FILE = "__DATA_DIR__\config.toml"

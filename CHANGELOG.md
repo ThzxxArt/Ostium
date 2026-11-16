@@ -3,6 +3,16 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- The generated Windows UI launcher (`ostium-ui.ps1`) no longer uses
+  `ErrorActionPreference=Stop`. Uvicorn writes normal startup INFO lines to
+  stderr; PowerShell treated them as terminating errors and killed the UI child,
+  leaving 8787 without a listener even though `OstiumCore` was running. The
+  launcher now uses `Continue` and checks the process exit code.
+
 ## [0.1.7] - 2026-11-16
 
 ### Fixed
