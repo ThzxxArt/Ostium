@@ -7,11 +7,14 @@ from PyInstaller.utils.hooks import collect_submodules
 ROOT = Path(SPECPATH).parent.parent
 ICON = str(ROOT / "assets" / "brand" / "ostium.ico") if sys.platform == "win32" else None
 hiddenimports = (
+    # SQLAlchemy imports the sqlite async DBAPI dynamically; PyInstaller does
+    # not see `import aiosqlite` from the dialect.  The core app creates the
+    # same async engine during startup, so the service needs it too.
+    collect_submodules("aiosqlite")
     # uvicorn resolves its loop/protocol/lifespan implementations by string at
-    # runtime.  Without collecting the submodules the Windows service exits
-    # immediately with ModuleNotFoundError while the console UI (whose spec
-    # already collects uvicorn) keeps working.
-    collect_submodules("uvicorn")
+    # runtime.  Without collecting the submodules the service can exit with
+    # ModuleNotFoundError.
+    + collect_submodules("uvicorn")
     + collect_submodules("win32serviceutil")
     + collect_submodules("servicemanager")
 )

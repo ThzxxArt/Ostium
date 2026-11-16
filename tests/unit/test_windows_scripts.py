@@ -67,11 +67,14 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     service_spec = (ROOT / "deploy" / "pyinstaller" / "ostium-service.spec").read_text(
         encoding="utf-8"
     )
+    # SQLAlchemy's async sqlite dialect imports aiosqlite dynamically.
+    assert 'collect_submodules("aiosqlite")' in service_spec
     # uvicorn's loop/protocol classes are imported by name at runtime.
     assert 'collect_submodules("uvicorn")' in service_spec
     assert 'sys.platform == "win32"' in service_spec
     assert "icon=ICON" in service_spec
     ui_spec = (ROOT / "deploy" / "pyinstaller" / "ostium.spec").read_text(encoding="utf-8")
+    assert 'collect_submodules("aiosqlite")' in ui_spec
     assert 'sys.platform == "win32"' in ui_spec
     assert "icon=ICON" in ui_spec
     icon = (ROOT / "assets" / "brand" / "ostium.ico").read_bytes()

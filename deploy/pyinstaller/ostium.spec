@@ -11,7 +11,10 @@ datas = [
     (str(ROOT / "alembic"), "ostium/db/alembic"),
 ]
 hiddenimports = (
-    collect_submodules("uvicorn")
+    # SQLAlchemy imports the sqlite async DBAPI dynamically; PyInstaller does
+    # not see `import aiosqlite` from the dialect.
+    collect_submodules("aiosqlite")
+    + collect_submodules("uvicorn")
     + collect_submodules("websockets")
     + collect_submodules("grpc")
     + collect_submodules("acme")
