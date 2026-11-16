@@ -10,6 +10,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.5** |
 | Status | **Published** |
+| Tag | `v0.1.5` (annotated, commit `8e61f07`) |
+| Assets | GitHub Release `v0.1.5` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.5` (wheel + sdist) |
+| GHCR | `0.1.5`, `v0.1.5`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `43790328641` — success |
 | Previous release | `v0.1.4`, published 2026-11-15 (23 assets, unchanged) |
 | Release type | TOTP login, Windows client and Clash subscription fixes; no new protocols or UI redesign |
 | Source branch | `main` |
@@ -47,6 +52,11 @@ artifacts.
   token, database, backup and `master.key` survive; a 0.1.4 backup restores.
 - `0.1.5` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
+- Publication verification: `scripts/verify-release.sh --version 0.1.5`
+  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  `ostium-ctl==0.1.5`. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
