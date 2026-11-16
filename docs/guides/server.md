@@ -30,7 +30,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 
 从 GitHub Release 下载：
 
-- `ostium_ctl-0.1.2-py3-none-any.whl`
+- `ostium_ctl-0.1.5-py3-none-any.whl`
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 - 源码包或包含 `scripts/`、`deploy/` 的目录
@@ -38,7 +38,7 @@ ssh -L 8443:127.0.0.1:8443 root@your-server
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
 sudo ./install.sh --role server \
-  --wheel ./ostium_ctl-0.1.2-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.5-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
@@ -123,7 +123,7 @@ UI 默认只监听回环；非回环明文监听需要显式 `allow_insecure_bin
 
 ## 分流规则
 
-服务端 **Routing** 页会把规则保存在本地数据库，但 v0.1.2 不会把自定义规则通过订阅分发给客户端；客户端会在应用的
+服务端 **Routing** 页会把规则保存在本地数据库，但当前版本不会把自定义规则通过订阅分发给客户端；客户端会在应用的
 Routing 页使用同一套规则编辑器，并立即应用到自己的核心。需要统一分流时，请在每个客户端导入/配置对应规则。
 
 ## 备份

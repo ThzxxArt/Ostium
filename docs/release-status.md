@@ -8,15 +8,10 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.4** |
+| Version | **0.1.5** |
 | Status | **Published** |
-| Tag | `v0.1.4` (annotated, commit `09c8605`) |
-| Assets | GitHub Release `v0.1.4` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.4` (wheel + sdist) |
-| GHCR | `0.1.4`, `v0.1.4`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `43726383707` — success |
-| Previous release | `v0.1.3`, published 2026-11-15 (23 assets, unchanged) |
-| Release type | Subscriptions layout patch; no new protocols or UI redesign |
+| Previous release | `v0.1.4`, published 2026-11-15 (23 assets, unchanged) |
+| Release type | TOTP login, Windows client and Clash subscription fixes; no new protocols or UI redesign |
 | Source branch | `main` |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
@@ -25,20 +20,33 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.4 continues to fix the status at its own tag instead of rewriting published
+0.1.5 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
-## 0.1.4 verification status
+## 0.1.5 verification status
 
 ### Verified locally
 
-- Backend unit and in-process integration tests: 710 passed / 10 deselected;
-  94.29% statements / 90.44% branches; `coverage_gate.py` passes.
-- Real sing-box integration tests with the pinned `1.14.4-ostium.1` core: 10 passed.
-- Frontend typecheck, lint, unit tests, production build and formatting: 203
-  passed; 90.82/85.91/88.54/92.37.
-- `0.1.3 -> 0.1.4` upgrade script: user, password material, subscription
-  token, database, backup and `master.key` survive; a 0.1.3 backup restores.
+- Backend unit and in-process integration tests: 712 passed / 10 deselected;
+  94.32% statements / 90.49% branches; `coverage_gate.py` passes.
+- Real sing-box integration tests with the pinned `1.14.4-ostium.1` core:
+  10 passed.
+- Frontend typecheck, lint, unit tests, production build and formatting: 204
+  passed; 90.86/85.90/88.63/92.40.
+- TOTP regressions: the status endpoint advertises `login_totp_required` before
+  login; six password-only attempts leave `failed_attempts=0` and
+  `locked_until=NULL`; a wrong TOTP still locks after five failures; a correct
+  TOTP logs in after the password-only challenges.
+- Windows installer scripts parse with PowerShell 7.7; the generated
+  `ostium-ui.ps1` template parses too. The scheduled task uses a hidden
+  PowerShell wrapper, waits for `/healthz`, writes `ui.log`, and updates the
+  machine PATH.
+- Generated Clash YAML was accepted by Mihomo 1.19.34 with `mihomo -t`; it
+  contains fake-IP DNS, `ipv6: false`, and `GEOIP,CN,DIRECT,no-resolve`.
+- `0.1.4 -> 0.1.5` upgrade script: user, password material, subscription
+  token, database, backup and `master.key` survive; a 0.1.4 backup restores.
+- `0.1.5` install/reinstall/uninstall e2e passed; reinstall kept exactly one
+  administrator.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -66,27 +74,24 @@ artifacts.
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See `versions/V0.1.2_REVIEW_ROUND4.md`.
-- 0.1.4 subscription layout fix: long URLs truncate inside the format cards
-  using shrinkable grid tracks and a block-level URL element; a Playwright
-  regression covers a 160-character token on desktop, tablet and mobile.
+- 0.1.4 subscription layout fix (included): long URLs truncate inside the
+  format cards using shrinkable grid tracks and a block-level URL element; a
+  Playwright regression covers a 160-character token on desktop, tablet and
+  mobile.
 - 0.1.3 deployment and UI fixes (included): `/api/v1/system/info` survives
   `psutil.net_if_addrs()` raising `EAFNOSUPPORT` on VPS/container network
   stacks; first-install readiness uses the unauthenticated `/v1/health`
   endpoint; the collapsed sidebar header no longer overlaps the expand button;
   the Logs level filter keeps its width; release e2e scripts are executable and
   the sudo step preserves `PATH`. Added regression tests for these behaviors.
-- Publication verification: `scripts/verify-release.sh --version 0.1.4`
-  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  `ostium-ctl==0.1.4`. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.
-
 ### Not verified in this workspace
 
 These items require external hardware, accounts, runners or time. They are
 **not** claimed as verified:
 
 - Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
+  The 0.1.5 scheduled-task/PATH fix was syntax-checked with PowerShell 7.7 but
+  not executed on a Windows host in this workspace.
 - macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.
 - Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.
 - Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.
@@ -127,11 +132,11 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.4
+## Release gates for 0.1.5
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.3 -> 0.1.4` upgrade plus backup restore;
+2. **Upgrade and data**: `0.1.4 -> 0.1.5` upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted

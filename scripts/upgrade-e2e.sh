@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise a real installed 0.1.3 -> current wheel upgrade without systemd.
+# Exercise a real installed 0.1.4 -> current wheel upgrade without systemd.
 #
 # The installer upgrades the same files this script does: a fresh virtualenv,
 # the published previous wheel, then the locally built wheel.  It verifies that
@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.3}"
+FROM_VERSION="${OSTIUM_E2E_FROM_VERSION:-0.1.4}"
 WORK="${OSTIUM_E2E_DIR:-$(mktemp -d -t ostium-upgrade-XXXXXX)}"
 KEEP="${OSTIUM_E2E_KEEP:-false}"
 
@@ -71,7 +71,7 @@ SETUPTOOLS_SCM_PRETEND_VERSION="v$VERSION" uv build --wheel --out-dir "$WORK/dis
 WHEEL="$(find "$WORK/dist" -maxdepth 1 -name 'ostium_ctl-*.whl' | head -1)"
 [[ -n "$WHEEL" ]] || fail "wheel was not built"
 
-say "installing $VERSION over 0.1.1"
+say "installing $VERSION over $FROM_VERSION"
 uv venv --python 3.13 "$WORK/new" >/dev/null
 uv pip install --python "$WORK/new/bin/python" "$WHEEL" >/dev/null
 
@@ -107,7 +107,7 @@ grep -q '"alice"' "$WORK/restored-users.json" || fail "restored backup lost user
 [[ "$(sha256sum "$DATA/master.key" | awk '{print $1}')" == "$OLD_KEY" ]] \
   || fail "restored backup replaced master.key"
 
-# A token created by 0.1.1 must still resolve after restore.  This checks the
+# A token created by the previous release must still resolve after restore.  This checks the
 # subscription lookup without exposing the token in logs.
 python3 - "$WORK/new/bin/python" "$OLD_TOKEN" <<'PY'
 import subprocess

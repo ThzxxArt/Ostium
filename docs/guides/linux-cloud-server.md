@@ -8,7 +8,7 @@
 - RHEL / Rocky Linux / AlmaLinux（dnf、firewalld）
 - Alpine / OpenRC 等非 systemd 发行版使用 `--no-service` + supervisord，见第 4.4 节
 
-> **兼容性说明**：Ubuntu 24.04 / Debian 13 是 0.1.2 的目标平台；截至本文撰写时，0.1.2 尚未在这些平台完成实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
+> **兼容性说明**：Ubuntu 24.04 / Debian 13 是当前目标平台；截至 0.1.5，仍未在这些平台完成本轮实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
 
 ## 1. 主方案与端口规划
 
@@ -68,7 +68,7 @@ Nginx 方案见本文附录，不作为主路径。
 
 **默认不能。**
 
-Ostium 0.1.2 默认把管理 UI 绑定在 `127.0.0.1:8443`，只允许本机访问。这是安全设计，不是安装失败。默认安装后：
+Ostium 默认把管理 UI 绑定在 `127.0.0.1:8443`，只允许本机访问。这是安全设计，不是安装失败。默认安装后：
 
 - `http://公网IP:8443` 连接不上；
 - `https://公网IP:8443` 也连接不上；
@@ -295,7 +295,7 @@ curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-o
 - 注册并启动 `ostium-core.service`、`ostium.service`；
 - 打印一次性管理员密码。
 
-不要把 `--public-ui` 加到首次安装命令里。0.1.2 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。
+不要把 `--public-ui` 加到首次安装命令里。Ostium 要求先登录、启用 TOTP、上传证书，再从 Settings 开启 Public UI。
 
 安装完成后检查：
 
@@ -847,8 +847,8 @@ journalctl -u ostium -n 100 --no-pager
 
 客户端：
 
-- Windows：`Ostium-0.1.2-windows-x64-setup.exe`
-- macOS：`Ostium-0.1.2-macos-arm64.dmg`
+- Windows：`Ostium-0.1.5-windows-x64-setup.exe`
+- macOS：`Ostium-0.1.5-macos-arm64.dmg`
 - Linux：在线安装器 `install --role client`，或 DEB/AppImage
 - 也可以用 Clash/sing-box/v2rayN 等兼容客户端导入订阅
 

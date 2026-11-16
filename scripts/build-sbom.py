@@ -31,7 +31,7 @@ def build_sbom() -> dict[str, object]:
         metadata = distribution("ostium-ctl")
         requires = metadata.requires or []
     except PackageNotFoundError:
-        app_version = "0.1.4"
+        app_version = "0.1.5"
         requires = []
     components: list[dict[str, object]] = []
     seen: set[str] = set()

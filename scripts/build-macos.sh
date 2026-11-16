@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-VERSION="${1:-$(cat VERSION 2>/dev/null || echo 0.1.4)}"
+VERSION="${1:-$(cat VERSION 2>/dev/null || echo 0.1.5)}"
 WHEEL="${OSTIUM_WHEEL:-}"
 CORE_TARBALL="${OSTIUM_CORE_TARBALL:-}"
 IDENTITY="${OSTIUM_CODESIGN_IDENTITY:-}"

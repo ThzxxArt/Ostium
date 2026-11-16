@@ -3,7 +3,7 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [Unreleased]
+## [0.1.5] - 2026-11-16
 
 ### Fixed
 
@@ -21,6 +21,11 @@ SemVer.
   `no-resolve` GEOIP rule. This prevents a polluted system DNS answer from
   matching `GEOIP,CN` and sending Google, YouTube or Hugging Face DIRECT while
   GitHub happens to resolve to a non-CN address.
+
+### Documentation
+
+- Added the 0.1.5 TOTP, Windows startup/PATH and Clash subscription
+  troubleshooting notes; refreshed install examples and test counts.
 
 ## [0.1.4] - 2026-11-15
 
