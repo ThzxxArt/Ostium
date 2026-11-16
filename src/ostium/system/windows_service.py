@@ -11,6 +11,7 @@ import sys
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 
 def service_paths(
@@ -62,16 +63,10 @@ if sys.platform != "win32":  # pragma: no cover - import guard
         raise SystemExit("Windows services are only available on Windows")
 
 else:  # pragma: no cover - exercised on Windows
-    import threading
-
     import servicemanager
-    import uvicorn
     import win32event
     import win32service
     import win32serviceutil
-
-    from ostium.config import Settings
-    from ostium.core.app import create_core_app
 
     class OstiumCoreService(win32serviceutil.ServiceFramework):
         _svc_name_ = "OstiumCore"
@@ -81,8 +76,7 @@ else:  # pragma: no cover - exercised on Windows
         def __init__(self, args: list[str]) -> None:
             super().__init__(args)
             self.stop_event = win32event.CreateEvent(None, 0, 0, None)
-            self.server: uvicorn.Server | None = None
-            self.thread: threading.Thread | None = None
+            self.server: Any = None
 
         def SvcStop(self) -> None:
             _service_log("stop requested")
@@ -117,6 +111,14 @@ else:  # pragma: no cover - exercised on Windows
                 # resolve relative files (cache.db, rule sets) against a protected
                 # system directory.
                 os.chdir(data_dir)
+                # Import the heavy application only after the log stream is
+                # active; an import failure is otherwise invisible in a service.
+                _service_log("importing core modules")
+                import uvicorn
+
+                from ostium.config import Settings
+                from ostium.core.app import create_core_app
+
                 settings = Settings.load()
                 _service_log(
                     f"settings loaded role={settings.role.value} engine={settings.engine_path}"
