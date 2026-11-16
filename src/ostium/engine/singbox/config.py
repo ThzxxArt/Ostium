@@ -245,6 +245,11 @@ def build_server_config(
         "log": {"level": spec.log_level, "timestamp": True},
         "dns": {
             "servers": [{"type": "udp", "tag": "local", "server": "223.5.5.5"}],
+            # The server may have IPv4 egress only.  Do not resolve proxied
+            # destinations to AAAA and then fail the direct outbound; GitHub
+            # (IPv4-only) worked while Google/Hugging Face timed out on hosts
+            # without IPv6.  ipv4_only keeps the server usable on IPv4-only VPS.
+            "strategy": "ipv4_only",
             "final": "local",
         },
         "inbounds": inbounds,
@@ -256,6 +261,10 @@ def build_server_config(
             "rules": route_rules,
             "final": "direct",
             "auto_detect_interface": True,
+            # Resolve outbound domains through the internal ipv4_only DNS
+            # instead of the OS resolver, which may prefer AAAA on an
+            # IPv4-only VPS.
+            "default_domain_resolver": {"server": "local"},
         },
         "experimental": {
             "clash_api": {

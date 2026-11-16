@@ -3,6 +3,16 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- Server-generated sing-box configurations now use `dns.strategy: ipv4_only`
+  and route outbound domain resolution through the internal `local` resolver.
+  On an IPv4-only VPS, Google and Hugging Face were resolved to AAAA, the
+  direct outbound timed out, and clients saw a TLS handshake failure while
+  IPv4-only GitHub worked.
+
 ## [0.1.8] - 2026-11-16
 
 ### Fixed

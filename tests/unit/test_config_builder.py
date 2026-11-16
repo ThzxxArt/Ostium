@@ -66,6 +66,8 @@ def test_server_config_shape() -> None:
     assert config["inbounds"][0]["type"] == "vless"
     assert config["experimental"]["v2ray_api"]["stats"]["users"] == ["alice"]
     assert config["route"]["final"] == "direct"
+    assert config["route"]["default_domain_resolver"] == {"server": "local"}
+    assert config["dns"]["strategy"] == "ipv4_only"
 
 
 def test_client_config_shape() -> None:
