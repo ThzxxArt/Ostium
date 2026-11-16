@@ -91,7 +91,7 @@ Issues = "https://github.com/ThzxxArt/Ostium/issues"
 source = "vcs"
 
 [tool.hatch.version.raw-options]
-fallback_version = "0.1.9"
+fallback_version = "0.1.10"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/ostium/_version.py"

@@ -8,15 +8,10 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.9** |
+| Version | **0.1.10** |
 | Status | **Published** |
-| Tag | `v0.1.9` (annotated, commit `fa35e2e`) |
-| Assets | GitHub Release `v0.1.9` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.9` (wheel + sdist) |
-| GHCR | `0.1.9`, `v0.1.9`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `43842024068` — success |
-| Previous release | `v0.1.8`, published 2026-11-16 (23 assets, unchanged) |
-| Release type | Server IPv4-only DNS/egress patch; no client reinstall required |
+| Previous release | `v0.1.9`, published 2026-11-16 (23 assets, unchanged) |
+| Release type | Server DNS pollution patch; no client reinstall required |
 | Source branch | `main` |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
@@ -25,10 +20,10 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.9 continues to fix the status at its own tag instead of rewriting published
+0.1.10 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
-## 0.1.9 verification status
+## 0.1.10 verification status
 
 ### Verified locally
 
@@ -73,15 +68,14 @@ artifacts.
   server config now uses `dns.strategy: ipv4_only` and
   `route.default_domain_resolver` to the internal `local` server; `sing-box
   check` accepts it.
-- `0.1.8 -> 0.1.9` upgrade script: user, password material, subscription
-  token, database, backup and `master.key` survive; a 0.1.8 backup restores.
-- `0.1.9` install/reinstall/uninstall e2e passed; reinstall kept exactly one
+- Server DNS pollution reproduced: `223.5.5.5` returned `104.244.42.197` for
+  Google and `157.240.3.8` for Hugging Face, while system DNS returned correct
+  A records. Generated config now uses `8.8.8.8` and `1.1.1.1`, not
+  `223.5.5.5`.
+- `0.1.9 -> 0.1.10` upgrade script: user, password material, subscription
+  token, database, backup and `master.key` survive; a 0.1.9 backup restores.
+- `0.1.10` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
-- Publication verification: `scripts/verify-release.sh --version 0.1.9`
-  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  `ostium-ctl==0.1.9`. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -126,10 +120,10 @@ These items require external hardware, accounts, runners or time. They are
 **not** claimed as verified:
 
 - Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
-  The 0.1.9 server IPv4-only fix was validated by generated-config checks and
-  user logs, but not by a full external Windows/server matrix. The 0.1.5/0.1.6/
-  0.1.7 Windows failures were reproduced from user logs and `sc qc`, and the
-  script changes were syntax-checked with PowerShell 7.7.
+  The 0.1.10 server DNS fix was validated by generated-config checks and direct
+  server DNS queries, but not by a full external Windows/server matrix. The
+  0.1.5/0.1.6/0.1.7 Windows failures were reproduced from user logs and
+  `sc qc`, and the script changes were syntax-checked with PowerShell 7.7.
 - macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.
 - Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.
 - Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.
@@ -170,11 +164,11 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.9
+## Release gates for 0.1.10
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.8 -> 0.1.9` upgrade plus backup restore;
+2. **Upgrade and data**: `0.1.9 -> 0.1.10` upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted
