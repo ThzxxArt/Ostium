@@ -244,7 +244,15 @@ def build_server_config(
     config: dict[str, Any] = {
         "log": {"level": spec.log_level, "timestamp": True},
         "dns": {
-            "servers": [{"type": "udp", "tag": "local", "server": "223.5.5.5"}],
+            # Do not use a domestic DNS resolver on the server: in this
+            # deployment 223.5.5.5 returned Facebook/Twitter addresses for
+            # Google/Hugging Face, which accepted TCP but failed TLS.  The
+            # server's system resolver already proves these public resolvers
+            # work and return correct A records.
+            "servers": [
+                {"type": "udp", "tag": "local", "server": "8.8.8.8"},
+                {"type": "udp", "tag": "local2", "server": "1.1.1.1"},
+            ],
             # The server may have IPv4 egress only.  Do not resolve proxied
             # destinations to AAAA and then fail the direct outbound; GitHub
             # (IPv4-only) worked while Google/Hugging Face timed out on hosts

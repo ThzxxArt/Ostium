@@ -68,6 +68,8 @@ def test_server_config_shape() -> None:
     assert config["route"]["final"] == "direct"
     assert config["route"]["default_domain_resolver"] == {"server": "local"}
     assert config["dns"]["strategy"] == "ipv4_only"
+    assert config["dns"]["servers"][0]["server"] == "8.8.8.8"
+    assert all(server["server"] != "223.5.5.5" for server in config["dns"]["servers"])
 
 
 def test_client_config_shape() -> None:

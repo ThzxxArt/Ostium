@@ -3,6 +3,16 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [Unreleased]
+
+### Fixed
+
+- Server-side sing-box no longer uses `223.5.5.5` as its outbound resolver.
+  On the deployed server that resolver returned Facebook/Twitter addresses for
+  Google and Hugging Face, which accepted TCP but failed TLS; GitHub happened
+  to resolve correctly. Use the public resolvers `8.8.8.8` and `1.1.1.1` with
+  the existing `ipv4_only` strategy.
+
 ## [0.1.9] - 2026-11-16
 
 ### Fixed
