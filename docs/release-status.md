@@ -10,6 +10,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.7** |
 | Status | **Published** |
+| Tag | `v0.1.7` (annotated, commit `83a1d90`) |
+| Assets | GitHub Release `v0.1.7` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.7` (wheel + sdist) |
+| GHCR | `0.1.7`, `v0.1.7`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `43819621727` — success |
 | Previous release | `v0.1.6`, published 2026-11-16 (23 assets, unchanged) |
 | Release type | Windows service dispatcher and installer-log patch; no new protocols or UI redesign |
 | Source branch | `main` |
@@ -63,6 +68,11 @@ artifacts.
   token, database, backup and `master.key` survive; a 0.1.6 backup restores.
 - `0.1.7` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
+- Publication verification: `scripts/verify-release.sh --version 0.1.7`
+  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  `ostium-ctl==0.1.7`. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
