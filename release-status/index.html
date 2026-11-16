@@ -1022,6 +1022,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.5-to-0.1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.5 → 0.1.6 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/upgrade-0.1.4-to-0.1.5/" class="md-nav__link">
         
   
@@ -1149,15 +1177,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#015-verification-status" class="md-nav__link">
+  <a href="#016-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.5 verification status
+        0.1.6 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.5 verification status">
+    <nav class="md-nav" aria-label="0.1.6 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1210,10 +1238,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-015" class="md-nav__link">
+  <a href="#release-gates-for-016" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.5
+        Release gates for 0.1.6
       
     </span>
   </a>
@@ -1603,15 +1631,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#015-verification-status" class="md-nav__link">
+  <a href="#016-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.5 verification status
+        0.1.6 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.5 verification status">
+    <nav class="md-nav" aria-label="0.1.6 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1664,10 +1692,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-015" class="md-nav__link">
+  <a href="#release-gates-for-016" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.5
+        Release gates for 0.1.6
       
     </span>
   </a>
@@ -1720,39 +1748,19 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 <tbody>
 <tr>
 <td>Version</td>
-<td><strong>0.1.5</strong></td>
+<td><strong>0.1.6</strong></td>
 </tr>
 <tr>
 <td>Status</td>
 <td><strong>Published</strong></td>
 </tr>
 <tr>
-<td>Tag</td>
-<td><code>v0.1.5</code> (annotated, commit <code>8e61f07</code>)</td>
-</tr>
-<tr>
-<td>Assets</td>
-<td>GitHub Release <code>v0.1.5</code> — 23 assets, marked Latest</td>
-</tr>
-<tr>
-<td>PyPI</td>
-<td><code>ostium-ctl==0.1.5</code> (wheel + sdist)</td>
-</tr>
-<tr>
-<td>GHCR</td>
-<td><code>0.1.5</code>, <code>v0.1.5</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
-</tr>
-<tr>
-<td>Release workflow</td>
-<td>run <code>43790328641</code> — success</td>
-</tr>
-<tr>
 <td>Previous release</td>
-<td><code>v0.1.4</code>, published 2026-11-15 (23 assets, unchanged)</td>
+<td><code>v0.1.5</code>, published 2026-11-16 (23 assets, unchanged)</td>
 </tr>
 <tr>
 <td>Release type</td>
-<td>TOTP login, Windows client and Clash subscription fixes; no new protocols or UI redesign</td>
+<td>Windows client bundle and service startup patch; no new protocols or UI redesign</td>
 </tr>
 <tr>
 <td>Source branch</td>
@@ -1765,13 +1773,13 @@ are published artifacts. They are never replaced or moved by this release.</p>
 <p>Known limitation: the <code>v0.1.1</code> tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.5 continues to fix the status at its own tag instead of rewriting published
+0.1.6 continues to fix the status at its own tag instead of rewriting published
 artifacts.</p>
-<h2 id="015-verification-status">0.1.5 verification status<a class="headerlink" href="#015-verification-status" title="Permanent link">&para;</a></h2>
+<h2 id="016-verification-status">0.1.6 verification status<a class="headerlink" href="#016-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Backend unit and in-process integration tests: 712 passed / 10 deselected;
-  94.32% statements / 90.49% branches; <code>coverage_gate.py</code> passes.</li>
+<li>Backend unit and in-process integration tests: 713 passed / 10 deselected;
+  94.33% statements / 90.49% branches; <code>coverage_gate.py</code> passes.</li>
 <li>Real sing-box integration tests with the pinned <code>1.14.4-ostium.1</code> core:
   10 passed.</li>
 <li>Frontend typecheck, lint, unit tests, production build and formatting: 204
@@ -1784,17 +1792,21 @@ artifacts.</p>
   <code>ostium-ui.ps1</code> template parses too. The scheduled task uses a hidden
   PowerShell wrapper, waits for <code>/healthz</code>, writes <code>ui.log</code>, and updates the
   machine PATH.</li>
+<li>0.1.5 Windows failure reproduced as
+  <code>ModuleNotFoundError: No module named 'aiosqlite'</code>; both PyInstaller specs now
+  collect <code>aiosqlite</code>.</li>
+<li>The 0.1.5 service reproduced SCM error 1053. The service entry point now
+  reaches the dispatcher before importing FastAPI/uvicorn/core; heavy imports
+  run inside <code>SvcDoRun</code> after <code>SERVICE_RUNNING</code>.</li>
+<li>Windows installer keeps the UI installable when the service fails, writes
+  <code>install.log</code>/<code>service.log</code>/<code>service-bootstrap.log</code>, stops orphan
+  <code>ostium-service</code>/<code>sing-box</code> processes, and embeds the Ostium icon.</li>
 <li>Generated Clash YAML was accepted by Mihomo 1.19.34 with <code>mihomo -t</code>; it
   contains fake-IP DNS, <code>ipv6: false</code>, and <code>GEOIP,CN,DIRECT,no-resolve</code>.</li>
-<li><code>0.1.4 -&gt; 0.1.5</code> upgrade script: user, password material, subscription
-  token, database, backup and <code>master.key</code> survive; a 0.1.4 backup restores.</li>
-<li><code>0.1.5</code> install/reinstall/uninstall e2e passed; reinstall kept exactly one
+<li><code>0.1.5 -&gt; 0.1.6</code> upgrade script: user, password material, subscription
+  token, database, backup and <code>master.key</code> survive; a 0.1.5 backup restores.</li>
+<li><code>0.1.6</code> install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.</li>
-<li>Publication verification: <code>scripts/verify-release.sh --version 0.1.5</code>
-  downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  <code>ostium-ctl==0.1.5</code>. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.</li>
 <li>Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.</li>
 <li>Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -1838,8 +1850,10 @@ artifacts.</p>
 <strong>not</strong> claimed as verified:</p>
 <ul>
 <li>Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
-  The 0.1.5 scheduled-task/PATH fix was syntax-checked with PowerShell 7.7 but
-  not executed on a Windows host in this workspace.</li>
+  The 0.1.6 installer (aiosqlite, lazy service imports, icon) was not executed
+  on a Windows host in this workspace. The 0.1.5 failures (<code>aiosqlite</code> and
+  service 1053) were reproduced from user logs, and the script changes were
+  syntax-checked with PowerShell 7.7.</li>
 <li>macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.</li>
 <li>Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.</li>
 <li>Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.</li>
@@ -1876,11 +1890,11 @@ evidence is in <code>versions/V0.1.2_RC_REPORT.md</code>:</p>
   unless signing credentials are supplied.</li>
 <li><strong>D-115</strong> Push, tag and publication require explicit release-owner approval.</li>
 </ul>
-<h2 id="release-gates-for-015">Release gates for 0.1.5<a class="headerlink" href="#release-gates-for-015" title="Permanent link">&para;</a></h2>
+<h2 id="release-gates-for-016">Release gates for 0.1.6<a class="headerlink" href="#release-gates-for-016" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Code and automation</strong>: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.</li>
-<li><strong>Upgrade and data</strong>: <code>0.1.4 -&gt; 0.1.5</code> upgrade plus backup restore;
+<li><strong>Upgrade and data</strong>: <code>0.1.5 -&gt; 0.1.6</code> upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.</li>
 <li><strong>Platform evidence</strong>: record only what was actually executed; unexecuted

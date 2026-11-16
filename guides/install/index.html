@@ -1256,6 +1256,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.5-to-0.1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.5 → 0.1.6 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/upgrade-0.1.4-to-0.1.5/" class="md-nav__link">
         
   
@@ -1935,6 +1963,18 @@
   重新打开才能直接运行 <code>ostium</code>；也可以用完整路径
   <code>&amp; "$env:ProgramFiles\Ostium\ostium.exe" version</code>。</li>
 </ul>
+<p>如果 <code>OstiumCore</code> 服务没有启动，安装器仍会完成 UI 安装并启动
+<a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>，不会在注册登录任务之前中止。诊断顺序：</p>
+<ol>
+<li>查看 <code>%ProgramData%\Ostium\logs\install.log</code> 和
+   <code>%ProgramData%\OstiumCore\logs\service.log</code>；</li>
+<li>以管理员 PowerShell 运行
+   <code>&amp; "$env:ProgramFiles\Ostium\service\ostium-service.exe" debug</code>，
+   服务会以前台模式启动并把异常打印出来；</li>
+<li>运行 <code>sc.exe qc OstiumCore</code> 和 <code>sc.exe query OstiumCore</code> 检查服务路径和状态。</li>
+</ol>
+<p>UI 能用但不代表 TUN 核心正常；服务未运行时只能先做系统代理/诊断，TUN 需要
+服务修复后再启用。</p>
 <p>需要连 UI 也以 SYSTEM 运行时：</p>
 <div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">latest</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
 </code></pre></div>
@@ -1942,10 +1982,10 @@
 <h2 id="_2">原生安装包<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>Release 同时提供可离线使用的原生包：</p>
 <ul>
-<li>Linux DEB：<code>ostium_0.1.5_amd64.deb</code> / <code>arm64</code>，安装后注册 systemd；</li>
-<li>Linux AppImage：<code>Ostium-0.1.5-linux-amd64.AppImage</code> / <code>arm64</code>；</li>
-<li>macOS DMG：<code>Ostium-0.1.5-macos-arm64.dmg</code>，挂载后运行 <code>install-macos.sh client</code>；DMG 不内置 Python/uv/wheelhouse，安装时仍需联网获取依赖（这是当前限制，不是离线包）；</li>
-<li>Windows：<code>Ostium-0.1.5-windows-x64-setup.exe</code>。</li>
+<li>Linux DEB：<code>ostium_0.1.6_amd64.deb</code> / <code>arm64</code>，安装后注册 systemd；</li>
+<li>Linux AppImage：<code>Ostium-0.1.6-linux-amd64.AppImage</code> / <code>arm64</code>；</li>
+<li>macOS DMG：<code>Ostium-0.1.6-macos-arm64.dmg</code>，挂载后运行 <code>install-macos.sh client</code>；DMG 不内置 Python/uv/wheelhouse，安装时仍需联网获取依赖（这是当前限制，不是离线包）；</li>
+<li>Windows：<code>Ostium-0.1.6-windows-x64-setup.exe</code>。</li>
 </ul>
 <p>未配置代码签名证书时，Windows/DMG 资产会明确标注为未签名；这不影响离线校验和
 <code>SHA256SUMS</code>，但不能声称已通过 Authenticode/notarization。</p>
@@ -2078,15 +2118,15 @@ sudo<span class="w"> </span><span class="nv">OSTIUM_ROLE</span><span class="o">=
 <p>准备一个扁平目录，包含同一版本的 Release 资产：</p>
 <div class="highlight"><pre><span></span><code>release/
 ├── install-online.sh
-├── ostium_ctl-0.1.5-py3-none-any.whl
-├── ostium_ctl-0.1.5.tar.gz
+├── ostium_ctl-0.1.6-py3-none-any.whl
+├── ostium_ctl-0.1.6.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz.sha256
 ├── core-manifest.json
 └── SHA256SUMS
 </code></pre></div>
 <blockquote>
-<p>以上文件名以 0.1.5 为例。在线命令默认使用 <code>latest</code>。</p>
+<p>以上文件名以 0.1.6 为例。在线命令默认使用 <code>latest</code>。</p>
 </blockquote>
 <p>然后：</p>
 <div class="highlight"><pre><span></span><code>sha256sum<span class="w"> </span>-c<span class="w"> </span>SHA256SUMS<span class="w"> </span>--ignore-missing
