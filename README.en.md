@@ -21,7 +21,7 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
   <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
-  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.5"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.5-5EEAD4?style=flat-square"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.6"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.6-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -35,18 +35,18 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.32%25%20statements%20%C2%B7%2090.49%25%20branches-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.33%25%20statements%20%C2%B7%2090.49%25%20branches-brightgreen?style=flat-square">
   <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.86%25%20statements%20%C2%B7%2085.90%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-712%20backend%20%C2%B7%20204%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-713%20backend%20%C2%B7%20204%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **Release status: v0.1.5 was published on 2026-11-16.** The previous release
-> is v0.1.4 (2026-11-15). See [release status](docs/release-status.md) for
+> **Release status: v0.1.6 was published on 2026-11-16.** The previous release
+> is v0.1.5 (2026-11-16). See [release status](docs/release-status.md) for
 > verified and unverified items.
 
 > [!TIP]
-> **Current public version: v0.1.5.** The easiest install does not require Python:
+> **Current public version: v0.1.6.** The easiest install does not require Python:
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \
@@ -82,7 +82,7 @@ and auditable private-network console.
 | 🎨 **Aurora Console** | Dark-first, responsive, installable PWA with command palette, shortcuts, live connections/logs and a job centre. |
 | 📦 **Deliverable** | systemd, launchd, Windows service, Docker, PyInstaller and Inno Setup build/install scripts. |
 | 🔐 **Secure defaults** | Argon2id, TOTP, CSRF, Origin/Host checks, AES-256-GCM field encryption, redacted diagnostics and login throttling. |
-| 🧪 **Verified** | 722 backend tests (712 regular + 10 live sing-box integration), 204 frontend tests and 73 Playwright cases; all executed locally in this round (see release status). |
+| 🧪 **Verified** | 723 backend tests (713 regular + 10 live sing-box integration), 204 frontend tests and 73 Playwright cases; all executed locally in this round (see release status). |
 
 ---
 
@@ -242,8 +242,8 @@ runit, s6, supervisord or run both commands manually. Full examples:
 Download the same release's assets into one directory, keeping their filenames:
 
 - `install-online.sh`
-- `ostium_ctl-0.1.5-py3-none-any.whl`
-- `ostium_ctl-0.1.5.tar.gz` (installer, systemd/launchd files)
+- `ostium_ctl-0.1.6-py3-none-any.whl`
+- `ostium_ctl-0.1.6.tar.gz` (installer, systemd/launchd files)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (choose the right architecture)
   and its `.sha256`
 - `SHA256SUMS`
@@ -269,29 +269,29 @@ The installer verifies the sdist first, then extracts `scripts/install.sh` and
 Download the wheel, sdist, core archive and `SHA256SUMS`, then run the platform
 installer from the extracted sdist:
 
-- `ostium_ctl-0.1.5-py3-none-any.whl`
-- `ostium_ctl-0.1.5.tar.gz` (contains `scripts/install.sh` and `deploy/`)
+- `ostium_ctl-0.1.6-py3-none-any.whl`
+- `ostium_ctl-0.1.6.tar.gz` (contains `scripts/install.sh` and `deploy/`)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
-Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.5)
+Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.6)
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.5.tar.gz
+tar -xzf ostium_ctl-0.1.6.tar.gz
 
-sudo ./ostium_ctl-0.1.5/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.5-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.6/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.6-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
 
 The same release also ships native packages:
 
-- `ostium_0.1.5_amd64.deb` / `ostium_0.1.5_arm64.deb` (PyInstaller control plane + core, systemd units);
-- `Ostium-0.1.5-linux-amd64.AppImage` / `arm64` (single-file client/temporary runtime);
-- `Ostium-0.1.5-macos-arm64.dmg` (wheel, darwin core and launchd installer);
-- `Ostium-0.1.5-windows-x64-setup.exe`.
+- `ostium_0.1.6_amd64.deb` / `ostium_0.1.6_arm64.deb` (PyInstaller control plane + core, systemd units);
+- `Ostium-0.1.6-linux-amd64.AppImage` / `arm64` (single-file client/temporary runtime);
+- `Ostium-0.1.6-macos-arm64.dmg` (wheel, darwin core and launchd installer);
+- `Ostium-0.1.6-windows-x64-setup.exe`.
 
 If no code-signing certificate is configured, Windows/DMG assets are explicitly labelled
 unsigned in the release notes; do not treat them as signed builds.
@@ -335,8 +335,8 @@ journalctl -u ostium -u ostium-core -f
 Extract the sdist first, then run:
 
 ```bash
-sudo ./ostium_ctl-0.1.5/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.5-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.6/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.6-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -350,7 +350,7 @@ Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 
 ### Option 4 — Windows client (offline)
 
-1. Run `Ostium-0.1.5-windows-x64-setup.exe`.
+1. Run `Ostium-0.1.6-windows-x64-setup.exe`.
 2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
    and starts the UI at logon.
 3. UI data lives in `%ProgramData%\Ostium`; core data, the token and last-good configuration
@@ -372,10 +372,10 @@ Use the one-click online installer from Option 1. For offline installs, extract 
 and point it at the wheel and core archive:
 
 ```bash
-tar -xzf ostium_ctl-0.1.5.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.5-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.6.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.6-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.5/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.6/deploy/launchd/install-macos.sh client
 ```
 
 The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` LaunchAgent,
@@ -395,14 +395,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 Local build:
 
 ```bash
-docker build -t ostium:0.1.5 .
+docker build -t ostium:0.1.6 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.5
+  ostium:0.1.6
 ```
 
 > Docker uses host networking so it can bind 443/80; the admin UI still listens on
@@ -421,14 +421,14 @@ uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
 # or pin the release
-uv tool install ostium-ctl    # pin "ostium-ctl==0.1.5"
+uv tool install ostium-ctl    # pin "ostium-ctl==0.1.6"
 ```
 
 Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install ostium-ctl    # pin ==0.1.5 after publication
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # pin ==0.1.6 after publication
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -648,7 +648,7 @@ A failed renewal keeps the previous ready certificate and does not downgrade the
 ```bash
 sudo bash install-online.sh upgrade
 # pin a version
-# pin a version: sudo bash install-online.sh upgrade --version 0.1.5
+# pin a version: sudo bash install-online.sh upgrade --version 0.1.6
 ```
 
 The upgrade keeps the database, `master.key`, configuration, certificates, users and
@@ -664,7 +664,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. Install the new wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.5-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.6-py3-none-any.whl
 
 # 4. Start; migrations run at startup
 sudo systemctl start ostium
@@ -849,8 +849,8 @@ npx playwright test
 
 Current results:
 
-- Backend: **712 passed** (regular suite) + **10 passed**
-  (live sing-box integration), **94.32%** statements / **90.49%** branches.
+- Backend: **713 passed** (regular suite) + **10 passed**
+  (live sing-box integration), **94.33%** statements / **90.49%** branches.
 - Frontend: **204 passed**, **90.86%** statements / **85.90%** branches /
   **88.63%** functions / **92.40%** lines.
 - Playwright: **73 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
@@ -882,6 +882,7 @@ Current results:
 - [Ports and paths](docs/reference/ports.md)
 - [Backup and restore](docs/operations/backup.md)
 - [Upgrade and rollback](docs/operations/upgrade.md)
+- [0.1.5 → 0.1.6 upgrade](docs/operations/upgrade-0.1.5-to-0.1.6.md)
 - [0.1.4 → 0.1.5 upgrade](docs/operations/upgrade-0.1.4-to-0.1.5.md)
 - [0.1.3 → 0.1.4 upgrade](docs/operations/upgrade-0.1.3-to-0.1.4.md)
 - [0.1.2 → 0.1.3 upgrade](docs/operations/upgrade-0.1.2-to-0.1.3.md)

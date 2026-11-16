@@ -3,10 +3,18 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [Unreleased]
+## [0.1.6] - 2026-11-16
 
 ### Fixed
 
+- The Windows UI and service bundles now include `aiosqlite`. SQLAlchemy imports
+  the async SQLite DBAPI dynamically, and the frozen apps previously exited
+  during FastAPI lifespan startup with `ModuleNotFoundError`.
+- The Windows service reaches the SCM dispatcher before importing FastAPI,
+  uvicorn and the core app. This removes the 30-second `1053` startup timeout on
+  machines where the frozen bundle's import takes longer than the SCM window.
+- Reinstalling stops orphan `ostium-service` and `sing-box` processes that could
+  hold port 8788 and make the replacement service exit immediately.
 - The Windows installer no longer aborts UI setup when `OstiumCore` fails to
   start. It registers and starts the UI task anyway, writes the service failure
   and `sc.exe qc` output to `%ProgramData%\Ostium\logs\install.log`, and reports
@@ -17,6 +25,10 @@ SemVer.
   there, so a service that stops immediately leaves a trace instead of only a
   generic SCM error.
 - The Windows setup and both executables now embed the Ostium app icon.
+
+### Documentation
+
+- Added the 0.1.5 -> 0.1.6 Windows reinstall and service-diagnostic guide.
 
 ## [0.1.5] - 2026-11-16
 
