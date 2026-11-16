@@ -10,6 +10,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.10** |
 | Status | **Published** |
+| Tag | `v0.1.10` (annotated, commit `361fa7c`) |
+| Assets | GitHub Release `v0.1.10` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.10` (wheel + sdist) |
+| GHCR | `0.1.10`, `v0.1.10`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `43866531455` — success |
 | Previous release | `v0.1.9`, published 2026-11-16 (23 assets, unchanged) |
 | Release type | Server DNS pollution patch; no client reinstall required |
 | Source branch | `main` |
@@ -76,6 +81,11 @@ artifacts.
   token, database, backup and `master.key` survive; a 0.1.9 backup restores.
 - `0.1.10` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
+- Publication verification: `scripts/verify-release.sh --version 0.1.10`
+  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  `ostium-ctl==0.1.10`. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
