@@ -170,7 +170,13 @@ $uiScriptContent = $uiScriptTemplate.Replace('__DATA_DIR__', $DataDir).Replace('
 [IO.File]::WriteAllText($uiScript, $uiScriptContent, (New-Object System.Text.UTF8Encoding($false)))
 
 if (-not $SkipPathUpdate) {
-    Add-MachinePathEntry -Directory $InstallDir
+    try {
+        Add-MachinePathEntry -Directory $InstallDir
+    } catch {
+        # PATH is a convenience; do not fail an otherwise working UI install
+        # because a locked-down registry policy rejected the update.
+        Write-Warning "Could not add $InstallDir to the machine PATH: $_"
+    }
 }
 
 # Allow only SYSTEM, Administrators and the interactive user to read/write the
