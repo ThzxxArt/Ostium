@@ -1755,6 +1755,26 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 <td><strong>Published</strong></td>
 </tr>
 <tr>
+<td>Tag</td>
+<td><code>v0.1.6</code> (annotated, commit <code>ffdc758</code>)</td>
+</tr>
+<tr>
+<td>Assets</td>
+<td>GitHub Release <code>v0.1.6</code> — 23 assets, marked Latest</td>
+</tr>
+<tr>
+<td>PyPI</td>
+<td><code>ostium-ctl==0.1.6</code> (wheel + sdist)</td>
+</tr>
+<tr>
+<td>GHCR</td>
+<td><code>0.1.6</code>, <code>v0.1.6</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
+</tr>
+<tr>
+<td>Release workflow</td>
+<td>run <code>43805851951</code> — success</td>
+</tr>
+<tr>
 <td>Previous release</td>
 <td><code>v0.1.5</code>, published 2026-11-16 (23 assets, unchanged)</td>
 </tr>
@@ -1794,7 +1814,8 @@ artifacts.</p>
   machine PATH.</li>
 <li>0.1.5 Windows failure reproduced as
   <code>ModuleNotFoundError: No module named 'aiosqlite'</code>; both PyInstaller specs now
-  collect <code>aiosqlite</code>.</li>
+  collect <code>aiosqlite</code>. A local PyInstaller build served <code>/healthz</code> after the
+  spec fix.</li>
 <li>The 0.1.5 service reproduced SCM error 1053. The service entry point now
   reaches the dispatcher before importing FastAPI/uvicorn/core; heavy imports
   run inside <code>SvcDoRun</code> after <code>SERVICE_RUNNING</code>.</li>
@@ -1807,6 +1828,11 @@ artifacts.</p>
   token, database, backup and <code>master.key</code> survive; a 0.1.5 backup restores.</li>
 <li><code>0.1.6</code> install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.</li>
+<li>Publication verification: <code>scripts/verify-release.sh --version 0.1.6</code>
+  downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
+  platforms are present, build attestations verified, and PyPI reports
+  <code>ostium-ctl==0.1.6</code>. The wheel and sdist SHA-256 values match between the
+  GitHub Release and PyPI.</li>
 <li>Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.</li>
 <li>Rule/RE2 validation, rule-set format validation, rule-set-only tester
