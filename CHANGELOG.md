@@ -3,7 +3,7 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [Unreleased]
+## [0.1.7] - 2026-11-16
 
 ### Fixed
 
@@ -15,6 +15,10 @@ SemVer.
 - Interactive Windows installs now show the final service step in a visible
   PowerShell console, with the same lines written to `install.log`. Silent
   installs remain hidden.
+
+### Documentation
+
+- Added the 0.1.6 -> 0.1.7 Windows reinstall and service-log guide.
 
 ## [0.1.6] - 2026-11-16
 

@@ -1,7 +1,7 @@
 # Build the Windows x64 client bundle and Inno Setup installer.
 # Run from the repository root in an elevated PowerShell with uv, Node and Inno Setup 6 installed.
 param(
-    [string]$Version = "0.1.6",
+    [string]$Version = "0.1.7",
     [string]$CoreBinary = "",
     [string]$WintunDll = ""
 )

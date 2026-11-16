@@ -1,47 +1,38 @@
-# Ostium v0.1.6
+# Ostium v0.1.7
 
-This is a Windows client patch release. It fixes the frozen bundle and service
-startup failures found after 0.1.5; no proxy protocol or UI redesign is included.
+This is a Windows client patch release. It fixes the frozen service dispatcher
+entry point that caused SCM error 1053 and adds real-time service logs to the
+interactive installer.
 
 ## Fixed
 
-- **Missing `aiosqlite`.** SQLAlchemy imports the async SQLite DBAPI dynamically.
-  Both PyInstaller bundles now collect `aiosqlite`; the UI and core service no
-  longer exit during FastAPI lifespan startup with `ModuleNotFoundError`.
-- **Windows service 1053 timeout.** The service entry point now reaches the SCM
-  dispatcher before importing FastAPI, uvicorn and the core app. On machines
-  where the frozen bundle import took longer than the 30-second SCM window, the
-  service previously failed with error 1053. Heavy imports now run inside
-  `SvcDoRun`, after the service is reported running.
-- **Installer no longer blocks the UI.** If `OstiumCore` cannot start, the UI
-  task is still registered and the 8787 health check still runs. The service
-  failure and `sc.exe qc` output are written to
-  `%ProgramData%\Ostium\logs\install.log`.
-- **Service diagnostics.** Startup exceptions and uvicorn output go to
-  `%ProgramData%\OstiumCore\logs\service.log`; import failures go to
-  `service-bootstrap.log`.
-- **Orphan cleanup.** Reinstalling stops leftover `ostium-service` and
-  `sing-box` processes that could hold port 8788 and make the replacement
-  service exit immediately.
-- **Installer icon.** The setup executable and both application executables now
-  embed the Ostium icon.
+- **Windows service 1053.** `sc qc OstiumCore` starts the frozen executable with
+  no arguments. `win32serviceutil.HandleCommandLine` treats an empty argument
+  list as a usage request and exits, so SCM never receives a dispatcher and
+  reports error 1053. The no-argument path now calls
+  `servicemanager.Initialize`, `PrepareToHostSingle` and
+  `StartServiceCtrlDispatcher` itself. `debug`, `install` and `remove` still use
+  `HandleCommandLine`.
+- **Installer real-time logs.** Interactive installs show the final service step
+  in a visible PowerShell console, mirroring service registration,
+  `Start-Service`, the 8787 health check and failure details. Silent installs
+  remain hidden and still write `%ProgramData%\Ostium\logs\install.log`.
 
-The 0.1.5 TOTP and Clash subscription fixes remain included when upgrading from
-0.1.4 or earlier.
+The 0.1.6 `aiosqlite` bundle fix, UI/service diagnostics, orphan cleanup and
+application icon are included.
 
 ## Upgrade notes
 
 - Back up the database, configuration, certificates, rule sets and
   `master.key` before upgrading a server.
-- `0.1.5 -> 0.1.6` keeps the database, users, credentials, subscription tokens,
-  certificates, backups and master key. The release workflow runs the upgrade
-  path and restores an encrypted backup from the previous release.
-- Windows must run the new `Ostium-0.1.6-windows-x64-setup.exe`; replacing only
-  `ostium.exe` does not fix the missing bundle dependency or service imports.
-- After a server upgrade, third-party Clash clients should refresh their
-  subscription if they still hold a 0.1.4 or older profile.
+- `0.1.6 -> 0.1.7` keeps the database, users, credentials, subscription tokens,
+  certificates, backups and master key.
+- Windows should run the new `Ostium-0.1.7-windows-x64-setup.exe` over 0.1.6;
+  replacing only `ostium.exe` does not update the service or installer.
+- 0.1.7 has no server-side feature changes. A server already on 0.1.6 can stay
+  there; upgrading from 0.1.5 or earlier also brings the TOTP and Clash fixes.
 - Windows/macOS binaries are unsigned unless the release owner supplies signing
-  certificates. Check `docs/release-status.md` for the current status.
+  certificates.
 
 ## Verified
 
@@ -50,24 +41,22 @@ The 0.1.5 TOTP and Clash subscription fixes remain included when upgrading from
 - Frontend: 204 tests passed; typecheck, lint, Prettier and production build
   passed.
 - Playwright: 73 passed, 2 skipped.
-- `0.1.5 -> 0.1.6` upgrade and encrypted-backup restore passed; install,
+- `0.1.6 -> 0.1.7` upgrade and encrypted-backup restore passed; install,
   reinstall and uninstall e2e passed.
-- Windows installer scripts parsed with PowerShell 7.7; generated service
-  wrapper and UI wrapper templates parsed too.
-- The 0.1.5 startup failure was reproduced on Windows as
-  `ModuleNotFoundError: No module named 'aiosqlite'`. The 0.1.6 bundle now
-  collects the package.
-- Exact command output and counts are recorded in `docs/release-status.md`.
+- Windows installer scripts parsed with PowerShell 7.7; Inno Setup `[Run]`
+  interactive/silent branches and the generated wrappers are covered by source
+  tests.
+- The 0.1.5 service failure was reproduced from `sc qc`: the service image had
+  no arguments, and `debug` worked because it supplied one.
 
 ## Not verified / accepted blockers
 
 The following were not executed in the workspace and are not claimed as
-verified: Windows 11 runtime of the 0.1.6 installer, macOS 14 runtime,
+verified: Windows 11 runtime of the 0.1.7 installer, macOS 14 runtime,
 Debian/RHEL real machines, Nginx, Docker runtime, real ACME against a public
 domain, real TUN, 72-hour soak, performance measurements and platform code
-signing. The 0.1.6 Windows service startup path is validated by source tests,
-PowerShell parsing and the reproduced 0.1.5 root cause; the new installer still
-needs a real Windows run.
+signing. The 0.1.7 Windows service path is validated by the reproduced SCM
+command line and source tests; the new installer still needs a real Windows run.
 
 ## Signing and artifacts
 
@@ -84,6 +73,6 @@ staged backup for retry and restores the previous database on error.
 ## Documentation
 
 - `docs/release-status.md`
-- `docs/operations/upgrade-0.1.5-to-0.1.6.md`
+- `docs/operations/upgrade-0.1.6-to-0.1.7.md`
 - `docs/guides/install.md`
 - `docs/guides/client.md`

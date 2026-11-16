@@ -8,15 +8,10 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.6** |
+| Version | **0.1.7** |
 | Status | **Published** |
-| Tag | `v0.1.6` (annotated, commit `ffdc758`) |
-| Assets | GitHub Release `v0.1.6` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.6` (wheel + sdist) |
-| GHCR | `0.1.6`, `v0.1.6`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `43805851951` — success |
-| Previous release | `v0.1.5`, published 2026-11-16 (23 assets, unchanged) |
-| Release type | Windows client bundle and service startup patch; no new protocols or UI redesign |
+| Previous release | `v0.1.6`, published 2026-11-16 (23 assets, unchanged) |
+| Release type | Windows service dispatcher and installer-log patch; no new protocols or UI redesign |
 | Source branch | `main` |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
@@ -25,10 +20,10 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.6 continues to fix the status at its own tag instead of rewriting published
+0.1.7 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
-## 0.1.6 verification status
+## 0.1.7 verification status
 
 ### Verified locally
 
@@ -50,23 +45,24 @@ artifacts.
   `ModuleNotFoundError: No module named 'aiosqlite'`; both PyInstaller specs now
   collect `aiosqlite`. A local PyInstaller build served `/healthz` after the
   spec fix.
-- The 0.1.5 service reproduced SCM error 1053. The service entry point now
-  reaches the dispatcher before importing FastAPI/uvicorn/core; heavy imports
-  run inside `SvcDoRun` after `SERVICE_RUNNING`.
+- The 0.1.5 service reproduced SCM error 1053. `sc qc` showed an image path with
+  no arguments; the frozen entry point now calls `Initialize`,
+  `PrepareToHostSingle` and `StartServiceCtrlDispatcher` itself when SCM starts
+  it without arguments. Interactive `debug`/`install`/`remove` still use
+  `HandleCommandLine`. Heavy imports run inside `SvcDoRun` after
+  `SERVICE_RUNNING`.
+- Interactive Windows installs now show a visible PowerShell console with the
+  service registration, `Start-Service`, 8787 health check and failure details;
+  silent installs stay hidden and write `install.log`.
 - Windows installer keeps the UI installable when the service fails, writes
   `install.log`/`service.log`/`service-bootstrap.log`, stops orphan
   `ostium-service`/`sing-box` processes, and embeds the Ostium icon.
 - Generated Clash YAML was accepted by Mihomo 1.19.34 with `mihomo -t`; it
   contains fake-IP DNS, `ipv6: false`, and `GEOIP,CN,DIRECT,no-resolve`.
-- `0.1.5 -> 0.1.6` upgrade script: user, password material, subscription
-  token, database, backup and `master.key` survive; a 0.1.5 backup restores.
-- `0.1.6` install/reinstall/uninstall e2e passed; reinstall kept exactly one
+- `0.1.6 -> 0.1.7` upgrade script: user, password material, subscription
+  token, database, backup and `master.key` survive; a 0.1.6 backup restores.
+- `0.1.7` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
-- Publication verification: `scripts/verify-release.sh --version 0.1.6`
-  downloaded all 23 assets, `sha256sum -c SHA256SUMS` passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  `ostium-ctl==0.1.6`. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
 - Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -111,10 +107,10 @@ These items require external hardware, accounts, runners or time. They are
 **not** claimed as verified:
 
 - Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
-  The 0.1.6 installer (aiosqlite, lazy service imports, icon) was not executed
-  on a Windows host in this workspace. The 0.1.5 failures (`aiosqlite` and
-  service 1053) were reproduced from user logs, and the script changes were
-  syntax-checked with PowerShell 7.7.
+  The 0.1.7 installer (service dispatcher entry, live installer logs, aiosqlite,
+  icon) was not executed on a Windows host in this workspace. The 0.1.5/0.1.6
+  failures were reproduced from user logs and `sc qc`, and the script changes
+  were syntax-checked with PowerShell 7.7.
 - macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.
 - Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.
 - Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.
@@ -155,11 +151,11 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.6
+## Release gates for 0.1.7
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.5 -> 0.1.6` upgrade plus backup restore;
+2. **Upgrade and data**: `0.1.6 -> 0.1.7` upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted

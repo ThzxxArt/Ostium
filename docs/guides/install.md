@@ -89,10 +89,10 @@ UI 能用但不代表 TUN 核心正常；服务未运行时只能先做系统代
 
 Release 同时提供可离线使用的原生包：
 
-- Linux DEB：`ostium_0.1.6_amd64.deb` / `arm64`，安装后注册 systemd；
-- Linux AppImage：`Ostium-0.1.6-linux-amd64.AppImage` / `arm64`；
-- macOS DMG：`Ostium-0.1.6-macos-arm64.dmg`，挂载后运行 `install-macos.sh client`；DMG 不内置 Python/uv/wheelhouse，安装时仍需联网获取依赖（这是当前限制，不是离线包）；
-- Windows：`Ostium-0.1.6-windows-x64-setup.exe`。
+- Linux DEB：`ostium_0.1.7_amd64.deb` / `arm64`，安装后注册 systemd；
+- Linux AppImage：`Ostium-0.1.7-linux-amd64.AppImage` / `arm64`；
+- macOS DMG：`Ostium-0.1.7-macos-arm64.dmg`，挂载后运行 `install-macos.sh client`；DMG 不内置 Python/uv/wheelhouse，安装时仍需联网获取依赖（这是当前限制，不是离线包）；
+- Windows：`Ostium-0.1.7-windows-x64-setup.exe`。
 
 未配置代码签名证书时，Windows/DMG 资产会明确标注为未签名；这不影响离线校验和
 `SHA256SUMS`，但不能声称已通过 Authenticode/notarization。
@@ -198,15 +198,15 @@ sudo OSTIUM_ROLE=server OSTIUM_CONFIG_FILE=/etc/ostium/config.toml \
 ```text
 release/
 ├── install-online.sh
-├── ostium_ctl-0.1.6-py3-none-any.whl
-├── ostium_ctl-0.1.6.tar.gz
+├── ostium_ctl-0.1.7-py3-none-any.whl
+├── ostium_ctl-0.1.7.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ├── ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz.sha256
 ├── core-manifest.json
 └── SHA256SUMS
 ```
 
-> 以上文件名以 0.1.6 为例。在线命令默认使用 `latest`。
+> 以上文件名以 0.1.7 为例。在线命令默认使用 `latest`。
 
 然后：
 

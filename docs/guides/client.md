@@ -71,7 +71,7 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role client --run-a
 
 ## 离线安装
 
-Windows：运行 `Ostium-0.1.6-windows-x64-setup.exe`。
+Windows：运行 `Ostium-0.1.7-windows-x64-setup.exe`。
 
 macOS：
 
@@ -83,7 +83,7 @@ Linux：
 
 ```bash
 sudo ./install.sh --role client \
-  --wheel ./ostium_ctl-0.1.6-py3-none-any.whl \
+  --wheel ./ostium_ctl-0.1.7-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
