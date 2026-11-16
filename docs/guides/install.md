@@ -59,7 +59,10 @@ irm https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.p
   会显示计划任务状态和 `%ProgramData%\Ostium\logs\ui.log` 的末尾内容；
 - 安装目录 `%ProgramFiles%\Ostium` 会加入机器级 `PATH`。已打开的终端需要
   重新打开才能直接运行 `ostium`；也可以用完整路径
-  `& "$env:ProgramFiles\Ostium\ostium.exe" version`。
+  `& "$env:ProgramFiles\Ostium\ostium.exe" version`；
+- 交互安装的最后一步会显示 PowerShell 控制台，实时输出服务安装、启动和
+  8787 健康检查日志；`/VERYSILENT` 安装保持隐藏，但同样写入
+  `%ProgramData%\Ostium\logs\install.log`。
 
 如果 `OstiumCore` 服务没有启动，安装器仍会完成 UI 安装并启动
 <http://127.0.0.1:8787>，不会在注册登录任务之前中止。诊断顺序：

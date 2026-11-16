@@ -33,6 +33,16 @@ UninstallDisplayIcon={app}\ostium.exe
 Source: "..\..\dist\windows\Ostium\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Code]
+function IsInteractiveInstall(): Boolean;
+begin
+  Result := not WizardSilent;
+end;
+
+function IsSilentInstall(): Boolean;
+begin
+  Result := WizardSilent;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -60,7 +70,10 @@ Name: "{group}\Ostium Console"; Filename: "http://127.0.0.1:8787"
 Name: "{group}\Uninstall Ostium"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing Ostium services..."
+; Interactive installs show the PowerShell console so service startup and the
+; 8787 health check are visible in real time.  Silent installs stay hidden.
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsInteractiveInstall
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsSilentInstall
 Filename: "http://127.0.0.1:8787"; Description: "Open Ostium"; Flags: postinstall shellexec nowait skipifsilent
 
 [UninstallRun]

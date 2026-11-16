@@ -12,6 +12,9 @@ SemVer.
   treated the empty argument list as a usage request and exited, so SCM waited
   for a dispatcher and reported error 1053. Interactive commands such as
   `debug`, `install` and `remove` still use `HandleCommandLine`.
+- Interactive Windows installs now show the final service step in a visible
+  PowerShell console, with the same lines written to `install.log`. Silent
+  installs remain hidden.
 
 ## [0.1.6] - 2026-11-16
 

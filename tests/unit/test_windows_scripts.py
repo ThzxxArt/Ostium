@@ -62,6 +62,10 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert "Get-Process ostium,ostium-service,sing-box" in setup
     assert 'Filename: "http://127.0.0.1:8787"' in setup
     assert "Get-Process ostium-service, sing-box" in install
+    assert 'Write-Host "[Ostium] $Message"' in install
+    assert "Check: IsInteractiveInstall" in setup
+    assert "Check: IsSilentInstall" in setup
+    assert "Result := not WizardSilent" in setup
     assert r"SetupIconFile=..\..\assets\brand\ostium.ico" in setup
 
     service_spec = (ROOT / "deploy" / "pyinstaller" / "ostium-service.spec").read_text(

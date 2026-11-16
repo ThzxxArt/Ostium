@@ -67,6 +67,10 @@ New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $D
 $installLog = "$DataDir\logs\install.log"
 function Write-InstallLog {
     param([string]$Message)
+    # Interactive installs run this script in a visible console; keep the same
+    # lines on screen so the service step is not a black box.  Silent installs
+    # run the script hidden and still get the file log.
+    Write-Host "[Ostium] $Message"
     try {
         "[$(Get-Date -Format o)] $Message" |
             Out-File -LiteralPath $installLog -Append -Encoding utf8
