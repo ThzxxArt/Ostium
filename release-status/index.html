@@ -1022,6 +1022,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.4-to-0.1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.4 → 0.1.5 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/upgrade-0.1.3-to-0.1.4/" class="md-nav__link">
         
   
@@ -1121,15 +1149,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#014-verification-status" class="md-nav__link">
+  <a href="#015-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.4 verification status
+        0.1.5 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.4 verification status">
+    <nav class="md-nav" aria-label="0.1.5 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1182,10 +1210,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-014" class="md-nav__link">
+  <a href="#release-gates-for-015" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.4
+        Release gates for 0.1.5
       
     </span>
   </a>
@@ -1575,15 +1603,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#014-verification-status" class="md-nav__link">
+  <a href="#015-verification-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.4 verification status
+        0.1.5 verification status
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.4 verification status">
+    <nav class="md-nav" aria-label="0.1.5 verification status">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1636,10 +1664,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-014" class="md-nav__link">
+  <a href="#release-gates-for-015" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.4
+        Release gates for 0.1.5
       
     </span>
   </a>
@@ -1692,39 +1720,19 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 <tbody>
 <tr>
 <td>Version</td>
-<td><strong>0.1.4</strong></td>
+<td><strong>0.1.5</strong></td>
 </tr>
 <tr>
 <td>Status</td>
 <td><strong>Published</strong></td>
 </tr>
 <tr>
-<td>Tag</td>
-<td><code>v0.1.4</code> (annotated, commit <code>09c8605</code>)</td>
-</tr>
-<tr>
-<td>Assets</td>
-<td>GitHub Release <code>v0.1.4</code> — 23 assets, marked Latest</td>
-</tr>
-<tr>
-<td>PyPI</td>
-<td><code>ostium-ctl==0.1.4</code> (wheel + sdist)</td>
-</tr>
-<tr>
-<td>GHCR</td>
-<td><code>0.1.4</code>, <code>v0.1.4</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
-</tr>
-<tr>
-<td>Release workflow</td>
-<td>run <code>43726383707</code> — success</td>
-</tr>
-<tr>
 <td>Previous release</td>
-<td><code>v0.1.3</code>, published 2026-11-15 (23 assets, unchanged)</td>
+<td><code>v0.1.4</code>, published 2026-11-15 (23 assets, unchanged)</td>
 </tr>
 <tr>
 <td>Release type</td>
-<td>Subscriptions layout patch; no new protocols or UI redesign</td>
+<td>TOTP login, Windows client and Clash subscription fixes; no new protocols or UI redesign</td>
 </tr>
 <tr>
 <td>Source branch</td>
@@ -1737,18 +1745,31 @@ are published artifacts. They are never replaced or moved by this release.</p>
 <p>Known limitation: the <code>v0.1.1</code> tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.4 continues to fix the status at its own tag instead of rewriting published
+0.1.5 continues to fix the status at its own tag instead of rewriting published
 artifacts.</p>
-<h2 id="014-verification-status">0.1.4 verification status<a class="headerlink" href="#014-verification-status" title="Permanent link">&para;</a></h2>
+<h2 id="015-verification-status">0.1.5 verification status<a class="headerlink" href="#015-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Backend unit and in-process integration tests: 710 passed / 10 deselected;
-  94.29% statements / 90.44% branches; <code>coverage_gate.py</code> passes.</li>
-<li>Real sing-box integration tests with the pinned <code>1.14.4-ostium.1</code> core: 10 passed.</li>
-<li>Frontend typecheck, lint, unit tests, production build and formatting: 203
-  passed; 90.82/85.91/88.54/92.37.</li>
-<li><code>0.1.3 -&gt; 0.1.4</code> upgrade script: user, password material, subscription
-  token, database, backup and <code>master.key</code> survive; a 0.1.3 backup restores.</li>
+<li>Backend unit and in-process integration tests: 712 passed / 10 deselected;
+  94.32% statements / 90.49% branches; <code>coverage_gate.py</code> passes.</li>
+<li>Real sing-box integration tests with the pinned <code>1.14.4-ostium.1</code> core:
+  10 passed.</li>
+<li>Frontend typecheck, lint, unit tests, production build and formatting: 204
+  passed; 90.86/85.90/88.63/92.40.</li>
+<li>TOTP regressions: the status endpoint advertises <code>login_totp_required</code> before
+  login; six password-only attempts leave <code>failed_attempts=0</code> and
+  <code>locked_until=NULL</code>; a wrong TOTP still locks after five failures; a correct
+  TOTP logs in after the password-only challenges.</li>
+<li>Windows installer scripts parse with PowerShell 7.7; the generated
+  <code>ostium-ui.ps1</code> template parses too. The scheduled task uses a hidden
+  PowerShell wrapper, waits for <code>/healthz</code>, writes <code>ui.log</code>, and updates the
+  machine PATH.</li>
+<li>Generated Clash YAML was accepted by Mihomo 1.19.34 with <code>mihomo -t</code>; it
+  contains fake-IP DNS, <code>ipv6: false</code>, and <code>GEOIP,CN,DIRECT,no-resolve</code>.</li>
+<li><code>0.1.4 -&gt; 0.1.5</code> upgrade script: user, password material, subscription
+  token, database, backup and <code>master.key</code> survive; a 0.1.4 backup restores.</li>
+<li><code>0.1.5</code> install/reinstall/uninstall e2e passed; reinstall kept exactly one
+  administrator.</li>
 <li>Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.</li>
 <li>Rule/RE2 validation, rule-set format validation, rule-set-only tester
@@ -1776,26 +1797,24 @@ artifacts.</p>
   replacement recovery, subscription-refresh error persistence, installer
   reinstall and upgrade snapshots on Linux/macOS/Windows, validation-error
   serialization, coverage-gate stability). See <code>versions/V0.1.2_REVIEW_ROUND4.md</code>.</li>
-<li>0.1.4 subscription layout fix: long URLs truncate inside the format cards
-  using shrinkable grid tracks and a block-level URL element; a Playwright
-  regression covers a 160-character token on desktop, tablet and mobile.</li>
+<li>0.1.4 subscription layout fix (included): long URLs truncate inside the
+  format cards using shrinkable grid tracks and a block-level URL element; a
+  Playwright regression covers a 160-character token on desktop, tablet and
+  mobile.</li>
 <li>0.1.3 deployment and UI fixes (included): <code>/api/v1/system/info</code> survives
   <code>psutil.net_if_addrs()</code> raising <code>EAFNOSUPPORT</code> on VPS/container network
   stacks; first-install readiness uses the unauthenticated <code>/v1/health</code>
   endpoint; the collapsed sidebar header no longer overlaps the expand button;
   the Logs level filter keeps its width; release e2e scripts are executable and
   the sudo step preserves <code>PATH</code>. Added regression tests for these behaviors.</li>
-<li>Publication verification: <code>scripts/verify-release.sh --version 0.1.4</code>
-  downloaded all 23 assets, <code>sha256sum -c SHA256SUMS</code> passed, all five core
-  platforms are present, build attestations verified, and PyPI reports
-  <code>ostium-ctl==0.1.4</code>. The wheel and sdist SHA-256 values match between the
-  GitHub Release and PyPI.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace">Not verified in this workspace<a class="headerlink" href="#not-verified-in-this-workspace" title="Permanent link">&para;</a></h3>
 <p>These items require external hardware, accounts, runners or time. They are
 <strong>not</strong> claimed as verified:</p>
 <ul>
-<li>Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.</li>
+<li>Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
+  The 0.1.5 scheduled-task/PATH fix was syntax-checked with PowerShell 7.7 but
+  not executed on a Windows host in this workspace.</li>
 <li>macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.</li>
 <li>Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.</li>
 <li>Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.</li>
@@ -1832,11 +1851,11 @@ evidence is in <code>versions/V0.1.2_RC_REPORT.md</code>:</p>
   unless signing credentials are supplied.</li>
 <li><strong>D-115</strong> Push, tag and publication require explicit release-owner approval.</li>
 </ul>
-<h2 id="release-gates-for-014">Release gates for 0.1.4<a class="headerlink" href="#release-gates-for-014" title="Permanent link">&para;</a></h2>
+<h2 id="release-gates-for-015">Release gates for 0.1.5<a class="headerlink" href="#release-gates-for-015" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Code and automation</strong>: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.</li>
-<li><strong>Upgrade and data</strong>: <code>0.1.3 -&gt; 0.1.4</code> upgrade plus backup restore;
+<li><strong>Upgrade and data</strong>: <code>0.1.4 -&gt; 0.1.5</code> upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.</li>
 <li><strong>Platform evidence</strong>: record only what was actually executed; unexecuted
