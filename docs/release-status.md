@@ -8,10 +8,10 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.8** |
+| Version | **0.1.9** |
 | Status | **Published** |
-| Previous release | `v0.1.7`, published 2026-11-16 (23 assets, unchanged) |
-| Release type | Windows UI launcher patch; no new protocols or UI redesign |
+| Previous release | `v0.1.8`, published 2026-11-16 (23 assets, unchanged) |
+| Release type | Server IPv4-only DNS/egress patch; no client reinstall required |
 | Source branch | `main` |
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
@@ -20,10 +20,10 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.8 continues to fix the status at its own tag instead of rewriting published
+0.1.9 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
-## 0.1.8 verification status
+## 0.1.9 verification status
 
 ### Verified locally
 
@@ -63,9 +63,14 @@ artifacts.
   `ostium-service`/`sing-box` processes, and embeds the Ostium icon.
 - Generated Clash YAML was accepted by Mihomo 1.19.34 with `mihomo -t`; it
   contains fake-IP DNS, `ipv6: false`, and `GEOIP,CN,DIRECT,no-resolve`.
-- `0.1.7 -> 0.1.8` upgrade script: user, password material, subscription
-  token, database, backup and `master.key` survive; a 0.1.7 backup restores.
-- `0.1.8` install/reinstall/uninstall e2e passed; reinstall kept exactly one
+- Server IPv4-only failure reproduced: `curl -4` returned 200 for Google and
+  Hugging Face, `curl -6` failed, while IPv4-only GitHub worked. Generated
+  server config now uses `dns.strategy: ipv4_only` and
+  `route.default_domain_resolver` to the internal `local` server; `sing-box
+  check` accepts it.
+- `0.1.8 -> 0.1.9` upgrade script: user, password material, subscription
+  token, database, backup and `master.key` survive; a 0.1.8 backup restores.
+- `0.1.9` install/reinstall/uninstall e2e passed; reinstall kept exactly one
   administrator.
 - Cross-directory backup restore (v2 streaming), missing-master-key rejection,
   checksum/tamper/truncation rejection and v1 backup import.
@@ -111,10 +116,10 @@ These items require external hardware, accounts, runners or time. They are
 **not** claimed as verified:
 
 - Windows 11 runtime: setup, service, TUN/Wintun, PAC, SmartScreen, uninstall.
-  The 0.1.8 installer (UI launcher wrapper, service dispatcher entry, live
-  installer logs, aiosqlite, icon) was not executed on a Windows host in this
-  workspace. The 0.1.5/0.1.6/0.1.7 failures were reproduced from user logs and
-  `sc qc`, and the script changes were syntax-checked with PowerShell 7.7.
+  The 0.1.9 server IPv4-only fix was validated by generated-config checks and
+  user logs, but not by a full external Windows/server matrix. The 0.1.5/0.1.6/
+  0.1.7 Windows failures were reproduced from user logs and `sc qc`, and the
+  script changes were syntax-checked with PowerShell 7.7.
 - macOS 14 runtime: launchd, utun, system proxy, DMG, Gatekeeper, notarization.
 - Debian 12/13, RHEL 9, non-systemd (OpenRC/runit/s6/supervisor) real machines.
 - Nginx TLS/WebSocket/IP allowlist on a real reverse proxy.
@@ -155,11 +160,11 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.8
+## Release gates for 0.1.9
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.7 -> 0.1.8` upgrade plus backup restore;
+2. **Upgrade and data**: `0.1.8 -> 0.1.9` upgrade plus backup restore;
    missing-key and corruption rejection. The installer's staged rollback files
    and the database snapshot are the recovery path if health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted

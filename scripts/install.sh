@@ -6,7 +6,7 @@
 # --no-service installs files only, for OpenRC/runit/s6/supervisord or manual use.
 #
 # Usage:
-#   sudo ./install.sh --role server --wheel ./ostium_ctl-0.1.8-py3-none-any.whl \
+#   sudo ./install.sh --role server --wheel ./ostium_ctl-0.1.9-py3-none-any.whl \
 #        --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz --domain vpn.example.com
 #   sudo ./install.sh --role client --wheel ... --core ...
 #   sudo ./install.sh --role server ... --run-as-root

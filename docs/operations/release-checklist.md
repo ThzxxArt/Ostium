@@ -33,7 +33,7 @@ a published asset is never replaced.
       macOS DMG, Linux DEB/AppImage, Docker staging image, installers, manifest,
       SBOM and `SHA256SUMS` from that tag.
 - [ ] The workflow creates a **draft** release, verifies its checksum manifest,
-      runs real-core integration and `0.1.7 -> current` upgrade e2e, then
+      runs real-core integration and `0.1.8 -> current` upgrade e2e, then
       publishes PyPI.
 - [ ] Only after PyPI succeeds are GHCR tags `X.Y.Z`/`vX.Y.Z`/`latest`
       promoted from the verified digest, and the draft is made public.

@@ -1,32 +1,34 @@
-# Ostium v0.1.8
+# Ostium v0.1.9
 
-This is a Windows client patch release. It fixes the UI launcher that killed the
-8787 server after uvicorn wrote normal startup INFO to stderr.
+This is a server-side DNS/egress patch for IPv4-only VPS hosts. Clients do not
+need to be reinstalled.
 
 ## Fixed
 
-- **UI launcher.** The generated `ostium-ui.ps1` used
-  `$ErrorActionPreference = "Stop"` around `ostium.exe serve`. PowerShell treated
-  uvicorn's normal stderr output as a terminating error and ended the child,
-  leaving 8787 without a listener even while `OstiumCore` was running. The
-  launcher now uses `Continue`, writes all output to `ui.log`, and checks the
-  process exit code.
-- **Existing Windows fixes included:** no-argument service dispatcher entry
-  (1053), `aiosqlite` bundling, live service logs in interactive installers,
-  UI installer fallback, orphan cleanup and the Ostium icon.
+- **IPv4-only server DNS.** Server-generated sing-box configurations now set
+  `dns.strategy: ipv4_only` and route outbound domain resolution through the
+  internal `local` DNS server. Previously an IPv4-only VPS could resolve Google
+  or Hugging Face to AAAA, time out on the direct outbound, and make the client
+  fail the TLS handshake after a successful HTTP CONNECT. IPv4-only GitHub
+  worked, which made the failure look domain-specific.
+- **Included Windows fixes:** the 0.1.8 UI launcher no longer treats uvicorn's
+  stderr as a terminating error; the 0.1.7 service dispatcher entry, 0.1.6
+  `aiosqlite` bundle, live installer logs, diagnostics and icon remain included.
 
 ## Upgrade notes
 
-- `0.1.7 -> 0.1.8` keeps the database, users, credentials, subscription tokens,
+- `0.1.8 -> 0.1.9` keeps the database, users, credentials, subscription tokens,
   certificates, backups and master key.
-- Windows should run the new `Ostium-0.1.8-windows-x64-setup.exe` over 0.1.7.
-- If the browser still shows the cached "cannot read authentication status"
-  page, clear site data/Service Worker for `127.0.0.1:8787` or use a private
-  window.
-- 0.1.8 has no server-side feature changes. A server already on 0.1.7 can stay
-  there; upgrading from 0.1.5 or earlier also brings the TOTP and Clash fixes.
-- Windows/macOS binaries are unsigned unless the release owner supplies signing
-  certificates.
+- Upgrade the server, then disconnect/reconnect the client or wait for the
+  watchdog to apply the new configuration. No Windows installer update is
+  required for this release.
+- The server must have working IPv4 egress. IPv6 is intentionally not used by
+  the generated server DNS; `ipv4_only` avoids IPv4-only VPS failures.
+- Online users are counted by a 60-second traffic window, not by TCP connection
+  state. A disconnected client clears after the window; closing only the browser
+  does not disconnect the tunnel.
+- Windows/macOS binaries remain unsigned unless the release owner supplies
+  signing certificates.
 
 ## Verified
 
@@ -35,21 +37,20 @@ This is a Windows client patch release. It fixes the UI launcher that killed the
 - Frontend: 204 tests passed; typecheck, lint, Prettier and production build
   passed.
 - Playwright: 73 passed, 2 skipped.
-- `0.1.7 -> 0.1.8` upgrade and encrypted-backup restore passed; install,
+- `0.1.8 -> 0.1.9` upgrade and encrypted-backup restore passed; install,
   reinstall and uninstall e2e passed.
-- Windows installer scripts parsed with PowerShell 7.7; the launcher regression
-  asserts `ErrorActionPreference = "Continue"`.
-- The 0.1.7 UI failure was reproduced from `ui.log`: uvicorn started, PowerShell
-  emitted `NativeCommandError`, then the wrapper exited with code 1.
+- Generated server configuration with `dns.strategy: ipv4_only` and
+  `route.default_domain_resolver` passes `sing-box check`.
+- The reported failure was reproduced from the server: IPv4 `curl` returned 200
+  for Google/Hugging Face, IPv6 failed, while GitHub was IPv4-only and worked.
 
 ## Not verified / accepted blockers
 
 The following were not executed in the workspace and are not claimed as
-verified: Windows 11 runtime of the 0.1.8 installer, macOS 14 runtime,
-Debian/RHEL real machines, Nginx, Docker runtime, real ACME against a public
-domain, real TUN, 72-hour soak, performance measurements and platform code
-signing. The 0.1.8 launcher fix is validated by the reproduced 0.1.7 log and
-source tests; the new installer still needs a real Windows run.
+verified: Windows 11 runtime, macOS 14 runtime, Debian/RHEL real machines,
+Nginx, Docker runtime, real ACME against a public domain, real TUN, 72-hour
+soak, performance measurements and platform code signing. The IPv4-only fix is
+validated by generated-config checks and the server/client evidence above.
 
 ## Signing and artifacts
 
@@ -66,6 +67,6 @@ staged backup for retry and restores the previous database on error.
 ## Documentation
 
 - `docs/release-status.md`
-- `docs/operations/upgrade-0.1.7-to-0.1.8.md`
+- `docs/operations/upgrade-0.1.8-to-0.1.9.md`
 - `docs/guides/install.md`
 - `docs/guides/client.md`

@@ -3,7 +3,7 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
-## [Unreleased]
+## [0.1.9] - 2026-11-16
 
 ### Fixed
 
@@ -12,6 +12,10 @@ SemVer.
   On an IPv4-only VPS, Google and Hugging Face were resolved to AAAA, the
   direct outbound timed out, and clients saw a TLS handshake failure while
   IPv4-only GitHub worked.
+
+### Documentation
+
+- Added the 0.1.8 -> 0.1.9 IPv4-only server upgrade and IPv6 port notes.
 
 ## [0.1.8] - 2026-11-16
 

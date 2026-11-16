@@ -37,7 +37,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--release-version",
-        default=os.environ.get("OSTIUM_RELEASE_VERSION", "0.1.8"),
+        default=os.environ.get("OSTIUM_RELEASE_VERSION", "0.1.9"),
         help="Ostium release tag/version that hosts the core archives",
     )
     parser.add_argument("--output", type=Path, default=Path("dist/core-manifest.json"))
