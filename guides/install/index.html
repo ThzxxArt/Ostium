@@ -1900,7 +1900,12 @@
 <ul>
 <li><code>OstiumCore</code> 服务以 LocalSystem 运行 TUN 核心；</li>
 <li>核心数据、token、last-good 配置在 <code>%ProgramData%\OstiumCore</code>（仅 SYSTEM/Administrators 可写）；</li>
-<li>Web UI 在当前用户登录时启动，数据在 <code>%ProgramData%\Ostium</code>。</li>
+<li>Web UI 在当前用户登录时启动，数据在 <code>%ProgramData%\Ostium</code>；</li>
+<li>安装器会等待 <code>http://127.0.0.1:8787/healthz</code> 返回成功后才报告完成；失败时
+  会显示计划任务状态和 <code>%ProgramData%\Ostium\logs\ui.log</code> 的末尾内容；</li>
+<li>安装目录 <code>%ProgramFiles%\Ostium</code> 会加入机器级 <code>PATH</code>。已打开的终端需要
+  重新打开才能直接运行 <code>ostium</code>；也可以用完整路径
+  <code>&amp; "$env:ProgramFiles\Ostium\ostium.exe" version</code>。</li>
 </ul>
 <p>需要连 UI 也以 SYSTEM 运行时：</p>
 <div class="highlight"><pre><span></span><code><span class="p">&amp;</span> <span class="p">(</span><span class="no">[scriptblock]</span><span class="p">::</span><span class="n">Create</span><span class="p">((</span><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">ThzxxArt</span><span class="p">/</span><span class="n">Ostium</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">latest</span><span class="p">/</span><span class="n">download</span><span class="p">/</span><span class="nb">install-online</span><span class="p">.</span><span class="n">ps1</span><span class="p">)))</span> <span class="n">-RunAsSystem</span>
