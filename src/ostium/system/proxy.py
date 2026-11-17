@@ -52,6 +52,34 @@ def _read_state(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _proxy_targets_local(value: object, port: int) -> bool:
+    """Recognise a WinINET proxy value that points at this install's port."""
+
+    if value is None:
+        return False
+    text = str(value).strip()
+    if not text:
+        return False
+    entries = [text]
+    if ";" in text:
+        entries = [entry for entry in text.split(";") if entry]
+    for entry in entries:
+        candidate = entry.split("=", 1)[-1].strip()
+        if candidate in {"127.0.0.1", "localhost"}:
+            candidate = f"{candidate}:80"
+        for prefix in ("http://", "https://", "socks://", "socks5://"):
+            if candidate.lower().startswith(prefix):
+                candidate = candidate[len(prefix) :]
+        host, _, raw_port = candidate.rpartition(":")
+        if host.strip("[]") in {"127.0.0.1", "localhost", "::1"}:
+            try:
+                if int(raw_port) == int(port):
+                    return True
+            except (TypeError, ValueError):
+                continue
+    return False
+
+
 def _write_state(path: Path, state: dict[str, Any]) -> None:
     import tempfile
 
@@ -93,6 +121,12 @@ class BaseProxy:
             "host": state.get("host", "127.0.0.1"),
             "port": state.get("port", self.settings.mixed_port),
         }
+
+    def is_owned(self, host: str = "127.0.0.1", port: int | None = None) -> bool:
+        """Return True when the platform proxy clearly belongs to this install."""
+
+        expected_port = int(port or self.settings.mixed_port)
+        return self._already_enabled(host, expected_port)
 
     def _already_enabled(self, host: str, port: int) -> bool:
         state = _read_state(self.state_path).get(STATE_KEY, {})
@@ -475,6 +509,33 @@ class WindowsProxy(BaseProxy):
     def supported(self) -> bool:
         return sys.platform == "win32"
 
+    def _registry_values(self) -> dict[str, Any]:
+        import winreg  # pragma: no cover - Windows only
+
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+        values: dict[str, Any] = {}
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ) as key:
+            for name in ("ProxyEnable", "ProxyServer", "ProxyOverride", "AutoConfigURL"):
+                try:
+                    values[name] = winreg.QueryValueEx(key, name)[0]
+                except FileNotFoundError:
+                    values[name] = None
+        return values
+
+    def is_owned(self, host: str = "127.0.0.1", port: int | None = None) -> bool:
+        expected_port = int(port or self.settings.mixed_port)
+        if self._already_enabled(host, expected_port):
+            return True
+        if sys.platform != "win32":  # pragma: no cover - Windows only
+            return False
+        try:
+            values = self._registry_values()
+        except OSError:  # pragma: no cover - Windows only
+            return False
+        return bool(values.get("ProxyEnable")) and _proxy_targets_local(
+            values.get("ProxyServer"), expected_port
+        )
+
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
         if self._already_enabled(host, port):
@@ -530,9 +591,28 @@ class WindowsProxy(BaseProxy):
         state = _read_state(self.state_path)
         entry = state.get(STATE_KEY, {})
         if not entry.get("enabled"):
-            # Without a state entry Ostium never changed this user's proxy.
-            # Clearing ProxyEnable/ProxyServer here used to destroy a manual
-            # proxy configuration that this process did not create.
+            # The state file can be lost (profile reset, backup restore) while
+            # WinINET still points at our mixed port.  Restore only a proxy we
+            # can prove belongs to this install; never clear a manual proxy.
+            try:
+                values = self._registry_values()
+            except OSError:  # pragma: no cover - Windows only
+                return self.status()
+            if not (
+                values.get("ProxyEnable")
+                and _proxy_targets_local(values.get("ProxyServer"), self.settings.mixed_port)
+            ):
+                return self.status()
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ | winreg.KEY_WRITE
+            ) as key:
+                winreg.SetValueEx(key, "ProxyEnable", 0, winreg.REG_DWORD, 0)
+                try:
+                    winreg.DeleteValue(key, "ProxyServer")
+                except FileNotFoundError:
+                    pass
+            _notify_wininet()
             return self.status()
         original = entry.get("original") or {}
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"

@@ -12,22 +12,27 @@ export function useStatus() {
   const serverHost = ref<string | null>(null)
   const loading = ref(false)
   let timer: number | null = null
+  let requestId = 0
 
   async function refresh() {
     if (document.hidden) return
     if (!auth.authenticated) return
+    const current = ++requestId
     loading.value = true
     try {
       const info = await api.system.info()
+      // A slow response from before a restart must not overwrite the newer
+      // version that a later request already observed.
+      if (current !== requestId) return
       version.value = info.app.version
       mode.value = info.mode
       serverHost.value = info.server_host
       coreRunning.value = Boolean((info.core as Record<string, unknown>).running)
       coreReachable.value = true
     } catch {
-      coreReachable.value = false
+      if (current === requestId) coreReachable.value = false
     } finally {
-      loading.value = false
+      if (current === requestId) loading.value = false
     }
   }
 

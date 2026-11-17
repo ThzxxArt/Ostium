@@ -171,7 +171,11 @@ def test_readyz_success_and_failure(tmp_path: Path) -> None:
         services.engine.client.status = running  # type: ignore[method-assign]
         ready = client.get("/readyz")
         assert ready.status_code == 200
-        assert ready.json() == {"ready": True, "checks": {"database": True, "core": True}}
+        payload = ready.json()
+        assert payload["ready"] is True
+        assert payload["checks"] == {"database": True, "core": True}
+        assert payload["core_running"] is True
+        assert payload["version"]
 
         async def down() -> dict:
             raise RuntimeError("down")

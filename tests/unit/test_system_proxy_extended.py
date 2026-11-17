@@ -456,3 +456,33 @@ def test_proxy_state_write_is_atomic(tmp_path: Path, monkeypatch) -> None:
         proxy_module._write_state(path, {"system_proxy": {"enabled": False}})
     # The original document must survive a failure during the replacement.
     assert path.read_text(encoding="utf-8") == original
+
+
+def test_windows_proxy_state_loss_still_restores_our_own_port(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: dict[str, Any] = {
+        "ProxyEnable": 1,
+        "ProxyServer": f"127.0.0.1:{settings.mixed_port}",
+    }
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    assert proxy.is_owned() is True
+    proxy.disable()
+    assert store["ProxyEnable"] == 0
+    assert "ProxyServer" not in store
+
+
+def test_windows_proxy_state_loss_leaves_manual_proxy_alone(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: dict[str, Any] = {"ProxyEnable": 1, "ProxyServer": "proxy.example:3128"}
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    assert proxy.is_owned() is False
+    proxy.disable()
+    assert store == {"ProxyEnable": 1, "ProxyServer": "proxy.example:3128"}

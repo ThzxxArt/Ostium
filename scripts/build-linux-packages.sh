@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2 ;;
     --skip-appimage) SKIP_APPIMAGE="true"; shift ;;
     -h|--help)
-      echo "usage: $0 --version 0.1.10 --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
+      echo "usage: $0 --version X.Y.Z --arch amd64 --core ostium-core-*.tar.gz [--out DIR] [--skip-appimage]"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;

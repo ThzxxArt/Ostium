@@ -21,6 +21,8 @@ import type {
   SystemInfo,
   TrafficPoint,
   User,
+  Provenance,
+  SelfTestResult,
 } from './types'
 
 const v1 = '/api/v1'
@@ -264,7 +266,13 @@ export const api = {
   },
   system: {
     info: () => http.get<SystemInfo>(`${v1}/system/info`),
-    doctor: () => http.get<{ checks: DoctorCheck[]; generated_at: string }>(`${v1}/system/doctor`),
+    provenance: () => http.get<Provenance>(`${v1}/system/provenance`),
+    selftest: (target = 'google') =>
+      http.get<SelfTestResult>(`${v1}/system/selftest?target=${encodeURIComponent(target)}`),
+    doctor: () =>
+      http.get<{ checks: DoctorCheck[]; generated_at: string; version?: string }>(
+        `${v1}/system/doctor`,
+      ),
     proxy: (enabled: boolean) =>
       http.post<{ supported: boolean; enabled: boolean; platform: string }>(`${v1}/system/proxy`, {
         enabled,

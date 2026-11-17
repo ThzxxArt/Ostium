@@ -121,10 +121,17 @@ if [[ "$UNINSTALL" != "true" ]]; then
     echo "请提供 --core /path/to/ostium-core-*.tar.gz" >&2
     exit 2
   fi
+  EXPECTED_VERSION="$(basename "$WHEEL" | sed -n 's/^ostium_ctl-\([0-9][^-]*\)-.*/\1/p')"
+  if [[ -z "$EXPECTED_VERSION" ]]; then
+    echo "无法从 wheel 文件名解析版本：$WHEEL" >&2
+    exit 2
+  fi
   if [[ -n "$PYTHON_BIN" && ! -x "$PYTHON_BIN" ]]; then
     echo "--python 不可执行：$PYTHON_BIN" >&2
     exit 2
   fi
+else
+  EXPECTED_VERSION=""
 fi
 PASSWORD_GENERATED="false"
 DB_PREEXISTING="false"
@@ -309,6 +316,71 @@ wait_for_url() {
   return 1
 }
 
+health_version() {
+  local url="$1" body
+  body="$(curl -fsSk --max-time 2 "$url" 2>/dev/null || true)"
+  printf '%s' "$body" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+}
+
+wait_for_version() {
+  # HTTP 200 alone proves nothing: a stale process can keep answering the
+  # health endpoint after an upgrade.  Compare the body's version.
+  local url="$1" expected="$2"
+  for _ in $(seq 1 40); do
+    if [[ "$(health_version "$url")" == "$expected" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+port_owner() {
+  local port="$1" owner=""
+  if command -v ss >/dev/null 2>&1; then
+    owner="$(ss -lntp "sport = :$port" 2>/dev/null | awk 'NR>1 {print; exit}')"
+  fi
+  if [[ -z "$owner" ]] && command -v lsof >/dev/null 2>&1; then
+    owner="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print; exit}')"
+  fi
+  if [[ -z "$owner" ]] && command -v fuser >/dev/null 2>&1; then
+    owner="$(fuser -n tcp "$port" 2>/dev/null || true)"
+    [[ -n "$owner" ]] && owner="fuser: $owner"
+  fi
+  printf '%s' "$owner"
+}
+
+stop_previous_listener() {
+  # Stop only a listener that is clearly an Ostium/sing-box process.  Unknown
+  # owners are reported and left alone; the caller then fails with evidence.
+  local port="$1" owner pid cmd exe
+  owner="$(port_owner "$port")"
+  [[ -z "$owner" ]] && return 0
+  pid="$(printf '%s' "$owner" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)"
+  if [[ -z "$pid" ]]; then
+    pid="$(printf '%s' "$owner" | grep -oE '[0-9]+' | head -1)"
+  fi
+  if [[ -n "$pid" && -d "/proc/$pid" ]]; then
+    cmd="$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)"
+    exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+    if [[ "$cmd" == *ostium* || "$exe" == *ostium* || "$cmd" == *sing-box* || "$exe" == *sing-box* ]]; then
+      echo "停止占用端口 $port 的旧进程 pid=$pid：$cmd" >&2
+      kill "$pid" 2>/dev/null || true
+      for _ in $(seq 1 10); do
+        [[ -z "$(port_owner "$port")" ]] && return 0
+        sleep 1
+      done
+      kill -9 "$pid" 2>/dev/null || true
+      sleep 1
+      [[ -z "$(port_owner "$port")" ]] && return 0
+      echo "旧进程未能释放端口 $port" >&2
+      return 1
+    fi
+  fi
+  echo "端口 $port 被未知进程占用：$owner" >&2
+  return 1
+}
+
 wait_for_core() {
   # A client with no profile (or a server with nothing applied yet) reports
   # running=false but is healthy.  Require the core API to answer, not a
@@ -324,14 +396,16 @@ wait_for_core() {
 
 wait_for_core_ready() {
   # A reachable core API is not enough: sing-box may have failed to bind a
-  # port or load the generated configuration.  The installer must not report
-  # success while the proxy is down.
+  # port or load the generated configuration, and the core may be the previous
+  # release.  The installer must not report success while the proxy is down or
+  # belongs to a different build.
   for _ in $(seq 1 30); do
     # /v1/status requires the core bearer token; /v1/health is the
     # unauthenticated liveness endpoint and reports the child process state.
     body="$(curl -fsS --max-time 2 http://127.0.0.1:8788/v1/health 2>/dev/null || true)"
-    body="${body// /}"
-    if [[ "$body" == *'"running":true'* ]]; then
+    compact="${body// /}"
+    if [[ "$compact" == *'"running":true'* ]] \
+      && [[ -z "${EXPECTED_VERSION:-}" || "$compact" == *"\"version\":\"$EXPECTED_VERSION\""* ]]; then
       return 0
     fi
     sleep 1
@@ -815,6 +889,16 @@ EOF
     systemctl daemon-reload
     systemctl enable ostium-core ostium
     if [[ "$START" == "true" ]]; then
+      if ! stop_previous_listener "$UI_PORT"; then
+        if [[ "$UPGRADE" == "true" ]]; then
+          rollback_control_plane "port owner check"
+        else
+          exit 1
+        fi
+      fi
+      if [[ "$UPGRADE" != "true" ]] && ! stop_previous_listener 8788; then
+        exit 1
+      fi
       systemctl restart ostium-core
       systemctl restart ostium
       if [[ "$UPGRADE" == "true" ]]; then
@@ -824,29 +908,30 @@ EOF
         fi
         HEALTH_SCHEME="http"
         [[ "$PUBLIC_UI" == "true" ]] && HEALTH_SCHEME="https"
-        if ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz" \
+        if ! wait_for_version "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/healthz" "$EXPECTED_VERSION" \
           || ! wait_for_url "$HEALTH_SCHEME://127.0.0.1:$UI_PORT/readyz"; then
           # An expired Public UI certificate intentionally starts a plaintext
           # loopback recovery console.  Rolling the upgrade back would leave the
           # operator on the older release and still locked out; accept the
           # recovery listener and let the renewal loop repair TLS.
           if [[ "$HEALTH_SCHEME" == "https" ]] \
+            && wait_for_version "http://127.0.0.1:$UI_PORT/healthz" "$EXPECTED_VERSION" \
             && wait_for_url "http://127.0.0.1:$UI_PORT/readyz"; then
             echo "警告：Public UI 证书不可用，当前运行回环恢复台；升级继续，请在恢复台完成续期。" >&2
           else
-            rollback_control_plane "control plane health/readiness check"
+            rollback_control_plane "control plane health/readiness/version check"
           fi
         fi
         rm -rf "$PREFIX/venv.old"
         rm -f "$DATA/core/sing-box.old"
       else
         if ! wait_for_core_ready; then
-          echo "首次安装失败：核心服务未运行 sing-box，请检查 $DATA/logs/core.log" >&2
+          echo "首次安装失败：核心服务未运行 sing-box 或版本不是 $EXPECTED_VERSION，请检查 $DATA/logs/core.log" >&2
           systemctl status ostium-core --no-pager >&2 || true
           exit 1
         fi
-        if ! wait_for_url "http://127.0.0.1:$UI_PORT/healthz"; then
-          echo "首次安装健康检查失败：http://127.0.0.1:$UI_PORT/healthz 无响应" >&2
+        if ! wait_for_version "http://127.0.0.1:$UI_PORT/healthz" "$EXPECTED_VERSION"; then
+          echo "首次安装健康检查失败：http://127.0.0.1:$UI_PORT/healthz 未报告版本 $EXPECTED_VERSION" >&2
           systemctl status ostium --no-pager >&2 || true
           exit 1
         fi
@@ -1011,4 +1096,21 @@ Ostium 客户端已安装。
 
 下一步：打开 Web UI，完成向导并导入订阅。
 EOF
+fi
+
+INSTALLED_VERSION="$("$PREFIX/venv/bin/ostium" version --json 2>/dev/null \
+  | "$PREFIX/venv/bin/python" -c 'import json,sys; print(json.load(sys.stdin).get("version", ""))' 2>/dev/null || true)"
+if [[ -z "$INSTALLED_VERSION" || "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+  echo "安装后版本校验失败：CLI 报告 '${INSTALLED_VERSION:-unknown}'，期望 '$EXPECTED_VERSION'" >&2
+  exit 1
+fi
+echo "版本校验通过：Ostium $INSTALLED_VERSION"
+
+if [[ "$ROLE" == "client" && "$RUN_AS_ROOT" == "true" && "$START" == "true" \
+  && "$NO_SERVICE" != "true" ]] && systemd_available; then
+  if ! wait_for_version "http://127.0.0.1:8787/healthz" "$EXPECTED_VERSION"; then
+    echo "客户端 UI 未在 8787 报告版本 $EXPECTED_VERSION" >&2
+    systemctl status ostium --no-pager >&2 || true
+    exit 1
+  fi
 fi

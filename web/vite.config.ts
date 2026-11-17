@@ -1,10 +1,20 @@
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 import { ostiumPwa } from './pwa.ts'
 
+const VERSION = readFileSync(new URL('../VERSION', import.meta.url), 'utf8').trim()
+const COMMIT = process.env.OSTIUM_BUILD_COMMIT ?? process.env.GITHUB_SHA ?? ''
+const BUILT_AT = process.env.OSTIUM_BUILD_TIME ?? new Date().toISOString()
+
 export default defineConfig({
-  plugins: [vue(), ostiumPwa()],
+  plugins: [vue(), ostiumPwa({ version: VERSION, commit: COMMIT, builtAt: BUILT_AT })],
+  define: {
+    __APP_VERSION__: JSON.stringify(VERSION),
+    __BUILD_COMMIT__: JSON.stringify(COMMIT),
+    __BUILD_TIME__: JSON.stringify(BUILT_AT),
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

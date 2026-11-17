@@ -594,6 +594,15 @@ export default {
     backup_plaintext_warning:
       'An unencrypted backup contains master.key and the full database. Store it on encrypted media.',
     backup_plaintext_ack: 'I understand the risk and want an unencrypted backup',
+    about: 'About',
+    about_control_plane: 'Control plane version',
+    about_commit: 'Commit',
+    about_pid: 'Control plane PID',
+    about_listener: 'Listening socket',
+    about_core: 'Core version',
+    about_web: 'Web bundle',
+    about_unavailable: 'Provenance is unavailable; the control plane may be older than 0.1.11.',
+    about_mismatch: 'Version mismatch:',
   },
   system: {
     title: 'System',

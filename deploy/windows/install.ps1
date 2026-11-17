@@ -3,6 +3,7 @@ param(
     [string]$InstallDir = "$env:ProgramFiles\Ostium",
     [string]$DataDir = "$env:ProgramData\Ostium",
     [string]$CoreDataDir = "$env:ProgramData\OstiumCore",
+    [string]$ExpectedVersion = "",
     [switch]$RunAsSystem,
     [switch]$SkipPathUpdate
 )
@@ -65,6 +66,80 @@ $ServiceDir = Join-Path $InstallDir "service"
 $CoreDir = Join-Path $InstallDir "core"
 New-Item -ItemType Directory -Force -Path $InstallDir, $ServiceDir, $CoreDir, $DataDir, "$DataDir\runtime", "$DataDir\logs", $CoreDataDir, "$CoreDataDir\runtime", "$CoreDataDir\logs" | Out-Null
 $installLog = "$DataDir\logs\install.log"
+
+function Read-ExpectedVersion {
+    if ($ExpectedVersion) { return $ExpectedVersion.TrimStart("v") }
+    $versionFile = Join-Path $InstallDir "VERSION"
+    if (Test-Path $versionFile) {
+        $value = (Get-Content -LiteralPath $versionFile -TotalCount 1).Trim()
+        if ($value) { return $value.TrimStart("v") }
+    }
+    return ""
+}
+
+function Get-ConfiguredUiPort {
+    $config = Join-Path $DataDir "config.toml"
+    if (Test-Path $config) {
+        foreach ($line in Get-Content -LiteralPath $config) {
+            if ($line -match '^\s*port\s*=\s*(\d{1,5})\s*$') {
+                return [int]$Matches[1]
+            }
+        }
+    }
+    return 8787
+}
+
+function Get-PortOwner([int]$Port) {
+    $connection = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $connection) { return $null }
+    $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        Port = $Port
+        Pid = [int]$connection.OwningProcess
+        Name = if ($process) { $process.ProcessName } else { "" }
+        Path = if ($process) { $process.Path } else { "" }
+        StartTime = if ($process) { $process.StartTime } else { $null }
+    }
+}
+
+function Test-OstiumOwnedProcess($Owner) {
+    if (-not $Owner) { return $false }
+    $knownNames = @("ostium", "ostium-service", "ostium-service.exe", "sing-box", "sing-box.exe")
+    if ($knownNames -contains $Owner.Name) { return $true }
+    if (-not $Owner.Path) { return $false }
+    $roots = @(
+        [IO.Path]::GetFullPath($InstallDir),
+        [IO.Path]::GetFullPath($DataDir),
+        [IO.Path]::GetFullPath($CoreDataDir),
+        [IO.Path]::GetFullPath("$env:ProgramFiles\Ostium"),
+        [IO.Path]::GetFullPath("$env:ProgramData\Ostium"),
+        [IO.Path]::GetFullPath("$env:ProgramData\OstiumCore")
+    )
+    $candidate = [IO.Path]::GetFullPath($Owner.Path)
+    foreach ($root in $roots) {
+        if ($candidate.StartsWith($root.TrimEnd([char[]]('\', '/')) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Stop-PreviousOstium([int]$Port) {
+    $owner = Get-PortOwner $Port
+    if (-not $owner) { return }
+    if (-not (Test-OstiumOwnedProcess $owner)) {
+        throw ("Port {0} is already owned by pid {1} ({2} at {3}). Refusing to install over an unknown process; stop it or change the UI port." -f `
+            $owner.Port, $owner.Pid, $owner.Name, $owner.Path)
+    }
+    Write-InstallLog ("stopping previous Ostium listener pid={0} path={1} on port {2}" -f $owner.Pid, $owner.Path, $owner.Port)
+    Stop-Process -Id $owner.Pid -Force -ErrorAction SilentlyContinue
+    for ($i = 0; $i -lt 15; $i++) {
+        Start-Sleep -Milliseconds 400
+        if (-not (Get-PortOwner $Port)) { return }
+    }
+    throw "Previous Ostium process did not release port $Port"
+}
 function Write-InstallLog {
     param([string]$Message)
     # Interactive installs run this script in a visible console; keep the same
@@ -133,6 +208,13 @@ mode = "system_proxy"
 "@
     [IO.File]::WriteAllText($uiConfig, $uiToml)
 }
+
+$ExpectedVersion = Read-ExpectedVersion
+if (-not $ExpectedVersion) {
+    throw "The installer bundle does not contain a VERSION file and -ExpectedVersion was not provided; refusing to report success without a version assertion."
+}
+$UiPort = Get-ConfiguredUiPort
+Write-InstallLog "expected version $ExpectedVersion; UI port $UiPort"
 
 # All client platforms use the same first-run wizard; do not create an
 # administrator or a plaintext password file during installation.
@@ -230,6 +312,10 @@ if (Get-Service -Name OstiumCore -ErrorAction SilentlyContinue) {
 # it would keep port 8788 occupied and make the new service exit immediately.
 Get-Process ostium-service, sing-box -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
+# Image-name cleanup misses `python.exe -m ostium serve`, which is exactly the
+# process that made an old release keep answering /healthz after an upgrade.
+Stop-PreviousOstium $UiPort
+if ($UiPort -ne 8788) { Stop-PreviousOstium 8788 }
 Write-InstallLog "installing OstiumCore service"
 & $serviceExe --startup auto install
 if ($LASTEXITCODE -ne 0) {
@@ -303,11 +389,12 @@ Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction Silentl
 Register-ScheduledTask -TaskName "Ostium" -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName "Ostium"
 
-# Do not report success before the UI actually answers.  The old installer
-# returned immediately, so a broken scheduled task or a missing web bundle
-# looked like a successful install and the browser showed a connection error.
-$healthUrl = "http://127.0.0.1:8787/healthz"
+# Do not report success before the UI actually answers with the expected
+# version.  A stale process returning HTTP 200 used to make the installer
+# declare success while the browser kept showing the previous release.
+$healthUrl = "http://127.0.0.1:$UiPort/healthz"
 $ready = $false
+$lastHealth = ""
 for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 1
     try {
@@ -319,17 +406,31 @@ for ($i = 0; $i -lt 60; $i++) {
         $request.Timeout = 2000
         $response = [System.Net.HttpWebResponse]$request.GetResponse()
         try {
-            $ready = $response.StatusCode -eq [System.Net.HttpStatusCode]::OK
+            $statusCode = $response.StatusCode
+            $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+            $lastHealth = $reader.ReadToEnd()
+            $reader.Dispose()
         } finally {
             $response.Close()
         }
-        if ($ready) { break }
+        if ($statusCode -eq [System.Net.HttpStatusCode]::OK) {
+            $health = $lastHealth | ConvertFrom-Json
+            if ([string]$health.version -eq $ExpectedVersion) {
+                $ready = $true
+                break
+            }
+            Write-InstallLog ("health check reported version {0}, expected {1}" -f $health.version, $ExpectedVersion)
+        }
     } catch {
         # The task may still be starting; retry until the deadline.
     }
 }
 if (-not $ready) {
-    Write-InstallLog "UI health check failed at $healthUrl"
+    Write-InstallLog "UI health/version check failed at $healthUrl (last body: $lastHealth)"
+    $owner = Get-PortOwner $UiPort
+    if ($owner) {
+        Write-InstallLog ("port owner: pid={0} name={1} path={2} started={3}" -f $owner.Pid, $owner.Name, $owner.Path, $owner.StartTime)
+    }
     $task = Get-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
     $info = Get-ScheduledTaskInfo -TaskName "Ostium" -ErrorAction SilentlyContinue
     $tail = ""
@@ -337,11 +438,44 @@ if (-not $ready) {
         $lines = Get-Content -LiteralPath $uiLog -Tail 20 -ErrorAction SilentlyContinue
         if ($lines) { $tail = $lines -join [Environment]::NewLine }
     }
-    throw "Ostium UI did not become ready at $healthUrl. Task state: $($task.State); last result: $($info.LastTaskResult). Log: $uiLog`n$tail"
+    throw "Ostium UI did not report version $ExpectedVersion at $healthUrl. Task state: $($task.State); last result: $($info.LastTaskResult). Log: $uiLog`n$tail"
 }
-Write-InstallLog "UI health check passed"
+Write-InstallLog "UI health/version check passed"
 
-Write-Host "Ostium installed. Open http://127.0.0.1:8787" -ForegroundColor Green
+$cliVersion = (& "$InstallDir\ostium.exe" version | Out-String)
+if ($LASTEXITCODE -ne 0 -or $cliVersion -notmatch [Regex]::Escape("Ostium $ExpectedVersion")) {
+    throw "Installed CLI reports a different version:`n$cliVersion"
+}
+Write-InstallLog "CLI version check passed"
+
+# A UI 200 is not enough when the core already has a configuration: the proxy
+# may be down while the console is perfectly reachable.
+$coreConfig = Join-Path $CoreDataDir "runtime\last-good.json"
+if ($serviceStarted -and (Test-Path $coreConfig)) {
+    $coreReady = $false
+    for ($i = 0; $i -lt 30; $i++) {
+        try {
+            $coreRequest = [System.Net.WebRequest]::Create("http://127.0.0.1:8788/v1/health")
+            $coreRequest.Proxy = $null
+            $coreRequest.Timeout = 2000
+            $coreResponse = [System.Net.HttpWebResponse]$coreRequest.GetResponse()
+            try {
+                $coreReader = New-Object System.IO.StreamReader($coreResponse.GetResponseStream())
+                $coreHealth = $coreReader.ReadToEnd() | ConvertFrom-Json
+            } finally {
+                $coreResponse.Close()
+            }
+            if ($coreHealth.running -eq $true) { $coreReady = $true; break }
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+    if (-not $coreReady) {
+        throw "OstiumCore is not running a configuration after install; see $CoreDataDir\logs\core.log"
+    }
+}
+
+Write-Host "Ostium installed. Open http://127.0.0.1:$UiPort" -ForegroundColor Green
 Write-Host "CLI: ostium (open a new terminal so PATH picks up $InstallDir)" -ForegroundColor Green
 Write-Host "Startup log: $uiLog" -ForegroundColor Green
 Write-Host "Install log: $installLog" -ForegroundColor Green

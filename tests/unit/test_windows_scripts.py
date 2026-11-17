@@ -37,8 +37,11 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert "-WindowStyle Hidden" in install
     assert "-WorkingDirectory $InstallDir" in install
     assert "Add-MachinePathEntry -Directory $InstallDir" in install
-    assert '$healthUrl = "http://127.0.0.1:8787/healthz"' in install
-    assert 'throw "Ostium UI did not become ready' in install
+    assert '$healthUrl = "http://127.0.0.1:$UiPort/healthz"' in install
+    assert "Ostium UI did not report version $ExpectedVersion" in install
+    assert "Get-PortOwner" in install
+    assert "Stop-PreviousOstium" in install
+    assert '[string]$ExpectedVersion = ""' in install
     # A failed privileged core must not prevent the UI from starting.
     assert "$serviceStarted = $false" in install
     assert "OstiumCore service did not start" in install
@@ -52,6 +55,7 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert "Remove-MachinePathEntry -Directory $InstallDir" in uninstall
 
     setup = (ROOT / "deploy" / "windows" / "ostium.iss").read_text(encoding="utf-8")
+    assert '-ExpectedVersion ""{#AppVersion}""' in setup
     # The client database is in the UI data directory, not the core's
     # ProgramData\OstiumCore tree; snapshotting the wrong tree loses rollback.
     assert "Join-Path $env:ProgramData ''Ostium''" in setup

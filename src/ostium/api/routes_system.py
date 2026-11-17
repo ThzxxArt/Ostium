@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ostium import __version__
 from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
 from ostium.api.errors import ApiError
+from ostium.build_info import build_info, listener_info, read_web_build, version_mismatches
 from ostium.config import Mode, Role
 from ostium.db.models import AdminUser, Certificate
 from ostium.services.audit import audit
@@ -81,12 +82,20 @@ async def info(
 ) -> dict[str, Any]:
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage(str(services.settings.data_dir))
+    build = build_info()
     try:
         core = await asyncio.wait_for(services.engine.client.status(), timeout=2.5)
     except Exception as exc:
         core = {"running": False, "last_error": str(exc) or "core service is unreachable"}
     return {
-        "app": {"name": "Ostium", "version": __version__, "role": services.settings.role.value},
+        "app": {
+            "name": "Ostium",
+            "version": __version__,
+            "commit": build.commit,
+            "built_at": build.built_at,
+            "frozen": build.frozen,
+            "role": services.settings.role.value,
+        },
         "host": {
             "hostname": socket.gethostname(),
             "platform": platform.platform(),
@@ -126,6 +135,78 @@ async def info(
     }
 
 
+@router.get("/system/provenance")
+async def provenance(
+    _: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+) -> dict[str, Any]:
+    """Report every observable version surface and the listening process.
+
+    A 200 from ``/healthz`` is not proof that the expected release is running:
+    an old process can still own the port.  This endpoint binds the answer to a
+    PID, an executable path and the actual process start time.
+    """
+
+    build = build_info()
+    web = read_web_build(services.settings.paths.web_dist)
+    try:
+        core = await asyncio.wait_for(services.engine.client.status(), timeout=2.0)
+        core_reachable = True
+    except Exception as exc:
+        core = {"running": False, "last_error": str(exc) or "core service is unreachable"}
+        core_reachable = False
+    listener = await asyncio.to_thread(
+        listener_info, services.settings.port, host=services.settings.host
+    )
+    listener["is_control_plane"] = listener.get("pid") == os.getpid()
+    core_version = core.get("core_version") if isinstance(core, dict) else None
+    web_version = web.get("version") if web.get("available") else None
+    mismatches = version_mismatches(
+        build.version,
+        core=str(core_version) if core_version else None,
+        web=str(web_version) if web_version else None,
+    )
+    return {
+        "app": build.as_dict(),
+        "web": web,
+        "core": {
+            "reachable": core_reachable,
+            "running": bool(core.get("running")) if isinstance(core, dict) else False,
+            "version": core_version,
+            "pid": core.get("pid") if isinstance(core, dict) else None,
+            "engine_version": core.get("engine_version") if isinstance(core, dict) else None,
+            "revision": core.get("revision") if isinstance(core, dict) else None,
+            "config_sha256": core.get("config_sha256") if isinstance(core, dict) else None,
+            "last_error": core.get("last_error") if isinstance(core, dict) else None,
+        },
+        "listener": listener,
+        "consistency": {
+            "ok": not mismatches,
+            "expected_version": build.version,
+            "mismatches": mismatches,
+        },
+        "generated_at": iso(utcnow()),
+    }
+
+
+@router.get("/system/port-owners")
+async def port_owners(
+    _: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+) -> dict[str, Any]:
+    ports = sorted(
+        {
+            int(services.settings.port),
+            int(services.settings.mixed_port),
+            int(services.settings.core_url.rsplit(":", 1)[-1])
+            if services.settings.core_url.rsplit(":", 1)[-1].isdigit()
+            else 8788,
+        }
+    )
+    owners = await asyncio.to_thread(lambda: [listener_info(port) for port in ports])
+    return {"owners": owners, "generated_at": iso(utcnow())}
+
+
 @router.get("/system/doctor")
 async def doctor(
     _: AdminUser = Depends(get_current_admin),
@@ -134,8 +215,58 @@ async def doctor(
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
-    def add(name: str, status: str, message: str, fix: str | None = None) -> None:
-        checks.append({"id": name, "status": status, "message": message, "fix": fix})
+    def add(
+        name: str,
+        status: str,
+        message: str,
+        fix: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        checks.append(
+            {"id": name, "status": status, "message": message, "fix": fix, "data": data or {}}
+        )
+
+    build = build_info()
+    add(
+        "version",
+        "pass" if build.version != "0.0.0" else "fail",
+        f"control plane {build.version}"
+        + (f" ({build.commit[:12]})" if build.commit else " (commit unknown)"),
+        None if build.version != "0.0.0" else "reinstall from a release artifact",
+        {
+            "version": build.version,
+            "commit": build.commit,
+            "source": build.as_dict()["version_source"],
+        },
+    )
+    listener = await asyncio.to_thread(
+        listener_info, services.settings.port, host=services.settings.host
+    )
+    if not listener.get("found"):
+        add(
+            f"port_owner:{services.settings.port}",
+            "fail",
+            f"nothing is listening on {services.settings.host}:{services.settings.port}",
+            "start the control plane and re-run doctor",
+            listener,
+        )
+    elif listener.get("pid") == os.getpid():
+        add(
+            f"port_owner:{services.settings.port}",
+            "pass",
+            f"listener pid {listener.get('pid')} is this process ({listener.get('exe')})",
+            None,
+            listener,
+        )
+    else:
+        add(
+            f"port_owner:{services.settings.port}",
+            "warn",
+            f"port is owned by pid {listener.get('pid')} ({listener.get('exe')}), "
+            "which is not this process",
+            "stop the stale process or start the expected control plane",
+            listener,
+        )
 
     try:
         async with services.session_factory() as db:
@@ -154,7 +285,30 @@ async def doctor(
                 "core", "warn", "sing-box is not running", "open System and apply the configuration"
             )
     except Exception as exc:
+        core = {}
         add("core", "fail", f"core API unreachable: {exc}", "start ostium-core.service")
+    web = read_web_build(services.settings.paths.web_dist)
+    core_version = str(core.get("core_version")) if core.get("core_version") else None
+    web_version = str(web.get("version")) if web.get("available") and web.get("version") else None
+    mismatches = version_mismatches(build.version, core=core_version, web=web_version)
+    add(
+        "version_consistency",
+        "pass" if not mismatches else "fail",
+        "control plane, core and Web bundle versions match"
+        if not mismatches
+        else "; ".join(
+            f"{item['surface']} reports {item['actual']} (expected {item['expected']})"
+            for item in mismatches
+        ),
+        None if not mismatches else "stop the stale process and reinstall the expected release",
+        {
+            "expected": build.version,
+            "core": core_version,
+            "web": web_version,
+            "web_build": web,
+            "mismatches": mismatches,
+        },
+    )
     engine = Path(services.settings.engine_path or services.settings.paths.engine_binary)
     if engine.is_file():
         add("engine", "pass", f"core binary found at {engine}")

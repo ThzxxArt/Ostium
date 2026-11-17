@@ -18,6 +18,7 @@ import {
   Bell,
   Database,
   Globe2,
+  Info,
   KeyRound,
   LockKeyhole,
   Moon,
@@ -37,7 +38,7 @@ import OQrModal from '@/components/OQrModal.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import OErrorState from '@/components/OErrorState.vue'
 import { api } from '@/api'
-import type { AppSettings, Backup, Certificate } from '@/api/types'
+import type { AppSettings, Backup, Certificate, Provenance } from '@/api/types'
 import { formatBytes, formatDate } from '@/utils/format'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -53,9 +54,12 @@ const browserNotifications = useBrowserNotifications()
 const settings = ref<AppSettings | null>(null)
 const certificates = ref<Certificate[]>([])
 const backups = ref<Backup[]>([])
+const provenance = ref<Provenance | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const activeTab = ref('general')
+
+const versionMismatch = computed(() => provenance.value?.consistency?.ok === false)
 
 const general = ref({
   log_level: 'info',
@@ -125,15 +129,17 @@ async function load() {
     // Settings is required for the page; certificates and backups are
     // independent panels.  A certificates/backups failure must not blank the
     // entire settings page.
-    const [dataResult, certResult, backupResult] = await Promise.allSettled([
+    const [dataResult, certResult, backupResult, provenanceResult] = await Promise.allSettled([
       api.settings.get(),
       server.value ? api.certificates.list() : Promise.resolve({ certificates: [] }),
       api.backups.list(),
+      api.system.provenance(),
     ])
     if (dataResult.status === 'rejected') throw dataResult.reason
     const data = dataResult.value
     settings.value = data
     loadError.value = ''
+    provenance.value = provenanceResult.status === 'fulfilled' ? provenanceResult.value : null
     if (certResult.status === 'fulfilled') {
       certificates.value = certResult.value.certificates
     } else {
@@ -488,7 +494,7 @@ onMounted(load)
     <div v-if="settings" class="settings-layout">
       <nav class="settings-nav o-card" :aria-label="t('settings.sections')">
         <button
-          v-for="tab in ['general', 'security', 'notifications', 'maintenance']"
+          v-for="tab in ['general', 'security', 'notifications', 'maintenance', 'about']"
           :key="tab"
           type="button"
           :class="{ active: activeTab === tab }"
@@ -501,6 +507,7 @@ onMounted(load)
                 security: ShieldCheck,
                 notifications: Bell,
                 maintenance: Database,
+                about: Info,
               }[tab]
             "
             :size="16"
@@ -796,7 +803,7 @@ onMounted(load)
           </OSectionCard>
         </template>
 
-        <template v-else>
+        <template v-else-if="activeTab === 'maintenance'">
           <OSectionCard :title="t('settings.maintenance')" :icon="Database">
             <div class="form-grid">
               <label class="field">
@@ -882,6 +889,65 @@ onMounted(load)
                 </NButton>
               </div>
             </div>
+          </OSectionCard>
+        </template>
+
+        <template v-else>
+          <OSectionCard :title="t('settings.about')" :icon="Info">
+            <div v-if="provenance?.app && provenance?.core && provenance?.web" class="form-grid">
+              <div class="field">
+                <span>{{ t('settings.about_control_plane') }}</span>
+                <strong>{{ provenance.app.version }}</strong>
+                <small class="o-subtle">{{ provenance.app.version_source }}</small>
+              </div>
+              <div class="field">
+                <span>{{ t('settings.about_commit') }}</span>
+                <strong class="o-truncate">{{ provenance.app.commit || t('common.unknown') }}</strong>
+              </div>
+              <div class="field">
+                <span>{{ t('settings.about_pid') }}</span>
+                <strong>{{ provenance.app.pid }}</strong>
+                <small class="o-subtle">{{ provenance.app.executable }}</small>
+              </div>
+              <div class="field">
+                <span>{{ t('settings.about_listener') }}</span>
+                <strong
+                  >{{ provenance.listener?.host }}:{{ provenance.listener?.port }} ·
+                  {{ provenance.listener?.pid ?? t('common.unknown') }}</strong
+                >
+                <small class="o-subtle">{{ provenance.listener?.exe || '' }}</small>
+              </div>
+              <div class="field">
+                <span>{{ t('settings.about_core') }}</span>
+                <strong>{{ provenance.core.version || t('common.unknown') }}</strong>
+                <small class="o-subtle">{{ provenance.core.engine_version || '' }}</small>
+              </div>
+              <div class="field">
+                <span>{{ t('settings.about_web') }}</span>
+                <strong>{{ provenance.web.version || t('common.unknown') }}</strong>
+                <small class="o-subtle">{{ provenance.web.built_at || '' }}</small>
+              </div>
+            </div>
+            <div v-else class="o-muted">{{ t('settings.about_unavailable') }}</div>
+            <div
+              v-if="versionMismatch"
+              class="o-small"
+              role="alert"
+              style="color: var(--o-danger, #d03050)"
+            >
+              {{ t('settings.about_mismatch') }}
+              <span v-for="item in provenance?.consistency.mismatches" :key="item.surface">
+                {{ item.surface }}={{ item.actual }}
+              </span>
+            </div>
+            <template #footer>
+              <div class="footer-actions">
+                <NButton secondary :loading="loading" @click="load">
+                  <template #icon><RefreshCw :size="15" /></template>
+                  {{ t('common.refresh') }}
+                </NButton>
+              </div>
+            </template>
           </OSectionCard>
         </template>
       </div>

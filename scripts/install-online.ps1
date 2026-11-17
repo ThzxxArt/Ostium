@@ -61,6 +61,49 @@ function Get-ExpectedHash([string]$SumsFile, [string]$AssetName) {
     throw "SHA256SUMS 中找不到 $AssetName"
 }
 
+function Get-UiPort([string]$DataDir) {
+    $config = Join-Path $DataDir "config.toml"
+    if (Test-Path $config) {
+        foreach ($line in Get-Content -LiteralPath $config) {
+            if ($line -match '^\s*port\s*=\s*(\d{1,5})\s*$') { return [int]$Matches[1] }
+        }
+    }
+    return 8787
+}
+
+function Assert-InstalledVersion([string]$InstallDir, [string]$ExpectedVersion) {
+    $output = (& (Join-Path $InstallDir "ostium.exe") version | Out-String)
+    if ($LASTEXITCODE -ne 0 -or $output -notmatch [Regex]::Escape("Ostium $ExpectedVersion")) {
+        throw "已安装的 Ostium CLI 版本与预期 $ExpectedVersion 不一致：`n$output"
+    }
+}
+
+function Wait-UiVersion([int]$Port, [string]$ExpectedVersion) {
+    $url = "http://127.0.0.1:$Port/healthz"
+    $last = ""
+    for ($i = 0; $i -lt 60; $i++) {
+        try {
+            $request = [System.Net.WebRequest]::Create($url)
+            $request.Proxy = $null
+            $request.Timeout = 2000
+            $response = [System.Net.HttpWebResponse]$request.GetResponse()
+            try {
+                $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+                $last = $reader.ReadToEnd()
+                $reader.Dispose()
+            } finally {
+                $response.Close()
+            }
+            $health = $last | ConvertFrom-Json
+            if ([string]$health.version -eq $ExpectedVersion) { return $health }
+        } catch {
+            # The scheduled task may still be starting.
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "UI 未在 $url 报告版本 $ExpectedVersion（最后响应：$last）"
+}
+
 function Install-Ostium([string]$ResolvedVersion) {
     $asset = "Ostium-$ResolvedVersion-windows-x64-setup.exe"
     $temp = Join-Path $env:TEMP ("ostium-install-" + [Guid]::NewGuid().ToString("N"))
@@ -124,8 +167,15 @@ function Install-Ostium([string]$ResolvedVersion) {
         if ($NoStart) {
             Stop-ScheduledTask -TaskName "Ostium" -ErrorAction SilentlyContinue
             Stop-Service OstiumCore -ErrorAction SilentlyContinue
+            Assert-InstalledVersion $installDir $ResolvedVersion
         }
-        Write-Step "安装完成。打开 http://127.0.0.1:8787"
+        else {
+            Assert-InstalledVersion $installDir $ResolvedVersion
+            $uiPort = Get-UiPort (Join-Path $env:ProgramData "Ostium")
+            $health = Wait-UiVersion $uiPort $ResolvedVersion
+            Write-Step "健康检查通过：Ostium $($health.version) on port $uiPort"
+        }
+        Write-Step "安装完成。打开 http://127.0.0.1:$(Get-UiPort (Join-Path $env:ProgramData 'Ostium'))"
     }
     finally {
         Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue

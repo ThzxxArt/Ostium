@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ostium import __version__
 from ostium.api.deps import Services, client_ip, ensure_cli_token
 from ostium.api.errors import ApiError, problem_response
+from ostium.build_info import build_info
 from ostium.config import Role, Settings
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.engine.manager import EngineManager
@@ -35,6 +36,17 @@ CSRF_COOKIE = "ostium_csrf"
 # reading an unbounded chunked body first would let an unauthenticated client
 # exhaust control-plane memory before CSRF/authentication runs.
 MAX_API_BODY_BYTES = 20 * 1024 * 1024
+# Version-bearing responses must never be cached by a browser, a reverse proxy
+# or the service worker: a stale cached body is exactly what makes an upgraded
+# install keep reporting the previous release.
+NO_STORE_PATHS = {
+    "/healthz",
+    "/readyz",
+    "/api/v1/auth/status",
+    "/api/v1/system/info",
+    "/api/v1/system/provenance",
+}
+BUILD = build_info()
 logger = logging.getLogger(__name__)
 
 
@@ -300,6 +312,8 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                     )
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
+        if request.url.path in NO_STORE_PATHS:
+            response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -366,7 +380,12 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
-        return {"status": "ok", "version": __version__}
+        return {
+            "status": "ok",
+            "version": BUILD.version,
+            "commit": BUILD.commit or "",
+            "started_at": BUILD.process_started_at or "",
+        }
 
     @app.get("/readyz")
     async def readyz(request: Request) -> JSONResponse:
@@ -385,7 +404,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             checks["core"] = False
         ready = checks["database"]
         return JSONResponse(
-            status_code=200 if ready else 503, content={"ready": ready, "checks": checks}
+            status_code=200 if ready else 503,
+            content={
+                "ready": ready,
+                "version": BUILD.version,
+                "core_running": checks["core"],
+                "checks": checks,
+            },
         )
 
     dist = settings.paths.web_dist
@@ -407,10 +432,15 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             except ValueError:
                 return JSONResponse(status_code=404, content={"detail": "not found"})
             if path and candidate.is_file():
-                return FileResponse(candidate)
+                response: Response = FileResponse(candidate)
+                if candidate.name in {"index.html", "sw.js", "build.json"}:
+                    response.headers["Cache-Control"] = "no-store"
+                return response
             index = dist / "index.html"
             if index.is_file():
-                return FileResponse(index)
+                response = FileResponse(index)
+                response.headers["Cache-Control"] = "no-store"
+                return response
             return JSONResponse(status_code=503, content={"detail": "frontend is not built"})
     else:
 

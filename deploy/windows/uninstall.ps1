@@ -8,6 +8,38 @@ param(
 
 $ErrorActionPreference = "SilentlyContinue"
 
+function Get-PortOwner([int]$Port) {
+    $connection = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $connection) { return $null }
+    $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        Port = $Port
+        Pid = [int]$connection.OwningProcess
+        Name = if ($process) { $process.ProcessName } else { "" }
+        Path = if ($process) { $process.Path } else { "" }
+    }
+}
+
+function Stop-OstiumListener([int]$Port) {
+    $owner = Get-PortOwner $Port
+    if (-not $owner) { return }
+    $known = @("ostium", "ostium-service", "sing-box")
+    $owned = $known -contains $owner.Name
+    if (-not $owned -and $owner.Path) {
+        $candidate = [IO.Path]::GetFullPath($owner.Path)
+        foreach ($root in @($InstallDir, $DataDir, "$env:ProgramData\OstiumCore")) {
+            $prefix = [IO.Path]::GetFullPath($root).TrimEnd([char[]]('\', '/')) + [IO.Path]::DirectorySeparatorChar
+            if ($candidate.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
+        }
+    }
+    if (-not $owned) {
+        Write-Warning "Port $Port is owned by pid $($owner.Pid) ($($owner.Name)); leaving it running."
+        return
+    }
+    Stop-Process -Id $owner.Pid -Force -ErrorAction SilentlyContinue
+}
+
 function Remove-MachinePathEntry {
     param([Parameter(Mandatory = $true)][string]$Directory)
     try {
@@ -64,6 +96,8 @@ if (-not $proxyRestored) {
     Write-Warning "Could not confirm the system proxy was restored; check Windows proxy settings."
 }
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
+Stop-OstiumListener 8787
+Stop-OstiumListener 8788
 Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force
 Stop-Service OstiumCore
 if (Test-Path $serviceExe) {

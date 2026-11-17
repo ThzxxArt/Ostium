@@ -486,6 +486,7 @@ def test_diagnostics_and_service_commands(tmp_path: Path, monkeypatch) -> None:
     with tarfile.open(output) as archive:
         assert set(archive.getnames()) == {
             "ostium-diagnostics.json",
+            "provenance.json",
             "doctor.json",
             "config.redacted.toml",
             "ostium.log.tail",

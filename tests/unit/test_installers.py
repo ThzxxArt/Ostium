@@ -153,7 +153,10 @@ def test_client_upgrade_restarts_the_user_ui() -> None:
 def test_fresh_install_waits_for_the_health_endpoint() -> None:
     install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
     assert "首次安装健康检查失败" in install
-    assert 'wait_for_url "http://127.0.0.1:$UI_PORT/healthz"' in install
+    assert 'wait_for_version "http://127.0.0.1:$UI_PORT/healthz" "$EXPECTED_VERSION"' in install
+    assert "wait_for_version()" in install
+    assert "stop_previous_listener()" in install
+    assert "端口 $port 被未知进程占用" in install
 
 
 def test_release_bundles_include_license_and_sbom() -> None:

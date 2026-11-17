@@ -102,6 +102,11 @@ if [[ -z "$WHEEL" || ! -f "$WHEEL" ]]; then
   echo "provide OSTIUM_WHEEL or place ostium_ctl-*.whl beside this script" >&2
   exit 2
 fi
+EXPECTED_VERSION="$(basename "$WHEEL" | sed -n 's/^ostium_ctl-\([0-9][^-]*\)-.*/\1/p')"
+if [[ -z "$EXPECTED_VERSION" ]]; then
+  echo "could not parse the wheel version from $WHEEL" >&2
+  exit 2
+fi
 if [[ -z "$CORE_TARBALL" || ! -f "$CORE_TARBALL" ]]; then
   echo "provide OSTIUM_CORE_TARBALL or place ostium-core-*-darwin-*.tar.gz beside this script" >&2
   exit 2
@@ -134,13 +139,44 @@ render_plist() {
 }
 
 wait_for_ui() {
-  local port="${1:-8787}"
-  for _ in $(seq 1 20); do
-    if curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+  local port="${1:-8787}" expected="${2:-$EXPECTED_VERSION}"
+  local body version
+  for _ in $(seq 1 40); do
+    body="$(curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" 2>/dev/null || true)"
+    version="$(printf '%s' "$body" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    if [[ "$version" == "$expected" ]]; then
       return 0
     fi
     sleep 1
   done
+  return 1
+}
+
+port_owner() {
+  local port="$1"
+  command -v lsof >/dev/null 2>&1 || return 0
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print; exit}'
+}
+
+stop_previous_listener() {
+  local port="$1" owner pid cmd
+  owner="$(port_owner "$port")"
+  [[ -z "$owner" ]] && return 0
+  pid="$(printf '%s' "$owner" | awk '{print $2}')"
+  if [[ -n "$pid" && -d "/proc/$pid" ]]; then
+    cmd="$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)"
+    if [[ "$cmd" == *ostium* || "$cmd" == *sing-box* ]]; then
+      kill "$pid" 2>/dev/null || true
+      sleep 1
+      return 0
+    fi
+  fi
+  if [[ "$owner" == *ostium* || "$owner" == *sing-box* ]]; then
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    return 0
+  fi
+  echo "port $port is owned by an unknown process: $owner" >&2
   return 1
 }
 
@@ -338,6 +374,10 @@ rollback_core_binary() {
 }
 
 if [[ "$NO_START" != "true" ]]; then
+  if ! stop_previous_listener "$UI_PORT"; then
+    echo "UI port $UI_PORT is not owned by Ostium; refusing to replace it" >&2
+    exit 1
+  fi
   launchctl load -w /Library/LaunchDaemons/com.ostium.core.plist
   if [[ -n "$OLD_VENV" ]] && ! wait_for_core; then
     echo "升级后核心健康检查失败，回滚核心……" >&2
@@ -356,7 +396,7 @@ if [[ "$NO_START" != "true" ]]; then
     launchctl load -w /Library/LaunchAgents/com.ostium.ui.plist
   fi
   if [[ -n "$OLD_VENV" ]]; then
-    if ! wait_for_ui "$UI_PORT"; then
+    if ! wait_for_ui "$UI_PORT" "$EXPECTED_VERSION"; then
       echo "升级健康检查失败，回滚旧虚拟环境……" >&2
       launchctl unload -w /Library/LaunchDaemons/com.ostium.ui.plist 2>/dev/null || true
       launchctl unload -w /Library/LaunchAgents/com.ostium.ui.plist 2>/dev/null || true
@@ -374,7 +414,19 @@ if [[ "$NO_START" != "true" ]]; then
     fi
     rm -rf "$OLD_VENV"
     rm -f "$PREFIX/sing-box.old" "$DATA/core/sing-box.old"
+  else
+    if ! wait_for_ui "$UI_PORT" "$EXPECTED_VERSION"; then
+      echo "fresh install health/version check failed at http://127.0.0.1:$UI_PORT/healthz (expected $EXPECTED_VERSION)" >&2
+      exit 1
+    fi
   fi
+fi
+
+INSTALLED_VERSION="$("$VENV/bin/ostium" version --json 2>/dev/null \
+  | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
+  echo "installed CLI reports '${INSTALLED_VERSION:-unknown}', expected '$EXPECTED_VERSION'" >&2
+  exit 1
 fi
 
 cat <<EOF

@@ -34,10 +34,12 @@ const totpRequired = ref(false)
 const showTotp = computed(() => totpRequired.value || auth.status?.login_totp_required === true)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const version = computed(() => auth.status?.version || '—')
+const version = computed(() => auth.status?.version || t('common.unknown'))
 
 onMounted(async () => {
-  if (!auth.ready) await auth.bootstrap()
+  // Always refresh on the login screen.  An old tab (or a logout in another
+  // tab) must not display the previous process's version as the live one.
+  await auth.bootstrap(true)
 })
 
 function toggleRecovery() {

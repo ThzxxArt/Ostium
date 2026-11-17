@@ -493,6 +493,11 @@ show_status() {
   if [[ -x "$BIN_LINK" ]]; then
     "$BIN_LINK" version 2>/dev/null || true
   fi
+  local ui_port="${UI_PORT:-8443}"
+  [[ "$ROLE" == "client" ]] && ui_port=8787
+  if command -v ss >/dev/null 2>&1; then
+    ss -lntp "sport = :$ui_port" 2>/dev/null || true
+  fi
   if [[ "$OS" == "linux" ]] && systemd_available; then
     systemctl status ostium-core ostium --no-pager 2>/dev/null || true
   elif [[ "$OS" == "darwin" ]]; then
@@ -582,6 +587,16 @@ download_release
 bootstrap_python
 detect_existing_mode
 run_platform_installer
+
+if [[ -x "$BIN_LINK" ]]; then
+  INSTALLED_VERSION="$("$BIN_LINK" version --json 2>/dev/null \
+    | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  if [[ -z "$INSTALLED_VERSION" || "$INSTALLED_VERSION" != "$VERSION" ]]; then
+    "$BIN_LINK" version 2>/dev/null || true
+    die "安装后版本校验失败：CLI 报告 '${INSTALLED_VERSION:-unknown}'，期望 '$VERSION'"
+  fi
+  say "版本校验通过：Ostium $INSTALLED_VERSION"
+fi
 
 if [[ "$ACTION" == "install" && "$ROLE" == "server" ]]; then
   if [[ "$BEHIND_PROXY" == "true" ]]; then

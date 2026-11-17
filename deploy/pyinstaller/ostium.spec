@@ -9,6 +9,9 @@ ICON = str(ROOT / "assets" / "brand" / "ostium.ico") if sys.platform == "win32" 
 datas = [
     (str(ROOT / "web" / "dist"), "ostium/web/dist"),
     (str(ROOT / "alembic"), "ostium/db/alembic"),
+    # build_info loads this file directly so a frozen bundle does not need
+    # dist-info; PyInstaller cannot see that path-based load.
+    (str(ROOT / "src" / "ostium" / "_version.py"), "ostium"),
 ]
 hiddenimports = (
     # SQLAlchemy imports the sqlite async DBAPI dynamically; PyInstaller does

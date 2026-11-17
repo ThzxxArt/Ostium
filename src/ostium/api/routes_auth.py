@@ -19,6 +19,7 @@ from ostium.api.deps import (
     is_loopback,
 )
 from ostium.api.errors import ApiError
+from ostium.build_info import build_info
 from ostium.config import Settings
 from ostium.db.models import AdminUser
 from ostium.services import auth as auth_service
@@ -137,6 +138,7 @@ async def status(
         "login_totp_required": login_totp_required,
         "role": services.settings.role.value,
         "version": __version__,
+        "commit": build_info().commit,
         "public_ui": services.settings.public_ui,
     }
 

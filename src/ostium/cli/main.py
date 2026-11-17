@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ostium import __version__
+from ostium.build_info import build_info, listener_info, read_web_build, version_mismatches
 from ostium.config import Mode, Role, Settings, is_loopback_host
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.services.crypto import SecretStore
@@ -202,11 +203,20 @@ def _api(settings: Settings, method: str, path: str, **kwargs: Any) -> Any:
 
 
 @app.command()
-def version() -> None:
+def version(json_output: bool = typer.Option(False, "--json")) -> None:
     """Print the Ostium version and build identifiers."""
 
-    console.print(f"Ostium {__version__}")
+    info = build_info()
+    if json_output:
+        _json(info.as_dict())
+        return
+    console.print(f"Ostium {info.version}")
+    if info.commit:
+        console.print(f"Commit {info.commit}")
+    if info.built_at:
+        console.print(f"Built {info.built_at}")
     console.print(f"Python {sys.version.split()[0]} on {platform.platform()}")
+    console.print(f"Executable {info.executable}")
 
 
 @app.command()
@@ -707,8 +717,13 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
     """Show local service and core status."""
 
     settings = _load_settings()
+    build = build_info()
     payload: dict[str, Any] = {
         "version": __version__,
+        "commit": build.commit,
+        "built_at": build.built_at,
+        "frozen": build.frozen,
+        "executable": build.executable,
         "role": settings.role.value,
         "data_dir": str(settings.data_dir),
         "config_file": str(settings.config_file),
@@ -716,6 +731,8 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         "core_binary": _engine_binary(settings).is_file(),
         "ui_url": (f"{'https' if settings.public_ui else 'http'}://127.0.0.1:{settings.port}"),
         "core": None,
+        "core_version": None,
+        "port_owner": listener_info(settings.port, host=settings.host),
     }
     try:
         services = _api(settings, "GET", "/api/v1/system/services").get("services", [])
@@ -723,17 +740,37 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
             (item for item in services if item.get("name") == "ostium-core.service"),
             {"running": False, "reachable": False},
         )
+        detail = payload["core"].get("detail") or {}
+        payload["core_version"] = detail.get("core_version")
     except SystemExit:
         payload["core"] = {"running": False, "reachable": False}
+    web = read_web_build(settings.paths.web_dist)
+    payload["web_version"] = web.get("version") if web.get("available") else None
+    payload["consistency"] = {
+        "ok": not version_mismatches(
+            __version__,
+            core=payload["core_version"],
+            web=payload["web_version"],
+        ),
+        "expected": __version__,
+        "core": payload["core_version"],
+        "web": payload["web_version"],
+    }
     if json_output:
         _json(payload)
         return
     console.print(f"[bold]Ostium {__version__}[/bold] ({payload['role']})")
+    if build.commit:
+        console.print(f"Commit: {build.commit}")
     console.print(f"Data: {payload['data_dir']}")
     console.print(f"UI:   {payload['ui_url']}")
     console.print(f"Core binary: {'yes' if payload['core_binary'] else 'no'}")
     core = payload["core"] or {}
     console.print(f"Core: {'running' if core.get('running') else 'stopped'}")
+    console.print(
+        f"Versions: control plane {__version__}, core "
+        f"{payload['core_version'] or 'unknown'}, web {payload['web_version'] or 'unknown'}"
+    )
 
 
 @app.command()
@@ -835,6 +872,20 @@ def doctor(
     def add(name: str, status: str, message: str) -> None:
         checks.append({"id": name, "status": status, "message": message})
 
+    build = build_info()
+    add("version", "pass" if build.version != "0.0.0" else "fail", f"Ostium {build.version}")
+    owner = listener_info(settings.port, host=settings.host)
+    if not owner.get("found"):
+        add("port_owner", "warn", f"nothing is listening on {settings.host}:{settings.port}")
+    elif owner.get("pid") == os.getpid():
+        add("port_owner", "pass", f"listener pid {owner.get('pid')} is this process")
+    else:
+        add(
+            "port_owner",
+            "warn",
+            f"{settings.host}:{settings.port} is owned by pid {owner.get('pid')} "
+            f"({owner.get('exe')})",
+        )
     add("data_dir", "pass" if settings.data_dir.is_dir() else "fail", str(settings.data_dir))
     add(
         "database",
@@ -851,11 +902,32 @@ def doctor(
         "pass" if _engine_binary(settings).is_file() else "fail",
         str(_engine_binary(settings)),
     )
+    core_version: str | None = None
     try:
         health = httpx.get(f"{settings.core_url}/v1/health", timeout=3, trust_env=False).json()
+        if isinstance(health, dict):
+            core_version = str(health["version"]) if health.get("version") else None
         add("core_api", "pass" if health.get("status") == "ok" else "warn", json.dumps(health))
     except Exception as exc:
+        health = {}
         add("core_api", "fail", str(exc))
+    web = read_web_build(settings.paths.web_dist)
+    web_version = str(web["version"]) if web.get("available") and web.get("version") else None
+    mismatches = version_mismatches(
+        build.version,
+        core=core_version,
+        web=web_version,
+    )
+    add(
+        "version_consistency",
+        "pass" if not mismatches else "fail",
+        "control plane, core and web versions match"
+        if not mismatches
+        else "; ".join(
+            f"{item['surface']}={item['actual']} (expected {item['expected']})"
+            for item in mismatches
+        ),
+    )
     if settings.role is Role.SERVER and not is_loopback_host(settings.host):
         add(
             "bind",
@@ -1062,6 +1134,9 @@ def diagnostics_export(
         "public_ui": settings.public_ui,
         "allow_insecure_bind": settings.allow_insecure_bind,
     }
+    provenance = build_info().as_dict()
+    provenance["listener"] = listener_info(settings.port, host=settings.host)
+    provenance["web"] = read_web_build(settings.paths.web_dist)
     doctor_payload: dict[str, Any] = {"checks": []}
     try:
         health = httpx.get(f"{settings.core_url}/v1/health", timeout=3, trust_env=False).json()
@@ -1081,6 +1156,7 @@ def diagnostics_export(
 
         entries = {
             "ostium-diagnostics.json": json.dumps(payload, indent=2),
+            "provenance.json": json.dumps(provenance, indent=2),
             "doctor.json": json.dumps(doctor_payload, indent=2),
             "config.redacted.toml": config_text,
             "ostium.log.tail": log_text,

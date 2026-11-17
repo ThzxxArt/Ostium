@@ -825,3 +825,38 @@ def test_acme_issue_schedules_job(api_client: TestClient, session_token: str, mo
     assert response.status_code == 202
     assert response.json()["status"] == "pending"
     assert response.json()["job_id"]
+
+
+def test_provenance_reports_version_listener_and_no_store(
+    api_client: TestClient, session_token: str, settings: Settings
+) -> None:
+    from ostium import __version__
+
+    response = api_client.get("/api/v1/system/provenance")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    payload = response.json()
+    assert payload["app"]["version"] == __version__
+    assert payload["app"]["pid"] > 0
+    assert payload["consistency"]["expected_version"] == __version__
+    assert payload["listener"]["port"] == settings.port
+    assert "version_source" in payload["app"]
+
+    health = api_client.get("/healthz")
+    assert health.status_code == 200
+    assert health.headers["cache-control"] == "no-store"
+    assert health.json()["version"] == __version__
+
+    ready = api_client.get("/readyz")
+    assert ready.headers["cache-control"] == "no-store"
+    assert ready.json()["version"] == __version__
+
+
+def test_port_owners_endpoint_lists_configured_ports(
+    api_client: TestClient, session_token: str, settings: Settings
+) -> None:
+    response = api_client.get("/api/v1/system/port-owners")
+    assert response.status_code == 200
+    ports = {owner["port"] for owner in response.json()["owners"]}
+    assert settings.port in ports
+    assert settings.mixed_port in ports

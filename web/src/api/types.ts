@@ -11,6 +11,7 @@ export interface AuthStatus {
   login_totp_required?: boolean
   role: Role
   version: string
+  commit?: string | null
   public_ui: boolean
 }
 
@@ -235,10 +236,90 @@ export interface DoctorCheck {
   status: 'pass' | 'warn' | 'fail'
   message: string
   fix: string | null
+  data?: Record<string, unknown>
+}
+
+export interface BuildInfo {
+  version: string
+  commit: string | null
+  built_at: string | null
+  frozen: boolean
+  executable: string
+  argv: string[]
+  pid: number
+  process_started_at: string | null
+  python: string
+  prefix: string
+  package_path: string
+  dist_info_path: string | null
+  version_source: string
+}
+
+export interface ListenerInfo {
+  port: number
+  host: string | null
+  found: boolean
+  pid: number | null
+  exe: string | null
+  name: string | null
+  cmdline: string[] | null
+  started_at: string | null
+  error?: string
+  is_control_plane?: boolean
+}
+
+export interface WebBuildInfo {
+  available: boolean
+  path?: string
+  version?: string
+  commit?: string | null
+  digest?: string
+  built_at?: string
+  reason?: string
+}
+
+export interface Provenance {
+  app: BuildInfo
+  web: WebBuildInfo
+  core: {
+    reachable: boolean
+    running: boolean
+    version: string | null
+    pid: number | null
+    engine_version: string | null
+    revision: string | null
+    config_sha256: string | null
+    last_error: string | null
+  }
+  listener: ListenerInfo
+  consistency: {
+    ok: boolean
+    expected_version: string
+    mismatches: Array<{ surface: string; expected: string; actual: string }>
+  }
+  generated_at: string
+}
+
+export interface SelfTestResult {
+  ok: boolean
+  target: string
+  mode: 'direct' | 'proxy'
+  stage: 'dns' | 'tcp' | 'tls' | 'http' | 'none'
+  latency_ms: number | null
+  status_code: number | null
+  error: string | null
+  generated_at: string
 }
 
 export interface SystemInfo {
-  app: { name: string; version: string; role: Role }
+  app: {
+    name: string
+    version: string
+    commit: string | null
+    built_at: string | null
+    frozen: boolean
+    role: Role
+  }
   host: {
     hostname: string
     platform: string

@@ -51,7 +51,7 @@ begin
     executables are locked while running; the UI holds ostium.exe open even
     when the service is already stopped. }
   Exec('powershell.exe',
-    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue; Get-Process ostium,ostium-service,sing-box -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"',
+    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Service -Name OstiumCore -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue; Get-Process ostium,ostium-service,sing-box -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Get-CimInstance Win32_Process -Filter "Name=''python.exe''" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match ''ostium'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   { The new UI migrates the database on first start.  Keep a quiescent copy
     (including WAL and the master key) so an operator can roll back to the
@@ -72,8 +72,8 @@ Name: "{group}\Uninstall Ostium"; Filename: "{uninstallexe}"
 [Run]
 ; Interactive installs show the PowerShell console so service startup and the
 ; 8787 health check are visible in real time.  Silent installs stay hidden.
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsInteractiveInstall
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsSilentInstall
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"" -ExpectedVersion ""{#AppVersion}"""; Flags: waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsInteractiveInstall
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install.ps1"" -InstallDir ""{app}"" -ExpectedVersion ""{#AppVersion}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing Ostium services..."; Check: IsSilentInstall
 Filename: "http://127.0.0.1:8787"; Description: "Open Ostium"; Flags: postinstall shellexec nowait skipifsilent
 
 [UninstallRun]

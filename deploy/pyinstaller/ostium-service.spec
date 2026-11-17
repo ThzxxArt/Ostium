@@ -23,7 +23,7 @@ a = Analysis(
     [str(ROOT / "deploy" / "pyinstaller" / "ostium_service.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
-    datas=[],
+    datas=[(str(ROOT / "src" / "ostium" / "_version.py"), "ostium")],
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],

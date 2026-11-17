@@ -121,7 +121,9 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await api.auth.logout()
     } finally {
-      status.value = status.value ? { ...status.value, authenticated: false } : null
+      status.value = status.value
+        ? { ...status.value, authenticated: false, version: '' }
+        : null
       me.value = null
       clearSessionCaches()
     }
@@ -131,7 +133,9 @@ export const useAuthStore = defineStore('auth', () => {
     // A 401 from any API must update the guard's source of truth before it
     // redirects to /login; otherwise the guard sees the stale authenticated
     // flag and immediately sends the user back to the protected page.
-    status.value = status.value ? { ...status.value, authenticated: false } : null
+    status.value = status.value
+      ? { ...status.value, authenticated: false, version: '' }
+      : null
     me.value = null
     clearSessionCaches()
   }

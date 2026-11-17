@@ -70,6 +70,7 @@ Copy-Item "dist\Ostium\*" $out -Recurse -Force
 Copy-Item "dist\OstiumService\*" "$out\service" -Recurse -Force
 Copy-Item "deploy\windows\install.ps1", "deploy\windows\uninstall.ps1" $out -Force
 Copy-Item "LICENSE", "NOTICE" $out -Force
+Set-Content -LiteralPath "$out\VERSION" -Value $Version -NoNewline -Encoding ascii
 if (Test-Path "dist\core\sing-box.exe") { Copy-Item "dist\core\sing-box.exe" "$out\core\" -Force }
 if (Test-Path "dist\core\wintun.dll") { Copy-Item "dist\core\wintun.dll" "$out\core\" -Force }
 foreach ($doc in @("LICENSE", "SBOM.txt")) {

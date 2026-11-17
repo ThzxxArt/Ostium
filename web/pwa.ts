@@ -83,6 +83,42 @@ export interface GeneratedServiceWorker {
   digest: string
 }
 
+export interface BuildManifest {
+  version: string
+  commit: string | null
+  digest: string
+  built_at: string
+}
+
+export interface PwaOptions {
+  version: string
+  commit?: string
+  builtAt?: string
+}
+
+/**
+ * Write the Web build manifest next to the SPA entry point.
+ *
+ * The control plane compares this file with its own version and the core's
+ * version.  Without it, a stale ``web/dist`` directory keeps serving an old UI
+ * while every other surface reports the new release.  It is deliberately
+ * written after the service worker so it is never precached.
+ */
+export async function writeBuildManifest(
+  outDir: string,
+  digest: string,
+  options: PwaOptions,
+): Promise<BuildManifest> {
+  const manifest: BuildManifest = {
+    version: options.version,
+    commit: options.commit || null,
+    digest,
+    built_at: options.builtAt || new Date().toISOString(),
+  }
+  await writeFile(join(outDir, 'build.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  return manifest
+}
+
 /**
  * Build a deterministic precache service worker for ``outDir``.
  *
@@ -117,7 +153,7 @@ export async function buildServiceWorker(outDir: string): Promise<GeneratedServi
  * precache service worker after Vite has written the bundle; no third-party
  * runtime or build dependency is involved.
  */
-export function ostiumPwa(): Plugin {
+export function ostiumPwa(options: PwaOptions): Plugin {
   let outDir = 'dist'
   return {
     name: 'ostium-pwa',
@@ -128,9 +164,11 @@ export function ostiumPwa(): Plugin {
     async closeBundle() {
       const generated = await buildServiceWorker(outDir)
       await writeFile(join(outDir, 'sw.js'), generated.source)
-      // Keep the emitted file in the build log without depending on a plugin.
+      const manifest = await writeBuildManifest(outDir, generated.digest, options)
+      // Keep the emitted files in the build log without depending on a plugin.
       this.info(
-        `generated sw.js (${generated.source.length} bytes, ${generated.files.length} precached files)`,
+        `generated sw.js (${generated.source.length} bytes, ${generated.files.length} precached files) ` +
+          `and build.json for ${manifest.version}`,
       )
     },
   }
