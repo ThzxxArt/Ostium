@@ -128,6 +128,11 @@ async def info(
         "proxy": await asyncio.to_thread(lambda: services.proxy.status()),
         "tun": {
             "enabled": services.settings.tun_enabled,
+            "available": (
+                os.name == "nt"
+                or (hasattr(os, "geteuid") and os.geteuid() == 0)
+                or Path("/dev/net/tun").exists()
+            ),
             "interface": services.settings.tun_interface,
             "mtu": services.settings.tun_mtu,
             "stack": services.settings.tun_stack,
@@ -251,136 +256,42 @@ async def doctor(
     services: Services = Depends(get_services),
     session: AsyncSession = Depends(get_session, scope="function"),
 ) -> dict[str, Any]:
-    checks: list[dict[str, Any]] = []
+    from ostium.services.diagnostics import run_checks
 
-    def add(
-        name: str,
-        status: str,
-        message: str,
-        fix: str | None = None,
-        data: dict[str, Any] | None = None,
-    ) -> None:
-        checks.append(
-            {"id": name, "status": status, "message": message, "fix": fix, "data": data or {}}
-        )
-
-    build = build_info()
-    add(
-        "version",
-        "pass" if build.version != "0.0.0" else "fail",
-        f"control plane {build.version}"
-        + (f" ({build.commit[:12]})" if build.commit else " (commit unknown)"),
-        None if build.version != "0.0.0" else "reinstall from a release artifact",
-        {
-            "version": build.version,
-            "commit": build.commit,
-            "source": build.as_dict()["version_source"],
-        },
-    )
-    listener = await asyncio.to_thread(
-        listener_info, services.settings.port, host=services.settings.host
-    )
-    if not listener.get("found"):
-        add(
-            f"port_owner:{services.settings.port}",
-            "fail",
-            f"nothing is listening on {services.settings.host}:{services.settings.port}",
-            "start the control plane and re-run doctor",
-            listener,
-        )
-    elif listener.get("pid") == os.getpid():
-        add(
-            f"port_owner:{services.settings.port}",
-            "pass",
-            f"listener pid {listener.get('pid')} is this process ({listener.get('exe')})",
-            None,
-            listener,
-        )
-    else:
-        add(
-            f"port_owner:{services.settings.port}",
-            "warn",
-            f"port is owned by pid {listener.get('pid')} ({listener.get('exe')}), "
-            "which is not this process",
-            "stop the stale process or start the expected control plane",
-            listener,
-        )
-
-    try:
-        async with services.session_factory() as db:
-            from sqlalchemy import text
-
-            await db.execute(text("SELECT 1"))
-        add("database", "pass", "SQLite database is readable")
-    except Exception as exc:
-        add("database", "fail", f"database check failed: {exc}", "check data directory permissions")
-    try:
-        core = await services.engine.client.status()
-        if core.get("running"):
-            add("core", "pass", f"sing-box is running (pid {core.get('pid')})")
-        else:
-            add(
-                "core", "warn", "sing-box is not running", "open System and apply the configuration"
-            )
-    except Exception as exc:
-        core = {}
-        add("core", "fail", f"core API unreachable: {exc}", "start ostium-core.service")
-    web = read_web_build(services.settings.paths.web_dist)
-    core_version = str(core.get("core_version")) if core.get("core_version") else None
-    web_version = str(web.get("version")) if web.get("available") and web.get("version") else None
-    mismatches = version_mismatches(build.version, core=core_version, web=web_version)
-    add(
-        "version_consistency",
-        "pass" if not mismatches else "fail",
-        "control plane, core and Web bundle versions match"
-        if not mismatches
-        else "; ".join(
-            f"{item['surface']} reports {item['actual']} (expected {item['expected']})"
-            for item in mismatches
-        ),
-        None if not mismatches else "stop the stale process and reinstall the expected release",
-        {
-            "expected": build.version,
-            "core": core_version,
-            "web": web_version,
-            "web_build": web,
-            "mismatches": mismatches,
-        },
-    )
-    engine = Path(services.settings.engine_path or services.settings.paths.engine_binary)
-    if engine.is_file():
-        add("engine", "pass", f"core binary found at {engine}")
-    else:
-        add("engine", "fail", f"core binary missing at {engine}", "run `ostium core install`")
-    proxy = await asyncio.to_thread(lambda: services.proxy.status())
-    proxy_message = (
-        f"system proxy: {'enabled' if proxy.get('enabled') else 'disabled'} "
-        f"({proxy.get('platform')})"
-    )
-    add(
-        "system_proxy",
-        "pass" if proxy.get("supported") else "warn",
-        proxy_message,
-    )
-    if services.settings.role is Role.CLIENT:
-        tun_ok = os.name == "nt" or os.geteuid() == 0 or Path("/dev/net/tun").exists()
-        add(
-            "tun",
-            "pass" if tun_ok else "warn",
-            "TUN device is available" if tun_ok else "/dev/net/tun is not available",
-            None if tun_ok else "install/start ostium-core.service with CAP_NET_ADMIN",
-        )
+    results = await run_checks(services, session)
+    checks = [item.as_dict() for item in results]
     certs = (await session.execute(select(Certificate))).scalars().all()
     for cert in certs:
         if cert.expires_at is not None:
             days = (as_utc(cert.expires_at) - utcnow()).days
-            add(
-                f"certificate:{cert.domain}",
-                "pass" if days > 14 else ("warn" if days >= 0 else "fail"),
-                f"certificate expires in {days} days",
-                "renew the certificate" if days <= 14 else None,
+            checks.append(
+                {
+                    "id": f"certificate:{cert.domain}",
+                    "status": "pass" if days > 14 else ("warn" if days >= 0 else "fail"),
+                    "message": f"certificate expires in {days} days",
+                    "fix": "renew the certificate" if days <= 14 else None,
+                    "data": {"domain": cert.domain, "days": days},
+                    "duration_ms": None,
+                }
             )
-    return {"checks": checks, "generated_at": iso(utcnow())}
+    return {"checks": checks, "generated_at": iso(utcnow()), "version": __version__}
+
+
+@router.get("/system/selftest")
+async def selftest_endpoint(
+    target: str = "google",
+    _: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+) -> dict[str, Any]:
+    from ostium.services import diagnostics
+
+    if target not in diagnostics.SELFTEST_TARGETS:
+        raise ApiError(
+            400,
+            "target must be google, huggingface or github",
+            "bad_selftest_target",
+        )
+    return await diagnostics.selftest(services, target)
 
 
 @router.post("/system/proxy")
@@ -710,6 +621,41 @@ async def restart_service(
     return {"restarted": True, "status": status}
 
 
+def _log_tail(path: Path, limit: int = 200) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
+    except OSError as exc:
+        return f"unreadable: {exc}"
+    return redact("\n".join(lines))
+
+
+def _service_manager_state() -> dict[str, Any]:
+    import subprocess
+
+    if os.name == "nt":
+        return {"platform": "scm", "supported": True, "detail": "use `sc query OstiumCore`"}
+    if sys.platform == "darwin":
+        return {"platform": "launchd", "supported": True}
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "ostium", "ostium-core"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        return {
+            "platform": "systemd",
+            "supported": True,
+            "states": result.stdout.split(),
+            "returncode": result.returncode,
+        }
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"platform": "systemd", "supported": False, "error": str(exc)}
+
+
 @router.get("/system/diagnostics")
 async def diagnostics(
     _: AdminUser = Depends(get_current_admin),
@@ -722,13 +668,33 @@ async def diagnostics(
         core_cfg_text = redact(json.dumps(core_cfg, indent=2))
     except Exception as exc:
         core_cfg_text = f"unavailable: {exc}"
+    provenance_payload = await provenance(_, services)
+    dns_payload = await dns_status(_, services)
+    last_good_meta: dict[str, Any] = {}
+    meta_path = services.settings.paths.last_good_meta_path
+    if meta_path.is_file():
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+            last_good_meta = loaded if isinstance(loaded, dict) else {}
+        except (OSError, ValueError):
+            last_good_meta = {"error": "last-good.meta.json is unreadable"}
+    logs_dir = services.settings.paths.logs_dir
     return {
         "version": __version__,
         "role": services.settings.role.value,
         "generated_at": iso(utcnow()),
         "checks": doctor_result["checks"],
         "config": core_cfg_text,
+        "provenance": provenance_payload,
+        "dns": dns_payload,
+        "system_proxy": await asyncio.to_thread(lambda: services.proxy.status()),
+        "last_good_meta": last_good_meta,
+        "service_manager": await asyncio.to_thread(_service_manager_state),
         "logs": services.bus.logs(limit=200),
+        "log_files": {
+            name: _log_tail(logs_dir / name)
+            for name in ("ui.log", "service.log", "install.log", "core.log")
+        },
         "system": {
             "platform": platform.platform(),
             "python": sys.version,
@@ -744,13 +710,26 @@ async def diagnostics_download(
     session: AsyncSession = Depends(get_session, scope="function"),
 ) -> Response:
     payload = await diagnostics(admin, services, session)
+    ports = await port_owners(admin, services)
     body = json.dumps(payload, indent=2, ensure_ascii=False).encode()
+    entries = {
+        "ostium-diagnostics.json": body,
+        "provenance.json": json.dumps(
+            payload.get("provenance") or {}, indent=2, ensure_ascii=False
+        ).encode(),
+        "dns.json": json.dumps(payload.get("dns") or {}, indent=2, ensure_ascii=False).encode(),
+        "ports.json": json.dumps(ports, indent=2, ensure_ascii=False).encode(),
+        "checks.json": json.dumps(
+            payload.get("checks") or [], indent=2, ensure_ascii=False
+        ).encode(),
+    }
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-        info = tarfile.TarInfo("ostium-diagnostics.json")
-        info.size = len(body)
-        info.mode = 0o600
-        archive.addfile(info, io.BytesIO(body))
+        for name, data in entries.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = 0o600
+            archive.addfile(info, io.BytesIO(data))
     return Response(
         content=buffer.getvalue(),
         media_type="application/gzip",

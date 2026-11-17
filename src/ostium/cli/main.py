@@ -1137,6 +1137,31 @@ def diagnostics_export(
     provenance = build_info().as_dict()
     provenance["listener"] = listener_info(settings.port, host=settings.host)
     provenance["web"] = read_web_build(settings.paths.web_dist)
+    last_good_meta: dict[str, Any] = {}
+    if settings.paths.last_good_meta_path.is_file():
+        with contextlib.suppress(OSError, ValueError):
+            loaded = json.loads(settings.paths.last_good_meta_path.read_text(encoding="utf-8"))
+            last_good_meta = loaded if isinstance(loaded, dict) else {}
+    dns_payload = {
+        "configured_mode": settings.server_dns_mode,
+        "doh_url": settings.server_dns_doh_url,
+        "last_good": last_good_meta,
+        "generated_at": iso(utcnow()),
+    }
+    ports_payload = {
+        "owners": [
+            listener_info(port)
+            for port in sorted(
+                {
+                    settings.port,
+                    settings.mixed_port,
+                    int(settings.core_url.rsplit(":", 1)[-1])
+                    if settings.core_url.rsplit(":", 1)[-1].isdigit()
+                    else 8788,
+                }
+            )
+        ]
+    }
     doctor_payload: dict[str, Any] = {"checks": []}
     try:
         health = httpx.get(f"{settings.core_url}/v1/health", timeout=3, trust_env=False).json()
@@ -1157,6 +1182,8 @@ def diagnostics_export(
         entries = {
             "ostium-diagnostics.json": json.dumps(payload, indent=2),
             "provenance.json": json.dumps(provenance, indent=2),
+            "dns.json": json.dumps(dns_payload, indent=2),
+            "ports.json": json.dumps(ports_payload, indent=2),
             "doctor.json": json.dumps(doctor_payload, indent=2),
             "config.redacted.toml": config_text,
             "ostium.log.tail": log_text,

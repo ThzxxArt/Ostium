@@ -40,6 +40,8 @@ const sessionUp = ref(0)
 const sessionDown = ref(0)
 const rateUp = ref(0)
 const rateDown = ref(0)
+const latency = ref<number | null>(null)
+const testing = ref(false)
 const connectedAt = ref<number | null>(null)
 let timer: number | null = null
 let firstSample = true
@@ -135,10 +137,33 @@ async function load() {
       failures.push((connectionData.reason as Error).message)
     }
     loadError.value = failures[0] || ''
-    if (connected.value && connectedAt.value === null) connectedAt.value = Date.now()
-    if (!connected.value) connectedAt.value = null
+    if (connected.value) {
+      // Prefer the core's own start time: page load time made the session
+      // duration reset every time the user navigated back.
+      const started = (info.value?.core as Record<string, unknown>)?.started_at
+      const parsed = typeof started === 'string' ? Date.parse(started) : Number.NaN
+      if (Number.isFinite(parsed)) connectedAt.value = parsed
+      else if (connectedAt.value === null) connectedAt.value = Date.now()
+    } else {
+      connectedAt.value = null
+    }
   } finally {
     if (request === loadRequest) loading.value = false
+  }
+}
+
+async function testConnection() {
+  if (testing.value) return
+  testing.value = true
+  try {
+    const result = await api.system.selftest('google')
+    latency.value = result.latency_ms
+    if (result.ok) message.success(t('diagnostics.selftest_ok'))
+    else message.error(result.error || `${result.stage}: ${t('diagnostics.selftest_fail')}`)
+  } catch (err) {
+    message.error((err as Error).message)
+  } finally {
+    testing.value = false
   }
 }
 
@@ -242,6 +267,10 @@ onBeforeUnmount(() => {
         <NButton secondary :loading="loading" @click="load">
           <template #icon><RefreshCw :size="15" /></template>
           {{ t('common.refresh') }}
+        </NButton>
+        <NButton secondary :loading="testing" @click="testConnection">
+          <template #icon><Gauge :size="15" /></template>
+          {{ t('home.test_connection') }}
         </NButton>
         <NButton secondary @click="router.push('/diagnostics')">
           <template #icon><Stethoscope :size="15" /></template>
@@ -380,7 +409,9 @@ onBeforeUnmount(() => {
               }}</strong>
             </div>
             <div>
-              <span>{{ t('home.latency') }}</span><strong>—</strong>
+              <span>{{ t('home.latency') }}</span><strong>{{
+                latency === null ? '—' : `${latency} ms`
+              }}</strong>
             </div>
             <div>
               <span>{{ t('common.version') }}</span><strong>{{ info?.app.version }}</strong>

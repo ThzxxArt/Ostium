@@ -83,7 +83,10 @@ def _is_ip_literal(value: str) -> bool:
 
 
 def probe_doh(
-    url: str = DEFAULT_DOH_URL, *, timeout: float = PROBE_TIMEOUT_SECONDS
+    url: str = DEFAULT_DOH_URL,
+    *,
+    timeout: float = PROBE_TIMEOUT_SECONDS,
+    name: str = PROBE_DOMAIN,
 ) -> DnsProbeResult:
     """Query a DoH JSON endpoint and return a bounded, structured result."""
 
@@ -96,7 +99,7 @@ def probe_doh(
         ) as client:
             response = client.get(
                 url,
-                params={"name": PROBE_DOMAIN, "type": "A"},
+                params={"name": name, "type": "A"},
                 headers={"Accept": "application/dns-json"},
             )
             response.raise_for_status()

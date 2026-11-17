@@ -356,6 +356,7 @@ export interface SystemInfo {
   }
   tun: {
     enabled: boolean
+    available: boolean
     interface: string
     mtu: number
     stack: string

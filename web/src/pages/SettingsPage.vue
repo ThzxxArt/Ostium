@@ -930,7 +930,9 @@ onMounted(load)
               </div>
               <div class="field">
                 <span>{{ t('settings.about_commit') }}</span>
-                <strong class="o-truncate">{{ provenance.app.commit || t('common.unknown') }}</strong>
+                <strong class="o-truncate">{{
+                  provenance.app.commit || t('common.unknown')
+                }}</strong>
               </div>
               <div class="field">
                 <span>{{ t('settings.about_pid') }}</span>

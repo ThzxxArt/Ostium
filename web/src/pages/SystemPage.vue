@@ -21,9 +21,9 @@ import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import { api } from '@/api'
 import type { DoctorCheck, ServiceStatus, SystemInfo } from '@/api/types'
-import { formatBytes, formatDuration, formatPercent } from '@/utils/format'
+import { formatBytes, formatDate, formatDuration, formatPercent } from '@/utils/format'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const message = useMessage()
 
 const info = ref<SystemInfo | null>(null)
@@ -41,7 +41,15 @@ const controlService = computed(() =>
   services.value.find((service) => service.name === 'ostium.service'),
 )
 const passCount = computed(() => checks.value.filter((check) => check.status === 'pass').length)
-const issueCount = computed(() => checks.value.filter((check) => check.status !== 'pass').length)
+const warnCount = computed(() => checks.value.filter((check) => check.status === 'warn').length)
+const failCount = computed(() => checks.value.filter((check) => check.status === 'fail').length)
+const doctorGeneratedAt = ref('')
+
+const coreState = computed(() => {
+  if (!coreService.value) return 'unknown'
+  if (coreService.value.reachable === false) return 'unreachable'
+  return coreService.value.running ? 'running' : 'stopped'
+})
 
 async function load() {
   loading.value = true
@@ -60,7 +68,9 @@ async function load() {
 async function runDoctor() {
   runningDoctor.value = true
   try {
-    checks.value = (await api.system.doctor()).checks
+    const result = await api.system.doctor()
+    checks.value = result.checks
+    doctorGeneratedAt.value = result.generated_at
   } catch (err) {
     message.error((err as Error).message)
   } finally {
@@ -164,7 +174,7 @@ onMounted(async () => {
                 >ostium-core.service · {{ info?.core.engine_version || '—' }}</span
               >
             </div>
-            <OStatusPill :status="coreService?.running ? 'running' : 'stopped'" size="sm" />
+            <OStatusPill :status="coreState" size="sm" />
           </div>
         </div>
         <div class="host-grid">
@@ -208,9 +218,13 @@ onMounted(async () => {
         <div v-else class="checks">
           <div class="check-summary">
             <span>{{ t('system.check_pass') }} {{ passCount }}</span>
-            <span :class="{ warn: issueCount > 0 }"
-              >{{ t('system.check_fail') }} {{ issueCount }}</span
+            <span class="warn">{{ t('system.check_warn') }} {{ warnCount }}</span>
+            <span :class="{ fail: failCount > 0 }"
+              >{{ t('system.check_fail') }} {{ failCount }}</span
             >
+            <small v-if="doctorGeneratedAt" class="o-micro o-subtle">{{
+              formatDate(doctorGeneratedAt, locale)
+            }}</small>
           </div>
           <div v-for="check in checks" :key="check.id" class="check">
             <span class="check-dot" :class="check.status" />
@@ -300,6 +314,9 @@ onMounted(async () => {
 }
 .check-summary .warn {
   color: var(--warning);
+}
+.check-summary .fail {
+  color: var(--danger);
 }
 .check {
   display: flex;

@@ -61,6 +61,15 @@ class ClashApi:
         except Exception:
             return {}
 
+    async def dns_query(self, name: str, *, record_type: str = "A") -> dict[str, Any] | None:
+        """Resolve a name through the running core's own DNS stack."""
+
+        try:
+            payload = await self._get(f"/dns/query?name={name}&type={record_type}")
+        except Exception:
+            return None
+        return dict(payload) if isinstance(payload, dict) else None
+
     async def delay(self, tag: str, *, url: str, timeout_ms: int = 5000) -> int | None:
         """Measure real latency through a proxy group via the Clash API."""
 

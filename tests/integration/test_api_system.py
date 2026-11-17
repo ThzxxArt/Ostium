@@ -96,8 +96,8 @@ def test_server_system_info_doctor_and_diagnostics(
     doctor = api_client.get("/api/v1/system/doctor").json()
     statuses = {(check["id"], check["status"]) for check in doctor["checks"]}
     assert ("database", "pass") in statuses
-    assert ("core", "pass") in statuses
-    assert ("engine", "fail") in statuses
+    assert ("core_running", "pass") in statuses
+    assert ("engine_binary", "fail") in statuses
     assert ("system_proxy", "pass") in statuses
 
     settings.paths.engine_binary.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ def test_server_system_info_doctor_and_diagnostics(
     assert "pass" in {
         check["status"]
         for check in api_client.get("/api/v1/system/doctor").json()["checks"]
-        if check["id"] == "engine"
+        if check["id"] == "engine_binary"
     }
 
     now = utcnow()
@@ -145,7 +145,7 @@ def test_server_system_info_doctor_and_diagnostics(
     api_client.app.state.services.engine.client.config = config  # type: ignore[method-assign]
     api_client.app.state.services.bus.log("info", "diagnostic log token=abc")
     diagnostics = api_client.get("/api/v1/system/diagnostics")
-    assert diagnostics.status_code == 200
+    assert diagnostics.status_code == 200, diagnostics.text
     body = diagnostics.json()
     assert body["version"]
     assert "[REDACTED]" in body["config"]
@@ -189,7 +189,7 @@ def test_system_info_and_doctor_core_failures(
     info = api_client.get("/api/v1/system/info").json()
     assert info["core"]["running"] is False
     doctor = api_client.get("/api/v1/system/doctor").json()
-    assert ("core", "fail") in {(check["id"], check["status"]) for check in doctor["checks"]}
+    assert ("core_api", "fail") in {(check["id"], check["status"]) for check in doctor["checks"]}
 
     async def bad_config() -> dict:
         raise RuntimeError("no config")
@@ -521,18 +521,18 @@ def test_client_doctor_tun_checks(client_api: TestClient, monkeypatch) -> None:
         return {"running": True, "pid": 1}
 
     client_api.app.state.services.engine.client.status = running  # type: ignore[method-assign]
-    monkeypatch.setattr("ostium.api.routes_system.os.geteuid", lambda: 0)
+    monkeypatch.setattr("ostium.services.diagnostics.os.geteuid", lambda: 0)
     checks = client_api.get("/api/v1/system/doctor").json()["checks"]
     assert any(check["id"] == "tun" and check["status"] == "pass" for check in checks)
 
-    monkeypatch.setattr("ostium.api.routes_system.os.geteuid", lambda: 1000)
+    monkeypatch.setattr("ostium.services.diagnostics.os.geteuid", lambda: 1000)
 
     def fake_path(value):  # type: ignore[no-untyped-def]
         if str(value) == "/dev/net/tun":
             return SimpleNamespace(exists=lambda: False)
         return Path(value)
 
-    monkeypatch.setattr("ostium.api.routes_system.Path", fake_path)
+    monkeypatch.setattr("ostium.services.diagnostics.Path", fake_path)
     checks = client_api.get("/api/v1/system/doctor").json()["checks"]
     assert any(check["id"] == "tun" and check["status"] == "warn" for check in checks)
 
@@ -860,3 +860,48 @@ def test_port_owners_endpoint_lists_configured_ports(
     ports = {owner["port"] for owner in response.json()["owners"]}
     assert settings.port in ports
     assert settings.mixed_port in ports
+
+
+def test_selftest_reports_stage_and_rejects_unknown_target(
+    api_client: TestClient, session_token: str, monkeypatch
+) -> None:
+    from ostium.services import diagnostics
+
+    monkeypatch.setattr(
+        diagnostics,
+        "tls_probe",
+        lambda host: {
+            "ok": True,
+            "host": host,
+            "port": 443,
+            "stage": "tls",
+            "latency_ms": 11,
+            "error": None,
+        },
+    )
+    response = api_client.get("/api/v1/system/selftest?target=google")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["stage"] == "tls"
+    assert body["target"] == "google"
+
+    bad = api_client.get("/api/v1/system/selftest?target=invalid")
+    assert bad.status_code == 400
+    assert bad.json()["code"] == "bad_selftest_target"
+
+
+def test_diagnostics_bundle_contains_provenance_and_dns(
+    api_client: TestClient, session_token: str
+) -> None:
+    response = api_client.get("/api/v1/system/diagnostics/download")
+    assert response.status_code == 200
+    with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
+        names = set(archive.getnames())
+    assert {
+        "ostium-diagnostics.json",
+        "provenance.json",
+        "dns.json",
+        "ports.json",
+        "checks.json",
+    } <= names

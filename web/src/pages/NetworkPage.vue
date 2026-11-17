@@ -7,7 +7,7 @@ import OPageHeader from '@/components/OPageHeader.vue'
 import OSectionCard from '@/components/OSectionCard.vue'
 import OStatusPill from '@/components/OStatusPill.vue'
 import { api } from '@/api'
-import type { SystemInfo } from '@/api/types'
+import type { Provenance, SystemInfo } from '@/api/types'
 import { useCopy } from '@/composables/useCopy'
 
 const { t } = useI18n()
@@ -15,6 +15,7 @@ const message = useMessage()
 const { copy } = useCopy()
 
 const info = ref<SystemInfo | null>(null)
+const provenance = ref<Provenance | null>(null)
 const loading = ref(true)
 const error = ref('')
 const busy = ref<string | null>(null)
@@ -23,8 +24,9 @@ const lanBusy = ref(false)
 const mode = computed(() => info.value?.mode || 'mixed')
 const proxy = computed(() => info.value?.proxy)
 const tun = computed(() => info.value?.tun)
+const tunAvailable = computed(() => tun.value?.available === true)
 const allowLan = computed(() => Boolean(info.value?.allow_lan))
-const lanPort = computed(() => info.value?.lan_port || 7890)
+const lanPort = computed(() => info.value?.lan_port || info.value?.mixed_port || 7890)
 const lanAddresses = computed(() => info.value?.lan_addresses ?? [])
 const lanAvailable = computed(() => mode.value !== 'tun' && !tun.value?.enabled)
 const proxyHost = computed(() => (allowLan.value ? '0.0.0.0' : '127.0.0.1'))
@@ -52,7 +54,7 @@ const modes = computed(() => [
     description: t('network.tun_desc'),
     icon: ShieldCheck,
     active: mode.value === 'tun',
-    enabled: true,
+    enabled: tunAvailable.value,
   },
 ])
 
@@ -64,7 +66,13 @@ const envHint = computed(
 async function load() {
   loading.value = true
   try {
-    info.value = await api.system.info()
+    const [infoResult, provenanceResult] = await Promise.allSettled([
+      api.system.info(),
+      api.system.provenance(),
+    ])
+    if (infoResult.status === 'rejected') throw infoResult.reason
+    info.value = infoResult.value
+    provenance.value = provenanceResult.status === 'fulfilled' ? provenanceResult.value : null
     error.value = ''
   } catch (err) {
     error.value = (err as Error).message
@@ -190,11 +198,19 @@ onMounted(load)
             <span>{{ t('network.stack') }}</span><strong>{{ tun?.stack || '—' }}</strong>
           </div>
           <div>
+            <span>{{ t('network.listener_owner') }}</span><strong class="o-mono">{{
+              provenance?.listener
+                ? `pid ${provenance.listener.pid ?? '—'} · ${provenance.listener.exe || '—'}`
+                : '—'
+            }}</strong>
+          </div>
+          <div>
             <span>{{ t('common.status') }}</span><strong>{{
               proxy?.enabled ? t('common.enabled') : t('common.disabled')
             }}</strong>
           </div>
         </div>
+        <p v-if="!tunAvailable" class="note">{{ t('network.tun_unavailable') }}</p>
         <p class="note">{{ t('home.tun_warning') }}</p>
       </OSectionCard>
 
