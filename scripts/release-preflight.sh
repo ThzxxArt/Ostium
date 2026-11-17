@@ -78,6 +78,16 @@ fi
 check_contains RELEASE_NOTES.md "$VERSION"
 check_contains docs/release-status.md "$VERSION"
 
+# The release status must be switched to Published before the tag is created.
+# Published wheel/sdist metadata and Release assets are immutable, so a tag
+# built while the docs still say "not published" cannot be repaired later.
+for file in README.md README.en.md docs/release-status.md docs/index.md RELEASE_NOTES.md SECURITY.md; do
+  if grep -Eq "尚未发布|not published|implemented, not published" "$ROOT/$file"; then
+    echo "$file still says the release is unpublished; update the release status before tagging" >&2
+    fail=1
+  fi
+done
+
 # Installers must follow the newest release instead of pinning an old one.
 check_contains scripts/install-online.sh 'VERSION="${OSTIUM_VERSION:-latest}"'
 check_contains scripts/install-online.ps1 '[string]$Version = "latest"'

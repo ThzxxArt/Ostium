@@ -21,7 +21,7 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
   <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
-  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.10"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.10-5EEAD4?style=flat-square"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.11"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.11-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -35,18 +35,18 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.33%25%20statements%20%C2%B7%2090.49%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.86%25%20statements%20%C2%B7%2085.90%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-713%20backend%20%C2%B7%20204%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.28%25%20statements%20%C2%B7%2090.32%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.78%25%20statements%20%C2%B7%2085.04%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-825%20backend%20%C2%B7%20219%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **v0.1.11 已完成实施，尚未发布。** 当前公开版本仍为 **v0.1.10**（2026-11-16）。
+> **v0.1.11 已于 2026-11-17 发布。** 上一版本为 v0.1.10（2026-11-16）。
 > 0.1.11 的已验证/未验证项见 [发布状态](docs/release-status.md) 和
-> [`versions/V0.1.11_PLAN.md`](versions/V0.1.11_PLAN.md)。
+> [`versions/V0.1.11_IMPLEMENTATION_STATUS.md`](versions/V0.1.11_IMPLEMENTATION_STATUS.md)。
 
 > [!TIP]
-> **当前公开版本：v0.1.10。** 0.1.11 发布后，以下版本号替换为 v0.1.11。
+> **当前公开版本：v0.1.11。**
 > 最省事的安装方式不需要预装 Python：
 >
 > ```bash
@@ -231,8 +231,8 @@ curl -fsSL .../install-online.sh | sudo bash -s -- install --role server --no-se
 把同一版本的 Release 资产下载到同一目录（保持文件名不变）：
 
 - `install-online.sh`
-- `ostium_ctl-0.1.10-py3-none-any.whl`
-- `ostium_ctl-0.1.10.tar.gz`（安装脚本、systemd/launchd 文件）
+- `ostium_ctl-0.1.11-py3-none-any.whl`
+- `ostium_ctl-0.1.11.tar.gz`（安装脚本、systemd/launchd 文件）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（按架构选择）及其 `.sha256`
 - `SHA256SUMS`
 
@@ -257,29 +257,29 @@ sudo bash install-online.sh install \
 从 GitHub Release 下载 wheel、sdist、核心包和 `SHA256SUMS`，解压 sdist 后直接运行
 其中的平台安装器：
 
-- `ostium_ctl-0.1.10-py3-none-any.whl`
-- `ostium_ctl-0.1.10.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
+- `ostium_ctl-0.1.11-py3-none-any.whl`
+- `ostium_ctl-0.1.11.tar.gz`（包含 `scripts/install.sh` 与 `deploy/`）
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz`（arm64 选对应架构）
 - `SHA256SUMS`
 
-下载入口：<https://github.com/ThzxxArt/Ostium/releases>（选择 v0.1.10）
+下载入口：<https://github.com/ThzxxArt/Ostium/releases>（选择 v0.1.11）
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.10.tar.gz
+tar -xzf ostium_ctl-0.1.11.tar.gz
 
-sudo ./ostium_ctl-0.1.10/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.10-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.11/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.11-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
 
 同一 Release 还提供：
 
-- `ostium_0.1.10_amd64.deb` / `ostium_0.1.10_arm64.deb`：原生 DEB，包含 PyInstaller 控制面与核心，安装后启用 systemd；
-- `Ostium-0.1.10-linux-amd64.AppImage` / `arm64`：单文件 AppImage，适合无 root 的客户端或临时运行；
-- `Ostium-0.1.10-macos-arm64.dmg`：macOS 客户端 DMG，内含 wheel、darwin 核心与 launchd 安装脚本；
-- `Ostium-0.1.10-windows-x64-setup.exe`：Windows 客户端安装包。
+- `ostium_0.1.11_amd64.deb` / `ostium_0.1.11_arm64.deb`：原生 DEB，包含 PyInstaller 控制面与核心，安装后启用 systemd；
+- `Ostium-0.1.11-linux-amd64.AppImage` / `arm64`：单文件 AppImage，适合无 root 的客户端或临时运行；
+- `Ostium-0.1.11-macos-arm64.dmg`：macOS 客户端 DMG，内含 wheel、darwin 核心与 launchd 安装脚本；
+- `Ostium-0.1.11-windows-x64-setup.exe`：Windows 客户端安装包。
 
 未配置代码签名证书时，Windows/DMG 资产会在 Release 说明中明确标注“未签名”；不要把它当作已签名构建。
 
@@ -324,8 +324,8 @@ journalctl -u ostium -u ostium-core -f
 同样先解压 sdist，再运行：
 
 ```bash
-sudo ./ostium_ctl-0.1.10/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.10-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.11/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.11-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -339,7 +339,7 @@ systemctl --user enable --now ostium
 
 ### 方式四：Windows 客户端（离线）
 
-1. 运行 `Ostium-0.1.10-windows-x64-setup.exe`。
+1. 运行 `Ostium-0.1.11-windows-x64-setup.exe`。
 2. 安装器会复制程序到 `%ProgramFiles%\Ostium`，注册 `OstiumCore` 服务，并设置登录时启动 UI。
 3. UI 数据保存在 `%ProgramData%\Ostium`；核心数据、token、last-good 配置位于 `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写）。
 4. 首次打开 <http://127.0.0.1:8787> 时完成设置向导并创建管理员；安装器不再生成或保存明文密码。
@@ -356,10 +356,10 @@ systemctl --user enable --now ostium
 推荐直接用方式一的一键在线安装。离线时解压 sdist，并用环境变量指向 wheel 与核心包：
 
 ```bash
-tar -xzf ostium_ctl-0.1.10.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.10-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.11.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.11-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.10/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.11/deploy/launchd/install-macos.sh client
 ```
 
 安装器会注册 `com.ostium.core` LaunchDaemon 和 `com.ostium.ui` LaunchAgent，并链接 `ostium` 命令。未签名/未公证构建会触发 Gatekeeper，请先校验校验和。
@@ -377,14 +377,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 本地构建：
 
 ```bash
-docker build -t ostium:0.1.10 .
+docker build -t ostium:0.1.11 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.10
+  ostium:0.1.11
 ```
 
 > Docker 使用 host 网络，以便绑定 443/80；管理 UI 默认仍只监听 `127.0.0.1`。
@@ -402,14 +402,14 @@ uv tool install ostium-ctl
 # 或
 pipx install ostium-ctl
 # 或指定版本
-uv tool install ostium-ctl    # 可 pin "ostium-ctl==0.1.10"
+uv tool install ostium-ctl    # 可 pin "ostium-ctl==0.1.11"
 ```
 
 服务器快速启动（独立 venv，避免 PEP 668 和污染系统 Python）：
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install ostium-ctl    # 可 pin ==0.1.10
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # 可 pin ==0.1.11
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -621,7 +621,7 @@ sudo systemctl start ostium-core ostium
 ```bash
 sudo bash install-online.sh upgrade
 # 指定版本
-# 固定版本：sudo bash install-online.sh upgrade --version 0.1.10
+# 固定版本：sudo bash install-online.sh upgrade --version 0.1.11
 ```
 
 升级会保留数据库、`master.key`、配置、证书、用户和订阅，只替换 venv 与核心二进制；如果原来是 root 模式，会自动保持。
@@ -636,7 +636,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. 安装新 wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.10-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.11-py3-none-any.whl
 
 # 4. 启动；迁移在启动时执行
 sudo systemctl start ostium
@@ -843,6 +843,7 @@ npx playwright test
 - [端口与路径](docs/reference/ports.md)
 - [备份与恢复](docs/operations/backup.md)
 - [升级与回滚](docs/operations/upgrade.md)
+- [0.1.10 → 0.1.11 升级](docs/operations/upgrade-0.1.10-to-0.1.11.md)
 - [0.1.9 → 0.1.10 升级](docs/operations/upgrade-0.1.9-to-0.1.10.md)
 - [0.1.8 → 0.1.9 升级](docs/operations/upgrade-0.1.8-to-0.1.9.md)
 - [0.1.7 → 0.1.8 升级](docs/operations/upgrade-0.1.7-to-0.1.8.md)

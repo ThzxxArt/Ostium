@@ -22,9 +22,7 @@ after a fix is available.
 ## Supported versions
 
 Only the latest v0.1.x release receives security fixes during the v0.1 series.
-**v0.1.10 is the current public release.** v0.1.11 is implemented on `main` but
-is not published; do not treat it as supported until the release is published and
-the security advisory process records it. The historical v0.1.1 default-bind
+**v0.1.11 is the current public release** (published 2026-11-17). The historical v0.1.1 default-bind
 issue is documented in
 [the advisory](docs/security/advisory-2026-11-default-bind.md).
 Operators still on v0.1.0 should upgrade as soon as possible; until then, apply

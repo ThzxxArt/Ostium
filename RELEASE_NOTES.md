@@ -1,7 +1,8 @@
 # Ostium v0.1.11
 
-**Status: implemented, not published.** No `v0.1.11` tag, GitHub Release, PyPI
-artifact or GHCR image exists yet. Publication requires explicit owner approval.
+**Status: published on 2026-11-17.** Tag `v0.1.11` (`098b2be`), 23 GitHub
+Release assets, `ostium-ctl==0.1.11` on PyPI, and GHCR `0.1.11`/`v0.1.11`/`latest`.
+Release workflow `44097108605` passed.
 
 This release is about verifiability and failure containment: prove which build is
 running, make installers fail when the wrong process answers, use encrypted DNS
@@ -51,7 +52,7 @@ honestly, and stop a dead core from blackholing the whole machine.
 - Wheel/sdist exact `0.1.11`; wheel CLI and bundled Web `build.json` match.
 - Release preflight, shellcheck, `bash -n` and `mkdocs --strict` passed.
 
-## Not published / not verified
+## Not verified
 
 - Windows 11, macOS 14, Debian/RHEL, Nginx, Docker, ACME, real TUN and 72-hour
   soak tests still require external hardware, domains or accounts.

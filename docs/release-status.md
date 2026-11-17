@@ -8,28 +8,20 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Current public version | **0.1.10** |
-| Status | **Published** (0.1.11 implemented, **not published**) |
-| Tag | `v0.1.10` (annotated, commit `361fa7c`) |
-| Assets | GitHub Release `v0.1.10` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.10` (wheel + sdist) |
-| GHCR | `0.1.10`, `v0.1.10`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `43866531455` — success |
-| Previous release | `v0.1.9`, published 2026-11-16 (23 assets, unchanged) |
-| Release type | Server DNS pollution patch; no client reinstall required |
+| Version | **0.1.11** |
+| Status | **Published** |
+| Tag | `v0.1.11` (annotated, commit `098b2be`) |
+| Assets | GitHub Release `v0.1.11` — 23 assets, marked Latest |
+| PyPI | `ostium-ctl==0.1.11` (wheel + sdist) |
+| GHCR | `0.1.11`, `v0.1.11`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | run `44097108605` — success |
+| Previous release | `v0.1.10`, published 2026-11-16 (23 assets, unchanged) |
+| Release type | Verifiability, DNS, diagnostics and failure containment |
 | Source branch | `main` |
 
-### 0.1.11 status
-
-0.1.11 is implemented on `main` and has not been tagged or published. It is
-**not** the current public version: no `v0.1.11` tag, GitHub Release, PyPI
-artifact or GHCR image exists. Publication requires explicit release-owner
-authorization after the evidence in
-[`versions/V0.1.11_PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/versions/V0.1.11_PLAN.md) §12 is checked.
-
-Scope: deterministic version/provenance, installer port/version assertions,
-DoH-first DNS with UDP fallback (`CONFIG_POLICY_VERSION=3`), layered diagnostics,
-honest online/rate semantics, and system-proxy fail-open. No database migration.
+`v0.1.11` was published on 2026-11-17. The tag targets `098b2be`; the release
+workflow passed verification, integration, upgrade-e2e, wheel, core, Windows,
+macOS, Linux package, Docker and publish jobs.
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.
@@ -37,7 +29,7 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.10 continues to fix the status at its own tag instead of rewriting published
+0.1.11 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
 ## 0.1.11 verification status
@@ -223,13 +215,14 @@ evidence is in `versions/V0.1.2_RC_REPORT.md`:
   unless signing credentials are supplied.
 - **D-115** Push, tag and publication require explicit release-owner approval.
 
-## Release gates for 0.1.10
+## Release gates for 0.1.11
 
 1. **Code and automation**: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.
-2. **Upgrade and data**: `0.1.9 -> 0.1.10` upgrade plus backup restore;
-   missing-key and corruption rejection. The installer's staged rollback files
-   and the database snapshot are the recovery path if health checks fail.
+2. **Upgrade and data**: `0.1.10 -> 0.1.11` and `0.1.9 -> 0.1.11` upgrades
+   plus backup restore; missing-key and corruption rejection. The installer's
+   staged rollback files and the database snapshot are the recovery path if
+   health checks fail.
 3. **Platform evidence**: record only what was actually executed; unexecuted
    items stay blockers.
 4. **Publication ordering**: draft release verified first, PyPI published only

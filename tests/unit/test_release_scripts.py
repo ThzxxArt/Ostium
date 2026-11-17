@@ -89,3 +89,9 @@ def test_core_manifest_points_at_the_ostium_release_tag(tmp_path: Path) -> None:
     assert artifact["version"] == "1.14.4-ostium.1"
     assert artifact["url"].endswith("/v0.2.0/ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz")
     assert "v1.14.4/" not in artifact["url"]
+
+
+def test_release_preflight_requires_published_status_before_tagging() -> None:
+    script = (ROOT / "scripts" / "release-preflight.sh").read_text(encoding="utf-8")
+    assert "尚未发布|not published|implemented, not published" in script
+    assert "update the release status before tagging" in script

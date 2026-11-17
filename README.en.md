@@ -21,7 +21,7 @@
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/ThzxxArt/Ostium/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml"><img alt="Security" src="https://github.com/ThzxxArt/Ostium/actions/workflows/security.yml/badge.svg"></a>
   <a href="https://pypi.org/project/ostium-ctl/"><img alt="PyPI" src="https://img.shields.io/badge/PyPI-ostium--ctl-3775A9?style=flat-square&logo=pypi&logoColor=white"></a>
-  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.10"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.10-5EEAD4?style=flat-square"></a>
+  <a href="https://github.com/ThzxxArt/Ostium/releases/tag/v0.1.11"><img alt="Release" src="https://img.shields.io/badge/release-v0.1.11-5EEAD4?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-3DA639?style=flat-square&logo=gnu&logoColor=white">
 </p>
 
@@ -35,19 +35,18 @@
 </p>
 
 <p align="center">
-  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.33%25%20statements%20%C2%B7%2090.49%25%20branches-brightgreen?style=flat-square">
-  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.86%25%20statements%20%C2%B7%2085.90%25%20branches-brightgreen?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-713%20backend%20%C2%B7%20204%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
+  <img alt="Backend coverage" src="https://img.shields.io/badge/backend-94.28%25%20statements%20%C2%B7%2090.32%25%20branches-brightgreen?style=flat-square">
+  <img alt="Frontend coverage" src="https://img.shields.io/badge/frontend-90.78%25%20statements%20%C2%B7%2085.04%25%20branches-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-825%20backend%20%C2%B7%20219%20frontend%20%C2%B7%2073%20e2e-brightgreen?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> **v0.1.11 is implemented but not published.** The current public release is
-> still **v0.1.10** (2026-11-16). See [release status](docs/release-status.md)
-> and [`versions/V0.1.11_PLAN.md`](versions/V0.1.11_PLAN.md).
+> **v0.1.11 was published on 2026-11-17.** The previous release is v0.1.10
+> (2026-11-16). See [release status](docs/release-status.md) and
+> [`versions/V0.1.11_IMPLEMENTATION_STATUS.md`](versions/V0.1.11_IMPLEMENTATION_STATUS.md).
 
 > [!TIP]
-> **Current public version: v0.1.10.** Replace the version numbers below with
-> v0.1.11 after that release is published. The easiest install does not require
+> **Current public version: v0.1.11.** The easiest install does not require
 > Python:
 >
 > ```bash
@@ -244,8 +243,8 @@ runit, s6, supervisord or run both commands manually. Full examples:
 Download the same release's assets into one directory, keeping their filenames:
 
 - `install-online.sh`
-- `ostium_ctl-0.1.10-py3-none-any.whl`
-- `ostium_ctl-0.1.10.tar.gz` (installer, systemd/launchd files)
+- `ostium_ctl-0.1.11-py3-none-any.whl`
+- `ostium_ctl-0.1.11.tar.gz` (installer, systemd/launchd files)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (choose the right architecture)
   and its `.sha256`
 - `SHA256SUMS`
@@ -271,29 +270,29 @@ The installer verifies the sdist first, then extracts `scripts/install.sh` and
 Download the wheel, sdist, core archive and `SHA256SUMS`, then run the platform
 installer from the extracted sdist:
 
-- `ostium_ctl-0.1.10-py3-none-any.whl`
-- `ostium_ctl-0.1.10.tar.gz` (contains `scripts/install.sh` and `deploy/`)
+- `ostium_ctl-0.1.11-py3-none-any.whl`
+- `ostium_ctl-0.1.11.tar.gz` (contains `scripts/install.sh` and `deploy/`)
 - `ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz` (or the matching arm64 archive)
 - `SHA256SUMS`
 
-Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.10)
+Download: <https://github.com/ThzxxArt/Ostium/releases> (choose v0.1.11)
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf ostium_ctl-0.1.10.tar.gz
+tar -xzf ostium_ctl-0.1.11.tar.gz
 
-sudo ./ostium_ctl-0.1.10/scripts/install.sh --role server \
-  --wheel ./ostium_ctl-0.1.10-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.11/scripts/install.sh --role server \
+  --wheel ./ostium_ctl-0.1.11-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz \
   --domain vpn.example.com
 ```
 
 The same release also ships native packages:
 
-- `ostium_0.1.10_amd64.deb` / `ostium_0.1.10_arm64.deb` (PyInstaller control plane + core, systemd units);
-- `Ostium-0.1.10-linux-amd64.AppImage` / `arm64` (single-file client/temporary runtime);
-- `Ostium-0.1.10-macos-arm64.dmg` (wheel, darwin core and launchd installer);
-- `Ostium-0.1.10-windows-x64-setup.exe`.
+- `ostium_0.1.11_amd64.deb` / `ostium_0.1.11_arm64.deb` (PyInstaller control plane + core, systemd units);
+- `Ostium-0.1.11-linux-amd64.AppImage` / `arm64` (single-file client/temporary runtime);
+- `Ostium-0.1.11-macos-arm64.dmg` (wheel, darwin core and launchd installer);
+- `Ostium-0.1.11-windows-x64-setup.exe`.
 
 If no code-signing certificate is configured, Windows/DMG assets are explicitly labelled
 unsigned in the release notes; do not treat them as signed builds.
@@ -337,8 +336,8 @@ journalctl -u ostium -u ostium-core -f
 Extract the sdist first, then run:
 
 ```bash
-sudo ./ostium_ctl-0.1.10/scripts/install.sh --role client \
-  --wheel ./ostium_ctl-0.1.10-py3-none-any.whl \
+sudo ./ostium_ctl-0.1.11/scripts/install.sh --role client \
+  --wheel ./ostium_ctl-0.1.11-py3-none-any.whl \
   --core ./ostium-core-1.14.4-ostium.1-linux-amd64.tar.gz
 ```
 
@@ -352,7 +351,7 @@ Open <http://127.0.0.1:8787>, complete the wizard and import a subscription.
 
 ### Option 4 — Windows client (offline)
 
-1. Run `Ostium-0.1.10-windows-x64-setup.exe`.
+1. Run `Ostium-0.1.11-windows-x64-setup.exe`.
 2. The installer copies the app to `%ProgramFiles%\Ostium`, registers the `OstiumCore` service
    and starts the UI at logon.
 3. UI data lives in `%ProgramData%\Ostium`; core data, the token and last-good configuration
@@ -374,10 +373,10 @@ Use the one-click online installer from Option 1. For offline installs, extract 
 and point it at the wheel and core archive:
 
 ```bash
-tar -xzf ostium_ctl-0.1.10.tar.gz
-sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.10-py3-none-any.whl" \
+tar -xzf ostium_ctl-0.1.11.tar.gz
+sudo OSTIUM_WHEEL="$PWD/ostium_ctl-0.1.11-py3-none-any.whl" \
   OSTIUM_CORE_TARBALL="$PWD/ostium-core-1.14.4-ostium.1-darwin-arm64.tar.gz" \
-  ./ostium_ctl-0.1.10/deploy/launchd/install-macos.sh client
+  ./ostium_ctl-0.1.11/deploy/launchd/install-macos.sh client
 ```
 
 The installer registers the `com.ostium.core` LaunchDaemon and `com.ostium.ui` LaunchAgent,
@@ -397,14 +396,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 Local build:
 
 ```bash
-docker build -t ostium:0.1.10 .
+docker build -t ostium:0.1.11 .
 docker run -d --name ostium --network host \
   -e OSTIUM_ROLE=server \
   -e OSTIUM_ADMIN_PASSWORD='change-me-now' \
   -e OSTIUM_DOMAIN='vpn.example.com' \
   -v ostium-data:/var/lib/ostium \
   -v ostium-etc:/etc/ostium \
-  ostium:0.1.10
+  ostium:0.1.11
 ```
 
 > Docker uses host networking so it can bind 443/80; the admin UI still listens on
@@ -423,14 +422,14 @@ uv tool install ostium-ctl
 # or
 pipx install ostium-ctl
 # or pin the release
-uv tool install ostium-ctl    # pin "ostium-ctl==0.1.10"
+uv tool install ostium-ctl    # pin "ostium-ctl==0.1.11"
 ```
 
 Server quick start (isolated venv, avoids PEP 668 and system Python pollution):
 
 ```bash
 sudo python3.13 -m venv /opt/ostium/venv
-sudo /opt/ostium/venv/bin/pip install ostium-ctl    # pin ==0.1.10 after publication
+sudo /opt/ostium/venv/bin/pip install ostium-ctl    # pin ==0.1.11 after publication
 sudo /opt/ostium/venv/bin/ostium init --role server --no-input --password 'change-me-now'
 sudo /opt/ostium/venv/bin/ostium core install \
   --manifest https://github.com/ThzxxArt/Ostium/releases/latest/download/core-manifest.json
@@ -650,7 +649,7 @@ A failed renewal keeps the previous ready certificate and does not downgrade the
 ```bash
 sudo bash install-online.sh upgrade
 # pin a version
-# pin a version: sudo bash install-online.sh upgrade --version 0.1.10
+# pin a version: sudo bash install-online.sh upgrade --version 0.1.11
 ```
 
 The upgrade keeps the database, `master.key`, configuration, certificates, users and
@@ -666,7 +665,7 @@ sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
 
 # 3. Install the new wheel
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.10-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.11-py3-none-any.whl
 
 # 4. Start; migrations run at startup
 sudo systemctl start ostium
@@ -884,6 +883,7 @@ Current results:
 - [Ports and paths](docs/reference/ports.md)
 - [Backup and restore](docs/operations/backup.md)
 - [Upgrade and rollback](docs/operations/upgrade.md)
+- [0.1.10 → 0.1.11 upgrade](docs/operations/upgrade-0.1.10-to-0.1.11.md)
 - [0.1.9 → 0.1.10 upgrade](docs/operations/upgrade-0.1.9-to-0.1.10.md)
 - [0.1.8 → 0.1.9 upgrade](docs/operations/upgrade-0.1.8-to-0.1.9.md)
 - [0.1.7 → 0.1.8 upgrade](docs/operations/upgrade-0.1.7-to-0.1.8.md)
