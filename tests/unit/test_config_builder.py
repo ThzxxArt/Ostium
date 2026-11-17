@@ -329,3 +329,14 @@ def test_generated_configs_never_hardcode_the_mainland_resolver() -> None:
         assert "223.5.5.5" not in rendered
         local = [item for item in config["dns"]["servers"] if item["tag"] == "local"]
         assert local == [{"type": "local", "tag": "local"}]
+
+
+def test_doh_url_path_is_not_treated_as_a_filesystem_path(tmp_path: Path) -> None:
+    config = build_server_config(_server_spec(ServerDnsSpec(mode="doh")))
+    validate_config(
+        config,
+        role=Role.SERVER,
+        allowed_ports={443},
+        allowed_paths=[tmp_path],
+        allow_lan=False,
+    )

@@ -44,8 +44,8 @@ artifacts.
 
 ### Verified locally
 
-- Backend non-integration suite: 824 passed / 10 deselected; 94.28% statements;
-  90.31% branches; `coverage_gate.py` passed.
+- Backend non-integration suite: 825 passed / 10 deselected; 94.28% statements;
+  90.32% branches; `coverage_gate.py` passed.
 - Real pinned core `1.14.4-ostium.1`: integration suite 10 passed, including
   generated-config validation and live SOCKS traffic accounting.
 - `sing-box check` accepts the generated DoH server configuration and the

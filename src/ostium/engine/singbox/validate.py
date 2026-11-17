@@ -217,7 +217,15 @@ def _validate_paths(value: Any, allowed_paths: list[Path], depth: int = 0) -> No
     if depth > 40:
         raise ConfigRejected("configuration nesting is too deep")
     if isinstance(value, dict):
+        # A DoH server has a URL path ("/dns-query"), not a filesystem path.
+        # The generic "path" key otherwise gets mistaken for a file and makes
+        # an otherwise valid encrypted-DNS configuration fail validation.
+        dns_server = value.get("type") in {"https", "h3", "quic", "tls"} and bool(
+            value.get("tag") and (value.get("server") or value.get("address"))
+        )
         for key, child in value.items():
+            if isinstance(child, str) and key == "path" and dns_server:
+                continue
             if isinstance(child, str) and _looks_like_path(key, child):
                 _check_path(child, allowed_paths)
             else:
