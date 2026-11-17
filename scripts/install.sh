@@ -1029,6 +1029,10 @@ EOF
   fi
 
   if [[ "$NO_SERVICE" != "true" ]] && systemd_available; then
+    if [[ "$START" == "true" ]] && ! stop_previous_listener 8787; then
+      echo "客户端 UI 端口 8787 被未知进程占用，安装中止" >&2
+      exit 1
+    fi
     render_unit "$(dirname "$0")/../deploy/systemd/ostium-core-client.service" \
       "$SYSTEMD_DIR/ostium-core.service" "$CLIENT_DATA" "$CLIENT_DATA"
     if [[ "$RUN_AS_ROOT" == "true" ]]; then
@@ -1077,6 +1081,12 @@ EOF
           # upgraded unit back instead of leaving the client offline.
           sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
             systemctl --user restart ostium.service || true
+          if ! wait_for_version "http://127.0.0.1:8787/healthz" "$EXPECTED_VERSION"; then
+            echo "客户端 UI 未报告版本 $EXPECTED_VERSION；请检查用户级 ostium.service" >&2
+            sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+              systemctl --user status ostium.service --no-pager >&2 || true
+            exit 1
+          fi
         fi
         echo "客户端 UI：注销并重新登录（让 $SUDO_USER 获得 ostium 组），然后运行 systemctl --user start ostium"
       fi

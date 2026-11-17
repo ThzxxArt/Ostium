@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import {
   NButton,
   NCheckbox,
@@ -45,6 +46,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useBrowserNotifications } from '@/composables/useBrowserNotifications'
 
 const { t, locale } = useI18n()
+const route = useRoute()
 const message = useMessage()
 const dialog = useDialog()
 const app = useAppStore()
@@ -60,6 +62,12 @@ const saving = ref(false)
 const activeTab = ref('general')
 
 const versionMismatch = computed(() => provenance.value?.consistency?.ok === false)
+
+function reportSettings(result: { applied?: boolean; warning?: string }, successMessage: string) {
+  if (result.warning) message.warning(result.warning)
+  else if (result.applied === false) message.warning(t('common.apply_failed'))
+  else message.success(successMessage)
+}
 
 const general = ref({
   log_level: 'info',
@@ -217,8 +225,7 @@ async function saveGeneral() {
       system_proxy_fail_open: general.value.system_proxy_fail_open,
       system_proxy_fail_open_seconds: general.value.system_proxy_fail_open_seconds,
     })
-    if (result.warning) message.warning(result.warning)
-    message.success(t('settings.saved'))
+    reportSettings(result, t('settings.saved'))
     if (result.restart_required) message.warning(t('settings.restart_hint'))
     await load()
   } catch (err) {
@@ -239,8 +246,8 @@ async function saveNotifications() {
     else if (notifications.value.webhook_secret) {
       payload.webhook_secret = notifications.value.webhook_secret
     }
-    await api.settings.update(payload)
-    message.success(t('settings.saved'))
+    const result = await api.settings.update(payload)
+    reportSettings(result, t('settings.saved'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -258,8 +265,8 @@ async function enableBrowserNotifications() {
 async function saveMaintenance() {
   saving.value = true
   try {
-    await api.settings.update(maintenance.value)
-    message.success(t('settings.saved'))
+    const result = await api.settings.update(maintenance.value)
+    reportSettings(result, t('settings.saved'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -275,8 +282,8 @@ async function saveAllowlist() {
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean)
-    await api.settings.update({ ui_allowlist: entries })
-    message.success(t('settings.saved'))
+    const result = await api.settings.update({ ui_allowlist: entries })
+    reportSettings(result, t('settings.saved'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -490,7 +497,25 @@ function showQr(value: string) {
   qrOpen.value = true
 }
 
-onMounted(load)
+onMounted(async () => {
+  const requested = typeof route.query.tab === 'string' ? route.query.tab : ''
+  if (['general', 'security', 'notifications', 'maintenance', 'about'].includes(requested)) {
+    activeTab.value = requested
+  }
+  await load()
+})
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    if (
+      typeof value === 'string' &&
+      ['general', 'security', 'notifications', 'maintenance', 'about'].includes(value)
+    ) {
+      activeTab.value = value
+    }
+  },
+)
 </script>
 
 <template>

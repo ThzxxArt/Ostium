@@ -178,6 +178,10 @@ def test_toggle_proxy_persist_failure_restores_proxy(client_api: TestClient, mon
     )
     assert response.status_code == 500
     assert response.json()["code"] == "settings_write_failed"
+    from ostium.config import Mode
+
+    assert services.settings.mode is Mode.MIXED
+    assert services.client_paused is False
 
 
 def test_tun_enable_reports_proxy_disable_failure(client_api: TestClient) -> None:

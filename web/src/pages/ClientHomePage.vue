@@ -62,7 +62,19 @@ const selectedEndpoint = computed(() => {
   return endpoints.value.length === 1 ? endpoints.value[0]?.tag || null : null
 })
 const connected = computed(() => Boolean((info.value?.core as Record<string, unknown>)?.running))
+const lastTestOk = ref<boolean | null>(null)
 const state = computed(() => (connected.value ? 'connected' : 'disconnected'))
+const connectionState = computed(() => {
+  if (!connected.value) return 'disconnected'
+  if (lastTestOk.value === false) return 'degraded'
+  return 'connected'
+})
+const connectionLabel = computed(() => {
+  if (!connected.value) return t('home.disconnected')
+  if (lastTestOk.value === false) return t('home.degraded')
+  if (lastTestOk.value === null) return t('home.core_running')
+  return t('home.connected')
+})
 const mode = computed(() => info.value?.mode || 'mixed')
 
 const endpointOptions = computed(() =>
@@ -158,6 +170,7 @@ async function testConnection() {
   try {
     const result = await api.system.selftest('google')
     latency.value = result.latency_ms
+    lastTestOk.value = result.ok
     if (result.ok) message.success(t('diagnostics.selftest_ok'))
     else message.error(result.error || `${result.stage}: ${t('diagnostics.selftest_fail')}`)
   } catch (err) {
@@ -182,6 +195,7 @@ async function toggleConnection() {
         const activated = await api.profiles.activate(selectedProfileId.value)
         if (activated.warning) message.warning(activated.warning)
         if (activated.applied === false) {
+          if (!activated.warning) message.warning(t('common.apply_failed'))
           await load()
           return
         }
@@ -206,6 +220,7 @@ async function selectProfile(id: string) {
       const result = await api.profiles.activate(id)
       if (result.warning) message.warning(result.warning)
       if (result.applied === false) {
+        if (!result.warning) message.warning(t('common.apply_failed'))
         await load()
         return
       }
@@ -233,6 +248,7 @@ async function selectEndpoint(tag: string | null) {
     profile.selected_endpoint = selected
     if (result.warning) message.warning(result.warning)
     if (result.applied === false) {
+      if (!result.warning) message.warning(t('common.apply_failed'))
       await load()
       return
     }
@@ -311,11 +327,7 @@ onBeforeUnmount(() => {
             <span class="chip">{{ modeLabel }}</span>
             <span class="chip subtle"><Wifi :size="12" /> {{ info?.host.hostname }}</span>
           </div>
-          <OStatusPill
-            :status="connected ? 'connected' : 'disconnected'"
-            :label="connected ? t('home.connected') : t('home.disconnected')"
-            :pulse="connected"
-          />
+          <OStatusPill :status="connectionState" :label="connectionLabel" :pulse="connected" />
         </div>
 
         <OConnectOrb

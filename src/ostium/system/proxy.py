@@ -128,6 +128,13 @@ class BaseProxy:
         expected_port = int(port or self.settings.mixed_port)
         return self._already_enabled(host, expected_port)
 
+    def disable_if_owned(self) -> dict[str, Any]:
+        """Restore only a proxy this install owns; never clear a manual one."""
+
+        if not self.is_owned():
+            return self.status()
+        return self.disable()
+
     def _already_enabled(self, host: str, port: int) -> bool:
         state = _read_state(self.state_path).get(STATE_KEY, {})
         if not state.get("enabled"):
@@ -535,6 +542,38 @@ class WindowsProxy(BaseProxy):
         return bool(values.get("ProxyEnable")) and _proxy_targets_local(
             values.get("ProxyServer"), expected_port
         )
+
+    def status(self) -> dict[str, Any]:
+        status = super().status()
+        if status["enabled"] or sys.platform != "win32":  # pragma: no cover - Windows only
+            return status
+        try:
+            values = self._registry_values()
+        except OSError:  # pragma: no cover - Windows only
+            return status
+        if values.get("ProxyEnable") and _proxy_targets_local(
+            values.get("ProxyServer"), self.settings.mixed_port
+        ):
+            status["enabled"] = True
+            status["host"] = "127.0.0.1"
+            status["port"] = self.settings.mixed_port
+        return status
+
+    def recover_if_stale(self) -> None:
+        state = _read_state(self.state_path).get(STATE_KEY, {})
+        if state.get("enabled") and not state.get("clean_shutdown", False):
+            try:
+                self.disable()
+            except ProxyError:
+                pass
+            return
+        if not state.get("enabled") and self.is_owned():
+            # The state file was lost (profile reset/backup restore) but
+            # WinINET still points at our own port.  Restore only that case.
+            try:
+                self.disable()
+            except ProxyError:
+                pass
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port

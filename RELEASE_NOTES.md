@@ -43,10 +43,11 @@ honestly, and stop a dead core from blackholing the whole machine.
 
 ## Verified in the implementation workspace
 
-- Backend: 803 passed, 94.21% statements / 90.03% branches, coverage gate passed.
+- Backend: 810 passed, 94.18% statements / 90.09% branches, coverage gate passed.
 - Real `1.14.4-ostium.1` core integration: 10 passed.
-- Frontend: 209 unit tests, 73 Playwright tests passed; coverage 90.75/85.07.
-- `0.1.10 -> 0.1.11` upgrade and encrypted-backup restore passed.
+- Frontend: 212 unit tests, 73 Playwright tests passed; coverage 90.80/85.03.
+- `0.1.10 -> 0.1.11` and `0.1.9 -> 0.1.11` upgrades plus encrypted-backup
+  restore passed.
 - Wheel/sdist exact `0.1.11`; wheel CLI and bundled Web `build.json` match.
 - Release preflight, shellcheck, `bash -n` and `mkdocs --strict` passed.
 

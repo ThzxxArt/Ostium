@@ -250,6 +250,39 @@ async def test_check_dns_matches_and_conflicts(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_dns_different_public_cdn_is_warn_not_fail(monkeypatch) -> None:
+    services = _services()
+
+    async def different(domain: str) -> dict[str, object]:
+        return {"Answer": [{"type": 1, "data": "142.251.155.119"}]}
+
+    services.clash.dns_query = different
+    monkeypatch.setattr(
+        diagnostics,
+        "probe_doh",
+        lambda url, timeout=5.0, name="": DnsProbeResult(
+            ok=True,
+            url=url,
+            latency_ms=3.0,
+            answers=("142.251.152.119",),
+            error=None,
+            probed_at="2026-11-17T00:00:00+00:00",
+        ),
+    )
+    checks = await diagnostics._check_dns(services)
+    matches = [check for check in checks if check.id.startswith("dns_match")]
+    assert matches
+    assert all(check.status == "warn" for check in matches)
+    assert all("different CDN" in check.message for check in matches)
+
+
+def test_answers_detect_private_and_pollution_networks() -> None:
+    assert diagnostics._looks_polluted(["104.244.42.197"]) is True
+    assert diagnostics._looks_polluted(["127.0.0.1"]) is True
+    assert diagnostics._looks_polluted(["142.251.152.119"]) is False
+
+
+@pytest.mark.asyncio
 async def test_check_egress_variants(monkeypatch) -> None:
     services = _services()
     monkeypatch.setattr(

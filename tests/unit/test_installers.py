@@ -209,6 +209,13 @@ def test_installers_default_to_loopback_and_require_insecure_opt_in() -> None:
     assert 'EXISTING_PORT="$(sed -n' in install
 
 
+def test_client_install_checks_the_ui_port_and_restarted_version() -> None:
+    install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+    assert "stop_previous_listener 8787" in install
+    assert 'wait_for_version "http://127.0.0.1:8787/healthz" "$EXPECTED_VERSION"' in install
+    assert "客户端 UI 未报告版本" in install
+
+
 def test_linux_uninstall_does_not_require_install_artifacts() -> None:
     install = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
     assert 'if [[ "$UNINSTALL" != "true" ]]; then' in install

@@ -96,12 +96,16 @@ def resolve_version() -> str:
     packaged_version = ""
     if packaged is not None:
         packaged_version = str(getattr(packaged, "__version__", "") or "").strip()
-    if packaged_version and _is_clean_release(packaged_version):
-        return packaged_version
+    # A source checkout is authoritative for the release being prepared.  The
+    # generated _version.py is rewritten by hatch-vcs on development installs
+    # and can lag VERSION; the wheel/one-dir bundle has no VERSION file and
+    # therefore falls through to the clean generated value.
     if not getattr(sys, "frozen", False):
         version_file = _version_file_version()
         if version_file:
             return version_file
+    if packaged_version and _is_clean_release(packaged_version):
+        return packaged_version
     meta = _metadata_version()
     if meta and _is_clean_release(meta):
         return meta
@@ -119,10 +123,10 @@ def version_source() -> str:
     packaged_version = ""
     if packaged is not None:
         packaged_version = str(getattr(packaged, "__version__", "") or "").strip()
-    if packaged_version and _is_clean_release(packaged_version):
-        return "generated_version_file"
     if not getattr(sys, "frozen", False) and _version_file_version():
         return "version_file"
+    if packaged_version and _is_clean_release(packaged_version):
+        return "generated_version_file"
     if _metadata_version():
         return "distribution_metadata"
     if packaged_version:

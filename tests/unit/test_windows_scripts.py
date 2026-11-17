@@ -42,6 +42,11 @@ def test_windows_release_layout_uses_the_full_service_bundle() -> None:
     assert "Get-PortOwner" in install
     assert "Stop-PreviousOstium" in install
     assert '[string]$ExpectedVersion = ""' in install
+    assert "[switch]$NoStart" in install
+    assert "if (-not $NoStart) {" in install
+    online = (ROOT / "scripts" / "install-online.ps1").read_text(encoding="utf-8")
+    assert "Remove-Item Env:OSTIUM_NO_START" in online
+    assert '$env:OSTIUM_NO_START = "1"' in online
     # A failed privileged core must not prevent the UI from starting.
     assert "$serviceStarted = $false" in install
     assert "OstiumCore service did not start" in install

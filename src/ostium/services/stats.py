@@ -549,6 +549,7 @@ class StatsCollector:
         self._last.pop(name, None)
         self.usage.pop(user_id, None)
         self._pending_disable.discard(name)
+        self._silent_ticks.pop(user_id, None)
 
     def snapshot(self) -> dict[str, object]:
         users = list(self.usage.values())

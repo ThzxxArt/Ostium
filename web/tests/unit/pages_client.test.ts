@@ -62,6 +62,46 @@ describe('client pages', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('warns instead of claiming success when a profile toggle was not applied', async () => {
+    installFetchMock({ role: 'client' })
+    const update = vi.spyOn(api.profiles, 'update').mockResolvedValueOnce({
+      profile: { ...fixtures.profile, enabled: false },
+      applied: false,
+    })
+    const { wrapper } = await mountPage(ProfilesPage)
+    await settle()
+    const state = stateOf(wrapper, ProfilesPage)
+    await state.toggleEnabled(fixtures.profile)
+    await settle()
+    expect(update).toHaveBeenCalled()
+  })
+
+  it('ClientHomePage marks the egress test failure without claiming connected', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/selftest': {
+          ok: false,
+          target: 'google',
+          host: 'www.google.com',
+          mode: 'proxy',
+          stage: 'tcp',
+          latency_ms: null,
+          status_code: null,
+          error: 'connection refused',
+          generated_at: '2026-11-17T00:00:00+00:00',
+        },
+      },
+    })
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    const state = stateOf(wrapper, ClientHomePage)
+    await state.testConnection()
+    await settle()
+    expect(state.lastTestOk).toBe(false)
+    expect(wrapper.text()).toContain('Egress test failed')
+  })
+
   it('ClientHomePage activates the selected profile', async () => {
     const second = { ...fixtures.profile, id: 'profile-2', name: 'JP' }
     installFetchMock({

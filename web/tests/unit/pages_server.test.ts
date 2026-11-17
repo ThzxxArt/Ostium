@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPage from '@/pages/DashboardPage.vue'
 import InboundsPage from '@/pages/InboundsPage.vue'
 import UsersPage from '@/pages/UsersPage.vue'
@@ -11,7 +11,15 @@ import JobsPage from '@/pages/JobsPage.vue'
 import SystemPage from '@/pages/SystemPage.vue'
 import AuditPage from '@/pages/AuditPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
-import { cleanupPage, clickAllButtons, installFetchMock, mountPage, settle } from './helpers'
+import {
+  cleanupPage,
+  clickAllButtons,
+  fixtures,
+  installFetchMock,
+  mountPage,
+  settle,
+} from './helpers'
+import { api } from '@/api'
 
 function stateOf(wrapper: any, component: any) {
   return wrapper.findComponent(component).vm.$.setupState
@@ -90,6 +98,22 @@ describe('server pages', () => {
     expect(wrapper.text()).toContain('abc123')
     expect(wrapper.text()).toContain('Version mismatch')
     expect(wrapper.text()).toContain('web=0.1.10')
+  })
+
+  it('warns instead of claiming success when a user update was not applied', async () => {
+    installFetchMock()
+    const update = vi.spyOn(api.users, 'update').mockResolvedValueOnce({
+      user: { ...fixtures.user },
+      applied: false,
+    })
+    const { wrapper } = await mountPage(UsersPage)
+    await settle()
+    const state = stateOf(wrapper, UsersPage)
+    state.editing = fixtures.user
+    state.form = { name: 'alice', quota: '', cycle: 'total', expires: null, note: '' }
+    await state.save()
+    await settle()
+    expect(update).toHaveBeenCalled()
   })
 
   it('makes the scrollable log region keyboard focusable', async () => {

@@ -319,8 +319,12 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                     )
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
-        if request.url.path in NO_STORE_PATHS:
+        if request.url.path in NO_STORE_PATHS or request.url.path.startswith("/api/v1/system/"):
             response.headers["Cache-Control"] = "no-store"
+        elif request.url.path.startswith("/assets/"):
+            # Vite emits content-hashed filenames; a long-lived immutable cache
+            # is safe and avoids revalidating every chunk after an upgrade.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -1017,6 +1021,7 @@ async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, n
     except Exception:
         running = False
     if running:
+        restored = True
         if services.proxy_restore_pending:
             try:
                 await asyncio.to_thread(
@@ -1024,13 +1029,17 @@ async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, n
                 )
                 services.bus.log("info", "system proxy restored after core recovery")
             except Exception as exc:
+                # Keep the pending marker: the next tick retries.  Clearing it
+                # here would leave a healthy core with the OS proxy still off.
+                restored = False
                 services.bus.log("error", "could not restore the system proxy", error=str(exc))
-        services.proxy_restore_pending = False
-        services.proxy_fail_open_active = False
-        services.proxy_fail_open_since = None
-        state.down_since = None
-        state.reconcile_attempted = False
-        state.alerted = False
+        if restored:
+            services.proxy_restore_pending = False
+            services.proxy_fail_open_active = False
+            services.proxy_fail_open_since = None
+            state.down_since = None
+            state.reconcile_attempted = False
+            state.alerted = False
         return
     if state.down_since is None:
         state.down_since = now
@@ -1085,6 +1094,24 @@ async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, n
             "proxy core is unavailable and fail-open is disabled; system traffic may blackhole",
             seconds=services.settings.system_proxy_fail_open_seconds,
         )
+        try:
+            from ostium.services.audit import create_alert
+
+            async with services.session_factory() as session:
+                await create_alert(
+                    session,
+                    services.bus,
+                    level="critical",
+                    code="system_proxy_core_down",
+                    message=(
+                        "the proxy core is unavailable and fail-open is disabled; "
+                        "traffic sent to the system proxy may blackhole"
+                    ),
+                    dedupe_key="system-proxy-core-down",
+                )
+                await session.commit()
+        except Exception as exc:
+            services.bus.log("error", "could not record the core-down alert", error=str(exc))
 
 
 async def _proxy_watchdog(

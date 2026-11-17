@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 import json
 import os
 import socket
 import ssl
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -195,6 +197,39 @@ def _answers(payload: dict[str, Any] | None) -> list[str]:
             elif isinstance(entry, str):
                 values.append(entry)
     return sorted(set(values))
+
+
+# Networks observed when DNS is hijacked to unrelated large sites.  These are
+# not proof by themselves, but for Google/Hugging Face/GitHub an answer inside
+# one of them is a concrete pollution signal (the deployment saw Facebook IPs
+# returned for Google/Hugging Face).
+_POLLUTION_NETWORKS = (
+    ipaddress.ip_network("157.240.0.0/16"),  # Facebook
+    ipaddress.ip_network("31.13.0.0/16"),  # Facebook
+    ipaddress.ip_network("179.60.192.0/22"),  # Facebook
+    ipaddress.ip_network("104.244.40.0/21"),  # X/Twitter
+)
+
+
+def _looks_polluted(answers: list[str]) -> bool:
+    for value in answers:
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            continue
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_unspecified
+        ):
+            return True
+        if isinstance(address, ipaddress.IPv4Address) and any(
+            address in network for network in _POLLUTION_NETWORKS
+        ):
+            return True
+    return False
 
 
 async def _check_version(services: Services, core: dict[str, Any]) -> CheckResult:
@@ -417,20 +452,42 @@ async def _check_dns(services: Services) -> list[CheckResult]:
                 },
             )
         )
-        conflict = bool(
-            core_values and trusted_values and not set(core_values) & set(trusted_values)
+        polluted = _looks_polluted(core_values)
+        conflict = polluted
+        different_cdn = bool(
+            core_values
+            and trusted_values
+            and not polluted
+            and not set(core_values) & set(trusted_values)
         )
         checks.append(
             _result(
                 f"dns_match:{label}",
-                "fail" if conflict else ("pass" if core_values and trusted_values else "warn"),
-                f"{domain} resolves to a conflicting address set"
+                "fail"
                 if conflict
-                else f"{domain} resolution is consistent"
-                if core_values and trusted_values
-                else f"{domain} comparison is incomplete",
+                else (
+                    "warn"
+                    if different_cdn
+                    else ("pass" if core_values and trusted_values else "warn")
+                ),
+                f"{domain} resolves into a known pollution network"
+                if conflict
+                else (
+                    f"{domain} returns different CDN addresses; both sets are public"
+                    if different_cdn
+                    else (
+                        f"{domain} resolution is consistent"
+                        if core_values and trusted_values
+                        else f"{domain} comparison is incomplete"
+                    )
+                ),
                 fix=None if not conflict else "switch server_dns_mode to doh and re-apply",
-                data={"domain": domain, "core": core_values, "trusted": trusted_values},
+                data={
+                    "domain": domain,
+                    "core": core_values,
+                    "trusted": trusted_values,
+                    "polluted": polluted,
+                },
             )
         )
     return checks
@@ -503,6 +560,10 @@ async def _check_tun(services: Services) -> CheckResult:
     if os.name == "nt":
         available = True
         detail = "Windows TUN uses the bundled wintun driver"
+    elif sys.platform == "darwin":
+        # The privileged core creates utun; the unprivileged UI cannot probe it.
+        available = True
+        detail = "the privileged core provides macOS utun"
     else:
         available = os.geteuid() == 0 or Path("/dev/net/tun").exists()
         detail = (

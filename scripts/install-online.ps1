@@ -138,7 +138,13 @@ function Install-Ostium([string]$ResolvedVersion) {
         }
         Write-Step "运行静默安装"
         $arguments = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
-        $process = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
+        if ($NoStart) { $env:OSTIUM_NO_START = "1" }
+        try {
+            $process = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
+        }
+        finally {
+            Remove-Item Env:OSTIUM_NO_START -ErrorAction SilentlyContinue
+        }
         if ($process.ExitCode -ne 0) { throw "安装程序退出码：$($process.ExitCode)" }
 
         $installDir = Join-Path $env:ProgramFiles "Ostium"

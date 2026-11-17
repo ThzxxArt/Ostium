@@ -227,6 +227,10 @@ function openJobs() {
   app.jobDrawerOpen = true
 }
 
+function openAbout() {
+  void router.push({ path: '/settings', query: { tab: 'about' } })
+}
+
 watch(
   () => events.lastAlert,
   (frame) => {
@@ -310,7 +314,9 @@ onBeforeUnmount(() => {
               coreRunning ? t('dashboard.engine_running') : t('dashboard.engine_stopped')
             }}</span>
           </div>
-          <p class="o-micro o-subtle">{{ t('footer.version', { version }) }}</p>
+          <button type="button" class="version-link" @click="openAbout">
+            {{ t('footer.version', { version }) }}
+          </button>
         </div>
       </div>
     </aside>
@@ -453,7 +459,9 @@ onBeforeUnmount(() => {
           t('footer.github')
         }}</a>
         <span class="dot-sep">·</span>
-        <span>{{ t('footer.version', { version }) }}</span>
+        <button type="button" class="version-link" @click="openAbout">
+          {{ t('footer.version', { version }) }}
+        </button>
       </footer>
     </div>
 
@@ -823,6 +831,19 @@ onBeforeUnmount(() => {
 }
 .app-footer a:hover {
   color: var(--accent);
+}
+.version-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text-3);
+  font: inherit;
+  cursor: pointer;
+}
+.version-link:hover,
+.version-link:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
 }
 .dot-sep {
   opacity: 0.5;

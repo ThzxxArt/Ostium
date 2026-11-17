@@ -153,6 +153,7 @@ def test_server_system_info_doctor_and_diagnostics(
 
     download = api_client.get("/api/v1/system/diagnostics/download")
     assert download.status_code == 200
+    assert download.headers["cache-control"] == "no-store"
     assert download.headers["content-disposition"].startswith("attachment;")
     with tarfile.open(fileobj=io.BytesIO(download.content), mode="r:gz") as archive:
         member = archive.getmembers()[0]

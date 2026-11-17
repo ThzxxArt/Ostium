@@ -48,6 +48,7 @@ const message = useMessage()
 const dialog = useDialog()
 
 const users = ref<User[]>([])
+const onlineWindow = ref(60)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const search = ref('')
@@ -80,7 +81,7 @@ const qrValue = ref('')
 
 const filterOptions = computed(() => [
   { label: t('common.all'), value: 'all' },
-  { label: t('users.active_window'), value: 'online' },
+  { label: t('users.active_window', { seconds: onlineWindow.value }), value: 'online' },
   { label: t('status.disabled'), value: 'disabled' },
   { label: t('status.expired'), value: 'expired' },
   { label: t('status.quota_exceeded'), value: 'quota_exceeded' },
@@ -115,15 +116,23 @@ const totalUsed = computed(() => users.value.reduce((sum, user) => sum + user.us
 async function load(silent = false) {
   if (!silent) loading.value = true
   try {
-    users.value = (await api.users.list()).users
+    const result = await api.users.list()
+    users.value = result.users
+    onlineWindow.value = result.online_window_seconds ?? 60
     const visible = new Set(users.value.map((user) => user.id))
     selected.value = new Set([...selected.value].filter((id) => visible.has(id)))
     error.value = null
   } catch (err) {
-    error.value = (err as Error).message
+    if (!silent || !users.value.length) error.value = (err as Error).message
   } finally {
     if (!silent) loading.value = false
   }
+}
+
+function reportApplied(result: { applied?: boolean; warning?: string }, successMessage: string) {
+  if (result.warning) message.warning(result.warning)
+  else if (result.applied === false) message.warning(t('common.apply_failed'))
+  else message.success(successMessage)
 }
 
 let pollTimer: number | null = null
@@ -210,12 +219,10 @@ async function save() {
     }
     if (editing.value) {
       const result = await api.users.update(editing.value.id, payload)
-      if (result.warning) message.warning(result.warning)
-      message.success(t('users.updated'))
+      reportApplied(result, t('users.updated'))
     } else {
       const result = await api.users.create(payload)
-      if (result.warning) message.warning(result.warning)
-      message.success(t('users.created'))
+      reportApplied(result, t('users.created'))
       subscription.value = result.subscription
       subscriptionUser.value = result.user
       subscriptionRevealed.value = true
@@ -327,8 +334,7 @@ function confirmRotate(user: User) {
     onPositiveClick: async () => {
       try {
         const result = await api.users.rotate(user.id)
-        if (result.warning) message.warning(result.warning)
-        message.success(t('users.credentials_rotated'))
+        reportApplied(result, t('users.credentials_rotated'))
         await load()
       } catch (err) {
         message.error((err as Error).message)
@@ -346,8 +352,7 @@ function confirmReset(user: User) {
     onPositiveClick: async () => {
       try {
         const result = await api.users.resetUsage(user.id)
-        if (result.warning) message.warning(result.warning)
-        message.success(t('users.usage_reset'))
+        reportApplied(result, t('users.usage_reset'))
         await load()
       } catch (err) {
         message.error((err as Error).message)
@@ -365,8 +370,7 @@ function confirmDelete(user: User) {
     onPositiveClick: async () => {
       try {
         const result = await api.users.remove(user.id)
-        if (result.warning) message.warning(result.warning)
-        message.success(t('users.deleted'))
+        reportApplied(result, t('users.deleted'))
         drawerOpen.value = false
         await load()
       } catch (err) {
@@ -407,6 +411,7 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
       return
     }
     let bulkWarning: string | undefined
+    let bulkApplied: boolean | undefined
     if (action === 'delete') {
       const confirmed = await new Promise<boolean>((resolve, reject) => {
         dialog.error({
@@ -418,6 +423,7 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
             try {
               const result = await api.users.bulk('delete', ids)
               bulkWarning = result.warning
+              bulkApplied = result.applied
               resolve(true)
             } catch (err) {
               reject(err)
@@ -430,9 +436,9 @@ async function bulk(action: 'enable' | 'disable' | 'delete' | 'export') {
     } else {
       const result = await api.users.bulk(action, ids)
       bulkWarning = result.warning
+      bulkApplied = result.applied
     }
-    if (bulkWarning) message.warning(bulkWarning)
-    message.success(t('users.updated'))
+    reportApplied({ warning: bulkWarning, applied: bulkApplied }, t('users.updated'))
     selected.value = new Set()
     await load()
   } catch (err) {
@@ -555,7 +561,7 @@ onBeforeUnmount(() => {
       <div class="summary" :title="t('users.active_window_hint')">
         <CalendarClock :size="17" />
         <strong>{{ users.filter((user) => user.online).length }}</strong>
-        <span>{{ t('users.active_window') }}</span>
+        <span>{{ t('users.active_window', { seconds: onlineWindow }) }}</span>
       </div>
     </div>
 

@@ -5,10 +5,12 @@ param(
     [string]$CoreDataDir = "$env:ProgramData\OstiumCore",
     [string]$ExpectedVersion = "",
     [switch]$RunAsSystem,
-    [switch]$SkipPathUpdate
+    [switch]$SkipPathUpdate,
+    [switch]$NoStart
 )
 
 $ErrorActionPreference = "Stop"
+if ($env:OSTIUM_NO_START -eq "1") { $NoStart = $true }
 if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Run this script as Administrator."
@@ -321,6 +323,8 @@ Write-InstallLog "installing OstiumCore service"
 if ($LASTEXITCODE -ne 0) {
     Write-InstallLog "Could not install the OstiumCore service (exit $LASTEXITCODE)"
     Write-Warning "Could not install the OstiumCore service; the UI will still be installed."
+} elseif ($NoStart) {
+    Write-InstallLog "OstiumCore service installed; start skipped because -NoStart was requested"
 } else {
     try {
         Start-Service OstiumCore -ErrorAction Stop
@@ -387,11 +391,14 @@ $action = New-ScheduledTaskAction `
     -WorkingDirectory $InstallDir
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName "Ostium" -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
-Start-ScheduledTask -TaskName "Ostium"
+if (-not $NoStart) {
+    Start-ScheduledTask -TaskName "Ostium"
+}
 
 # Do not report success before the UI actually answers with the expected
 # version.  A stale process returning HTTP 200 used to make the installer
 # declare success while the browser kept showing the previous release.
+if (-not $NoStart) {
 $healthUrl = "http://127.0.0.1:$UiPort/healthz"
 $ready = $false
 $lastHealth = ""
@@ -441,6 +448,9 @@ if (-not $ready) {
     throw "Ostium UI did not report version $ExpectedVersion at $healthUrl. Task state: $($task.State); last result: $($info.LastTaskResult). Log: $uiLog`n$tail"
 }
 Write-InstallLog "UI health/version check passed"
+} else {
+    Write-InstallLog "UI start skipped because -NoStart was requested"
+}
 
 $cliVersion = (& "$InstallDir\ostium.exe" version | Out-String)
 if ($LASTEXITCODE -ne 0 -or $cliVersion -notmatch [Regex]::Escape("Ostium $ExpectedVersion")) {
@@ -451,7 +461,7 @@ Write-InstallLog "CLI version check passed"
 # A UI 200 is not enough when the core already has a configuration: the proxy
 # may be down while the console is perfectly reachable.
 $coreConfig = Join-Path $CoreDataDir "runtime\last-good.json"
-if ($serviceStarted -and (Test-Path $coreConfig)) {
+if (-not $NoStart -and $serviceStarted -and (Test-Path $coreConfig)) {
     $coreReady = $false
     for ($i = 0; $i -lt 30; $i++) {
         try {
@@ -475,10 +485,14 @@ if ($serviceStarted -and (Test-Path $coreConfig)) {
     }
 }
 
-Write-Host "Ostium installed. Open http://127.0.0.1:$UiPort" -ForegroundColor Green
+if ($NoStart) {
+    Write-Host "Ostium installed but not started (-NoStart). Start the OstiumCore service and the Ostium task when ready." -ForegroundColor Yellow
+} else {
+    Write-Host "Ostium installed. Open http://127.0.0.1:$UiPort" -ForegroundColor Green
+}
 Write-Host "CLI: ostium (open a new terminal so PATH picks up $InstallDir)" -ForegroundColor Green
 Write-Host "Startup log: $uiLog" -ForegroundColor Green
 Write-Host "Install log: $installLog" -ForegroundColor Green
-if (-not $serviceStarted) {
+if (-not $serviceStarted -and -not $NoStart) {
     Write-Host "Warning: OstiumCore is not running; TUN/core features are unavailable. See $installLog" -ForegroundColor Yellow
 }

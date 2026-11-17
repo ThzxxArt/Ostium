@@ -29,6 +29,18 @@ def test_environment_override_wins(monkeypatch) -> None:
     assert version_source() == "environment"
 
 
+def test_source_checkout_prefers_version_file_over_generated(monkeypatch) -> None:
+    class Packaged:
+        __version__ = "9.9.9"
+
+    monkeypatch.delenv("OSTIUM_BUILD_VERSION", raising=False)
+    monkeypatch.setattr(build_info_module, "_packaged_version_module", lambda: Packaged())
+    monkeypatch.setattr(build_info_module, "_version_file_version", lambda: "0.1.11")
+    monkeypatch.setattr(build_info_module.sys, "frozen", False, raising=False)
+    assert resolve_version() == "0.1.11"
+    assert version_source() == "version_file"
+
+
 def test_generated_version_file_matches_version_file() -> None:
     assert resolve_version() == VERSION
 

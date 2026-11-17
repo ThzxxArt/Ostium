@@ -16,6 +16,12 @@ const { t, locale } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
 
+function reportApplied(result: { applied?: boolean; warning?: string }, successMessage: string) {
+  if (result.warning) message.warning(result.warning)
+  else if (result.applied === false) message.warning(t('common.apply_failed'))
+  else message.success(successMessage)
+}
+
 const profiles = ref<Profile[]>([])
 const activeProfileId = ref<string | null>(null)
 const dragId = ref<string | null>(null)
@@ -59,7 +65,7 @@ async function activate(profile: Profile) {
       // The database desired state changed, but the running core did not.  Do
       // not claim this profile is current; the reconciler will retry and the
       // UI can refresh after it succeeds.
-      message.warning(result.warning || t('common.apply_failed'))
+      if (!result.warning) message.warning(t('common.apply_failed'))
       await load()
       return
     }
@@ -76,7 +82,7 @@ async function toggleEnabled(profile: Profile) {
   busy.value = profile.id
   try {
     const result = await api.profiles.update(profile.id, { enabled: !profile.enabled })
-    if (result.warning) message.warning(result.warning)
+    reportApplied(result, t('common.saved'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -102,8 +108,7 @@ async function onDrop(target: Profile) {
   profiles.value = next.map((item, index) => ({ ...item, sort_order: index * 10 }))
   try {
     const result = await api.profiles.reorder(next.map((item) => item.id))
-    if (result.warning) message.warning(result.warning)
-    message.success(t('profiles.reordered'))
+    reportApplied(result, t('profiles.reordered'))
   } catch (err) {
     message.error((err as Error).message)
     await load()
@@ -122,7 +127,8 @@ async function importProfile() {
       text: importMode.value === 'text' ? importText.value.trim() : undefined,
     })
     if (result.warning) message.warning(result.warning)
-    message.success(t('profiles.add'))
+    else if (result.applied === false) message.warning(t('common.apply_failed'))
+    else message.success(t('profiles.add'))
     importOpen.value = false
     importUrl.value = ''
     importText.value = ''
@@ -139,8 +145,7 @@ async function refresh(profile: Profile) {
   busy.value = profile.id
   try {
     const result = await api.profiles.refresh(profile.id)
-    if (result.warning) message.warning(result.warning)
-    message.success(t('profiles.refreshed'))
+    reportApplied(result, t('profiles.refreshed'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -153,12 +158,8 @@ async function selectEndpoint(profile: Profile, tag: string) {
   try {
     const result = await api.profiles.update(profile.id, { selected_endpoint: tag })
     profile.selected_endpoint = tag
-    if (result.warning) message.warning(result.warning)
-    if (result.applied === false) {
-      await load()
-      return
-    }
-    message.success(t('profiles.selected'))
+    reportApplied(result, t('profiles.selected'))
+    if (result.applied === false) await load()
   } catch (err) {
     message.error((err as Error).message)
   }
@@ -173,8 +174,7 @@ function remove(profile: Profile) {
     onPositiveClick: async () => {
       try {
         const result = await api.profiles.remove(profile.id)
-        if (result.warning) message.warning(result.warning)
-        message.success(t('common.delete'))
+        reportApplied(result, t('common.delete'))
         await load()
       } catch (err) {
         message.error((err as Error).message)

@@ -591,3 +591,16 @@ def test_cert_renewal_and_profile_refresh_outer_errors(tmp_path: Path, monkeypat
 
         client.portal.call(app_module._profile_refresh, services, failing_sleep)
         assert any("profile refresh loop failed" in item["message"] for item in services.bus.logs())
+
+
+def test_assets_are_immutable_and_forwarded_docs_are_rejected(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    app = build_app(settings)
+    with TestClient(app) as client:
+        asset = client.get("/assets/example.js")
+        assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+        docs = client.get(
+            "/api/docs",
+            headers={"Authorization": "Bearer not-a-real-token", "X-Forwarded-For": "203.0.113.9"},
+        )
+        assert docs.status_code == 401

@@ -17,6 +17,7 @@ class FakeProxy:
         self.enabled = True
         self.disable_calls = 0
         self.enable_calls = 0
+        self.fail_enable = False
 
     def status(self) -> dict[str, object]:
         return {"enabled": self.enabled, "supported": True, "platform": "test"}
@@ -27,6 +28,9 @@ class FakeProxy:
         return self.status()
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, object]:
+        if self.fail_enable:
+            self.fail_enable = False
+            raise RuntimeError("cannot enable")
         self.enable_calls += 1
         self.enabled = True
         return self.status()
@@ -159,6 +163,42 @@ def test_fail_open_disabled_keeps_the_proxy(tmp_path: Path) -> None:
         await _proxy_watchdog_tick(services, state, 60.0)
         assert proxy.disable_calls == 0
         assert services.proxy_fail_open_active is False
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_failed_proxy_restore_is_retried(tmp_path: Path) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        engine = create_engine(settings.paths.db_path)
+        await create_schema(engine)
+        factory = create_session_factory(engine)
+        proxy = FakeProxy()
+        proxy.enabled = False
+        engine_stub = FakeEngine()
+        services = SimpleNamespace(
+            settings=settings,
+            session_factory=factory,
+            bus=EventBus(),
+            proxy=proxy,
+            engine=engine_stub,
+            client_paused=False,
+            proxy_fail_open_active=True,
+            proxy_fail_open_since="2026-11-17T00:00:00+00:00",
+            proxy_restore_pending=True,
+        )
+        state = _ProxyWatchdogState()
+        engine_stub.running = True
+        proxy.fail_enable = True
+        await _proxy_watchdog_tick(services, state, 200.0)
+        assert services.proxy_restore_pending is True
+        assert services.proxy_fail_open_active is True
+
+        await _proxy_watchdog_tick(services, state, 205.0)
+        assert services.proxy_restore_pending is False
+        assert services.proxy_fail_open_active is False
+        assert proxy.enable_calls == 1
         await engine.dispose()
 
     asyncio.run(_run())

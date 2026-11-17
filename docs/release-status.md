@@ -44,8 +44,8 @@ artifacts.
 
 ### Verified locally
 
-- Backend non-integration suite: 803 passed / 10 deselected; 94.21% statements;
-  90.03% branches; `coverage_gate.py` passed.
+- Backend non-integration suite: 810 passed / 10 deselected; 94.18% statements;
+  90.09% branches; `coverage_gate.py` passed.
 - Real pinned core `1.14.4-ostium.1`: integration suite 10 passed, including
   generated-config validation and live SOCKS traffic accounting.
 - `sing-box check` accepts the generated DoH server configuration and the
@@ -53,12 +53,13 @@ artifacts.
   not reach `1.1.1.1:443` in this workspace because direct egress is blocked
   here (the environment requires an HTTP proxy); production DoH remains a
   server-side verification item.
-- Frontend: 209 unit tests passed; typecheck, lint, Prettier and production
-  build passed; coverage 90.75/85.07/88.32/92.30.
+- Frontend: 212 unit tests passed; typecheck, lint, Prettier and production
+  build passed; coverage 90.80/85.03/88.33/92.36.
 - Playwright: 73 passed, 2 skipped; axe, responsive layout, PWA and updated
   visual snapshots passed.
 - `0.1.10 -> 0.1.11` upgrade-e2e passed, including database integrity,
   `master.key`, subscription token, and restoring a 0.1.10 encrypted backup.
+  `0.1.9 -> 0.1.11` passed with the same checks.
 - Wheel/sdist built as `0.1.11`; the wheel CLI reports `0.1.11` and ships
   `web/dist/build.json` with `version: 0.1.11`.
 - `scripts/release-preflight.sh --version 0.1.11 --skip-git` passed;

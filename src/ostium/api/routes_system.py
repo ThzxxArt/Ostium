@@ -137,6 +137,7 @@ async def info(
             "enabled": services.settings.tun_enabled,
             "available": (
                 os.name == "nt"
+                or sys.platform == "darwin"
                 or (hasattr(os, "geteuid") and os.geteuid() == 0)
                 or Path("/dev/net/tun").exists()
             ),
@@ -313,6 +314,8 @@ async def toggle_proxy(
         raise ApiError(400, "system proxy is a client feature", "role_mismatch")
     if services.settings.tun_enabled and payload.enabled:
         raise ApiError(409, "TUN and system proxy are mutually exclusive", "mode_conflict")
+    previous_mode = services.settings.mode
+    previous_paused = services.client_paused
     if payload.enabled:
         try:
             core = await services.engine.client.status()
@@ -352,6 +355,8 @@ async def toggle_proxy(
     try:
         services.settings.save()
     except OSError as exc:
+        services.settings.mode = previous_mode
+        services.client_paused = previous_paused
         if payload.enabled:
             try:
                 await asyncio.to_thread(lambda: services.proxy.disable())

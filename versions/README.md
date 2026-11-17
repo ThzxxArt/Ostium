@@ -47,6 +47,7 @@
 | 文件 | 内容 |
 |---|---|
 | [`V0.1.11_PLAN.md`](V0.1.11_PLAN.md) | v0.1.11 可验证性与故障闭环全量实施方案（P0+P1） |
+| [`V0.1.11_IMPLEMENTATION_STATUS.md`](V0.1.11_IMPLEMENTATION_STATUS.md) | 逐项实施/验证台账、修复清单与外部阻塞 |
 
 ## 当前版本
 

@@ -71,7 +71,8 @@ export const api = {
       ),
   },
   users: {
-    list: () => http.get<{ users: User[]; total: number }>(`${v1}/users`),
+    list: () =>
+      http.get<{ users: User[]; total: number; online_window_seconds?: number }>(`${v1}/users`),
     create: (payload: Record<string, unknown>) =>
       http.post<{
         user: User

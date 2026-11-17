@@ -34,6 +34,12 @@ const { t } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
 
+function reportApplied(result: { applied?: boolean; warning?: string }, successMessage: string) {
+  if (result.warning) message.warning(result.warning)
+  else if (result.applied === false) message.warning(t('common.apply_failed'))
+  else message.success(successMessage)
+}
+
 const rules = ref<Rule[]>([])
 const ruleSets = ref<RuleSet[]>([])
 const loading = ref(true)
@@ -194,6 +200,7 @@ async function saveRule() {
         })
       : await api.rules.create({ action: form.value.action, match, note: form.value.note })
     if (result.warning) message.warning(result.warning)
+    else if (result.applied === false) message.warning(t('common.apply_failed'))
     else message.success(t('rules.applied'))
     ruleOpen.value = false
     await load()
@@ -281,10 +288,8 @@ async function updateRuleSet(ruleSet: RuleSet) {
     const result = await api.rules.updateRuleSet(ruleSet.id)
     if (result.result?.error) {
       message.error(String(result.result.error))
-    } else if (result.warning) {
-      message.warning(result.warning)
     } else {
-      message.success(t('rules.applied'))
+      reportApplied(result, t('rules.applied'))
     }
     await load()
   } catch (err) {
