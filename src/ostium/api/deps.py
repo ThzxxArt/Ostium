@@ -50,6 +50,11 @@ class Services:
     # must evaluate this property inside ``asyncio.to_thread`` so a missing
     # session bus cannot stall the event loop.
     proxy_manager: Any = field(default=None, repr=False)
+    # Runtime fail-open state, surfaced by /system/info so the UI can explain
+    # why the system proxy is off while the core is down.
+    proxy_fail_open_active: bool = False
+    proxy_fail_open_since: str | None = None
+    proxy_restore_pending: bool = False
 
     @property
     def proxy(self) -> Any:

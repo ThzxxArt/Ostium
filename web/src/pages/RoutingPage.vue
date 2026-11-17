@@ -95,6 +95,7 @@ async function setPreset(id: string) {
     const result = await api.settings.update({ routing_mode: id })
     if (settings.value) settings.value.general.routing_mode = id
     if (result.warning) message.warning(result.warning)
+    else if (result.applied === false) message.warning(t('common.apply_failed'))
     else message.success(t('rules.applied'))
   } catch (err) {
     message.error((err as Error).message)

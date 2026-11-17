@@ -48,6 +48,7 @@ function toggleRecovery() {
 }
 
 async function submit() {
+  if (loading.value) return
   if (!username.value || !password.value) {
     error.value = t('auth.invalid')
     return
@@ -70,7 +71,7 @@ async function submit() {
       totpRequired.value = true
       error.value = useRecovery.value ? t('auth.recovery_invalid') : t('auth.totp_hint')
     } else if (err instanceof ApiError && err.code === 'rate_limited') {
-      error.value = t('auth.invalid')
+      error.value = t('auth.rate_limited')
     } else {
       error.value = err instanceof Error ? err.message : t('errors.unknown')
     }

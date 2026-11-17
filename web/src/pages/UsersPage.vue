@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -80,7 +80,7 @@ const qrValue = ref('')
 
 const filterOptions = computed(() => [
   { label: t('common.all'), value: 'all' },
-  { label: t('common.online'), value: 'online' },
+  { label: t('users.active_window'), value: 'online' },
   { label: t('status.disabled'), value: 'disabled' },
   { label: t('status.expired'), value: 'expired' },
   { label: t('status.quota_exceeded'), value: 'quota_exceeded' },
@@ -112,8 +112,8 @@ const paged = computed(() =>
 
 const totalUsed = computed(() => users.value.reduce((sum, user) => sum + user.used_bytes, 0))
 
-async function load() {
-  loading.value = true
+async function load(silent = false) {
+  if (!silent) loading.value = true
   try {
     users.value = (await api.users.list()).users
     const visible = new Set(users.value.map((user) => user.id))
@@ -122,7 +122,21 @@ async function load() {
   } catch (err) {
     error.value = (err as Error).message
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
+  }
+}
+
+let pollTimer: number | null = null
+function refreshIfVisible() {
+  if (!document.hidden) void load(true)
+}
+function startPolling() {
+  if (pollTimer === null) pollTimer = window.setInterval(refreshIfVisible, 10_000)
+}
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 }
 
@@ -496,6 +510,8 @@ onMounted(async () => {
   if (typeof route.query.filter === 'string') filter.value = route.query.filter
   if (typeof route.query.page === 'string') page.value = Math.max(1, Number(route.query.page) || 1)
   await load()
+  startPolling()
+  document.addEventListener('visibilitychange', refreshIfVisible)
   if (route.query.create === '1') openCreate()
   if (typeof route.query.focus === 'string') {
     const user = users.value.find((item) => item.id === route.query.focus)
@@ -503,13 +519,18 @@ onMounted(async () => {
     void router.replace({ query: { ...route.query, focus: undefined } })
   }
 })
+
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('visibilitychange', refreshIfVisible)
+})
 </script>
 
 <template>
   <div class="o-page">
     <OPageHeader :title="t('users.title')" :subtitle="t('users.subtitle')">
       <template #actions>
-        <NButton secondary :loading="loading" @click="load">
+        <NButton secondary :loading="loading" @click="load()">
           <template #icon><RefreshCw :size="15" /></template>
           {{ t('common.refresh') }}
         </NButton>
@@ -531,10 +552,10 @@ onMounted(async () => {
         <strong>{{ formatBytes(totalUsed) }}</strong>
         <span>{{ t('common.total') }}</span>
       </div>
-      <div class="summary">
+      <div class="summary" :title="t('users.active_window_hint')">
         <CalendarClock :size="17" />
         <strong>{{ users.filter((user) => user.online).length }}</strong>
-        <span>{{ t('common.online') }}</span>
+        <span>{{ t('users.active_window') }}</span>
       </div>
     </div>
 
@@ -595,7 +616,11 @@ onMounted(async () => {
         :key="user.id"
         class="table-row"
         :class="{ selected: selected.has(user.id) }"
+        role="button"
+        tabindex="0"
         @click="openDetail(user)"
+        @keydown.enter.prevent="openDetail(user)"
+        @keydown.space.prevent="openDetail(user)"
       >
         <label class="check" @click.stop>
           <input type="checkbox" :checked="selected.has(user.id)" @change="toggleSelect(user.id)" />

@@ -210,6 +210,9 @@ onMounted(load)
             }}</strong>
           </div>
         </div>
+        <p v-if="info?.proxy_fail_open?.active" class="note">
+          {{ t('network.fail_open_active', { seconds: info?.proxy_fail_open.seconds }) }}
+        </p>
         <p v-if="!tunAvailable" class="note">{{ t('network.tun_unavailable') }}</p>
         <p class="note">{{ t('home.tun_warning') }}</p>
       </OSectionCard>

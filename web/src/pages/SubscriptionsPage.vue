@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, useDialog, useMessage } from 'naive-ui'
 import { Link2, QrCode, RefreshCw, RotateCcw, Search, ShieldAlert } from '@lucide/vue'
@@ -39,8 +39,8 @@ const selectedUser = computed(
   () => users.value.find((user) => user.id === selectedId.value) || null,
 )
 
-async function load() {
-  loading.value = true
+async function load(silent = false) {
+  if (!silent) loading.value = true
   try {
     const [overview, userList] = await Promise.all([api.subscriptions.overview(), api.users.list()])
     users.value = userList.users
@@ -51,9 +51,27 @@ async function load() {
   } catch (err) {
     error.value = (err as Error).message
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
+
+let pollTimer: number | null = null
+function refreshIfVisible() {
+  if (!document.hidden) void load(true)
+}
+function startPolling() {
+  if (pollTimer === null) pollTimer = window.setInterval(refreshIfVisible, 10_000)
+}
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('visibilitychange', refreshIfVisible)
+})
 
 let subscriptionRequest = 0
 
@@ -117,14 +135,18 @@ function confirmRotate() {
   })
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  startPolling()
+  document.addEventListener('visibilitychange', refreshIfVisible)
+})
 </script>
 
 <template>
   <div class="o-page">
     <OPageHeader :title="t('subscriptions.title')" :subtitle="t('subscriptions.subtitle')">
       <template #actions>
-        <NButton secondary :loading="loading" @click="load">
+        <NButton secondary :loading="loading" @click="load()">
           <template #icon><RefreshCw :size="15" /></template>
           {{ t('common.refresh') }}
         </NButton>

@@ -93,6 +93,27 @@ def _online_names(services: Services) -> set[str]:
     return {str(item["name"]) for item in users if item.get("online")}
 
 
+def _usage_by_name(services: Services) -> dict[str, dict[str, Any]]:
+    if services.stats is None:
+        return {}
+    snapshot = services.stats.snapshot()
+    users = cast(list[dict[str, Any]], snapshot.get("users", []))
+    return {str(item["name"]): item for item in users}
+
+
+def _apply_live_traffic(payload: dict[str, Any], usage: dict[str, Any] | None) -> dict[str, Any]:
+    if usage is None:
+        return payload
+    last_traffic = usage.get("last_traffic_at")
+    if last_traffic:
+        payload["last_seen_at"] = last_traffic
+    payload["online_reason"] = usage.get("online_reason", "stale")
+    payload["last_traffic_at"] = last_traffic
+    payload["rate_up"] = usage.get("rate_up", 0.0)
+    payload["rate_down"] = usage.get("rate_down", 0.0)
+    return payload
+
+
 async def _public_base_url(session: AsyncSession, services: Services) -> str:
     from ostium.services.public_url import public_base_url
 
@@ -159,9 +180,18 @@ async def list_users(
         (await session.execute(select(ProxyUser).order_by(ProxyUser.created_at))).scalars().all()
     )
     online = _online_names(services)
+    usage = _usage_by_name(services)
+    serialized = [
+        _apply_live_traffic(
+            serialize_user(user, online=user.name in online),
+            usage.get(user.name),
+        )
+        for user in users
+    ]
     return {
-        "users": [serialize_user(user, online=user.name in online) for user in users],
+        "users": serialized,
         "total": len(users),
+        "online_window_seconds": services.settings.stats_online_window_seconds,
     }
 
 
@@ -233,7 +263,10 @@ async def get_user(
     user = await _get_user(session, user_id)
     online = user.name in _online_names(services)
     pending = services.stats.pending_bytes(user.id) if services.stats is not None else 0
-    return {"user": serialize_user(user, online=online), "pending_bytes": pending}
+    payload = _apply_live_traffic(
+        serialize_user(user, online=online), _usage_by_name(services).get(user.name)
+    )
+    return {"user": payload, "pending_bytes": pending}
 
 
 @router.patch("/users/{user_id}")

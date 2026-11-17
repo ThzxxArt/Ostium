@@ -332,8 +332,16 @@ function eventLabel(type: string): string {
         />
         <OStatCard
           :label="t('dashboard.live_rate')"
-          :value="formatRate((overview?.rates.down || 0) + (overview?.rates.up || 0))"
-          :hint="`${formatRate(overview?.rates.down)} ${t('common.down')}`"
+          :value="
+            overview?.rates_stale || overview?.rates.stale
+              ? t('dashboard.stale')
+              : formatRate((overview?.rates.down || 0) + (overview?.rates.up || 0))
+          "
+          :hint="
+            overview?.rates_stale || overview?.rates.stale
+              ? t('dashboard.stale_hint')
+              : `${formatRate(overview?.rates.down)} ${t('common.down')}`
+          "
           :icon="Gauge"
           tone="info"
           :loading="loading"
@@ -341,7 +349,7 @@ function eventLabel(type: string): string {
         <OStatCard
           :label="t('dashboard.online_users')"
           :value="overview?.users.online || 0"
-          :hint="`${overview?.users.enabled || 0} / ${overview?.users.total || 0} ${t('common.enabled')}`"
+          :hint="t('dashboard.active_window', { seconds: overview?.online_window_seconds || 60 })"
           :icon="Users"
           tone="success"
           :loading="loading"

@@ -230,7 +230,16 @@ onBeforeUnmount(() => {
         <span>{{ t('connections.duration') }}</span>
         <span />
       </div>
-      <div v-for="item in filtered" :key="item.id" class="row" @click="openDetail(item)">
+      <div
+        v-for="item in filtered"
+        :key="item.id"
+        class="row"
+        role="button"
+        tabindex="0"
+        @click="openDetail(item)"
+        @keydown.enter.prevent="openDetail(item)"
+        @keydown.space.prevent="openDetail(item)"
+      >
         <div class="user">
           <span class="avatar">{{
             String(item.metadata?.user || '?')

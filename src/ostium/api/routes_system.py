@@ -126,6 +126,13 @@ async def info(
         "lan_addresses": _lan_addresses(),
         "lan_port": services.settings.mixed_port,
         "proxy": await asyncio.to_thread(lambda: services.proxy.status()),
+        "proxy_fail_open": {
+            "enabled": services.settings.system_proxy_fail_open,
+            "seconds": services.settings.system_proxy_fail_open_seconds,
+            "active": services.proxy_fail_open_active,
+            "since": services.proxy_fail_open_since,
+            "restore_pending": services.proxy_restore_pending,
+        },
         "tun": {
             "enabled": services.settings.tun_enabled,
             "available": (
@@ -337,6 +344,9 @@ async def toggle_proxy(
             result = await asyncio.to_thread(lambda: services.proxy.disable())
         except Exception as exc:
             raise ApiError(500, f"could not disable system proxy: {exc}", "proxy_failed") from exc
+        services.proxy_fail_open_active = False
+        services.proxy_fail_open_since = None
+        services.proxy_restore_pending = False
         if services.settings.mode is Mode.SYSTEM_PROXY and not services.settings.tun_enabled:
             services.settings.mode = Mode.MIXED
     try:
@@ -512,6 +522,9 @@ async def connect(
                 f"core is running but the system proxy could not be restored: {exc}",
                 "proxy_failed",
             ) from exc
+        services.proxy_fail_open_active = False
+        services.proxy_fail_open_since = None
+        services.proxy_restore_pending = False
     await audit(session, actor=admin.username, action="client.connect", ip=client_ip(request))
     return {"connected": True, "status": result.get("status")}
 
@@ -557,6 +570,9 @@ async def disconnect(
     except Exception as exc:
         raise ApiError(502, f"could not stop the core: {exc}", "core_error") from exc
     services.settings.tun_enabled = False
+    services.proxy_fail_open_active = False
+    services.proxy_fail_open_since = None
+    services.proxy_restore_pending = False
     if services.settings.mode is Mode.TUN:
         services.settings.mode = Mode.MIXED
     try:

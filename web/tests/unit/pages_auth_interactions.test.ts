@@ -113,7 +113,17 @@ describe('auth page interactions', () => {
   })
 
   it('pre-shows the TOTP field before the first login attempt', async () => {
-    const { calls } = installFetchMock()
+    const { calls } = installFetchMock({
+      overrides: {
+        '/api/v1/auth/status': {
+          ...status('server'),
+          initialized: true,
+          has_admin: true,
+          authenticated: true,
+          login_totp_required: true,
+        },
+      },
+    })
     const { wrapper } = await mountPage(LoginPage, {}, (pinia) => {
       const auth = useAuthStore(pinia)
       auth.ready = true

@@ -168,6 +168,13 @@ function daysStatus(certificate: Certificate): string {
   return certificate.status === 'ready' ? 'ready' : certificate.status
 }
 
+function daysLabel(certificate: Certificate): string {
+  const status = daysStatus(certificate)
+  if (status === 'expired') return t('status.expired')
+  if (status === 'warning') return t('status.expiring')
+  return certificate.status
+}
+
 onMounted(load)
 </script>
 
@@ -211,7 +218,11 @@ onMounted(load)
             <h2>{{ certificate.domain }}</h2>
             <span class="o-micro o-subtle">{{ certificate.issuer || certificate.source }}</span>
           </div>
-          <OStatusPill :status="daysStatus(certificate)" :label="certificate.status" size="sm" />
+          <OStatusPill
+            :status="daysStatus(certificate)"
+            :label="daysLabel(certificate)"
+            size="sm"
+          />
         </div>
 
         <div class="cert-ring-row">

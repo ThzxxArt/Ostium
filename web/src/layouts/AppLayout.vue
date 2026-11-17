@@ -194,6 +194,11 @@ function onKeydown(event: KeyboardEvent) {
     app.shortcutsOpen = false
     return
   }
+  if (meta || event.altKey) {
+    // Ctrl/Cmd+C is copy, Ctrl/Cmd+R is reload.  Never turn a modifier
+    // shortcut into a connect/disconnect or navigation command.
+    return
+  }
   if (event.key.toLowerCase() === 'g') {
     goPrefix = true
     if (goTimer !== null) clearTimeout(goTimer)
@@ -398,7 +403,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="icon-btn"
-              :aria-label="t('common.actions')"
+              :aria-label="app.isDark ? t('settings.theme_light') : t('settings.theme_dark')"
               @click="app.toggleTheme()"
             >
               <component :is="app.isDark ? Sun : Moon" :size="18" :stroke-width="1.7" />

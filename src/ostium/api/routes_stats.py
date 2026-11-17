@@ -57,7 +57,10 @@ async def overview(
         "rates": {
             "up": snapshot.get("rate_up", 0.0) if snapshot else 0.0,
             "down": snapshot.get("rate_down", 0.0) if snapshot else 0.0,
+            "stale": snapshot.get("rates_stale", False) if snapshot else False,
         },
+        "online_window_seconds": snapshot.get("online_window_seconds", 60) if snapshot else 60,
+        "rates_stale": snapshot.get("rates_stale", False) if snapshot else False,
         "engine": {
             "running": engine_status.get("running", False),
             "revision": engine_status.get("revision"),

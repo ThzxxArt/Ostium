@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -31,6 +31,9 @@ class UserUsage:
     rate_down: float = 0.0
     online: bool = False
     last_seen: str | None = None
+    last_traffic_at: str | None = None
+    rate_updated_at: str | None = None
+    online_reason: str = "stale"
 
 
 @dataclass
@@ -82,6 +85,7 @@ class StatsCollector:
         self._first_enforce = True
         self._stats_down_since: float | None = None
         self._stats_alerted = False
+        self._silent_ticks: dict[str, int] = defaultdict(int)
 
     async def start(self) -> None:
         if self._task is None:
@@ -171,10 +175,13 @@ class StatsCollector:
         async with self.session_factory() as session:
             users = (await session.execute(select(ProxyUser))).scalars().all()
         by_name = {user.name: user for user in users}
+        seen_ids: set[str] = set()
+        stamp = iso(utcnow())
         for name, (up, down) in counts.items():
             user = by_name.get(name)
             if user is None:
                 continue
+            seen_ids.add(user.id)
             previous = self._last.get(name)
             self._last[name] = (up, down)
             if previous is None:
@@ -193,24 +200,47 @@ class StatsCollector:
             usage = self.usage.setdefault(user.id, UserUsage(user_id=user.id, name=user.name))
             usage.up += delta_up
             usage.down += delta_down
-            usage.rate_up = delta_up / elapsed
-            usage.rate_down = delta_down / elapsed
             if delta_up or delta_down:
+                usage.rate_up = delta_up / elapsed
+                usage.rate_down = delta_down / elapsed
+                usage.rate_updated_at = stamp
                 usage.online = True
-                usage.last_seen = iso(utcnow())
-            async with self._pending_lock:
-                self._pending[user.id].up += delta_up
-                self._pending[user.id].down += delta_down
+                usage.online_reason = "traffic"
+                usage.last_seen = stamp
+                usage.last_traffic_at = stamp
+                self._silent_ticks[user.id] = 0
+                async with self._pending_lock:
+                    self._pending[user.id].up += delta_up
+                    self._pending[user.id].down += delta_down
+            else:
+                # One quiet tick is normal jitter; two consecutive quiet ticks
+                # mean the displayed rate is no longer live.
+                self._silent_ticks[user.id] += 1
+                if self._silent_ticks[user.id] >= 2:
+                    usage.rate_up = 0.0
+                    usage.rate_down = 0.0
+                    usage.rate_updated_at = stamp
         for name, (up, down) in counts.items():
             if name not in self._last:
                 self._last[name] = (up, down)
-        # Mark stale online states based on the most recent delta.
+        # A user missing from the core counters has no live traffic at all.
+        for usage in self.usage.values():
+            if usage.user_id not in seen_ids:
+                usage.rate_up = 0.0
+                usage.rate_down = 0.0
+                self._silent_ticks[usage.user_id] = 0
+        # "Online" is a traffic-recency label, not a TCP connection count.
+        window = int(self.settings.stats_online_window_seconds)
+        current = utcnow()
         for usage in self.usage.values():
             if usage.last_seen:
-                from datetime import datetime
-
                 seen = datetime.fromisoformat(usage.last_seen)
-                usage.online = (utcnow() - seen).total_seconds() < 60
+                usage.online = (current - seen).total_seconds() < window
+                usage.online_reason = "traffic" if usage.online else "stale"
+                usage.last_traffic_at = usage.last_seen
+            else:
+                usage.online = False
+                usage.online_reason = "stale"
 
     async def _record_stats_unavailable(self, exc: StatsUnavailable) -> None:
         message = str(exc)
@@ -220,6 +250,11 @@ class StatsCollector:
         now = time.monotonic()
         if self._stats_down_since is None:
             self._stats_down_since = now
+            # No sample means the rates are no longer live.  Zero them
+            # immediately instead of leaving the last burst on the dashboard.
+            for usage in self.usage.values():
+                usage.rate_up = 0.0
+                usage.rate_down = 0.0
         if now - self._stats_down_since >= 60.0:
             # No sample means liveness cannot be proven.  Leaving the last
             # snapshot marked online forever made the dashboard claim active
@@ -519,8 +554,11 @@ class StatsCollector:
         users = list(self.usage.values())
         return {
             "online": sum(1 for user in users if user.online),
+            "online_window_seconds": int(self.settings.stats_online_window_seconds),
+            "rates_stale": self._stats_down_since is not None,
             "rate_up": sum(user.rate_up for user in users),
             "rate_down": sum(user.rate_down for user in users),
+            "generated_at": iso(utcnow()),
             "users": [
                 {
                     "id": user.user_id,
@@ -530,7 +568,10 @@ class StatsCollector:
                     "rate_up": user.rate_up,
                     "rate_down": user.rate_down,
                     "online": user.online,
+                    "online_reason": user.online_reason,
                     "last_seen": user.last_seen,
+                    "last_traffic_at": user.last_traffic_at,
+                    "rate_updated_at": user.rate_updated_at,
                 }
                 for user in users
             ],

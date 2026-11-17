@@ -21,7 +21,7 @@ from ostium import __version__
 from ostium.api.deps import Services, client_ip, ensure_cli_token
 from ostium.api.errors import ApiError, problem_response
 from ostium.build_info import build_info
-from ostium.config import Role, Settings
+from ostium.config import Mode, Role, Settings
 from ostium.db.session import create_engine, create_schema, create_session_factory
 from ostium.engine.manager import EngineManager
 from ostium.engine.singbox.clash_api import ClashApi
@@ -226,6 +226,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             # auto-reconnect in Settings takes effect without a restart.
             services.tasks.append(
                 asyncio.create_task(_core_watchdog(services), name="ostium-core-watchdog")
+            )
+            services.tasks.append(
+                asyncio.create_task(_proxy_watchdog(services), name="ostium-proxy-watchdog")
             )
         bus.log(
             "info", "Ostium control plane started", version=__version__, role=settings.role.value
@@ -969,6 +972,142 @@ async def _watchdog_tick(services: Services) -> None:
         services.bus.log("info", "client core auto-reconnected")
     except Exception as exc:
         services.bus.log("warning", "client core auto-reconnect failed", error=str(exc))
+
+
+class _ProxyWatchdogState:
+    __slots__ = ("alerted", "down_since", "reconcile_attempted")
+
+    def __init__(self) -> None:
+        self.down_since: float | None = None
+        self.reconcile_attempted = False
+        self.alerted = False
+
+
+async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, now: float) -> None:
+    from ostium.util.time import iso, utcnow
+
+    if services.settings.role is Role.SERVER:
+        return
+    if services.client_paused:
+        # Explicit Disconnect wins.  Leave the proxy as the operator left it.
+        state.down_since = None
+        state.reconcile_attempted = False
+        state.alerted = False
+        services.proxy_restore_pending = False
+        services.proxy_fail_open_active = False
+        services.proxy_fail_open_since = None
+        return
+    if services.settings.mode is not Mode.SYSTEM_PROXY:
+        state.down_since = None
+        state.reconcile_attempted = False
+        state.alerted = False
+        services.proxy_restore_pending = False
+        services.proxy_fail_open_active = False
+        return
+    proxy_status = await asyncio.to_thread(lambda: services.proxy.status())
+    if not proxy_status.get("enabled") and not services.proxy_fail_open_active:
+        state.down_since = None
+        state.reconcile_attempted = False
+        state.alerted = False
+        return
+    running = False
+    try:
+        status = await services.engine.client.status()
+        running = bool(status.get("running"))
+    except Exception:
+        running = False
+    if running:
+        if services.proxy_restore_pending:
+            try:
+                await asyncio.to_thread(
+                    lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+                )
+                services.bus.log("info", "system proxy restored after core recovery")
+            except Exception as exc:
+                services.bus.log("error", "could not restore the system proxy", error=str(exc))
+        services.proxy_restore_pending = False
+        services.proxy_fail_open_active = False
+        services.proxy_fail_open_since = None
+        state.down_since = None
+        state.reconcile_attempted = False
+        state.alerted = False
+        return
+    if state.down_since is None:
+        state.down_since = now
+    if not state.reconcile_attempted:
+        # One bounded recovery attempt before declaring the path dead.
+        try:
+            async with services.session_factory() as session:
+                await services.engine.reconcile_client(session, force=True)
+            state.down_since = now
+        except Exception as exc:
+            services.bus.log("warning", "system proxy recovery attempt failed", error=str(exc))
+        state.reconcile_attempted = True
+    elapsed = now - state.down_since
+    if elapsed < services.settings.system_proxy_fail_open_seconds or state.alerted:
+        return
+    state.alerted = True
+    if services.settings.system_proxy_fail_open:
+        try:
+            await asyncio.to_thread(lambda: services.proxy.disable())
+        except Exception as exc:
+            services.bus.log("error", "could not fail open the system proxy", error=str(exc))
+        services.proxy_fail_open_active = True
+        services.proxy_fail_open_since = iso(utcnow())
+        services.proxy_restore_pending = True
+        services.bus.log(
+            "critical",
+            "system proxy failed open after the core became unavailable",
+            seconds=services.settings.system_proxy_fail_open_seconds,
+        )
+        try:
+            from ostium.services.audit import create_alert
+
+            async with services.session_factory() as session:
+                await create_alert(
+                    session,
+                    services.bus,
+                    level="critical",
+                    code="system_proxy_fail_open",
+                    message=(
+                        "the proxy core was unavailable for "
+                        f"{services.settings.system_proxy_fail_open_seconds}s; "
+                        "the system proxy was disabled to restore direct internet"
+                    ),
+                    dedupe_key="system-proxy-fail-open",
+                )
+                await session.commit()
+        except Exception as exc:
+            services.bus.log("error", "could not record the fail-open alert", error=str(exc))
+    else:
+        services.bus.log(
+            "critical",
+            "proxy core is unavailable and fail-open is disabled; system traffic may blackhole",
+            seconds=services.settings.system_proxy_fail_open_seconds,
+        )
+
+
+async def _proxy_watchdog(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    """Fail open when the system proxy points at a dead core.
+
+    The OS proxy is enabled only while the core is running.  If the core
+    disappears, every application keeps sending traffic to a closed loopback
+    port.  After the configured threshold this watchdog restores direct
+    internet and raises a critical alert; an explicit Disconnect suppresses
+    both automatic recovery and proxy restoration.
+    """
+
+    state = _ProxyWatchdogState()
+    while True:
+        try:
+            await sleep(5)
+            await _proxy_watchdog_tick(services, state, asyncio.get_running_loop().time())
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            services.bus.log("error", "system proxy watchdog failed", error=str(exc))
 
 
 async def _core_watchdog(

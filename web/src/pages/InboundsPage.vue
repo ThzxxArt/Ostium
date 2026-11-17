@@ -101,13 +101,18 @@ async function load() {
   }
 }
 
+function reportApplied(result: { applied?: boolean; warning?: string }, successMessage: string) {
+  if (result.warning) warning.value = result.warning
+  if (result.applied === false) message.warning(result.warning || t('common.apply_failed'))
+  else message.success(successMessage)
+}
+
 async function assignCertificate(inbound: Inbound, certificateId: string | null) {
   busy.value = inbound.kind
   warning.value = null
   try {
     const result = await api.inbounds.update(inbound.kind, { certificate_id: certificateId })
-    if (result.warning) warning.value = result.warning
-    message.success(t('inbounds.certificate_saved'))
+    reportApplied(result, t('inbounds.certificate_saved'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -121,8 +126,7 @@ async function toggle(inbound: Inbound, enabled: boolean) {
   warning.value = null
   try {
     const result = await api.inbounds.update(inbound.kind, { enabled })
-    if (result.warning) warning.value = result.warning
-    message.success(enabled ? t('inbounds.enabled') : t('inbounds.disabled'))
+    reportApplied(result, enabled ? t('inbounds.enabled') : t('inbounds.disabled'))
     await load()
   } catch (err) {
     message.error((err as Error).message)
@@ -141,8 +145,7 @@ function confirmRotate(inbound: Inbound) {
       busy.value = inbound.kind
       try {
         const result = await api.inbounds.rotateReality('vless')
-        if (result.warning) warning.value = result.warning
-        message.success(t('inbounds.rotate_keys'))
+        reportApplied(result, t('inbounds.rotate_keys'))
         await load()
       } catch (err) {
         message.error((err as Error).message)
@@ -165,8 +168,7 @@ async function savePort() {
   warning.value = null
   try {
     const result = await api.inbounds.update(portTarget.value.kind, { port: portValue.value })
-    if (result.warning) warning.value = result.warning
-    message.success(t('inbounds.port_saved'))
+    reportApplied(result, t('inbounds.port_saved'))
     showPortModal.value = false
     await load()
   } catch (err) {

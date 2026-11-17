@@ -46,7 +46,10 @@ def test_user_lifecycle_and_subscriptions(api_client: TestClient, settings: Sett
     api_client.app.state.services.engine.apply_server = applied  # type: ignore[method-assign]
 
     api_client.app.state.services.stats = None
-    assert api_client.get("/api/v1/users").json() == {"users": [], "total": 0}
+    empty = api_client.get("/api/v1/users").json()
+    assert empty["users"] == []
+    assert empty["total"] == 0
+    assert empty["online_window_seconds"] == 60
 
     invalid = api_client.post("/api/v1/users", json={"name": "bad<name"}, headers=headers)
     assert invalid.status_code == 400

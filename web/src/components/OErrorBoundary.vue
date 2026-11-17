@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onErrorCaptured, ref } from 'vue'
+import { onErrorCaptured, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 
 const { t } = useI18n()
+const route = useRoute()
 const failed = ref(false)
 
 onErrorCaptured((error) => {
@@ -10,6 +12,14 @@ onErrorCaptured((error) => {
   failed.value = true
   return false
 })
+
+// A routing failure must not trap the operator on the error card forever.
+watch(
+  () => route?.fullPath ?? '',
+  () => {
+    failed.value = false
+  },
+)
 
 function reload() {
   window.location.reload()

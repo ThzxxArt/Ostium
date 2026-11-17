@@ -73,6 +73,8 @@ const general = ref({
   server_dns_mode: 'auto',
   server_dns_doh_url: 'https://1.1.1.1/dns-query',
   client_dns_local: 'local',
+  system_proxy_fail_open: true,
+  system_proxy_fail_open_seconds: 45,
 })
 const notifications = ref({ webhook_url: '', webhook_secret: '', enabled: true })
 const clearWebhookSecret = ref(false)
@@ -170,6 +172,8 @@ async function load() {
       server_dns_mode: data.general.server_dns_mode ?? 'auto',
       server_dns_doh_url: data.general.server_dns_doh_url ?? 'https://1.1.1.1/dns-query',
       client_dns_local: data.general.client_dns_local ?? 'local',
+      system_proxy_fail_open: data.general.system_proxy_fail_open ?? true,
+      system_proxy_fail_open_seconds: data.general.system_proxy_fail_open_seconds ?? 45,
     }
     notifications.value = {
       webhook_url: data.notifications.webhook_url || '',
@@ -210,6 +214,8 @@ async function saveGeneral() {
       server_dns_mode: general.value.server_dns_mode,
       server_dns_doh_url: general.value.server_dns_doh_url,
       client_dns_local: general.value.client_dns_local,
+      system_proxy_fail_open: general.value.system_proxy_fail_open,
+      system_proxy_fail_open_seconds: general.value.system_proxy_fail_open_seconds,
     })
     if (result.warning) message.warning(result.warning)
     message.success(t('settings.saved'))
@@ -629,6 +635,20 @@ onMounted(load)
                 <span>{{ t('settings.client_dns_local') }}</span>
                 <NInput v-model:value="general.client_dns_local" placeholder="local" />
                 <small class="o-subtle">{{ t('settings.client_dns_local_hint') }}</small>
+              </label>
+              <label v-if="!server" class="field row">
+                <NCheckbox v-model:checked="general.system_proxy_fail_open">{{
+                  t('settings.system_proxy_fail_open')
+                }}</NCheckbox>
+                <small class="o-subtle">{{ t('settings.system_proxy_fail_open_hint') }}</small>
+              </label>
+              <label v-if="!server" class="field">
+                <span>{{ t('settings.system_proxy_fail_open_seconds') }}</span>
+                <NInputNumber
+                  v-model:value="general.system_proxy_fail_open_seconds"
+                  :min="5"
+                  :max="600"
+                />
               </label>
             </div>
             <template #footer>

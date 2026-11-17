@@ -59,6 +59,7 @@ async function activate(profile: Profile) {
       // The database desired state changed, but the running core did not.  Do
       // not claim this profile is current; the reconciler will retry and the
       // UI can refresh after it succeeds.
+      message.warning(result.warning || t('common.apply_failed'))
       await load()
       return
     }

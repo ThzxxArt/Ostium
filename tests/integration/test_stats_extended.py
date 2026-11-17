@@ -293,13 +293,14 @@ def test_snapshot_empty_and_disable_without_callback(tmp_path: Path) -> None:
     async def _run() -> None:
         settings, engine, factory, _store = await _setup(tmp_path)
         collector = StatsCollector(settings=settings, session_factory=factory, bus=EventBus())
-        assert collector.snapshot() == {
-            "online": 0,
-            "rate_up": 0,
-            "rate_down": 0,
-            "users": [],
-            "last_error": None,
-        }
+        snapshot = collector.snapshot()
+        assert snapshot["online"] == 0
+        assert snapshot["rate_up"] == 0
+        assert snapshot["rate_down"] == 0
+        assert snapshot["users"] == []
+        assert snapshot["last_error"] is None
+        assert snapshot["online_window_seconds"] == settings.stats_online_window_seconds
+        assert snapshot["rates_stale"] is False
         await collector._disable(["nobody"])
         await collector.stop()
         await engine.dispose()
@@ -339,6 +340,63 @@ def test_usage_series_filter_epoch_and_speed_sample(tmp_path: Path) -> None:
             await session.commit()
 
         assert SpeedSample().samples == []
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_online_window_boundaries_and_rate_decay(tmp_path: Path) -> None:
+    async def _run() -> None:
+        settings, engine, factory, store = await _setup(tmp_path)
+        async with factory() as session:
+            user, _password, _token = await create_user(session, store, name="alice")
+            await session.commit()
+            user_id = user.id
+        collector = StatsCollector(settings=settings, session_factory=factory, bus=EventBus())
+        values = iter([(0, 0), (1000, 2000)])
+        fallback = (1000, 2000)
+
+        async def query() -> dict[str, tuple[int, int]]:
+            try:
+                return {"alice": next(values)}
+            except StopIteration:
+                return {"alice": fallback}
+
+        collector.client.query_users = query  # type: ignore[method-assign]
+        await collector.tick()  # baseline
+        await collector.tick()  # traffic
+        usage = collector.usage[user_id]
+        assert usage.online is True
+        assert usage.rate_down > 0
+
+        # One quiet tick keeps the last rate; the second zeroes it.
+        await collector.tick()
+        assert usage.rate_down > 0
+        await collector.tick()
+        assert usage.rate_down == 0.0
+        assert usage.rate_up == 0.0
+
+        now = utcnow()
+        usage.last_seen = (now - timedelta(seconds=59)).isoformat()
+        await collector.tick()
+        assert usage.online is True
+        assert usage.online_reason == "traffic"
+
+        usage.last_seen = (now - timedelta(seconds=60)).isoformat()
+        await collector.tick()
+        assert usage.online is False
+        assert usage.online_reason == "stale"
+
+        usage.last_seen = (now - timedelta(seconds=61)).isoformat()
+        await collector.tick()
+        assert usage.online is False
+
+        # A collector outage must clear rates immediately.
+        usage.rate_down = 123.0
+        from ostium.engine.singbox.v2ray_stats import StatsUnavailable
+
+        await collector._record_stats_unavailable(StatsUnavailable("down"))
+        assert usage.rate_down == 0.0
         await engine.dispose()
 
     asyncio.run(_run())

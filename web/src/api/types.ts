@@ -158,7 +158,9 @@ export interface StatsOverview {
   role: Role
   users: { total: number; enabled: number; online: number; disabled: number }
   traffic: { today_up: number; today_down: number; session_up: number; session_down: number }
-  rates: { up: number; down: number }
+  rates: { up: number; down: number; stale?: boolean }
+  online_window_seconds?: number
+  rates_stale?: boolean
   engine: {
     running: boolean
     revision: string | null
@@ -354,6 +356,13 @@ export interface SystemInfo {
     host: string
     port: number
   }
+  proxy_fail_open: {
+    enabled: boolean
+    seconds: number
+    active: boolean
+    since: string | null
+    restore_pending: boolean
+  }
   tun: {
     enabled: boolean
     available: boolean
@@ -392,6 +401,8 @@ export interface AppSettings {
     server_dns_mode: string
     server_dns_doh_url: string
     client_dns_local: string
+    system_proxy_fail_open: boolean
+    system_proxy_fail_open_seconds: number
   }
   security: {
     secure_cookies: boolean

@@ -45,6 +45,8 @@ class SettingsPatch(BaseModel):
     server_dns_mode: str | None = None
     server_dns_doh_url: str | None = None
     client_dns_local: str | None = None
+    system_proxy_fail_open: bool | None = None
+    system_proxy_fail_open_seconds: int | None = None
 
 
 class PublicUiRequest(BaseModel):
@@ -109,6 +111,8 @@ async def read_settings(
             "server_dns_mode": services.settings.server_dns_mode,
             "server_dns_doh_url": services.settings.server_dns_doh_url,
             "client_dns_local": services.settings.client_dns_local,
+            "system_proxy_fail_open": services.settings.system_proxy_fail_open,
+            "system_proxy_fail_open_seconds": services.settings.system_proxy_fail_open_seconds,
         },
         "security": {
             "secure_cookies": services.settings.secure_cookies,
@@ -185,6 +189,17 @@ async def update_settings(
         candidate.server_dns_doh_url = str(changes["server_dns_doh_url"]).strip()
     if changes.get("client_dns_local"):
         candidate.client_dns_local = str(changes["client_dns_local"]).strip()
+    if changes.get("system_proxy_fail_open") is not None:
+        candidate.system_proxy_fail_open = bool(changes["system_proxy_fail_open"])
+    if changes.get("system_proxy_fail_open_seconds") is not None:
+        seconds = int(changes["system_proxy_fail_open_seconds"])
+        if not 5 <= seconds <= 600:
+            raise ApiError(
+                400,
+                "system_proxy_fail_open_seconds must be between 5 and 600",
+                "bad_fail_open_delay",
+            )
+        candidate.system_proxy_fail_open_seconds = seconds
     if changes.get("allow_lan") is not None:
         candidate.allow_lan = bool(changes["allow_lan"])
     if changes.get("log_level"):

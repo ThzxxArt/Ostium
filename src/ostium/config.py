@@ -190,6 +190,14 @@ class Settings(BaseModel):
     # Client local resolver.  ``local`` uses the OS resolver; an IP literal
     # keeps the previous explicit-UDP behaviour.
     client_dns_local: str = "local"
+    # "Online" means traffic was observed within this window, not that a TCP
+    # connection exists.  Bounded to avoid a dashboard that never ages out.
+    stats_online_window_seconds: int = 60
+    # Client policy when the core disappears while the OS proxy is enabled.
+    # Fail-open restores direct internet instead of blackholing every request;
+    # the project still has no firewall-level kill switch.
+    system_proxy_fail_open: bool = True
+    system_proxy_fail_open_seconds: int = 45
     proxy_ports: list[int] = Field(default_factory=lambda: [443, 8388])
     auto_connect: bool = False
     auto_reconnect: bool = True
@@ -217,6 +225,20 @@ class Settings(BaseModel):
         value = value.strip().lower()
         if value not in {"auto", "doh", "udp"}:
             raise ValueError("server_dns_mode must be auto, doh or udp")
+        return value
+
+    @field_validator("stats_online_window_seconds")
+    @classmethod
+    def _validate_online_window(cls, value: int) -> int:
+        if not 30 <= value <= 300:
+            raise ValueError("stats_online_window_seconds must be between 30 and 300")
+        return value
+
+    @field_validator("system_proxy_fail_open_seconds")
+    @classmethod
+    def _validate_fail_open_delay(cls, value: int) -> int:
+        if not 5 <= value <= 600:
+            raise ValueError("system_proxy_fail_open_seconds must be between 5 and 600")
         return value
 
     def validate_bind(self) -> None:
@@ -298,6 +320,9 @@ class Settings(BaseModel):
             "server_dns_mode": self.server_dns_mode,
             "server_dns_doh_url": self.server_dns_doh_url,
             "client_dns_local": self.client_dns_local,
+            "stats_online_window_seconds": self.stats_online_window_seconds,
+            "system_proxy_fail_open": self.system_proxy_fail_open,
+            "system_proxy_fail_open_seconds": self.system_proxy_fail_open_seconds,
             "proxy_ports": self.proxy_ports,
             "auto_connect": self.auto_connect,
             "auto_reconnect": self.auto_reconnect,
@@ -414,6 +439,9 @@ class Settings(BaseModel):
             "server_dns_mode": raw.get("server_dns_mode", "auto"),
             "server_dns_doh_url": raw.get("server_dns_doh_url", "https://1.1.1.1/dns-query"),
             "client_dns_local": raw.get("client_dns_local", "local"),
+            "stats_online_window_seconds": raw.get("stats_online_window_seconds", 60),
+            "system_proxy_fail_open": raw.get("system_proxy_fail_open", True),
+            "system_proxy_fail_open_seconds": raw.get("system_proxy_fail_open_seconds", 45),
             "proxy_ports": raw.get("proxy_ports", [443, 8388]),
             "auto_connect": raw.get("auto_connect", False),
             "auto_reconnect": raw.get("auto_reconnect", True),
@@ -442,6 +470,9 @@ class Settings(BaseModel):
             "OSTIUM_SERVER_DNS_MODE": ("server_dns_mode", str),
             "OSTIUM_SERVER_DNS_DOH_URL": ("server_dns_doh_url", str),
             "OSTIUM_CLIENT_DNS_LOCAL": ("client_dns_local", str),
+            "OSTIUM_STATS_ONLINE_WINDOW_SECONDS": ("stats_online_window_seconds", int),
+            "OSTIUM_SYSTEM_PROXY_FAIL_OPEN": ("system_proxy_fail_open", _as_bool),
+            "OSTIUM_SYSTEM_PROXY_FAIL_OPEN_SECONDS": ("system_proxy_fail_open_seconds", int),
             "OSTIUM_PROXY_PORTS": ("proxy_ports", _as_ports),
             "OSTIUM_DEV": ("dev", _as_bool),
         }
