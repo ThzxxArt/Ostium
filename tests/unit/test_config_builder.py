@@ -10,10 +10,12 @@ import pytest
 from ostium.config import Role
 from ostium.domain.endpoints import Endpoint, Protocol, TLSConfig
 from ostium.engine.singbox.config import (
+    CONFIG_POLICY_VERSION,
     ClientConfigSpec,
     ClientTunSpec,
     RealitySpec,
     ServerConfigSpec,
+    ServerDnsSpec,
     ServerInbound,
     UserCredential,
     build_client_config,
@@ -253,3 +255,77 @@ def test_generated_configs_pass_singbox_check(tmp_path: Path) -> None:
             check=False,
         )
         assert result.returncode == 0, result.stderr
+
+
+def _server_spec(dns: ServerDnsSpec | None = None) -> ServerConfigSpec:
+    return ServerConfigSpec(
+        inbounds=[
+            ServerInbound(
+                kind="vless",
+                enabled=True,
+                reality=RealitySpec(private_key="private", short_id="abcd"),
+            )
+        ],
+        users=[
+            UserCredential(
+                name="alice",
+                uuid="2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e",
+                password="pw",
+                ss_password="c3M=",
+            )
+        ],
+        clash_secret="secret",
+        dns=dns or ServerDnsSpec(mode="udp"),
+    )
+
+
+def test_server_doh_uses_one_encrypted_resolver() -> None:
+    config = build_server_config(_server_spec(ServerDnsSpec(mode="doh")))
+    servers = config["dns"]["servers"]
+    assert len(servers) == 1
+    server = servers[0]
+    assert server["type"] == "https"
+    assert server["tag"] == "local"
+    assert server["server"] == "1.1.1.1"
+    assert server["path"] == "/dns-query"
+    assert server["tls"]["server_name"] == "cloudflare-dns.com"
+    # sing-box 1.14 FATALs on a detour to the empty direct outbound.
+    assert "detour" not in server
+    assert config["dns"]["final"] == "local"
+    assert CONFIG_POLICY_VERSION == 3
+
+
+def test_server_udp_has_no_dead_second_server() -> None:
+    config = build_server_config(_server_spec(ServerDnsSpec(mode="udp")))
+    servers = config["dns"]["servers"]
+    assert servers == [{"type": "udp", "tag": "local", "server": "8.8.8.8"}]
+    assert all(server["tag"] != "local2" for server in servers)
+
+
+def test_generated_configs_never_hardcode_the_mainland_resolver() -> None:
+    endpoint = Endpoint(
+        tag="reality",
+        protocol=Protocol.VLESS_REALITY,
+        name="HK",
+        server="vpn.example.com",
+        port=443,
+        uuid="2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e",
+        tls=TLSConfig(
+            server_name="www.apple.com",
+            reality_public_key="Bs2KLXAKuw5pGFpBIwnyt896Y8mhNJHewMHHY0en6hM",
+            reality_short_id="55e1651e",
+        ),
+    )
+    for routing in ("smart", "direct"):
+        config = build_client_config(
+            ClientConfigSpec(
+                endpoints=[endpoint],
+                routing_mode=routing,
+                mixed_port=7890,
+                clash_secret="secret",
+            )
+        )
+        rendered = json.dumps(config)
+        assert "223.5.5.5" not in rendered
+        local = [item for item in config["dns"]["servers"] if item["tag"] == "local"]
+        assert local == [{"type": "local", "tag": "local"}]

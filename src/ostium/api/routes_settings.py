@@ -42,6 +42,9 @@ class SettingsPatch(BaseModel):
     acme_email: str | None = Field(default=None, max_length=254)
     acme_staging: bool | None = None
     block_private_egress: bool | None = None
+    server_dns_mode: str | None = None
+    server_dns_doh_url: str | None = None
+    client_dns_local: str | None = None
 
 
 class PublicUiRequest(BaseModel):
@@ -103,6 +106,9 @@ async def read_settings(
             "acme_staging": services.settings.acme_staging,
             "public_base_url": stored.get("public_base_url"),
             "block_private_egress": services.settings.block_private_egress,
+            "server_dns_mode": services.settings.server_dns_mode,
+            "server_dns_doh_url": services.settings.server_dns_doh_url,
+            "client_dns_local": services.settings.client_dns_local,
         },
         "security": {
             "secure_cookies": services.settings.secure_cookies,
@@ -170,6 +176,15 @@ async def update_settings(
         candidate.acme_staging = bool(changes["acme_staging"])
     if changes.get("block_private_egress") is not None:
         candidate.block_private_egress = bool(changes["block_private_egress"])
+    if changes.get("server_dns_mode") is not None:
+        mode = str(changes["server_dns_mode"]).strip().lower()
+        if mode not in {"auto", "doh", "udp"}:
+            raise ApiError(400, "server_dns_mode must be auto, doh or udp", "bad_dns_mode")
+        candidate.server_dns_mode = mode
+    if changes.get("server_dns_doh_url"):
+        candidate.server_dns_doh_url = str(changes["server_dns_doh_url"]).strip()
+    if changes.get("client_dns_local"):
+        candidate.client_dns_local = str(changes["client_dns_local"]).strip()
     if changes.get("allow_lan") is not None:
         candidate.allow_lan = bool(changes["allow_lan"])
     if changes.get("log_level"):
@@ -292,6 +307,17 @@ async def update_settings(
         detail={"fields": sorted(changes)},
     )
     applied: dict[str, Any] = {}
+    if services.settings.role.value == "server" and (
+        "server_dns_mode" in changes
+        or "server_dns_doh_url" in changes
+        or "block_private_egress" in changes
+    ):
+        try:
+            await services.engine.refresh_server_dns(force=True)
+            result = await services.engine.apply_server(session)
+            applied = {"applied": True, "revision": result["status"].get("revision")}
+        except Exception as exc:
+            applied = {"applied": False, "warning": str(exc)}
     if services.settings.role.value == "client" and (
         "mixed_port" in changes
         or "allow_lan" in changes

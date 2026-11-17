@@ -688,3 +688,42 @@ def test_windows_spawn_and_reload_branches(tmp_path: Path, monkeypatch) -> None:
         await supervisor.shutdown()
 
     asyncio.run(_run())
+
+
+def test_last_good_meta_records_dns_and_build_provenance(tmp_path: Path) -> None:
+    from ostium import __version__
+    from ostium.engine.singbox.config import ServerDnsSpec
+
+    settings = _settings(tmp_path)
+    supervisor = CoreSupervisor(settings)
+    config = build_server_config(
+        ServerConfigSpec(
+            inbounds=[
+                ServerInbound(
+                    kind="vless",
+                    enabled=True,
+                    listen="127.0.0.1",
+                    port=443,
+                    reality=RealitySpec(private_key="private", short_id="short"),
+                )
+            ],
+            users=[
+                UserCredential(
+                    name="alice",
+                    uuid="2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e",
+                    password="pw",
+                    ss_password="c3M=",
+                )
+            ],
+            clash_secret="secret",
+            dns=ServerDnsSpec(mode="doh"),
+        )
+    )
+    supervisor._write_meta(False, config, dns_mode="doh", dns_probed_at="2026-11-17T00:00:00+00:00")
+    meta = json.loads(settings.paths.last_good_meta_path.read_text(encoding="utf-8"))
+    assert meta["policy_version"] == CONFIG_POLICY_VERSION == 3
+    assert meta["dns_mode"] == "doh"
+    assert meta["dns_servers"] == ["https://1.1.1.1/dns-query"]
+    assert meta["dns_probed_at"] == "2026-11-17T00:00:00+00:00"
+    assert meta["app_version"] == __version__
+    assert meta["config_sha256"] == config_digest(config)

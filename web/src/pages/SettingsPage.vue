@@ -70,6 +70,9 @@ const general = ref({
   acme_email: '',
   acme_staging: false,
   block_private_egress: true,
+  server_dns_mode: 'auto',
+  server_dns_doh_url: 'https://1.1.1.1/dns-query',
+  client_dns_local: 'local',
 })
 const notifications = ref({ webhook_url: '', webhook_secret: '', enabled: true })
 const clearWebhookSecret = ref(false)
@@ -113,6 +116,11 @@ const logLevels = [
   { label: 'Info', value: 'info' },
   { label: 'Warning', value: 'warning' },
   { label: 'Error', value: 'error' },
+]
+const dnsModes = [
+  { label: 'Auto (DoH, then UDP)', value: 'auto' },
+  { label: 'DoH only', value: 'doh' },
+  { label: 'UDP only', value: 'udp' },
 ]
 const certDomains = computed(() =>
   certificates.value
@@ -159,6 +167,9 @@ async function load() {
       acme_email: data.general.acme_email || '',
       acme_staging: data.general.acme_staging,
       block_private_egress: data.general.block_private_egress,
+      server_dns_mode: data.general.server_dns_mode ?? 'auto',
+      server_dns_doh_url: data.general.server_dns_doh_url ?? 'https://1.1.1.1/dns-query',
+      client_dns_local: data.general.client_dns_local ?? 'local',
     }
     notifications.value = {
       webhook_url: data.notifications.webhook_url || '',
@@ -196,6 +207,9 @@ async function saveGeneral() {
       acme_email: general.value.acme_email || null,
       acme_staging: general.value.acme_staging,
       block_private_egress: general.value.block_private_egress,
+      server_dns_mode: general.value.server_dns_mode,
+      server_dns_doh_url: general.value.server_dns_doh_url,
+      client_dns_local: general.value.client_dns_local,
     })
     if (result.warning) message.warning(result.warning)
     message.success(t('settings.saved'))
@@ -601,6 +615,20 @@ onMounted(load)
                 <NCheckbox v-model:checked="general.block_private_egress">{{
                   t('settings.block_private_egress')
                 }}</NCheckbox>
+              </label>
+              <label v-if="server" class="field">
+                <span>{{ t('settings.server_dns_mode') }}</span>
+                <NSelect v-model:value="general.server_dns_mode" :options="dnsModes" />
+                <small class="o-subtle">{{ t('settings.server_dns_mode_hint') }}</small>
+              </label>
+              <label v-if="server" class="field">
+                <span>{{ t('settings.server_dns_doh_url') }}</span>
+                <NInput v-model:value="general.server_dns_doh_url" />
+              </label>
+              <label v-if="!server" class="field">
+                <span>{{ t('settings.client_dns_local') }}</span>
+                <NInput v-model:value="general.client_dns_local" placeholder="local" />
+                <small class="o-subtle">{{ t('settings.client_dns_local_hint') }}</small>
               </label>
             </div>
             <template #footer>

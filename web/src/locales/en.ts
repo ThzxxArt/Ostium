@@ -586,6 +586,12 @@ export default {
     acme_email: 'ACME email',
     acme_staging: 'Use ACME staging',
     block_private_egress: 'Block server access to private networks',
+    server_dns_mode: 'Server DNS mode',
+    server_dns_mode_hint:
+      'Auto probes DoH at startup and falls back to UDP only when it fails. DoH fails closed.',
+    server_dns_doh_url: 'DoH endpoint',
+    client_dns_local: 'Local DNS resolver',
+    client_dns_local_hint: '"local" uses the operating system resolver; an IP literal forces UDP.',
     ip_allowlist: 'Admin UI IP allowlist',
     ip_allowlist_hint:
       'Comma-separated CIDRs; empty means no restriction. Behind a reverse proxy only trust the address it injects.',

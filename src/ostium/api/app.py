@@ -184,6 +184,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             # the long-running state.  Failure is retried by the reconciler.
             try:
                 async with factory() as session:
+                    await engine_manager.refresh_server_dns(force=True)
                     await engine_manager.reconcile_server(session, force=True)
                 bus.log("info", "server configuration reconciled at startup")
             except Exception as exc:
@@ -213,6 +214,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             )
             services.tasks.append(
                 asyncio.create_task(_server_watchdog(services), name="ostium-server-watchdog")
+            )
+            services.tasks.append(
+                asyncio.create_task(_server_dns_watch(services), name="ostium-server-dns")
             )
         else:
             services.tasks.append(
@@ -820,6 +824,31 @@ async def _server_watchdog(
                 error=str(exc),
                 retry_in=delay,
             )
+
+
+async def _server_dns_watch(
+    services: Services, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    """Re-probe DoH and reapply when the effective resolver mode changes."""
+
+    while True:
+        try:
+            await sleep(300)
+            previous = services.engine.server_dns.mode if services.engine.server_dns else None
+            selection = await services.engine.refresh_server_dns(force=True)
+            if selection is None or selection.mode == previous:
+                continue
+            async with services.session_factory() as session:
+                await services.engine.reconcile_server(session, force=True)
+            services.bus.log(
+                "info",
+                "server DNS mode changed; configuration reapplied",
+                mode=selection.mode,
+            )
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            services.bus.log("error", "server DNS recheck failed", error=str(exc))
 
 
 async def _profile_refresh(

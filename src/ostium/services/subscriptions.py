@@ -107,10 +107,14 @@ def _render_clash(name: str, endpoints: list[Endpoint]) -> str:
             "enhanced-mode": "fake-ip",
             "fake-ip-range": "198.18.0.1/16",
             "fake-ip-filter": ["*.lan", "*.local", "localhost.ptlogin2.qq.com"],
-            "default-nameserver": ["223.5.5.5", "119.29.29.29"],
+            # Clash needs literal bootstrap resolvers here; use the same
+            # trusted public resolvers as the server.  Do not reintroduce
+            # 223.5.5.5: it returned polluted answers on the deployment
+            # network.
+            "default-nameserver": ["1.1.1.1", "8.8.8.8"],
             "nameserver": [
-                "https://dns.alidns.com/dns-query",
-                "https://doh.pub/dns-query",
+                "https://1.1.1.1/dns-query",
+                "https://8.8.8.8/dns-query",
             ],
             "fallback": [
                 "https://1.1.1.1/dns-query",

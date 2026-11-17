@@ -101,6 +101,8 @@ class CoreClient:
         role: str,
         *,
         artifacts: dict[str, str] | None = None,
+        dns_mode: str | None = None,
+        dns_probed_at: str | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "config": config,
@@ -113,6 +115,10 @@ class CoreClient:
         }
         if artifacts:
             payload["artifacts"] = artifacts
+        if dns_mode:
+            payload["dns_mode"] = dns_mode
+        if dns_probed_at:
+            payload["dns_probed_at"] = dns_probed_at
         return dict(
             await self._request(
                 "POST",

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ostium.domain.endpoints import Endpoint
+from ostium.engine.dns import DEFAULT_DOH_URL, DEFAULT_UDP_SERVER, doh_host_and_path
 
 LAN_CIDRS = [
     "10.0.0.0/8",
@@ -72,7 +73,7 @@ SERVER_EGRESS_BLOCK_PORTS = [25]
 # server last-good file that was generated under an older policy; the control
 # plane regenerates and applies the current configuration instead of silently
 # running stale rules after an upgrade.
-CONFIG_POLICY_VERSION = 2
+CONFIG_POLICY_VERSION = 3
 
 DEFAULT_RULE_SETS = {
     "geosite-cn": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
@@ -176,6 +177,19 @@ class ServerInbound:
     ss_server_key: str | None = None
 
 
+@dataclass(frozen=True)
+class ServerDnsSpec:
+    """The one DNS server the generated configuration actually uses.
+
+    ``sing-box`` resolves through a single ``dns.final`` server.  Listing two
+    UDP servers and expecting failover was a no-op: the second entry was never
+    referenced.  The control plane therefore selects one mode up front.
+    """
+
+    mode: str = "udp"
+    doh_url: str = DEFAULT_DOH_URL
+
+
 @dataclass
 class ServerConfigSpec:
     inbounds: list[ServerInbound]
@@ -186,6 +200,7 @@ class ServerConfigSpec:
     log_level: str = "info"
     block_private_egress: bool = True
     enable_v2ray_api: bool = True
+    dns: ServerDnsSpec = field(default_factory=ServerDnsSpec)
 
 
 @dataclass
@@ -216,11 +231,29 @@ class ClientConfigSpec:
     log_level: str = "info"
     ipv6: bool = True
     dns_remote: str = "https://1.1.1.1/dns-query"
-    dns_local: str = "223.5.5.5"
+    dns_local: str = "local"
     # Absolute path for sing-box's cache file.  Without it sing-box writes
     # ``cache.db`` into its working directory, which is read-only for the
     # packaged systemd/launchd clients (and polluted for manual runs).
     cache_path: str | None = None
+
+
+def _server_dns_server(spec: ServerDnsSpec) -> dict[str, Any]:
+    mode = spec.mode.strip().lower()
+    if mode == "doh":
+        host, path, tls_name = doh_host_and_path(spec.doh_url or DEFAULT_DOH_URL)
+        entry: dict[str, Any] = {
+            "type": "https",
+            "tag": "local",
+            "server": host,
+            "path": path,
+        }
+        # ``detour: direct`` is fatal in sing-box 1.14.x because the direct
+        # outbound is empty; omitting it uses the default route.
+        if tls_name:
+            entry["tls"] = {"server_name": tls_name}
+        return entry
+    return {"type": "udp", "tag": "local", "server": DEFAULT_UDP_SERVER}
 
 
 def build_server_config(
@@ -244,15 +277,12 @@ def build_server_config(
     config: dict[str, Any] = {
         "log": {"level": spec.log_level, "timestamp": True},
         "dns": {
-            # Do not use a domestic DNS resolver on the server: in this
-            # deployment 223.5.5.5 returned Facebook/Twitter addresses for
-            # Google/Hugging Face, which accepted TCP but failed TLS.  The
-            # server's system resolver already proves these public resolvers
-            # work and return correct A records.
-            "servers": [
-                {"type": "udp", "tag": "local", "server": "8.8.8.8"},
-                {"type": "udp", "tag": "local2", "server": "1.1.1.1"},
-            ],
+            # Exactly one resolver is generated.  In 0.1.10 a second UDP entry
+            # existed but ``dns.final`` only referenced the first, so it never
+            # participated in resolution.  DoH is preferred because UDP/53 was
+            # observed returning polluted answers; UDP remains an explicit
+            # operator choice and the ``auto`` fallback.
+            "servers": [_server_dns_server(spec.dns)],
             # The server may have IPv4 egress only.  Do not resolve proxied
             # destinations to AAAA and then fail the direct outbound; GitHub
             # (IPv4-only) worked while Google/Hugging Face timed out on hosts
@@ -523,12 +553,26 @@ def _rule_sets(spec: ClientConfigSpec) -> list[dict[str, Any]]:
     return list(defined.values())
 
 
+def _local_dns_server(value: str) -> dict[str, Any]:
+    """Build the ``local`` entry without assuming a mainland resolver.
+
+    ``local`` uses the operating system resolver and never hardcodes a
+    third-party address.  Operators that need a specific UDP resolver can still
+    set ``client_dns_local`` to an IP literal.
+    """
+
+    candidate = (value or "local").strip()
+    if candidate.lower() in {"local", "system", "os"}:
+        return {"type": "local", "tag": "local"}
+    return {"type": "udp", "tag": "local", "server": candidate}
+
+
 def _client_dns(spec: ClientConfigSpec, tun_enabled: bool) -> dict[str, Any]:
     if spec.routing_mode == "direct":
         # Direct mode must not send DNS queries through a proxy outbound that
         # is not used for traffic; use the local resolver only.
         return {
-            "servers": [{"type": "udp", "tag": "local", "server": spec.dns_local}],
+            "servers": [_local_dns_server(spec.dns_local)],
             "rules": [],
             "final": "local",
         }
@@ -539,7 +583,7 @@ def _client_dns(spec: ClientConfigSpec, tun_enabled: bool) -> dict[str, Any]:
             "server": spec.dns_remote.removeprefix("https://").split("/")[0],
             "detour": "proxy",
         },
-        {"type": "udp", "tag": "local", "server": spec.dns_local},
+        _local_dns_server(spec.dns_local),
     ]
     rules: list[dict[str, Any]] = []
     if tun_enabled:

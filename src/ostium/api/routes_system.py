@@ -207,6 +207,44 @@ async def port_owners(
     return {"owners": owners, "generated_at": iso(utcnow())}
 
 
+@router.get("/system/dns")
+async def dns_status(
+    _: AdminUser = Depends(get_current_admin),
+    services: Services = Depends(get_services),
+) -> dict[str, Any]:
+    selection = services.engine.server_dns
+    probe = services.engine.dns_probe
+    meta: dict[str, Any] = {}
+    meta_path = services.settings.paths.last_good_meta_path
+    if meta_path.is_file():
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta = loaded if isinstance(loaded, dict) else {}
+        except (OSError, ValueError):
+            meta = {}
+    return {
+        "configured_mode": services.settings.server_dns_mode,
+        "doh_url": services.settings.server_dns_doh_url,
+        "effective_mode": selection.mode if selection else None,
+        "probe": {
+            "ok": probe.ok if probe else None,
+            "latency_ms": probe.latency_ms if probe else None,
+            "answers": list(probe.answers) if probe else [],
+            "error": probe.error if probe else None,
+            "probed_at": probe.probed_at if probe else None,
+        },
+        "last_good": {
+            "dns_mode": meta.get("dns_mode"),
+            "dns_servers": meta.get("dns_servers"),
+            "dns_probed_at": meta.get("dns_probed_at"),
+            "policy_version": meta.get("policy_version"),
+            "config_sha256": meta.get("config_sha256"),
+            "updated_at": meta.get("updated_at"),
+        },
+        "generated_at": iso(utcnow()),
+    }
+
+
 @router.get("/system/doctor")
 async def doctor(
     _: AdminUser = Depends(get_current_admin),

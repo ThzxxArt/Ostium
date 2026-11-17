@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from ostium.build_info import build_info
 from ostium.config import Role, Settings
 from ostium.engine.singbox.config import CONFIG_POLICY_VERSION, config_digest
 from ostium.engine.singbox.validate import validate_config
@@ -276,6 +277,8 @@ class CoreSupervisor:
         allow_lan: bool = False,
         allowed_ports: set[int] | None = None,
         artifacts: dict[str, str] | None = None,
+        dns_mode: str | None = None,
+        dns_probed_at: str | None = None,
     ) -> SupervisorStatus:
         if not self.engine.is_file():
             raise EngineUnavailable(
@@ -319,7 +322,12 @@ class CoreSupervisor:
                 replaced = True
                 if os.name == "posix":
                     self.last_good.chmod(0o600)
-                self._write_meta(allow_lan)
+                self._write_meta(
+                    allow_lan,
+                    config,
+                    dns_mode=dns_mode,
+                    dns_probed_at=dns_probed_at,
+                )
                 if self._process is not None and self._process.returncode is None:
                     # A SIGHUP only proves the signal was delivered, not that
                     # the new configuration is active.  Restart and verify.
@@ -682,10 +690,42 @@ class CoreSupervisor:
         if os.name == "posix":
             self.last_good.chmod(0o600)
 
-    def _write_meta(self, allow_lan: bool) -> None:
+    def _write_meta(
+        self,
+        allow_lan: bool,
+        config: dict[str, Any] | None = None,
+        *,
+        dns_mode: str | None = None,
+        dns_probed_at: str | None = None,
+    ) -> None:
+        dns_mode_value = dns_mode
+        dns_servers: list[str] = []
+        if isinstance(config, dict):
+            dns = config.get("dns")
+            if isinstance(dns, dict):
+                for server in dns.get("servers") or []:
+                    if not isinstance(server, dict):
+                        continue
+                    kind = str(server.get("type") or "")
+                    address = server.get("server") or server.get("address")
+                    if kind == "https" and address:
+                        dns_path = str(server.get("path") or "/dns-query")
+                        dns_servers.append(f"https://{address}{dns_path}")
+                        dns_mode_value = dns_mode_value or "doh"
+                    elif kind == "udp" and address:
+                        dns_servers.append(str(address))
+                        dns_mode_value = dns_mode_value or "udp"
+                    elif kind == "local":
+                        dns_servers.append("local")
+                        dns_mode_value = dns_mode_value or "local"
         payload = {
             "allow_lan": bool(allow_lan),
             "policy_version": CONFIG_POLICY_VERSION,
+            "app_version": build_info().version,
+            "dns_mode": dns_mode_value or "unknown",
+            "dns_servers": dns_servers,
+            "dns_probed_at": dns_probed_at,
+            "config_sha256": config_digest(config) if isinstance(config, dict) else None,
             "updated_at": iso(utcnow()),
         }
         path = self.paths.last_good_meta_path

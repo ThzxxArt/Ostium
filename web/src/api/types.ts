@@ -388,6 +388,9 @@ export interface AppSettings {
     acme_staging: boolean
     public_base_url: string | null
     block_private_egress: boolean
+    server_dns_mode: string
+    server_dns_doh_url: string
+    client_dns_local: string
   }
   security: {
     secure_cookies: boolean

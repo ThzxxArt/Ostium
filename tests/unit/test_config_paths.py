@@ -101,6 +101,9 @@ def test_save_and_load_roundtrip(tmp_path: Path) -> None:
         auto_connect=True,
         auto_reconnect=False,
         dev=True,
+        server_dns_mode="doh",
+        server_dns_doh_url="https://dns.google/dns-query",
+        client_dns_local="1.1.1.1",
     )
     value.paths.ensure()
     target = value.save()
@@ -116,6 +119,9 @@ def test_save_and_load_roundtrip(tmp_path: Path) -> None:
     assert loaded.tun_enabled is True
     assert loaded.proxy_ports == [1, 2]
     assert loaded.auto_reconnect is False
+    assert loaded.server_dns_mode == "doh"
+    assert loaded.server_dns_doh_url == "https://dns.google/dns-query"
+    assert loaded.client_dns_local == "1.1.1.1"
 
 
 def test_save_to_explicit_path_and_none_fields(tmp_path: Path) -> None:

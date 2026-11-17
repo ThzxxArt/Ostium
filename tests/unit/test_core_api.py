@@ -43,6 +43,20 @@ async def test_core_client_methods(tmp_path: Path) -> None:
         assert b'"sha256"' in apply_route.calls[0].request.content
         assert b'"allow_lan":false' in apply_route.calls[0].request.content
 
+        respx.post("http://127.0.0.1:8788/v1/apply").mock(
+            return_value=httpx.Response(200, json={"running": True})
+        )
+        await client.apply(
+            {"log": {}},
+            "0" * 64,
+            "server",
+            dns_mode="doh",
+            dns_probed_at="2026-11-17T00:00:00+00:00",
+        )
+        body = apply_route.calls[-1].request.content
+        assert b'"dns_mode":"doh"' in body
+        assert b'"dns_probed_at"' in body
+
         respx.post("http://127.0.0.1:8788/v1/reload").mock(
             return_value=httpx.Response(200, json={"running": True})
         )

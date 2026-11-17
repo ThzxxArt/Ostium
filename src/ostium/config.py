@@ -183,6 +183,13 @@ class Settings(BaseModel):
     tun_mtu: int = 1500
     tun_stack: str = "gvisor"
     block_private_egress: bool = True
+    # Server DNS policy.  ``auto`` probes DoH at startup and falls back to UDP
+    # only when the encrypted path fails; ``doh`` fails closed instead.
+    server_dns_mode: str = "auto"
+    server_dns_doh_url: str = "https://1.1.1.1/dns-query"
+    # Client local resolver.  ``local`` uses the OS resolver; an IP literal
+    # keeps the previous explicit-UDP behaviour.
+    client_dns_local: str = "local"
     proxy_ports: list[int] = Field(default_factory=lambda: [443, 8388])
     auto_connect: bool = False
     auto_reconnect: bool = True
@@ -203,6 +210,14 @@ class Settings(BaseModel):
     @classmethod
     def _normalise_level(cls, value: str) -> str:
         return value.lower()
+
+    @field_validator("server_dns_mode")
+    @classmethod
+    def _normalise_dns_mode(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in {"auto", "doh", "udp"}:
+            raise ValueError("server_dns_mode must be auto, doh or udp")
+        return value
 
     def validate_bind(self) -> None:
         """Fail closed when a plaintext admin UI would listen publicly."""
@@ -280,6 +295,9 @@ class Settings(BaseModel):
             "tun_mtu": self.tun_mtu,
             "tun_stack": self.tun_stack,
             "block_private_egress": self.block_private_egress,
+            "server_dns_mode": self.server_dns_mode,
+            "server_dns_doh_url": self.server_dns_doh_url,
+            "client_dns_local": self.client_dns_local,
             "proxy_ports": self.proxy_ports,
             "auto_connect": self.auto_connect,
             "auto_reconnect": self.auto_reconnect,
@@ -393,6 +411,9 @@ class Settings(BaseModel):
             "tun_mtu": raw.get("tun_mtu", 1500),
             "tun_stack": raw.get("tun_stack", "gvisor"),
             "block_private_egress": raw.get("block_private_egress", True),
+            "server_dns_mode": raw.get("server_dns_mode", "auto"),
+            "server_dns_doh_url": raw.get("server_dns_doh_url", "https://1.1.1.1/dns-query"),
+            "client_dns_local": raw.get("client_dns_local", "local"),
             "proxy_ports": raw.get("proxy_ports", [443, 8388]),
             "auto_connect": raw.get("auto_connect", False),
             "auto_reconnect": raw.get("auto_reconnect", True),
@@ -418,6 +439,9 @@ class Settings(BaseModel):
             "OSTIUM_TUN_MTU": ("tun_mtu", int),
             "OSTIUM_TUN_STACK": ("tun_stack", str),
             "OSTIUM_BLOCK_PRIVATE_EGRESS": ("block_private_egress", _as_bool),
+            "OSTIUM_SERVER_DNS_MODE": ("server_dns_mode", str),
+            "OSTIUM_SERVER_DNS_DOH_URL": ("server_dns_doh_url", str),
+            "OSTIUM_CLIENT_DNS_LOCAL": ("client_dns_local", str),
             "OSTIUM_PROXY_PORTS": ("proxy_ports", _as_ports),
             "OSTIUM_DEV": ("dev", _as_bool),
         }

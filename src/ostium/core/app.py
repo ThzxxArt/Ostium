@@ -77,6 +77,10 @@ class ApplyRequest(BaseModel):
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     role: Role
     allow_lan: bool = False
+    # Server DNS provenance supplied by the control plane.  It is recorded in
+    # last-good.meta.json so an operator can prove which resolver mode ran.
+    dns_mode: str | None = None
+    dns_probed_at: str | None = None
     # Rule-set files owned by a client control plane that runs as a different
     # user.  Keys are the UI-side paths referenced by ``config``.
     artifacts: dict[str, str] | None = None
@@ -181,6 +185,8 @@ def create_core_app(settings: Settings) -> FastAPI:
             allow_lan=request.allow_lan,
             allowed_ports=set(current.proxy_ports),
             artifacts=request.artifacts,
+            dns_mode=request.dns_mode,
+            dns_probed_at=request.dns_probed_at,
         )
         return _status_payload(result, settings)
 

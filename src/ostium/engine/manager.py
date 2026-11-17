@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import time
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ostium.config import Role, Settings
 from ostium.db.models import Certificate, Inbound, Profile, ProxyUser, Rule, RuleSet
 from ostium.engine.core_api import CoreApiError, CoreClient
+from ostium.engine.dns import (
+    DEFAULT_DOH_URL,
+    PROBE_CACHE_SECONDS,
+    DnsProbeResult,
+    ServerDnsSelection,
+    probe_doh,
+    select_server_dns,
+)
 from ostium.engine.singbox.config import (
     CertificateSpec,
     ClientConfigSpec,
     ClientTunSpec,
     RealitySpec,
     ServerConfigSpec,
+    ServerDnsSpec,
     ServerInbound,
     UserCredential,
     build_client_config,
@@ -66,17 +76,100 @@ class EngineManager:
         # overwriting each other out of order.
         self._apply_lock = asyncio.Lock()
         self._last_applied: dict[str, str] = {}
+        self._dns_lock = asyncio.Lock()
+        self._dns_probed_monotonic = 0.0
+        self.dns_probe: DnsProbeResult | None = None
+        self.server_dns: ServerDnsSelection | None = None
+
+    async def refresh_server_dns(self, *, force: bool = False) -> ServerDnsSelection | None:
+        """Probe DoH and resolve the effective server DNS policy.
+
+        The result is cached for ten minutes; a forced refresh is used at
+        startup and by the background recheck.  ``doh`` fails closed, while
+        ``auto`` falls back to UDP with a warning.
+        """
+
+        if self.settings.role is not Role.SERVER:
+            return None
+        async with self._dns_lock:
+            now = time.monotonic()
+            if (
+                not force
+                and self.server_dns is not None
+                and now - self._dns_probed_monotonic < PROBE_CACHE_SECONDS
+            ):
+                return self.server_dns
+            configured = self.settings.server_dns_mode
+            url = self.settings.server_dns_doh_url or DEFAULT_DOH_URL
+            if configured == "udp":
+                probe = DnsProbeResult(
+                    ok=False,
+                    url=url,
+                    latency_ms=None,
+                    answers=(),
+                    error=None,
+                    probed_at="",
+                )
+            else:
+                probe = await asyncio.to_thread(probe_doh, url)
+            self.dns_probe = probe
+            try:
+                selection = select_server_dns(mode=configured, doh_url=url, probe=probe)
+            except (ValueError, RuntimeError) as exc:
+                self.server_dns = None
+                raise EngineError(str(exc), "dns_probe_failed", 502) from exc
+            self.server_dns = selection
+            self._dns_probed_monotonic = now
+            if configured == "auto" and selection.mode == "udp" and not probe.ok:
+                self.bus.log(
+                    "warning",
+                    "DoH probe failed; server DNS falls back to UDP",
+                    doh_url=url,
+                    error=probe.error,
+                )
+            elif selection.mode == "doh":
+                self.bus.log(
+                    "info",
+                    "server DNS uses DoH",
+                    doh_url=url,
+                    latency_ms=probe.latency_ms,
+                )
+            return selection
+
+    async def server_dns_preview(self) -> ServerDnsSelection:
+        # Selection happens at startup and on the background recheck.  A
+        # config preview must stay deterministic and must never block an admin
+        # request on a network probe; before the first selection the safe
+        # default is UDP, exactly the pre-0.1.11 behaviour.
+        if self.server_dns is None:
+            return ServerDnsSelection(
+                mode="udp",
+                doh_url=self.settings.server_dns_doh_url or DEFAULT_DOH_URL,
+                probed_at=None,
+                probe_ok=True,
+                probe_error=None,
+            )
+        return self.server_dns
 
     async def server_preview(self, session: AsyncSession) -> dict[str, Any]:
         spec = await self._server_spec(session)
+        selection = await self.server_dns_preview()
+        spec.dns = ServerDnsSpec(mode=selection.mode, doh_url=selection.doh_url)
         return build_server_config(spec)
 
     async def apply_server(self, session: AsyncSession) -> dict[str, Any]:
         async with self._apply_lock:
             config = await self.server_preview(session)
             digest = config_digest(config)
+            selection = self.server_dns
             try:
-                result = await self.client.apply(config, digest, Role.SERVER.value)
+                result = await self.client.apply(
+                    config,
+                    digest,
+                    Role.SERVER.value,
+                    dns_mode=selection.mode if selection else "udp",
+                    dns_probed_at=selection.probed_at if selection else None,
+                )
             except CoreApiError as exc:
                 raise EngineError(exc.detail, exc.code, exc.status_code) from exc
             self._last_applied["server"] = digest
@@ -383,6 +476,7 @@ class EngineManager:
             clash_secret=self._clash_secret(),
             log_level=self.settings.log_level,
             ipv6=True,
+            dns_local=self.settings.client_dns_local,
             cache_path=str(self.settings.paths.data_dir / "cache.db"),
         )
 
