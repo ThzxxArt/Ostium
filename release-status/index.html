@@ -1314,23 +1314,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Current release">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#0111-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        0.1.11 status
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1434,10 +1417,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-0110" class="md-nav__link">
+  <a href="#release-gates-for-0111" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.10
+        Release gates for 0.1.11
       
     </span>
   </a>
@@ -1824,23 +1807,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Current release">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#0111-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        0.1.11 status
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -1944,10 +1910,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#release-gates-for-0110" class="md-nav__link">
+  <a href="#release-gates-for-0111" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Release gates for 0.1.10
+        Release gates for 0.1.11
       
     </span>
   </a>
@@ -1999,40 +1965,40 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </thead>
 <tbody>
 <tr>
-<td>Current public version</td>
-<td><strong>0.1.10</strong></td>
+<td>Version</td>
+<td><strong>0.1.11</strong></td>
 </tr>
 <tr>
 <td>Status</td>
-<td><strong>Published</strong> (0.1.11 implemented, <strong>not published</strong>)</td>
+<td><strong>Published</strong></td>
 </tr>
 <tr>
 <td>Tag</td>
-<td><code>v0.1.10</code> (annotated, commit <code>361fa7c</code>)</td>
+<td><code>v0.1.11</code> (annotated, commit <code>098b2be</code>)</td>
 </tr>
 <tr>
 <td>Assets</td>
-<td>GitHub Release <code>v0.1.10</code> — 23 assets, marked Latest</td>
+<td>GitHub Release <code>v0.1.11</code> — 23 assets, marked Latest</td>
 </tr>
 <tr>
 <td>PyPI</td>
-<td><code>ostium-ctl==0.1.10</code> (wheel + sdist)</td>
+<td><code>ostium-ctl==0.1.11</code> (wheel + sdist)</td>
 </tr>
 <tr>
 <td>GHCR</td>
-<td><code>0.1.10</code>, <code>v0.1.10</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
+<td><code>0.1.11</code>, <code>v0.1.11</code>, <code>latest</code> — linux/amd64 + linux/arm64</td>
 </tr>
 <tr>
 <td>Release workflow</td>
-<td>run <code>43866531455</code> — success</td>
+<td>run <code>44097108605</code> — success</td>
 </tr>
 <tr>
 <td>Previous release</td>
-<td><code>v0.1.9</code>, published 2026-11-16 (23 assets, unchanged)</td>
+<td><code>v0.1.10</code>, published 2026-11-16 (23 assets, unchanged)</td>
 </tr>
 <tr>
 <td>Release type</td>
-<td>Server DNS pollution patch; no client reinstall required</td>
+<td>Verifiability, DNS, diagnostics and failure containment</td>
 </tr>
 <tr>
 <td>Source branch</td>
@@ -2040,21 +2006,15 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </tr>
 </tbody>
 </table>
-<h3 id="0111-status">0.1.11 status<a class="headerlink" href="#0111-status" title="Permanent link">&para;</a></h3>
-<p>0.1.11 is implemented on <code>main</code> and has not been tagged or published. It is
-<strong>not</strong> the current public version: no <code>v0.1.11</code> tag, GitHub Release, PyPI
-artifact or GHCR image exists. Publication requires explicit release-owner
-authorization after the evidence in
-<a href="https://github.com/ThzxxArt/Ostium/blob/main/versions/V0.1.11_PLAN.md"><code>versions/V0.1.11_PLAN.md</code></a> §12 is checked.</p>
-<p>Scope: deterministic version/provenance, installer port/version assertions,
-DoH-first DNS with UDP fallback (<code>CONFIG_POLICY_VERSION=3</code>), layered diagnostics,
-honest online/rate semantics, and system-proxy fail-open. No database migration.</p>
+<p><code>v0.1.11</code> was published on 2026-11-17. The tag targets <code>098b2be</code>; the release
+workflow passed verification, integration, upgrade-e2e, wheel, core, Windows,
+macOS, Linux package, Docker and publish jobs.</p>
 <p><code>v0.1.0</code> and <code>v0.1.1</code> tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.</p>
 <p>Known limitation: the <code>v0.1.1</code> tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.10 continues to fix the status at its own tag instead of rewriting published
+0.1.11 continues to fix the status at its own tag instead of rewriting published
 artifacts.</p>
 <h2 id="0111-verification-status">0.1.11 verification status<a class="headerlink" href="#0111-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
@@ -2230,13 +2190,14 @@ evidence is in <code>versions/V0.1.2_RC_REPORT.md</code>:</p>
   unless signing credentials are supplied.</li>
 <li><strong>D-115</strong> Push, tag and publication require explicit release-owner approval.</li>
 </ul>
-<h2 id="release-gates-for-0110">Release gates for 0.1.10<a class="headerlink" href="#release-gates-for-0110" title="Permanent link">&para;</a></h2>
+<h2 id="release-gates-for-0111">Release gates for 0.1.11<a class="headerlink" href="#release-gates-for-0111" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Code and automation</strong>: ruff, mypy, shellcheck, mkdocs strict, backend and
    frontend suites, real-core integration, coverage gates.</li>
-<li><strong>Upgrade and data</strong>: <code>0.1.9 -&gt; 0.1.10</code> upgrade plus backup restore;
-   missing-key and corruption rejection. The installer's staged rollback files
-   and the database snapshot are the recovery path if health checks fail.</li>
+<li><strong>Upgrade and data</strong>: <code>0.1.10 -&gt; 0.1.11</code> and <code>0.1.9 -&gt; 0.1.11</code> upgrades
+   plus backup restore; missing-key and corruption rejection. The installer's
+   staged rollback files and the database snapshot are the recovery path if
+   health checks fail.</li>
 <li><strong>Platform evidence</strong>: record only what was actually executed; unexecuted
    items stay blockers.</li>
 <li><strong>Publication ordering</strong>: draft release verified first, PyPI published only
