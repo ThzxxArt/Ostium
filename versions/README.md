@@ -42,6 +42,12 @@
 | [`V0.1.2_RC_REPORT.md`](V0.1.2_RC_REPORT.md) | RC 报告与发布检查表 |
 | [`MANUAL_TASKS.md`](MANUAL_TASKS.md) | 外部实机/签名/平台验证清单 |
 
+## v0.1.11
+
+| 文件 | 内容 |
+|---|---|
+| [`V0.1.11_PLAN.md`](V0.1.11_PLAN.md) | v0.1.11 可验证性与故障闭环全量实施方案（P0+P1） |
+
 ## 当前版本
 
 - 发布事实：[`docs/release-status.md`](../docs/release-status.md)
