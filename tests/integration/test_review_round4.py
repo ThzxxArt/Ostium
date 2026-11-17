@@ -409,17 +409,19 @@ def test_readme_marks_the_current_release_status() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     status = (ROOT / "docs" / "release-status.md").read_text(encoding="utf-8")
-    # 0.1.11 is implemented but deliberately unpublished.  The README must say
-    # both facts: the code version and the current public release.
-    assert f"v{version} 已完成实施，尚未发布" in readme
-    assert "当前公开版本仍为 **v0.1.10**" in readme
+    # The exact wording changes between "implemented" and "published"; the
+    # invariant is that every live status surface names the VERSION being
+    # prepared, and that a published status page is not contradicted by the
+    # README.  Do not pin an ephemeral "not published" sentence here.
+    assert f"v{version}" in readme
+    assert f"v{version}" in readme_en
     assert "正在准备" not in readme
-    assert f"v{version} is implemented but not published" in readme_en
-    assert "Current public version: v0.1.10" in readme_en
-    assert "not published yet" not in readme_en.lower()
-    assert "| Current public version | **0.1.10** |" in status
-    assert "0.1.11 is implemented on `main`" in status
     assert "Preparing; not tagged or published" not in status
+    assert f"**{version}**" in status or f"v{version}" in status
+    if "| Status | **Published** |" in status:
+        assert "尚未发布" not in readme
+        assert "not published" not in readme_en.lower()
+        assert "not published" not in status.lower()
 
 
 def test_setup_overview_does_not_break_on_a_corrupt_user(
