@@ -37,6 +37,12 @@ def test_runtime_version_is_not_a_hardcoded_literal() -> None:
     assert re.search(r'__version__\s*=\s*"\d', init) is None
 
 
+def test_docker_web_stage_has_the_version_file() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY VERSION /build/VERSION" in dockerfile
+    assert dockerfile.index("COPY VERSION /build/VERSION") < dockerfile.index("RUN npm run build")
+
+
 def test_installers_follow_latest_instead_of_a_pinned_release() -> None:
     shell = (ROOT / "scripts/install-online.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "scripts/install-online.ps1").read_text(encoding="utf-8")
