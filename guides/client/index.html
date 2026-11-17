@@ -722,6 +722,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#fail-open0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本、诊断与 fail-open（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1232,6 +1243,34 @@
     
   
     0.1.9 → 0.1.10 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.10-to-0.1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.10 → 0.1.11 迁移
   
 
     
@@ -1947,6 +1986,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#fail-open0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本、诊断与 fail-open（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2111,6 +2161,15 @@ sudo<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>
 sudo<span class="w"> </span>bash<span class="w"> </span>install-online.sh<span class="w"> </span>uninstall<span class="w"> </span>--purge
 </code></pre></div>
 <p>卸载器会恢复系统代理，并要求核心清理路由和虚拟网卡。</p>
+<h2 id="fail-open0111">版本、诊断与 fail-open（0.1.11）<a class="headerlink" href="#fail-open0111" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>ostium version --json</code> 与页面 Settings → 关于显示控制面版本、commit、PID、核心版本和
+  Web 构建；不一致时标红。</li>
+<li>首页“测试连接”会通过真实代理链路测量 DNS/TCP/TLS/HTTP 阶段和延迟；诊断页可按版本、
+  端口、核心、DNS、出口分组查看，并复制报告或下载脱敏诊断包。</li>
+<li>系统代理默认在核心不可达 45 秒后 fail-open（恢复直连）并产生 critical 告警；核心恢复
+  后自动恢复。显式断开不会被自动恢复覆盖。该策略不是 kill switch。</li>
+</ul>
 
 
 

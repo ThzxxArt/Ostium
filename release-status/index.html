@@ -1050,6 +1050,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../operations/upgrade-0.1.10-to-0.1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.10 → 0.1.11 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../operations/upgrade-0.1.8-to-0.1.9/" class="md-nav__link">
         
   
@@ -1286,6 +1314,62 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Current release">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#0111-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.11 status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0111-verification-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.11 verification status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.11 verification status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verified-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-verified-in-this-workspace-0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not verified in this workspace (0.1.11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1301,7 +1385,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#verified-locally" class="md-nav__link">
+  <a href="#verified-locally_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Verified locally
@@ -1740,6 +1824,62 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Current release">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#0111-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.11 status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0111-verification-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.11 verification status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.11 verification status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verified-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-verified-in-this-workspace-0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not verified in this workspace (0.1.11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1755,7 +1895,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#verified-locally" class="md-nav__link">
+  <a href="#verified-locally_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Verified locally
@@ -1859,12 +1999,12 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </thead>
 <tbody>
 <tr>
-<td>Version</td>
+<td>Current public version</td>
 <td><strong>0.1.10</strong></td>
 </tr>
 <tr>
 <td>Status</td>
-<td><strong>Published</strong></td>
+<td><strong>Published</strong> (0.1.11 implemented, <strong>not published</strong>)</td>
 </tr>
 <tr>
 <td>Tag</td>
@@ -1900,6 +2040,15 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </tr>
 </tbody>
 </table>
+<h3 id="0111-status">0.1.11 status<a class="headerlink" href="#0111-status" title="Permanent link">&para;</a></h3>
+<p>0.1.11 is implemented on <code>main</code> and has not been tagged or published. It is
+<strong>not</strong> the current public version: no <code>v0.1.11</code> tag, GitHub Release, PyPI
+artifact or GHCR image exists. Publication requires explicit release-owner
+authorization after the evidence in
+<a href="https://github.com/ThzxxArt/Ostium/blob/main/versions/V0.1.11_PLAN.md"><code>versions/V0.1.11_PLAN.md</code></a> §12 is checked.</p>
+<p>Scope: deterministic version/provenance, installer port/version assertions,
+DoH-first DNS with UDP fallback (<code>CONFIG_POLICY_VERSION=3</code>), layered diagnostics,
+honest online/rate semantics, and system-proxy fail-open. No database migration.</p>
 <p><code>v0.1.0</code> and <code>v0.1.1</code> tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.</p>
 <p>Known limitation: the <code>v0.1.1</code> tag and its PyPI sdist still contain the
@@ -1907,8 +2056,42 @@ pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
 0.1.10 continues to fix the status at its own tag instead of rewriting published
 artifacts.</p>
-<h2 id="0110-verification-status">0.1.10 verification status<a class="headerlink" href="#0110-verification-status" title="Permanent link">&para;</a></h2>
+<h2 id="0111-verification-status">0.1.11 verification status<a class="headerlink" href="#0111-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Backend non-integration suite: 824 passed / 10 deselected; 94.28% statements;
+  90.31% branches; <code>coverage_gate.py</code> passed.</li>
+<li>Real pinned core <code>1.14.4-ostium.1</code>: integration suite 10 passed, including
+  generated-config validation and live SOCKS traffic accounting.</li>
+<li><code>sing-box check</code> accepts the generated DoH server configuration and the
+  client <code>type: local</code> resolver. A live DoH query through the test core could
+  not reach <code>1.1.1.1:443</code> in this workspace because direct egress is blocked
+  here (the environment requires an HTTP proxy); production DoH remains a
+  server-side verification item.</li>
+<li>Frontend: 219 unit tests passed; typecheck, lint, Prettier and production
+  build passed; coverage 90.78/85.04/88.31/92.37.</li>
+<li>Playwright: 73 passed, 2 skipped; axe, responsive layout, PWA and updated
+  visual snapshots passed.</li>
+<li><code>0.1.10 -&gt; 0.1.11</code> upgrade-e2e passed, including database integrity,
+  <code>master.key</code>, subscription token, and restoring a 0.1.10 encrypted backup.
+  <code>0.1.9 -&gt; 0.1.11</code> passed with the same checks.</li>
+<li>Wheel/sdist built as <code>0.1.11</code>; the wheel CLI reports <code>0.1.11</code> and ships
+  <code>web/dist/build.json</code> with <code>version: 0.1.11</code>.</li>
+<li><code>scripts/release-preflight.sh --version 0.1.11 --skip-git</code> passed;
+  shellcheck, <code>bash -n</code> and <code>mkdocs build --strict</code> passed.</li>
+</ul>
+<h3 id="not-verified-in-this-workspace-0111">Not verified in this workspace (0.1.11)<a class="headerlink" href="#not-verified-in-this-workspace-0111" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Windows 11 and Windows 10 runtime installer/TUN/signing matrix.</li>
+<li>macOS 14 launchd/utun/DMG/notarization.</li>
+<li>Server 0.1.11 deployment and production DoH/UDP behavior on
+  <code>149.88.67.131</code>.</li>
+<li>A real root <code>scripts/install-e2e.sh</code> run (the workspace has no sudo/root).</li>
+<li>Debian/RHEL real machines, Nginx, Docker runtime, ACME, real TUN, 72-hour
+  soak and performance.</li>
+</ul>
+<h2 id="0110-verification-status">0.1.10 verification status<a class="headerlink" href="#0110-verification-status" title="Permanent link">&para;</a></h2>
+<h3 id="verified-locally_1">Verified locally<a class="headerlink" href="#verified-locally_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Backend unit and in-process integration tests: 713 passed / 10 deselected;
   94.33% statements / 90.49% branches; <code>coverage_gate.py</code> passes.</li>

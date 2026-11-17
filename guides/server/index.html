@@ -672,6 +672,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dns0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        服务端 DNS（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1220,6 +1231,34 @@
     
   
     0.1.9 → 0.1.10 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.10-to-0.1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.10 → 0.1.11 迁移
   
 
     
@@ -1913,6 +1952,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dns0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        服务端 DNS（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2044,6 +2094,18 @@ sudo<span class="w"> </span>-u<span class="w"> </span>ostium<span class="w"> </s
 sudo<span class="w"> </span>ostium<span class="w"> </span>update<span class="w"> </span>--check
 </code></pre></div>
 <p>root 部署（<code>--run-as-root</code>）去掉 <code>sudo -u ostium</code>。</p>
+<h2 id="dns0111">服务端 DNS（0.1.11）<a class="headerlink" href="#dns0111" title="Permanent link">&para;</a></h2>
+<p>服务端默认 <code>server_dns_mode = "auto"</code>：</p>
+<ul>
+<li>启动时通过 DoH 查询一个已知域名；成功则生成一个 <code>https</code> DNS 服务器。</li>
+<li>探测失败时回退到 UDP <code>8.8.8.8</code>，并写入 warning 日志和告警。</li>
+<li>配置为 <code>doh</code> 时故障会拒绝启动，避免静默降级；配置为 <code>udp</code> 时不做探测。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">server_dns_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto"</span><span class="w">          </span><span class="c1"># auto | doh | udp</span>
+<span class="n">server_dns_doh_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://1.1.1.1/dns-query"</span>
+</code></pre></div>
+<p><code>last-good.meta.json</code> 记录 <code>policy_version: 3</code>、实际 <code>dns_mode</code>、<code>dns_servers</code>、
+探测时间和配置 SHA256。旧策略版本的核心会等待控制面重新 apply，不会继续运行。</p>
 <h2 id="_9">安全底线<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>默认不要用 root 跑控制面；如使用 <code>--run-as-root</code>，明确接受风险。</li>

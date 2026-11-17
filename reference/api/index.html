@@ -746,6 +746,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -762,6 +780,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dns0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本、诊断与 DNS（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1040,6 +1088,34 @@
     
   
     0.1.9 → 0.1.10 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.10-to-0.1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.10 → 0.1.11 迁移
   
 
     
@@ -1594,6 +1670,25 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dns0111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本、诊断与 DNS（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1680,7 +1775,7 @@
 </tr>
 <tr>
 <td>System</td>
-<td><code>POST /system/proxy</code>、<code>POST /system/tun</code>、<code>POST /system/mode</code>、<code>POST /system/connect</code>、<code>POST /system/disconnect</code>、<code>GET /system/services</code>、<code>POST /system/services/{name}/restart</code>、<code>GET /system/doctor</code>、<code>GET /system/diagnostics</code></td>
+<td><code>GET /system/info</code>、<code>GET /system/provenance</code>、<code>GET /system/port-owners</code>、<code>GET /system/dns</code>、<code>GET /system/selftest?target=google\|huggingface\|github</code>、<code>POST /system/proxy</code>、<code>POST /system/tun</code>、<code>POST /system/mode</code>、<code>POST /system/connect</code>、<code>POST /system/disconnect</code>、<code>GET /system/services</code>、<code>POST /system/services/{name}/restart</code>、<code>GET /system/doctor</code>、<code>GET /system/diagnostics</code>、<code>GET /system/diagnostics/download</code></td>
 </tr>
 <tr>
 <td>Backups</td>
@@ -1708,6 +1803,20 @@
 <p><code>GET /users/{id}/subscription</code> 默认只返回 <code>reveal_required</code>/<code>token_hint</code>；完整 token、URL 和
 二维码需 <code>?reveal=true</code>，并写审计。未知订阅格式返回 400；禁用/到期/超配额返回 403。</p>
 <p>公开订阅端点是独立限速的，永远不接受管理员会话。</p>
+<h2 id="dns0111">版本、诊断与 DNS（0.1.11）<a class="headerlink" href="#dns0111" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>GET /system/provenance</code>：控制面版本/commit/executable/PID、核心版本、Web <code>build.json</code>、
+  监听端口 PID/路径/启动时间，以及 <code>consistency</code>。版本响应均带 <code>Cache-Control: no-store</code>。</li>
+<li><code>GET /system/port-owners</code>：控制面、混合代理和核心端口的实际监听进程。</li>
+<li><code>GET /system/dns</code>：配置模式、实际模式、最近 DoH 探测结果和 <code>last-good.meta.json</code>。</li>
+<li><code>GET /system/selftest?target=google|huggingface|github</code>：返回 <code>stage</code>
+  （dns/tcp/tls/http）、<code>latency_ms</code>、<code>status_code</code> 和错误。</li>
+<li><code>GET /system/doctor</code>：返回带 <code>data</code> 和 <code>duration_ms</code> 的分类检查。</li>
+<li><code>GET /system/diagnostics/download</code>：tar.gz 内含 <code>ostium-diagnostics.json</code>、
+  <code>provenance.json</code>、<code>dns.json</code>、<code>ports.json</code>、<code>checks.json</code>，全部脱敏且 <code>no-store</code>。</li>
+<li><code>/stats/overview</code> 增加 <code>online_window_seconds</code>、<code>rates_stale</code> 和 <code>rates.stale</code>；
+  <code>/users</code> 返回 <code>online_window_seconds</code>、<code>last_traffic_at</code> 与 <code>online_reason</code>。</li>
+</ul>
 
 
 

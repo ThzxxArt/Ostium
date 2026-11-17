@@ -1060,6 +1060,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.10-to-0.1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.10 → 0.1.11 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/upgrade-0.1.8-to-0.1.9/" class="md-nav__link">
         
   
@@ -1724,6 +1752,13 @@ ostium<span class="w"> </span>profile<span class="w"> </span>import<span class="
 ostium<span class="w"> </span>backup<span class="w"> </span>create<span class="w"> </span>--password<span class="w"> </span><span class="s1">'long passphrase'</span>
 </code></pre></div>
 <p>本地 CLI 请求使用 <code>&lt;data&gt;/runtime/cli.token</code> 的回环 token。远程自动化请在 <strong>Settings → API tokens</strong> 创建带 scope 的 API token。</p>
+<p>0.1.11 新增：</p>
+<div class="highlight"><pre><span></span><code>ostium<span class="w"> </span>version<span class="w"> </span>--json<span class="w">          </span><span class="c1"># version/commit/built_at/executable/PID</span>
+ostium<span class="w"> </span>status<span class="w"> </span>--json<span class="w">           </span><span class="c1"># 版本、核心版本、Web 版本、监听端口 owner</span>
+ostium<span class="w"> </span>doctor<span class="w"> </span>--json<span class="w">           </span><span class="c1"># version/port_owner/version_consistency 等检查</span>
+ostium<span class="w"> </span>diagnostics<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--output<span class="w"> </span>/tmp/ostium-diagnostics.tar.gz
+</code></pre></div>
+<p>诊断包包含 <code>provenance.json</code>、<code>dns.json</code>、<code>ports.json</code>、<code>doctor.json</code>、脱敏配置和日志尾部。</p>
 <blockquote>
 <p><code>ostium service install</code> 只安装默认 systemd 单元。需要 <code>--run-as-root</code> 或自定义用户时，请使用一键安装器，或按<a href="../../guides/service-manager/">服务管理</a>编辑 drop-in。</p>
 </blockquote>
