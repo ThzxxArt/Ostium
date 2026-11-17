@@ -429,6 +429,7 @@ def test_public_ui_certificate_cannot_be_deleted_while_in_use(
     "payload",
     [
         {"server_dns_mode": "system"},
+        {"server_dns_doh_url": "http://1.1.1.1/dns-query"},
         {"system_proxy_fail_open_seconds": 1},
         {"trusted_hosts": [""]},
         {"ui_allowlist": ["not-a-cidr"]},

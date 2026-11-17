@@ -305,7 +305,7 @@ export interface Provenance {
 export interface SelfTestResult {
   ok: boolean
   target: string
-  mode: 'direct' | 'proxy'
+  mode: 'direct' | 'proxy' | 'tun'
   stage: 'dns' | 'tcp' | 'tls' | 'http' | 'none'
   latency_ms: number | null
   status_code: number | null

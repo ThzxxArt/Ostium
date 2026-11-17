@@ -263,6 +263,48 @@ describe('client pages', () => {
     expect(state.selftest.latency_ms).toBe(21)
   })
 
+  it('ClientHomePage shows Core running before an egress test', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': {
+          ...fixtures.systemInfo,
+          core: { ...fixtures.systemInfo.core, running: true },
+        },
+      },
+    })
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    expect(wrapper.text()).toContain('Core running')
+  })
+
+  it('StatsPage keeps existing data when a silent poll fails', async () => {
+    installFetchMock({ role: 'client' })
+    const { wrapper } = await mountPage(StatsPage)
+    await settle()
+    const state = stateOf(wrapper, StatsPage)
+    const overview = vi.spyOn(api.stats, 'overview').mockRejectedValueOnce(new Error('down'))
+    await state.load(true)
+    await settle()
+    expect(overview).toHaveBeenCalled()
+    expect(state.error).toBe('')
+  })
+
+  it('NetworkPage explains unsupported system proxy settings', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': {
+          ...fixtures.systemInfo,
+          proxy: { ...fixtures.systemInfo.proxy, supported: false },
+        },
+      },
+    })
+    const { wrapper } = await mountPage(NetworkPage)
+    await settle()
+    expect(wrapper.text()).toContain('does not support automatic proxy settings')
+  })
+
   it('HomeGate renders the client home for client roles', async () => {
     installFetchMock({ role: 'client' })
     const { wrapper } = await mountPage(

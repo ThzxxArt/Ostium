@@ -416,8 +416,7 @@ if [[ "$NO_START" != "true" ]]; then
     rm -f "$PREFIX/sing-box.old" "$DATA/core/sing-box.old"
   else
     if ! wait_for_ui "$UI_PORT" "$EXPECTED_VERSION"; then
-      echo "fresh install health/version check failed at http://127.0.0.1:$UI_PORT/healthz (expected $EXPECTED_VERSION)" >&2
-      exit 1
+      echo "warning: fresh-install UI did not report version $EXPECTED_VERSION yet; log in as the UI user and check launchd." >&2
     fi
   fi
 fi

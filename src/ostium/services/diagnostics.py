@@ -239,16 +239,27 @@ async def _check_version(services: Services, core: dict[str, Any]) -> CheckResul
     web_version = str(web.get("version")) if web.get("available") and web.get("version") else None
     core_version = str(core["core_version"]) if core.get("core_version") else None
     mismatches = version_mismatches(build.version, core=core_version, web=web_version)
-    return _result(
-        "version_consistency",
-        "pass" if not mismatches else "fail",
-        "control plane, core and Web bundle versions match"
-        if not mismatches
-        else "; ".join(
+    web_available = bool(web.get("available"))
+    if mismatches:
+        status = "fail"
+        message = "; ".join(
             f"{item['surface']} reports {item['actual']} (expected {item['expected']})"
             for item in mismatches
-        ),
-        fix=None if not mismatches else "stop the stale process and install the expected release",
+        )
+        fix = "stop the stale process and install the expected release"
+    elif not web_available:
+        status = "warn"
+        message = f"Web build manifest is unavailable: {web.get('reason', 'missing')}"
+        fix = "rebuild the Web bundle before serving the UI"
+    else:
+        status = "pass"
+        message = "control plane, core and Web bundle versions match"
+        fix = None
+    return _result(
+        "version_consistency",
+        status,
+        message,
+        fix=fix,
         data={
             "expected": build.version,
             "commit": build.commit,
@@ -512,7 +523,25 @@ async def _check_egress(services: Services) -> CheckResult:
             data={"google": result, "huggingface": result_hf},
             started=started,
         )
-    proxy_url = f"http://127.0.0.1:{services.settings.mixed_port}"
+    if services.settings.tun_enabled or services.settings.mode.value == "tun":
+        # TUN has no local mixed-port listener; direct HTTP is routed by the OS
+        # through the tunnel and is the correct path to test.  Never claim that
+        # path works while the core that owns the tunnel is stopped.
+        try:
+            core = await services.engine.client.status()
+        except Exception:
+            core = {}
+        if not core.get("running"):
+            return _result(
+                "egress_proxy",
+                "fail",
+                "TUN mode is selected but the core is not running; direct egress would leak",
+                fix="start the core or switch to mixed/system proxy mode",
+                started=started,
+            )
+        proxy_url = None
+    else:
+        proxy_url = f"http://127.0.0.1:{services.settings.mixed_port}"
     google = await asyncio.to_thread(http_probe, "https://www.google.com/", proxy=proxy_url)
     hf = await asyncio.to_thread(http_probe, "https://huggingface.co/", proxy=proxy_url)
     ok = bool(google["ok"] and hf["ok"])
@@ -657,14 +686,35 @@ async def selftest(services: Services, target: str) -> dict[str, Any]:
     host, url = SELFTEST_TARGETS[target]
     if services.settings.role.value == "server":
         result = await asyncio.to_thread(tls_probe, host)
+        mode = "direct"
+    elif services.settings.tun_enabled or services.settings.mode.value == "tun":
+        try:
+            core = await services.engine.client.status()
+        except Exception:
+            core = {}
+        if not core.get("running"):
+            return {
+                "ok": False,
+                "target": target,
+                "host": host,
+                "mode": "tun",
+                "stage": "none",
+                "latency_ms": None,
+                "status_code": None,
+                "error": "TUN mode is selected but the core is not running",
+                "generated_at": iso(utcnow()) or "",
+            }
+        result = await asyncio.to_thread(http_probe, url)
+        mode = "tun"
     else:
         proxy_url = f"http://127.0.0.1:{services.settings.mixed_port}"
         result = await asyncio.to_thread(http_probe, url, proxy=proxy_url)
+        mode = "proxy"
     return {
         "ok": bool(result["ok"]),
         "target": target,
         "host": host,
-        "mode": "direct" if services.settings.role.value == "server" else "proxy",
+        "mode": mode,
         "stage": result["stage"],
         "latency_ms": result["latency_ms"],
         "status_code": result.get("status_code"),

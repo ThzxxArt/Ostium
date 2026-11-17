@@ -466,7 +466,7 @@ function onRowAction(user: User, key: string) {
 }
 
 function statusLabel(user: User): string {
-  if (user.online) return t('status.online')
+  if (user.online) return t('users.active_window', { seconds: onlineWindow.value })
   if (!user.enabled)
     return user.disabled_reason ? t(`status.${user.disabled_reason}`) : t('status.disabled')
   if (user.status === 'expired') return t('status.expired')

@@ -18,9 +18,11 @@ import OStatusPill from '@/components/OStatusPill.vue'
 import OEmptyState from '@/components/OEmptyState.vue'
 import { api } from '@/api'
 import type { DoctorCheck, SelfTestResult } from '@/api/types'
+import { useCopy } from '@/composables/useCopy'
 
 const { t } = useI18n()
 const router = useRouter()
+const { copy } = useCopy()
 
 const checks = ref<DoctorCheck[]>([])
 const running = ref(false)
@@ -122,7 +124,7 @@ async function copyReport() {
     null,
     2,
   )
-  await navigator.clipboard.writeText(report)
+  await copy(report)
 }
 
 onMounted(run)

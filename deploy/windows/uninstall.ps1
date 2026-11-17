@@ -97,9 +97,9 @@ if (-not $proxyRestored) {
 }
 Unregister-ScheduledTask -TaskName "Ostium" -Confirm:$false
 Stop-OstiumListener 8787
+Stop-Service OstiumCore
 Stop-OstiumListener 8788
 Get-Process ostium -ErrorAction SilentlyContinue | Stop-Process -Force
-Stop-Service OstiumCore
 if (Test-Path $serviceExe) {
     & $serviceExe remove
 }

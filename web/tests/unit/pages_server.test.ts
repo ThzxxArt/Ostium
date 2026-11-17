@@ -116,6 +116,47 @@ describe('server pages', () => {
     expect(update).toHaveBeenCalled()
   })
 
+  it('UsersPage uses the configured online window in its labels', async () => {
+    installFetchMock({
+      overrides: {
+        '/api/v1/users': {
+          users: [{ ...fixtures.user, online: true }],
+          total: 1,
+          online_window_seconds: 90,
+        },
+      },
+    })
+    const { wrapper } = await mountPage(UsersPage)
+    await settle()
+    expect(wrapper.text()).toContain('Active (≤90s)')
+  })
+
+  it('SubscriptionsPage uses the configured online window in its labels', async () => {
+    installFetchMock({
+      overrides: {
+        '/api/v1/users': {
+          users: [{ ...fixtures.user, online: true }],
+          total: 1,
+          online_window_seconds: 90,
+        },
+      },
+    })
+    const { wrapper } = await mountPage(SubscriptionsPage)
+    await settle()
+    expect(wrapper.text()).toContain('Active (≤90s)')
+  })
+
+  it('SubscriptionsPage keeps data on a silent poll failure', async () => {
+    installFetchMock()
+    const { wrapper } = await mountPage(SubscriptionsPage)
+    await settle()
+    const state = stateOf(wrapper, SubscriptionsPage)
+    vi.spyOn(api.users, 'list').mockRejectedValueOnce(new Error('down'))
+    await state.load(true)
+    await settle()
+    expect(state.error).not.toBe('down')
+  })
+
   it('makes the scrollable log region keyboard focusable', async () => {
     installFetchMock()
     const { wrapper } = await mountPage(LogsPage)

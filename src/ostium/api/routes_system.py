@@ -179,6 +179,14 @@ async def provenance(
         core=str(core_version) if core_version else None,
         web=str(web_version) if web_version else None,
     )
+    if listener.get("found") and listener.get("pid") != os.getpid():
+        mismatches.append(
+            {
+                "surface": "listener",
+                "expected": str(os.getpid()),
+                "actual": str(listener.get("pid")),
+            }
+        )
     return {
         "app": build.as_dict(),
         "web": web,

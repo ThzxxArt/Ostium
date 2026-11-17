@@ -62,6 +62,8 @@ def doh_host_and_path(url: str) -> tuple[str, str, str | None]:
     parsed = urlsplit(url.strip())
     if parsed.scheme != "https" or not parsed.hostname:
         raise ValueError("DoH URL must be an https:// URL with a host")
+    if parsed.username or parsed.password:
+        raise ValueError("DoH URL must not contain credentials")
     host = parsed.hostname
     path = parsed.path or "/dns-query"
     if parsed.query:

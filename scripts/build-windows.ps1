@@ -25,6 +25,7 @@ if (-not $WintunDll -or -not (Test-Path $WintunDll)) {
 }
 
 Push-Location web
+if ($env:GITHUB_SHA) { $env:OSTIUM_BUILD_COMMIT = $env:GITHUB_SHA }
 npm ci --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
 npm run build

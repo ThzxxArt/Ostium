@@ -116,7 +116,9 @@ class EngineManager:
             try:
                 selection = select_server_dns(mode=configured, doh_url=url, probe=probe)
             except (ValueError, RuntimeError) as exc:
-                self.server_dns = None
+                # Keep the last good selection in explicit DoH mode.  Clearing
+                # it would make a later admin apply silently generate UDP even
+                # though the operator required encrypted DNS.
                 raise EngineError(str(exc), "dns_probe_failed", 502) from exc
             self.server_dns = selection
             self._dns_probed_monotonic = now
@@ -142,6 +144,12 @@ class EngineManager:
         # request on a network probe; before the first selection the safe
         # default is UDP, exactly the pre-0.1.11 behaviour.
         if self.server_dns is None:
+            if self.settings.server_dns_mode == "doh":
+                raise EngineError(
+                    "server_dns_mode is doh but no successful DoH probe is available",
+                    "dns_probe_failed",
+                    502,
+                )
             return ServerDnsSelection(
                 mode="udp",
                 doh_url=self.settings.server_dns_doh_url or DEFAULT_DOH_URL,

@@ -39,6 +39,7 @@ const modes = computed(() => [
     icon: Waypoints,
     active: mode.value === 'mixed',
     enabled: true,
+    unsupported: '',
   },
   {
     id: 'system_proxy' as const,
@@ -47,6 +48,7 @@ const modes = computed(() => [
     icon: Globe2,
     active: mode.value === 'system_proxy',
     enabled: proxy.value?.supported ?? false,
+    unsupported: t('network.system_proxy_unsupported'),
   },
   {
     id: 'tun' as const,
@@ -55,6 +57,7 @@ const modes = computed(() => [
     icon: ShieldCheck,
     active: mode.value === 'tun',
     enabled: tunAvailable.value,
+    unsupported: t('network.tun_unavailable'),
   },
 ])
 
@@ -157,9 +160,7 @@ onMounted(load)
         <h2>{{ item.title }}</h2>
         <p>{{ item.description }}</p>
         <div class="mode-foot">
-          <span v-if="!item.enabled" class="unsupported-text">{{
-            t('network.system_proxy_unsupported')
-          }}</span>
+          <span v-if="!item.enabled" class="unsupported-text">{{ item.unsupported }}</span>
           <span v-else-if="item.active" class="active-text"
             ><Check :size="13" /> {{ t('network.current') }}</span
           >

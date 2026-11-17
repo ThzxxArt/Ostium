@@ -18,6 +18,7 @@ const message = useMessage()
 const dialog = useDialog()
 
 const users = ref<User[]>([])
+const onlineWindow = ref(60)
 const selectedId = ref<string | null>(null)
 const subscription = ref<SubscriptionPayload | null>(null)
 const loading = ref(true)
@@ -44,12 +45,13 @@ async function load(silent = false) {
   try {
     const [overview, userList] = await Promise.all([api.subscriptions.overview(), api.users.list()])
     users.value = userList.users
+    onlineWindow.value = userList.online_window_seconds ?? 60
     baseUrl.value = overview.base_url
     if (!selectedId.value && users.value.length) selectedId.value = users.value[0].id
-    if (selectedId.value) await loadSubscription(selectedId.value)
+    if (selectedId.value) await loadSubscription(selectedId.value, revealed.value)
     error.value = null
   } catch (err) {
-    error.value = (err as Error).message
+    if (!silent || !users.value.length) error.value = (err as Error).message
   } finally {
     if (!silent) loading.value = false
   }
@@ -185,6 +187,13 @@ onMounted(async () => {
           </span>
           <OStatusPill
             :status="user.online ? 'online' : user.enabled ? 'active' : 'disabled'"
+            :label="
+              user.online
+                ? t('users.active_window', { seconds: onlineWindow })
+                : user.enabled
+                  ? t('status.active')
+                  : t('status.disabled')
+            "
             size="sm"
           />
         </button>

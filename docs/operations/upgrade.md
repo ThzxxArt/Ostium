@@ -36,7 +36,7 @@ sudo bash install-online.sh upgrade --version 0.1.11
 ```bash
 sudo -u ostium ostium backup create --password '...'
 sudo systemctl stop ostium
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.10-py3-none-any.whl
+sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.11-py3-none-any.whl
 sudo systemctl start ostium
 curl -fsS http://127.0.0.1:8443/readyz
 ```

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NButton, NSelect, useMessage } from 'naive-ui'
@@ -74,6 +74,10 @@ const connectionLabel = computed(() => {
   if (lastTestOk.value === false) return t('home.degraded')
   if (lastTestOk.value === null) return t('home.core_running')
   return t('home.connected')
+})
+watch(connected, (value) => {
+  // A previous egress result belongs to the previous core session.
+  if (!value) lastTestOk.value = null
 })
 const mode = computed(() => info.value?.mode || 'mixed')
 

@@ -344,8 +344,12 @@ port_owner() {
     owner="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print; exit}')"
   fi
   if [[ -z "$owner" ]] && command -v fuser >/dev/null 2>&1; then
-    owner="$(fuser -n tcp "$port" 2>/dev/null || true)"
-    [[ -n "$owner" ]] && owner="fuser: $owner"
+    local fuser_output
+    fuser_output="$(fuser -n tcp "$port" 2>/dev/null || true)"
+    if [[ -n "$fuser_output" ]]; then
+      # fuser prints "8787/tcp: 1234 5678"; keep the PIDs, not the port.
+      owner="fuser: ${fuser_output##*: }"
+    fi
   fi
   printf '%s' "$owner"
 }
@@ -935,6 +939,11 @@ EOF
           systemctl status ostium --no-pager >&2 || true
           exit 1
         fi
+        if ! wait_for_url "http://127.0.0.1:$UI_PORT/readyz"; then
+          echo "首次安装就绪检查失败：http://127.0.0.1:$UI_PORT/readyz 未就绪" >&2
+          systemctl status ostium --no-pager >&2 || true
+          exit 1
+        fi
       fi
     fi
   else
@@ -1087,6 +1096,10 @@ EOF
               systemctl --user status ostium.service --no-pager >&2 || true
             exit 1
           fi
+          if ! wait_for_url "http://127.0.0.1:8787/readyz"; then
+            echo "客户端 UI 未在 8787 就绪；请检查用户级 ostium.service" >&2
+            exit 1
+          fi
         fi
         echo "客户端 UI：注销并重新登录（让 $SUDO_USER 获得 ostium 组），然后运行 systemctl --user start ostium"
       fi
@@ -1120,6 +1133,11 @@ if [[ "$ROLE" == "client" && "$RUN_AS_ROOT" == "true" && "$START" == "true" \
   && "$NO_SERVICE" != "true" ]] && systemd_available; then
   if ! wait_for_version "http://127.0.0.1:8787/healthz" "$EXPECTED_VERSION"; then
     echo "客户端 UI 未在 8787 报告版本 $EXPECTED_VERSION" >&2
+    systemctl status ostium --no-pager >&2 || true
+    exit 1
+  fi
+  if ! wait_for_url "http://127.0.0.1:8787/readyz"; then
+    echo "客户端 UI 未在 8787 就绪" >&2
     systemctl status ostium --no-pager >&2 || true
     exit 1
   fi

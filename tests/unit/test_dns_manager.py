@@ -82,3 +82,32 @@ async def test_udp_mode_never_probes(settings: Settings, monkeypatch) -> None:
     assert selection is not None
     assert selection.mode == "udp"
     assert selection.probed_at is None
+
+
+@pytest.mark.asyncio
+async def test_doh_failure_keeps_last_selection_and_preview_fails_closed(
+    settings: Settings, monkeypatch
+) -> None:
+    settings.role = Role.SERVER
+    settings.server_dns_mode = "doh"
+    manager = _manager(settings)
+    monkeypatch.setattr(manager_module, "probe_doh", lambda url: _probe(True))
+    first = await manager.refresh_server_dns(force=True)
+    assert first is not None and first.mode == "doh"
+
+    monkeypatch.setattr(manager_module, "probe_doh", lambda url: _probe(False))
+    with pytest.raises(EngineError, match="DoH is required"):
+        await manager.refresh_server_dns(force=True)
+    assert manager.server_dns is not None
+    assert manager.server_dns.mode == "doh"
+    preview = await manager.server_dns_preview()
+    assert preview.mode == "doh"
+
+
+@pytest.mark.asyncio
+async def test_doh_without_any_probe_fails_preview(settings: Settings) -> None:
+    settings.role = Role.SERVER
+    settings.server_dns_mode = "doh"
+    manager = _manager(settings)
+    with pytest.raises(EngineError, match="no successful DoH probe"):
+        await manager.server_dns_preview()

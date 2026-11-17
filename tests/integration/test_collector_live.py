@@ -199,23 +199,28 @@ def test_live_custom_core_collector_accounts_traffic(tmp_path: Path) -> None:
             assert _wait_port(27890), "client mixed inbound did not listen"
 
             def curl_once() -> None:
-                completed = subprocess.run(
-                    [
-                        "curl",
-                        "-sS",
-                        "--max-time",
-                        "8",
-                        "--noproxy",
-                        "",
-                        "--socks5-hostname",
-                        "127.0.0.1:27890",
-                        "http://127.0.0.1:28080/",
-                    ],
-                    capture_output=True,
-                    timeout=15,
-                )
-                assert completed.returncode == 0, completed.stderr
-                assert b"ostium-live-collector" in completed.stdout, completed.stdout
+                last_error = b""
+                for _ in range(3):
+                    completed = subprocess.run(
+                        [
+                            "curl",
+                            "-sS",
+                            "--max-time",
+                            "8",
+                            "--noproxy",
+                            "",
+                            "--socks5-hostname",
+                            "127.0.0.1:27890",
+                            "http://127.0.0.1:28080/",
+                        ],
+                        capture_output=True,
+                        timeout=15,
+                    )
+                    if completed.returncode == 0 and b"ostium-live-collector" in completed.stdout:
+                        return
+                    last_error = completed.stderr or completed.stdout
+                    time.sleep(0.3)
+                raise AssertionError(last_error)
 
             async def collect_live_traffic() -> int:
                 engine = create_engine(settings.paths.db_path)

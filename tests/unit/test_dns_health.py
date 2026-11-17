@@ -25,6 +25,8 @@ def test_doh_host_and_path_defaults_to_cloudflare_sni() -> None:
 def test_doh_rejects_non_https_urls() -> None:
     with pytest.raises(ValueError):
         doh_host_and_path("http://1.1.1.1/dns-query")
+    with pytest.raises(ValueError, match="credentials"):
+        doh_host_and_path("https://user:pass@1.1.1.1/dns-query")
 
 
 @respx.mock

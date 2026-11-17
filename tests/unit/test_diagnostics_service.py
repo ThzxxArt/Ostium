@@ -476,3 +476,154 @@ async def test_run_checks_network_branch_and_database_failure(monkeypatch) -> No
     assert "dns_trusted" in ids
     assert "egress" in ids
     assert next(check for check in checks if check.id == "database").status == "fail"
+
+
+@pytest.mark.asyncio
+async def test_selftest_client_tun_does_not_require_a_mixed_port(monkeypatch) -> None:
+    services = _services(Role.CLIENT, tun_enabled=True)
+    calls: list[str | None] = []
+
+    def fake(url: str, *, proxy: str | None = None, timeout: float = 8.0):  # type: ignore[no-untyped-def]
+        calls.append(proxy)
+        return {
+            "ok": True,
+            "status_code": 200,
+            "stage": "http",
+            "latency_ms": 25,
+            "error": None,
+        }
+
+    monkeypatch.setattr(diagnostics, "http_probe", fake)
+    result = await diagnostics.selftest(services, "google")  # type: ignore[arg-type]
+    assert result["mode"] == "tun"
+    assert calls == [None]
+
+
+@pytest.mark.asyncio
+async def test_selftest_tun_fails_when_core_is_down(monkeypatch) -> None:
+    services = _services(Role.CLIENT, tun_enabled=True)
+
+    async def down() -> dict[str, object]:
+        return {"running": False}
+
+    services.engine.client.status = down
+    called = False
+
+    def fake(*args, **kwargs):  # type: ignore[no-untyped-def]
+        nonlocal called
+        called = True
+        return {"ok": True, "stage": "http", "latency_ms": 1, "status_code": 200, "error": None}
+
+    monkeypatch.setattr(diagnostics, "http_probe", fake)
+    result = await diagnostics.selftest(services, "google")  # type: ignore[arg-type]
+    assert result["ok"] is False
+    assert result["stage"] == "none"
+    assert called is False
+
+
+def test_tls_probe_no_addresses(monkeypatch) -> None:
+    monkeypatch.setattr(diagnostics.socket, "getaddrinfo", lambda *a, **k: [])
+    result = diagnostics.tls_probe("empty.example")
+    assert result["ok"] is False
+    assert result["stage"] == "dns"
+
+
+def test_tls_probe_all_addresses_fail(monkeypatch) -> None:
+    monkeypatch.setattr(
+        diagnostics.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("1.2.3.4", 443))],
+    )
+
+    def fail_socket(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("connect failed")
+
+    monkeypatch.setattr(diagnostics.socket, "socket", fail_socket)
+    result = diagnostics.tls_probe("down.example")
+    assert result["ok"] is False
+    assert result["stage"] == "tcp"
+
+
+def test_http_probe_reports_ssl_and_generic_stage(monkeypatch) -> None:
+    class BadClient:
+        def __enter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str) -> None:
+            raise diagnostics.ssl.SSLError("bad certificate")
+
+    monkeypatch.setattr("httpx.Client", lambda **kwargs: BadClient())
+    result = diagnostics.http_probe("https://tls.example/", timeout=1)
+    assert result["stage"] == "tls"
+
+    class OtherClient(BadClient):
+        def get(self, url: str) -> None:
+            raise ValueError("bad response")
+
+    monkeypatch.setattr("httpx.Client", lambda **kwargs: OtherClient())
+    result = diagnostics.http_probe("https://http.example/", timeout=1)
+    assert result["stage"] == "http"
+
+
+def test_looks_polluted_ignores_non_ip() -> None:
+    assert diagnostics._looks_polluted(["not-an-ip"]) is False
+
+
+@pytest.mark.asyncio
+async def test_version_warns_when_web_manifest_is_missing(monkeypatch) -> None:
+    services = _services()
+    monkeypatch.setattr(
+        diagnostics,
+        "read_web_build",
+        lambda dist: {"available": False, "reason": "missing"},
+    )
+    result = await diagnostics._check_version(services, {"core_version": "0.1.11"})
+    assert result.status == "warn"
+    assert "Web build manifest" in result.message
+
+
+@pytest.mark.asyncio
+async def test_egress_tun_core_failure_and_exception() -> None:
+    services = _services(Role.CLIENT, tun_enabled=True)
+
+    async def down() -> dict[str, object]:
+        return {"running": False}
+
+    services.engine.client.status = down
+    result = await diagnostics._check_egress(services)
+    assert result.status == "fail"
+    assert "core is not running" in result.message
+
+    async def broken() -> dict[str, object]:
+        raise RuntimeError("down")
+
+    services.engine.client.status = broken
+    result = await diagnostics._check_egress(services)
+    assert result.status == "fail"
+
+
+def test_tun_on_macos_is_core_provided(monkeypatch) -> None:
+    import asyncio
+    from types import SimpleNamespace
+
+    services = _services(Role.CLIENT)
+    monkeypatch.setattr(diagnostics, "sys", SimpleNamespace(platform="darwin"))
+    result = asyncio.run(diagnostics._check_tun(services))
+    assert result.status == "pass"
+    assert "utun" in result.message
+
+
+@pytest.mark.asyncio
+async def test_selftest_tun_core_status_exception() -> None:
+    services = _services(Role.CLIENT, tun_enabled=True)
+
+    async def broken() -> dict[str, object]:
+        raise RuntimeError("down")
+
+    services.engine.client.status = broken
+    result = await diagnostics.selftest(services, "google")  # type: ignore[arg-type]
+    assert result["ok"] is False
+    assert result["mode"] == "tun"

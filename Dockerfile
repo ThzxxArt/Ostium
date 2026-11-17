@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM node:24.19.0-bookworm-slim AS web
+ARG GITHUB_SHA=""
+ENV OSTIUM_BUILD_COMMIT=$GITHUB_SHA
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund

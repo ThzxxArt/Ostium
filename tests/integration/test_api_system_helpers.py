@@ -253,3 +253,24 @@ def test_disconnect_from_tun_survives_settings_write_failure(
     response = client_api.post("/api/v1/system/disconnect", headers=_headers(token))
     assert response.status_code == 200
     assert response.json()["connected"] is False
+
+
+def test_provenance_flags_a_stale_listener_pid(
+    api_client: TestClient, session_token: str, monkeypatch
+) -> None:
+    from ostium.api import routes_system
+
+    monkeypatch.setattr(
+        routes_system,
+        "listener_info",
+        lambda port, host=None: {
+            "port": port,
+            "host": host,
+            "found": True,
+            "pid": 999999,
+            "exe": "/old/ostium",
+        },
+    )
+    payload = api_client.get("/api/v1/system/provenance").json()
+    assert payload["consistency"]["ok"] is False
+    assert any(item["surface"] == "listener" for item in payload["consistency"]["mismatches"])

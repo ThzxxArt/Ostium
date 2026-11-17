@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NSelect } from 'naive-ui'
 import { Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, RefreshCw } from '@lucide/vue'
@@ -34,9 +34,9 @@ const topDestinations = computed(() => {
   return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
 })
 
-async function load() {
+async function load(silent = false) {
   const request = ++loadRequest
-  loading.value = true
+  if (!silent) loading.value = true
   try {
     const [stats, traffic, connectionData] = await Promise.all([
       api.stats.overview(),
@@ -49,11 +49,32 @@ async function load() {
     connections.value = connectionData.connections
     error.value = ''
   } catch (err) {
-    if (request === loadRequest) error.value = (err as Error).message
+    if (request === loadRequest && (!silent || !overview.value)) {
+      error.value = (err as Error).message
+    }
   } finally {
-    if (request === loadRequest) loading.value = false
+    if (request === loadRequest && !silent) loading.value = false
   }
 }
+
+let pollTimer: number | null = null
+function refreshIfVisible() {
+  if (!document.hidden) void load(true)
+}
+function startPolling() {
+  if (pollTimer === null) pollTimer = window.setInterval(refreshIfVisible, 10_000)
+}
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('visibilitychange', refreshIfVisible)
+})
 
 async function changeDays(value: number) {
   const request = ++loadRequest
@@ -73,7 +94,11 @@ async function changeDays(value: number) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  startPolling()
+  document.addEventListener('visibilitychange', refreshIfVisible)
+})
 </script>
 
 <template>
@@ -92,7 +117,7 @@ onMounted(load)
           style="width: 120px"
           @update:value="changeDays"
         />
-        <NButton secondary :loading="loading" @click="load">
+        <NButton secondary :loading="loading" @click="load()">
           <template #icon><RefreshCw :size="15" /></template>
           {{ t('common.refresh') }}
         </NButton>

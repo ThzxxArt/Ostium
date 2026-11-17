@@ -186,7 +186,14 @@ async def update_settings(
             raise ApiError(400, "server_dns_mode must be auto, doh or udp", "bad_dns_mode")
         candidate.server_dns_mode = mode
     if changes.get("server_dns_doh_url"):
-        candidate.server_dns_doh_url = str(changes["server_dns_doh_url"]).strip()
+        url = str(changes["server_dns_doh_url"]).strip()
+        from ostium.engine.dns import doh_host_and_path
+
+        try:
+            doh_host_and_path(url)
+        except ValueError as exc:
+            raise ApiError(400, str(exc), "bad_doh_url") from exc
+        candidate.server_dns_doh_url = url
     if changes.get("client_dns_local"):
         candidate.client_dns_local = str(changes["client_dns_local"]).strip()
     if changes.get("system_proxy_fail_open") is not None:

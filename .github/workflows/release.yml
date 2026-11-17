@@ -445,6 +445,7 @@ jobs:
           push: true
           build-args: |
             OSTIUM_VERSION=${{ github.ref_name }}
+            GITHUB_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       - name: Verify staging image version

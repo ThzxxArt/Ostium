@@ -144,6 +144,17 @@ describe('application shell', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('opens About from the footer version link', async () => {
+    installFetchMock()
+    const wrapper = await mountApp(await bootstrapApp())
+    const link = wrapper.find('.version-link')
+    expect(link.exists()).toBe(true)
+    await link.trigger('click')
+    await settle(3)
+    expect(router.currentRoute.value.path).toBe('/settings')
+    expect(router.currentRoute.value.query.tab).toBe('about')
+  })
+
   it('renders the client shell and client routes', async () => {
     installFetchMock({ role: 'client' })
     const wrapper = await mountApp(await bootstrapApp())
