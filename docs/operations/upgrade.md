@@ -13,13 +13,14 @@ sudo bash install-online.sh upgrade
 3. 替换 `/opt/ostium/venv` 和核心二进制。
 4. 保留数据库、`master.key`、配置、证书、用户和订阅。
 5. 启动并做健康检查；控制面健康检查失败会自动回滚旧 venv，核心启动失败会回滚旧核心。
+   0.1.11 起健康检查同时断言 `/healthz` 的版本和监听端口归属。
 6. 0.1.0 的 `host = "0.0.0.0"` 明文配置会收敛到 `127.0.0.1`；需要保留公网明文绑定时使用
    `--allow-insecure-bind` 并配置防火墙。
 
 指定版本：
 
 ```bash
-sudo bash install-online.sh upgrade --version 0.1.10
+sudo bash install-online.sh upgrade --version 0.1.11
 ```
 
 ## 手动升级应用

@@ -1420,3 +1420,54 @@ def test_init_rejects_weak_password_and_empty_username(tmp_path: Path, monkeypat
     assert empty.exit_code == 2
     assert "username" in empty.output
     assert not (data / "ostium.db").exists()
+
+
+def test_version_status_and_invalid_dns_metadata(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    monkeypatch.setenv("OSTIUM_BUILD_VERSION", "9.9.9")
+    monkeypatch.setenv("OSTIUM_BUILD_COMMIT", "abc123")
+    monkeypatch.setenv("OSTIUM_BUILD_TIME", "2026-11-17T00:00:00+00:00")
+
+    version = runner.invoke(app, ["version", "--json"])
+    assert version.exit_code == 0
+    payload = json.loads(version.output[version.output.index("{") :])
+    assert payload["version"] == "9.9.9"
+    assert payload["commit"] == "abc123"
+    assert payload["built_at"] == "2026-11-17T00:00:00+00:00"
+
+    human = runner.invoke(app, ["version"])
+    assert "Ostium 9.9.9" in human.output
+    assert "Commit abc123" in human.output
+    assert "Built 2026-11-17" in human.output
+
+    status = runner.invoke(app, ["status", "--json"])
+    assert status.exit_code == 0
+    status_payload = json.loads(status.output[status.output.index("{") :])
+    assert "port_owner" in status_payload
+    assert status_payload["consistency"]["expected"]
+    assert "web_version" in status_payload
+
+    human_status = runner.invoke(app, ["status"])
+    assert human_status.exit_code == 0
+    assert "Ostium" in human_status.output
+    assert "Versions:" in human_status.output
+
+    meta = tmp_path / "data" / "runtime" / "last-good.meta.json"
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    meta.write_text("{not-json", encoding="utf-8")
+    output = tmp_path / "diag.tar.gz"
+    assert runner.invoke(app, ["diagnostics", "export", "--output", str(output)]).exit_code == 0
+    with tarfile.open(output) as archive:
+        dns = json.loads(archive.extractfile("dns.json").read())
+    assert dns["last_good"] == {}
+
+
+def test_doctor_fix_reports_paths_in_human_output(tmp_path: Path, monkeypatch) -> None:
+    runner = _init(tmp_path, monkeypatch)
+    config = tmp_path / "config" / "config.toml"
+    config.unlink(missing_ok=True)
+    monkeypatch.setattr(cli, "_engine_binary", lambda settings: tmp_path / "missing-engine")
+    result = runner.invoke(app, ["doctor", "--fix"])
+    assert result.exit_code == 1
+    assert "fixed" in result.output
+    assert config.is_file()

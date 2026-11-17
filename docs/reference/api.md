@@ -25,7 +25,7 @@
 | Logs | `GET /logs`、`GET /logs/download` |
 | Certificates | `GET/POST /certificates`、`POST /certificates/issue`、`POST /certificates/upload`、`POST /certificates/{id}/renew`、`POST /certificates/{id}/use`、`DELETE /certificates/{id}` |
 | Jobs | `GET /jobs`、`GET /jobs/{id}`、`POST /jobs/{id}/cancel` |
-| System | `POST /system/proxy`、`POST /system/tun`、`POST /system/mode`、`POST /system/connect`、`POST /system/disconnect`、`GET /system/services`、`POST /system/services/{name}/restart`、`GET /system/doctor`、`GET /system/diagnostics` |
+| System | `GET /system/info`、`GET /system/provenance`、`GET /system/port-owners`、`GET /system/dns`、`GET /system/selftest?target=google\|huggingface\|github`、`POST /system/proxy`、`POST /system/tun`、`POST /system/mode`、`POST /system/connect`、`POST /system/disconnect`、`GET /system/services`、`POST /system/services/{name}/restart`、`GET /system/doctor`、`GET /system/diagnostics`、`GET /system/diagnostics/download` |
 | Backups | `GET/POST /backups`、`POST /backups/{id}/restore`、`DELETE /backups/{id}` |
 | Alerts | `GET /alerts`、`POST /alerts/{id}/ack` |
 | Audit | `GET /audit` |
@@ -38,3 +38,17 @@
 二维码需 `?reveal=true`，并写审计。未知订阅格式返回 400；禁用/到期/超配额返回 403。
 
 公开订阅端点是独立限速的，永远不接受管理员会话。
+
+## 版本、诊断与 DNS（0.1.11）
+
+- `GET /system/provenance`：控制面版本/commit/executable/PID、核心版本、Web `build.json`、
+  监听端口 PID/路径/启动时间，以及 `consistency`。版本响应均带 `Cache-Control: no-store`。
+- `GET /system/port-owners`：控制面、混合代理和核心端口的实际监听进程。
+- `GET /system/dns`：配置模式、实际模式、最近 DoH 探测结果和 `last-good.meta.json`。
+- `GET /system/selftest?target=google|huggingface|github`：返回 `stage`
+  （dns/tcp/tls/http）、`latency_ms`、`status_code` 和错误。
+- `GET /system/doctor`：返回带 `data` 和 `duration_ms` 的分类检查。
+- `GET /system/diagnostics/download`：tar.gz 内含 `ostium-diagnostics.json`、
+  `provenance.json`、`dns.json`、`ports.json`、`checks.json`，全部脱敏且 `no-store`。
+- `/stats/overview` 增加 `online_window_seconds`、`rates_stale` 和 `rates.stale`；
+  `/users` 返回 `online_window_seconds`、`last_traffic_at` 与 `online_reason`。

@@ -152,6 +152,22 @@ sudo ostium update --check
 
 root 部署（`--run-as-root`）去掉 `sudo -u ostium`。
 
+## 服务端 DNS（0.1.11）
+
+服务端默认 `server_dns_mode = "auto"`：
+
+- 启动时通过 DoH 查询一个已知域名；成功则生成一个 `https` DNS 服务器。
+- 探测失败时回退到 UDP `8.8.8.8`，并写入 warning 日志和告警。
+- 配置为 `doh` 时故障会拒绝启动，避免静默降级；配置为 `udp` 时不做探测。
+
+```toml
+server_dns_mode = "auto"          # auto | doh | udp
+server_dns_doh_url = "https://1.1.1.1/dns-query"
+```
+
+`last-good.meta.json` 记录 `policy_version: 3`、实际 `dns_mode`、`dns_servers`、
+探测时间和配置 SHA256。旧策略版本的核心会等待控制面重新 apply，不会继续运行。
+
 ## 安全底线
 
 - 默认不要用 root 跑控制面；如使用 `--run-as-root`，明确接受风险。

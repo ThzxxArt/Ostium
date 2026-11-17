@@ -181,3 +181,12 @@ sudo bash install-online.sh uninstall --purge
 ```
 
 卸载器会恢复系统代理，并要求核心清理路由和虚拟网卡。
+
+## 版本、诊断与 fail-open（0.1.11）
+
+- `ostium version --json` 与页面 Settings → 关于显示控制面版本、commit、PID、核心版本和
+  Web 构建；不一致时标红。
+- 首页“测试连接”会通过真实代理链路测量 DNS/TCP/TLS/HTTP 阶段和延迟；诊断页可按版本、
+  端口、核心、DNS、出口分组查看，并复制报告或下载脱敏诊断包。
+- 系统代理默认在核心不可达 45 秒后 fail-open（恢复直连）并产生 critical 告警；核心恢复
+  后自动恢复。显式断开不会被自动恢复覆盖。该策略不是 kill switch。

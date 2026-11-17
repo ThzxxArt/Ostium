@@ -742,7 +742,7 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         )
         detail = payload["core"].get("detail") or {}
         payload["core_version"] = detail.get("core_version")
-    except SystemExit:
+    except (SystemExit, typer.Exit):
         payload["core"] = {"running": False, "reachable": False}
     web = read_web_build(settings.paths.web_dist)
     payload["web_version"] = web.get("version") if web.get("available") else None

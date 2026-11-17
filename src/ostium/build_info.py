@@ -60,27 +60,74 @@ def _metadata_path() -> str | None:
     return str(value) if value is not None else None
 
 
+def _version_file_version() -> str | None:
+    """Read the repository ``VERSION`` file in a source checkout."""
+
+    path = Path(__file__).resolve().parent.parent.parent / "VERSION"
+    if not path.is_file():
+        return None
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return value or None
+
+
+def _is_clean_release(value: str) -> bool:
+    """Reject VCS dev/local suffixes; they are not a shippable version."""
+
+    return ".dev" not in value and "+" not in value
+
+
 def resolve_version() -> str:
     """Resolve the live version in a deterministic order.
 
     ``OSTIUM_BUILD_VERSION`` is an explicit override used by packaging and
-    tests.  The generated module wins over installed metadata because a frozen
-    bundle may not carry ``dist-info`` at all; a source checkout still falls
-    back to metadata when the generated file is absent or unreadable.
+    tests.  A clean generated version wins over installed metadata because a
+    frozen bundle may not carry ``dist-info``.  A source checkout whose generated
+    file was rewritten with a VCS ``.dev`` suffix uses the repository ``VERSION``
+    file, so local tests and builds report the exact release they are preparing.
     """
 
     override = os.environ.get("OSTIUM_BUILD_VERSION", "").strip()
     if override:
         return override
     packaged = _packaged_version_module()
+    packaged_version = ""
     if packaged is not None:
-        value = str(getattr(packaged, "__version__", "") or "").strip()
-        if value:
-            return value
+        packaged_version = str(getattr(packaged, "__version__", "") or "").strip()
+    if packaged_version and _is_clean_release(packaged_version):
+        return packaged_version
+    if not getattr(sys, "frozen", False):
+        version_file = _version_file_version()
+        if version_file:
+            return version_file
     meta = _metadata_version()
+    if meta and _is_clean_release(meta):
+        return meta
+    if packaged_version:
+        return packaged_version
     if meta:
         return meta
     return FALLBACK_VERSION
+
+
+def version_source() -> str:
+    if os.environ.get("OSTIUM_BUILD_VERSION", "").strip():
+        return "environment"
+    packaged = _packaged_version_module()
+    packaged_version = ""
+    if packaged is not None:
+        packaged_version = str(getattr(packaged, "__version__", "") or "").strip()
+    if packaged_version and _is_clean_release(packaged_version):
+        return "generated_version_file"
+    if not getattr(sys, "frozen", False) and _version_file_version():
+        return "version_file"
+    if _metadata_version():
+        return "distribution_metadata"
+    if packaged_version:
+        return "generated_version_file"
+    return "fallback"
 
 
 def resolve_commit() -> str | None:
@@ -129,17 +176,6 @@ class BuildInfo:
         payload["argv"] = list(self.argv)
         payload["version_source"] = version_source()
         return payload
-
-
-def version_source() -> str:
-    if os.environ.get("OSTIUM_BUILD_VERSION", "").strip():
-        return "environment"
-    packaged = _packaged_version_module()
-    if packaged is not None and str(getattr(packaged, "__version__", "") or "").strip():
-        return "generated_version_file"
-    if _metadata_version():
-        return "distribution_metadata"
-    return "fallback"
 
 
 def build_info() -> BuildInfo:

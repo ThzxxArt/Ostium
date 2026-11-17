@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -o /out/sing-box ./cmd/sing-box
 
 FROM python:3.13.5-slim-bookworm AS runtime
-ARG OSTIUM_VERSION=0.1.10
+ARG OSTIUM_VERSION=0.1.11
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     OSTIUM_ROLE=server \

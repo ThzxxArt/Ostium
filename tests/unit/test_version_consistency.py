@@ -16,7 +16,6 @@ def test_version_file_is_semver() -> None:
 def test_live_version_sources_match_version_file() -> None:
     checks = {
         "pyproject.toml": f'fallback_version = "{VERSION}"',
-        "src/ostium/_version.py": f"__version__ = version = '{VERSION}'",
         "web/package.json": f'"version": "{VERSION}"',
         "web/package-lock.json": f'"version": "{VERSION}"',
         "Dockerfile": f"ARG OSTIUM_VERSION={VERSION}",
@@ -59,7 +58,6 @@ def test_no_live_file_pins_an_older_release() -> None:
         "deploy/windows/ostium.iss",
         "web/package.json",
         "pyproject.toml",
-        "src/ostium/_version.py",
     ]
     current = tuple(int(part) for part in VERSION.split(".")[:3])
     old_versions = [f"0.1.{patch}" for patch in range(current[2]) if (0, 1, patch) != current]

@@ -8,8 +8,8 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.10** |
-| Status | **Published** |
+| Current public version | **0.1.10** |
+| Status | **Published** (0.1.11 implemented, **not published**) |
 | Tag | `v0.1.10` (annotated, commit `361fa7c`) |
 | Assets | GitHub Release `v0.1.10` — 23 assets, marked Latest |
 | PyPI | `ostium-ctl==0.1.10` (wheel + sdist) |
@@ -19,6 +19,18 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 | Release type | Server DNS pollution patch; no client reinstall required |
 | Source branch | `main` |
 
+### 0.1.11 status
+
+0.1.11 is implemented on `main` and has not been tagged or published. It is
+**not** the current public version: no `v0.1.11` tag, GitHub Release, PyPI
+artifact or GHCR image exists. Publication requires explicit release-owner
+authorization after the evidence in
+[`versions/V0.1.11_PLAN.md`](https://github.com/ThzxxArt/Ostium/blob/main/versions/V0.1.11_PLAN.md) §12 is checked.
+
+Scope: deterministic version/provenance, installer port/version assertions,
+DoH-first DNS with UDP fallback (`CONFIG_POLICY_VERSION=3`), layered diagnostics,
+honest online/rate semantics, and system-proxy fail-open. No database migration.
+
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.
 
@@ -27,6 +39,42 @@ pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
 0.1.10 continues to fix the status at its own tag instead of rewriting published
 artifacts.
+
+## 0.1.11 verification status
+
+### Verified locally
+
+- Backend non-integration suite: 803 passed / 10 deselected; 94.21% statements;
+  90.03% branches; `coverage_gate.py` passed.
+- Real pinned core `1.14.4-ostium.1`: integration suite 10 passed, including
+  generated-config validation and live SOCKS traffic accounting.
+- `sing-box check` accepts the generated DoH server configuration and the
+  client `type: local` resolver. A live DoH query through the test core could
+  not reach `1.1.1.1:443` in this workspace because direct egress is blocked
+  here (the environment requires an HTTP proxy); production DoH remains a
+  server-side verification item.
+- Frontend: 209 unit tests passed; typecheck, lint, Prettier and production
+  build passed; coverage 90.75/85.07/88.32/92.30.
+- Playwright: 73 passed, 2 skipped; axe, responsive layout, PWA and updated
+  visual snapshots passed.
+- `0.1.10 -> 0.1.11` upgrade-e2e passed, including database integrity,
+  `master.key`, subscription token, and restoring a 0.1.10 encrypted backup.
+- Wheel/sdist built as `0.1.11`; the wheel CLI reports `0.1.11` and ships
+  `web/dist/build.json` with `version: 0.1.11`.
+- `scripts/release-preflight.sh --version 0.1.11 --skip-git` passed;
+  shellcheck, `bash -n` and `mkdocs build --strict` passed.
+
+### Not verified in this workspace (0.1.11)
+
+- Windows 11 and Windows 10 runtime installer/TUN/signing matrix.
+- macOS 14 launchd/utun/DMG/notarization.
+- Server 0.1.11 deployment and production DoH/UDP behavior on
+  `149.88.67.131`.
+- A real root `scripts/install-e2e.sh` run (the workspace has no sudo/root).
+- Debian/RHEL real machines, Nginx, Docker runtime, ACME, real TUN, 72-hour
+  soak and performance.
+
+
 
 ## 0.1.10 verification status
 

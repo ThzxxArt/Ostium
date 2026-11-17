@@ -3,6 +3,46 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [0.1.11] - 2026-11-17
+
+### Added
+
+- Deterministic build/runtime provenance: `ostium version --json`,
+  `/api/v1/system/provenance`, Web `build.json` and `/system/port-owners`.
+- Layered diagnostics for version consistency, listener ownership, configuration
+  drift, core readiness, DoH comparison, direct/proxy TLS egress, system proxy,
+  TUN and disk usage, plus `/system/selftest` and grouped UI.
+- Server DNS policy: `server_dns_mode` (`auto`/`doh`/`udp`) and
+  `server_dns_doh_url`; startup DoH probe with explicit UDP fallback.
+- Client policy `system_proxy_fail_open` / `system_proxy_fail_open_seconds`
+  (default 45 s) with critical alert and automatic proxy restoration.
+- Configurable `stats_online_window_seconds` and live per-user traffic timestamps.
+
+### Changed
+
+- `CONFIG_POLICY_VERSION` is now `3`; one DNS server is generated instead of an
+  unreferenced second entry. DoH is preferred; UDP is an explicit fallback.
+- Online means "traffic observed within the window", not a TCP connection count.
+  Rates decay to zero after two quiet ticks and during a stats outage.
+- Installers assert the expected version and port ownership instead of accepting
+  any HTTP 200; Windows refuses to stop an unknown process on the UI port.
+- Web UI: Ctrl/Cmd+C no longer toggles the connection, login refresh is
+  re-entrant-safe, warn/fail counts are separate, `applied=false` shows a warning,
+  TUN availability is real, certificate expiry labels are accurate and table rows
+  are keyboard accessible.
+
+### Fixed
+
+- Removed the dead `local2` DNS entry and every hardcoded `223.5.5.5` default,
+  including the Clash subscription template.
+- Windows system-proxy restoration recognises a lost state file when WinINET
+  still points at Ostium's own mixed port.
+- Stale version data in the login screen and status poll race.
+
+### Documentation
+
+- Added the 0.1.10 -> 0.1.11 upgrade, DNS, fail-open and rollback guide.
+
 ## [0.1.10] - 2026-11-16
 
 ### Fixed

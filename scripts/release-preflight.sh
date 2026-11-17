@@ -49,10 +49,11 @@ check_not_contains() {
 }
 
 check_contains pyproject.toml "fallback_version = \"$VERSION\""
-check_contains src/ostium/__init__.py "__version__ = \"$VERSION\""
+check_contains src/ostium/__init__.py "from ostium.build_info import build_info"
 check_contains web/package.json "\"version\": \"$VERSION\""
 check_contains web/package-lock.json "\"version\": \"$VERSION\""
 check_contains Dockerfile "ARG OSTIUM_VERSION=$VERSION"
+check_contains deploy/windows/ostium.iss "#define AppVersion \"$VERSION\""
 # Compose tracks the mutable `latest` tag so a fresh checkout does not request
 # an unpublished version; release jobs still build the immutable VERSION tags.
 if ! grep -q "ostium:$VERSION" "$ROOT/deploy/docker/docker-compose.yml" \
@@ -63,6 +64,11 @@ fi
 check_contains scripts/build-windows.ps1 "[string]\$Version = \"$VERSION\""
 check_contains scripts/build-sbom.py "app_version = \"$VERSION\""
 check_contains scripts/build-core-manifest.py "\"$VERSION\""
+check_contains scripts/build-linux-packages.sh "|| echo $VERSION"
+check_contains scripts/build-macos.sh "|| echo $VERSION"
+if [[ -f "$ROOT/web/dist/build.json" ]]; then
+  check_contains web/dist/build.json "\"version\": \"$VERSION\""
+fi
 check_contains README.md "$VERSION"
 check_contains CHANGELOG.md "## [$VERSION]"
 if grep -q "^## \[$VERSION\] - Unreleased" "$ROOT/CHANGELOG.md"; then
@@ -87,13 +93,16 @@ for file in \
   scripts/build-core-manifest.py \
   Dockerfile \
   deploy/docker/docker-compose.yml \
+  deploy/windows/ostium.iss \
   web/package.json \
-  pyproject.toml \
-  src/ostium/__init__.py; do
-  if grep -Eq '(^|[^0-9])0\.1\.[01]([^0-9]|$)' "$ROOT/$file"; then
-    echo "stale 0.1.0/0.1.1 version in $file" >&2
-    fail=1
-  fi
+  pyproject.toml; do
+  IFS=. read -r major minor patch <<<"$VERSION"
+  for ((older = 0; older < patch; older++)); do
+    if grep -Eq "(^|[^0-9])${major}\.${minor}\.${older}([^0-9]|$)" "$ROOT/$file"; then
+      echo "stale ${major}.${minor}.${older} version in $file" >&2
+      fail=1
+    fi
+  done
 done
 
 if [[ "$SKIP_GIT" != "true" && -d "$ROOT/.git" ]]; then

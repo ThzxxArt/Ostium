@@ -41,4 +41,15 @@ ostium backup create --password 'long passphrase'
 
 本地 CLI 请求使用 `<data>/runtime/cli.token` 的回环 token。远程自动化请在 **Settings → API tokens** 创建带 scope 的 API token。
 
+0.1.11 新增：
+
+```bash
+ostium version --json          # version/commit/built_at/executable/PID
+ostium status --json           # 版本、核心版本、Web 版本、监听端口 owner
+ostium doctor --json           # version/port_owner/version_consistency 等检查
+ostium diagnostics export --output /tmp/ostium-diagnostics.tar.gz
+```
+
+诊断包包含 `provenance.json`、`dns.json`、`ports.json`、`doctor.json`、脱敏配置和日志尾部。
+
 > `ostium service install` 只安装默认 systemd 单元。需要 `--run-as-root` 或自定义用户时，请使用一键安装器，或按[服务管理](../guides/service-manager.md)编辑 drop-in。

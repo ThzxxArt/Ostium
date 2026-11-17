@@ -41,12 +41,14 @@
 </p>
 
 > [!IMPORTANT]
-> **Release status: v0.1.10 was published on 2026-11-16.** The previous release
-> is v0.1.9 (2026-11-16). See [release status](docs/release-status.md) for
-> verified and unverified items.
+> **v0.1.11 is implemented but not published.** The current public release is
+> still **v0.1.10** (2026-11-16). See [release status](docs/release-status.md)
+> and [`versions/V0.1.11_PLAN.md`](versions/V0.1.11_PLAN.md).
 
 > [!TIP]
-> **Current public version: v0.1.10.** The easiest install does not require Python:
+> **Current public version: v0.1.10.** Replace the version numbers below with
+> v0.1.11 after that release is published. The easiest install does not require
+> Python:
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \

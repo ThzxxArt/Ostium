@@ -41,11 +41,13 @@
 </p>
 
 > [!IMPORTANT]
-> **发布状态：v0.1.10 已于 2026-11-16 发布。** 上一版本为 v0.1.9
-> （2026-11-16）。0.1.10 的已验证/未验证项见 [发布状态](docs/release-status.md)。
+> **v0.1.11 已完成实施，尚未发布。** 当前公开版本仍为 **v0.1.10**（2026-11-16）。
+> 0.1.11 的已验证/未验证项见 [发布状态](docs/release-status.md) 和
+> [`versions/V0.1.11_PLAN.md`](versions/V0.1.11_PLAN.md)。
 
 > [!TIP]
-> **当前公开版本：v0.1.10。** 最省事的安装方式不需要预装 Python：
+> **当前公开版本：v0.1.10。** 0.1.11 发布后，以下版本号替换为 v0.1.11。
+> 最省事的安装方式不需要预装 Python：
 >
 > ```bash
 > curl -fsSL https://github.com/ThzxxArt/Ostium/releases/latest/download/install-online.sh \

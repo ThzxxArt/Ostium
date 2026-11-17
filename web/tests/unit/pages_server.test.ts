@@ -13,6 +13,10 @@ import AuditPage from '@/pages/AuditPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
 import { cleanupPage, clickAllButtons, installFetchMock, mountPage, settle } from './helpers'
 
+function stateOf(wrapper: any, component: any) {
+  return wrapper.findComponent(component).vm.$.setupState
+}
+
 const pages = [
   ['DashboardPage', DashboardPage],
   ['InboundsPage', InboundsPage],
@@ -44,6 +48,48 @@ describe('server pages', () => {
     expect(wrapper.text().length).toBeGreaterThan(10)
     await clickAllButtons(1)
     expect(wrapper.html()).toBeTruthy()
+  })
+
+  it('SettingsPage shows build provenance and version mismatches', async () => {
+    installFetchMock({
+      overrides: {
+        '/api/v1/system/provenance': {
+          app: {
+            version: '0.1.11',
+            commit: 'abc123',
+            built_at: '2026-11-17T00:00:00+00:00',
+            frozen: false,
+            executable: '/usr/bin/ostium',
+            argv: [],
+            pid: 42,
+            process_started_at: null,
+            python: '3.13.5',
+            prefix: '/usr',
+            package_path: '/usr/lib/ostium',
+            dist_info_path: null,
+            version_source: 'version_file',
+          },
+          web: { available: true, version: '0.1.10', built_at: '2026-11-16T00:00:00+00:00' },
+          core: { reachable: true, running: true, version: '0.1.11', engine_version: '1.14.4' },
+          listener: { port: 8443, host: '127.0.0.1', found: true, pid: 42, exe: '/usr/bin/ostium' },
+          consistency: {
+            ok: false,
+            expected_version: '0.1.11',
+            mismatches: [{ surface: 'web', expected: '0.1.11', actual: '0.1.10' }],
+          },
+          generated_at: '2026-11-17T00:00:00+00:00',
+        },
+      },
+    })
+    const { wrapper } = await mountPage(SettingsPage)
+    await settle()
+    const state = stateOf(wrapper, SettingsPage)
+    state.activeTab = 'about'
+    await settle()
+    expect(wrapper.text()).toContain('0.1.11')
+    expect(wrapper.text()).toContain('abc123')
+    expect(wrapper.text()).toContain('Version mismatch')
+    expect(wrapper.text()).toContain('web=0.1.10')
   })
 
   it('makes the scrollable log region keyboard focusable', async () => {

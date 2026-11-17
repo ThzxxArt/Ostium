@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pyotp
+import pytest
 from fastapi.testclient import TestClient
 
 from ostium.config import Settings
@@ -422,3 +423,21 @@ def test_public_ui_certificate_cannot_be_deleted_while_in_use(
     deleted = api_client.delete(f"/api/v1/certificates/{other_id}", headers=headers)
     assert deleted.status_code == 200, deleted.text
     assert deleted.json()["deleted"] is True
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"server_dns_mode": "system"},
+        {"system_proxy_fail_open_seconds": 1},
+        {"trusted_hosts": [""]},
+        {"ui_allowlist": ["not-a-cidr"]},
+        {"routing_mode": "bogus"},
+        {"webhook_url": "ftp://example.com/hook"},
+        {"public_base_url": "ftp://example.com"},
+    ],
+)
+def test_settings_reject_invalid_values(api_client: TestClient, payload: dict[str, object]) -> None:
+    token = setup_admin(api_client)
+    response = api_client.patch("/api/v1/settings", json=payload, headers=_headers(token))
+    assert response.status_code == 400, response.text

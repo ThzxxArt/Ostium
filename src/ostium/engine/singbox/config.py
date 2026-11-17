@@ -277,11 +277,11 @@ def build_server_config(
     config: dict[str, Any] = {
         "log": {"level": spec.log_level, "timestamp": True},
         "dns": {
-            # Exactly one resolver is generated.  In 0.1.10 a second UDP entry
-            # existed but ``dns.final`` only referenced the first, so it never
-            # participated in resolution.  DoH is preferred because UDP/53 was
-            # observed returning polluted answers; UDP remains an explicit
-            # operator choice and the ``auto`` fallback.
+            # Exactly one resolver is generated.  Before 0.1.11 a second UDP
+            # entry existed but ``dns.final`` only referenced the first, so it
+            # never participated in resolution.  DoH is preferred because
+            # UDP/53 was observed returning polluted answers; UDP remains an
+            # explicit operator choice and the ``auto`` fallback.
             "servers": [_server_dns_server(spec.dns)],
             # The server may have IPv4 egress only.  Do not resolve proxied
             # destinations to AAAA and then fail the direct outbound; GitHub

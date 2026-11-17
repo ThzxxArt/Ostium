@@ -2,7 +2,16 @@
 
 Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包可以装到服务器，也可以装到你的电脑；服务端和客户端共用一套 Web UI、CLI 和安装器。数据面是固定版本的 sing-box，控制面是 FastAPI + Vue 3。
 
-当前公开版本：**v0.1.10**（2026-11-16）。上一版本为 **v0.1.9**（2026-11-16）。发布状态与已验证/未验证项以 [发布状态](release-status.md) 为准。
+当前公开版本：**v0.1.10**（2026-11-16）。**v0.1.11 已完成实施，尚未发布**；发布状态与已验证/未验证项以 [发布状态](release-status.md) 为准。
+
+## 0.1.11 的变化
+
+- 版本与构建可溯源：`/system/provenance`、`ostium version --json`、Web `build.json`、安装器精确版本断言。
+- 服务端 DNS 默认 DoH 优先、UDP 显式回退；配置策略版本 3；不再生成不会生效的第二个 DNS 服务器。
+- 诊断覆盖版本、端口归属、配置漂移、DNS 对照、TLS/代理出口、系统代理、TUN 与磁盘。
+- “在线”改为近期流量窗口；速率在无流量或采集中断后归零；用户/订阅页面自动刷新。
+- 客户端系统代理在核心故障 45 秒后默认 fail-open，核心恢复后自动恢复；显式 Disconnect 不被覆盖。
+- 升级步骤见 [0.1.10 → 0.1.11](operations/upgrade-0.1.10-to-0.1.11.md)。
 
 > 文档以中文为主。英文概览见 [`README.en.md`](https://github.com/ThzxxArt/Ostium/blob/main/README.en.md)。
 

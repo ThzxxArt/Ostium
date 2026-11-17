@@ -66,3 +66,51 @@ sudo ostium diagnostics export --output /tmp/ostium-diagnostics.tar.gz
 ```
 
 诊断包会脱敏 token、密码、UUID、私钥和分享链接。仍然不要发到公开 issue，优先走私密安全渠道。
+
+## 页面版本和 CLI 不一致（0.1.11）
+
+先确认监听端口的进程，而不是只看 HTTP 200：
+
+```bash
+ostium version --json
+curl -fsS http://127.0.0.1:8443/healthz
+curl -fsS -H "Authorization: Bearer $(sudo cat /var/lib/ostium/runtime/cli.token)" \
+  http://127.0.0.1:8443/api/v1/system/provenance
+```
+
+`/system/provenance` 会返回 `listener.pid`、`listener.exe`、`started_at` 和
+`consistency.mismatches`。如果 `listener.pid` 不是当前控制面，说明旧进程仍占着端口；
+停止它后重新启动服务。0.1.11 安装器会在版本不匹配时直接失败，不再误报成功。
+
+## DNS 仍然解析错误（0.1.11）
+
+```bash
+sudo cat /var/lib/ostium/runtime/last-good.meta.json
+```
+
+- `dns_mode=doh`：加密 DNS 已生效。
+- `dns_mode=udp` 且配置为 `auto`：DoH 探测失败后回退，查看告警和
+  `journalctl -u ostium`；必要时把 `server_dns_mode` 改为 `doh` 让失败显式化。
+- 配置为 `doh` 却启动失败：说明 DoH 被网络阻断，先修复网络或显式改为 `udp`。
+
+`local2` 已删除：sing-box 的 `dns.final` 只使用一个服务器，旧配置里的第二个服务器
+从未生效。
+
+## “在线”是什么意思（0.1.11）
+
+在线表示“最近 N 秒内观察到流量”（默认 60 秒），不是 TCP 连接数，也不是设备数。
+同一用户的多个设备会合并；精确到设备需要定制核心，当前版本不提供。
+速率在连续两个采样无流量或统计采集中断后归零。
+
+## 核心崩溃后整机断网（0.1.11）
+
+客户端默认 `system_proxy_fail_open = true`，核心不可达 45 秒后会关闭系统代理并恢复
+直连，同时产生 critical 告警。核心恢复后代理自动恢复；显式 Disconnect 不会被覆盖。
+
+这不是 kill switch。若关闭 fail-open，核心故障时系统代理会继续指向已停止的本地端口，
+整机流量可能黑洞。可在 Settings 中调整阈值。
+
+## 安装器拒绝未知端口占用
+
+0.1.11 安装器只停止可证明属于 Ostium 的监听进程。遇到未知进程时会输出 PID、路径和
+启动时间并退出。先确认该进程用途，再手动停止或修改 UI 端口；安装器不会盲杀。

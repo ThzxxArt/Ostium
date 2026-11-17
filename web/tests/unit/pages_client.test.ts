@@ -135,6 +135,94 @@ describe('client pages', () => {
     expect(wrapper.text()).toContain('192.168.1.10:7890')
   })
 
+  it('ClientHomePage measures latency with the real selftest endpoint', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/selftest': {
+          ok: true,
+          target: 'google',
+          host: 'www.google.com',
+          mode: 'proxy',
+          stage: 'http',
+          latency_ms: 37,
+          status_code: 200,
+          error: null,
+          generated_at: '2026-11-17T00:00:00+00:00',
+        },
+      },
+    })
+    const { wrapper } = await mountPage(ClientHomePage)
+    await settle()
+    const state = stateOf(wrapper, ClientHomePage)
+    await state.testConnection()
+    await settle()
+    expect(state.latency).toBe(37)
+    expect(wrapper.text()).toContain('37 ms')
+  })
+
+  it('NetworkPage explains fail-open and unavailable TUN', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/info': {
+          ...fixtures.systemInfo,
+          tun: { ...fixtures.systemInfo.tun, available: false },
+          proxy_fail_open: {
+            enabled: true,
+            seconds: 45,
+            active: true,
+            since: '2026-11-17T00:00:00+00:00',
+            restore_pending: true,
+          },
+        },
+      },
+    })
+    const { wrapper } = await mountPage(NetworkPage)
+    await settle()
+    expect(wrapper.text()).toContain('45s')
+    expect(wrapper.text()).toContain('TUN is unavailable')
+  })
+
+  it('DiagnosticsPage groups checks and runs a selftest', async () => {
+    installFetchMock({
+      role: 'client',
+      overrides: {
+        '/api/v1/system/doctor': {
+          generated_at: '2026-11-17T00:00:00+00:00',
+          version: '0.1.11',
+          checks: [
+            { id: 'version_consistency', status: 'pass', message: 'ok', fix: null, data: {} },
+            { id: 'port_owner:8787', status: 'pass', message: 'ok', fix: null, data: {} },
+            { id: 'core_running', status: 'pass', message: 'ok', fix: null, data: {} },
+            { id: 'dns_match:google', status: 'warn', message: 'partial', fix: null, data: {} },
+            { id: 'egress_proxy', status: 'fail', message: 'tcp', fix: 'check', data: {} },
+          ],
+        },
+        '/api/v1/system/selftest': {
+          ok: true,
+          target: 'google',
+          host: 'www.google.com',
+          mode: 'proxy',
+          stage: 'tls',
+          latency_ms: 21,
+          status_code: 200,
+          error: null,
+          generated_at: '2026-11-17T00:00:00+00:00',
+        },
+      },
+    })
+    const { wrapper } = await mountPage(DiagnosticsPage)
+    await settle()
+    const state = stateOf(wrapper, DiagnosticsPage)
+    await state.runSelftest('google')
+    await settle()
+    expect(wrapper.text()).toContain('Version')
+    expect(wrapper.text()).toContain('DNS')
+    expect(wrapper.text()).toContain('Connection succeeded')
+    expect(state.selftest.latency_ms).toBe(21)
+  })
+
   it('HomeGate renders the client home for client roles', async () => {
     installFetchMock({ role: 'client' })
     const { wrapper } = await mountPage(

@@ -122,6 +122,28 @@ describe('application shell', () => {
     expect(wrapper.html()).toBeTruthy()
   })
 
+  it('does not turn Ctrl/Cmd+C into a connection toggle', async () => {
+    const { fetchMock } = installFetchMock({ role: 'client' })
+    const wrapper = await mountApp(await bootstrapApp())
+    const paths = () =>
+      fetchMock.mock.calls.map((call) => new URL(String(call[0]), 'http://localhost').pathname)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true }))
+    await settle(2)
+    expect(paths()).not.toContain('/api/v1/system/connect')
+    expect(paths()).not.toContain('/api/v1/system/disconnect')
+
+    // The unmodified shortcut still works.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true }))
+    await settle(2)
+    expect(
+      paths().some(
+        (path) => path === '/api/v1/system/connect' || path === '/api/v1/system/disconnect',
+      ),
+    ).toBe(true)
+    expect(wrapper.html()).toBeTruthy()
+  })
+
   it('renders the client shell and client routes', async () => {
     installFetchMock({ role: 'client' })
     const wrapper = await mountApp(await bootstrapApp())

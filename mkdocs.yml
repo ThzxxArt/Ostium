@@ -57,6 +57,7 @@ nav:
       - 0.1.1 → 0.1.2 迁移: operations/upgrade-0.1.1-to-0.1.2.md
       - 0.1.2 → 0.1.3 迁移: operations/upgrade-0.1.2-to-0.1.3.md
       - 0.1.9 → 0.1.10 迁移: operations/upgrade-0.1.9-to-0.1.10.md
+      - 0.1.10 → 0.1.11 迁移: operations/upgrade-0.1.10-to-0.1.11.md
       - 0.1.8 → 0.1.9 迁移: operations/upgrade-0.1.8-to-0.1.9.md
       - 0.1.7 → 0.1.8 迁移: operations/upgrade-0.1.7-to-0.1.8.md
       - 0.1.6 → 0.1.7 迁移: operations/upgrade-0.1.6-to-0.1.7.md

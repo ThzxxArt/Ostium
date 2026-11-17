@@ -112,17 +112,38 @@ jobs:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
       - name: Smoke-test the wheel
         run: |
+          EXPECTED="${GITHUB_REF_NAME#v}"
           uv venv /tmp/ostium-wheel
           uv pip install --python /tmp/ostium-wheel/bin/python dist/*.whl
-          /tmp/ostium-wheel/bin/ostium version
-          /tmp/ostium-wheel/bin/python - <<'PY'
+          /tmp/ostium-wheel/bin/ostium version --json
+          /tmp/ostium-wheel/bin/python - "$EXPECTED" <<'PY'
+          import json
+          import subprocess
+          import sys
           from pathlib import Path
 
           import ostium
 
+          expected = sys.argv[1]
+          payload = json.loads(
+              subprocess.check_output(
+                  ["/tmp/ostium-wheel/bin/ostium", "version", "--json"], text=True
+              )
+          )
+          assert payload["version"] == expected, payload
+          assert ostium.__version__ == expected, ostium.__version__
+          metadata = next(Path("dist").glob("*.whl"))
+          import zipfile
+
+          with zipfile.ZipFile(metadata) as archive:
+              name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+              text = archive.read(name).decode()
+          assert f"Version: {expected}" in text, text[:200]
+          build = json.loads(Path("web/dist/build.json").read_text())
+          assert build["version"] == expected, build
           asset = Path(ostium.__file__).parent / "web" / "dist" / "index.html"
           assert asset.is_file(), asset
-          print("wheel SPA:", asset)
+          print("wheel and web versions:", expected)
           PY
       - uses: actions/upload-artifact@v7
         with:
@@ -248,6 +269,35 @@ jobs:
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           $version = "${{ github.ref_name }}".TrimStart("v")
           & $iscc deploy/windows/ostium.iss /DAppVersion=$version
+      - name: Install, assert version and uninstall
+        shell: pwsh
+        run: |
+          $expected = "${{ github.ref_name }}".TrimStart("v")
+          $setup = Get-ChildItem dist/windows/*-setup.exe | Select-Object -First 1
+          $install = Start-Process -FilePath $setup.FullName `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "installer exited with $($install.ExitCode)" }
+          $cli = Join-Path $env:ProgramFiles "Ostium\ostium.exe"
+          $payload = (& $cli version --json | ConvertFrom-Json)
+          if ($payload.version -ne $expected) { throw "CLI reports $($payload.version), expected $expected" }
+          $health = Invoke-RestMethod -UseBasicParsing -Uri "http://127.0.0.1:8787/healthz"
+          if ($health.version -ne $expected) { throw "health reports $($health.version), expected $expected" }
+          $env:OSTIUM_ROLE = "client"
+          $env:OSTIUM_DATA_DIR = "$env:ProgramData\Ostium"
+          $env:OSTIUM_CONFIG_FILE = "$env:ProgramData\Ostium\config.toml"
+          $version = (& $cli version | Out-String)
+          if ($version -notmatch [Regex]::Escape("Ostium $expected")) { throw "unexpected CLI output: $version" }
+          $uninstaller = Join-Path $env:ProgramFiles "Ostium\unins000.exe"
+          $uninstall = Start-Process -FilePath $uninstaller `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "uninstaller exited with $($uninstall.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue) {
+            throw "port 8787 is still listening after uninstall"
+          }
+          if (Get-Process ostium, ostium-service -ErrorAction SilentlyContinue) {
+            throw "Ostium processes survived uninstall"
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
@@ -280,6 +330,17 @@ jobs:
           chmod +x scripts/build-macos.sh
           VERSION="${{ github.ref_name }}"
           ./scripts/build-macos.sh "${VERSION#v}"
+      - name: Verify DMG contents
+        run: |
+          EXPECTED="${{ github.ref_name }}"
+          EXPECTED="${EXPECTED#v}"
+          DMG="$(find dist -name '*.dmg' | head -1)"
+          MOUNT="$(mktemp -d)"
+          hdiutil attach "$DMG" -mountpoint "$MOUNT" -nobrowse -quiet
+          trap 'hdiutil detach "$MOUNT" -quiet || true' EXIT
+          grep -q "Ostium $EXPECTED for macOS" "$MOUNT/README.txt"
+          test -f "$MOUNT/ostium_ctl-$EXPECTED-py3-none-any.whl"
+          test -f "$MOUNT/install-macos.sh"
       - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
@@ -321,6 +382,20 @@ jobs:
           CORE="$(find dist -maxdepth 1 -name 'ostium-core-*-linux-${{ matrix.arch }}.tar.gz' | head -1)"
           ./scripts/build-linux-packages.sh --version "${{ github.ref_name }}" \
             --arch "${{ matrix.arch }}" --core "$CORE"
+      - name: Verify package versions
+        run: |
+          EXPECTED="${{ github.ref_name }}"
+          EXPECTED="${EXPECTED#v}"
+          DEB="$(find dist/packages -name '*.deb' | head -1)"
+          test -n "$DEB"
+          test "$(dpkg-deb -f "$DEB" Version)" = "$EXPECTED"
+          APP="$(realpath "$(find dist/packages -name '*.AppImage' | head -1)")"
+          test -n "$APP"
+          chmod +x "$APP"
+          (cd /tmp && "$APP" --appimage-extract >/dev/null)
+          VERSION_JSON="$(/tmp/squashfs-root/AppRun version --json)"
+          echo "$VERSION_JSON"
+          echo "$VERSION_JSON" | grep -q "\"version\": \"$EXPECTED\""
       - uses: actions/upload-artifact@v7
         with:
           name: linux-packages-${{ matrix.arch }}
@@ -368,6 +443,14 @@ jobs:
             OSTIUM_VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Verify staging image version
+        run: |
+          EXPECTED="${{ github.ref_name }}"
+          EXPECTED="${EXPECTED#v}"
+          docker pull ghcr.io/thzxxart/ostium:staging
+          JSON="$(docker run --rm --entrypoint ostium ghcr.io/thzxxart/ostium:staging version --json)"
+          echo "$JSON"
+          echo "$JSON" | grep -q "\"version\": \"$EXPECTED\""
 
   publish:
     needs:

@@ -409,12 +409,16 @@ def test_readme_marks_the_current_release_status() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     status = (ROOT / "docs" / "release-status.md").read_text(encoding="utf-8")
-    assert f"v{version} 已于" in readme
+    # 0.1.11 is implemented but deliberately unpublished.  The README must say
+    # both facts: the code version and the current public release.
+    assert f"v{version} 已完成实施，尚未发布" in readme
+    assert "当前公开版本仍为 **v0.1.10**" in readme
     assert "正在准备" not in readme
-    assert "尚未发布" not in readme
-    assert f"release status: v{version} was published" in readme_en.lower()
+    assert f"v{version} is implemented but not published" in readme_en
+    assert "Current public version: v0.1.10" in readme_en
     assert "not published yet" not in readme_en.lower()
-    assert "| Status | **Published** |" in status
+    assert "| Current public version | **0.1.10** |" in status
+    assert "0.1.11 is implemented on `main`" in status
     assert "Preparing; not tagged or published" not in status
 
 
