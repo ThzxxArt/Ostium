@@ -209,11 +209,12 @@ write_env() {
     warn "$env_file already exists; keeping it"
     return
   fi
-  local secret field allowed
+  local secret field allowed old_umask
   secret="$(openssl rand -base64 48 | tr -d '\n')"
   field="$(openssl rand -base64 32 | tr -d '\n')"
   allowed="localhost,127.0.0.1,[::1]"
   if [ -n "$DOMAIN" ]; then allowed="$DOMAIN,$allowed"; fi
+  old_umask="$(umask)"
   umask 077
   cat >"$env_file" <<EOF
 DJANGO_SETTINGS_MODULE=ostium.config.settings.prod
@@ -234,6 +235,7 @@ OSTIUM_ACME_EMAIL=${DOMAIN:+admin@$DOMAIN}
 EOF
   chown root:"$SERVICE_USER" "$env_file"
   chmod 0640 "$env_file"
+  umask "$old_umask"
 }
 
 install_uv() {
@@ -279,6 +281,9 @@ install_app() {
   else
     die "No wheel supplied. Use the release assets, --wheel, or --from-source."
   fi
+  # Packages created by uv inherit the caller's umask. Normalize again after
+  # installation so the service user can read every module.
+  chmod -R a+rX "$PREFIX/venv" "$UV_PYTHON_INSTALL_DIR" 2>/dev/null || true
   runuser -u "$SERVICE_USER" -- "$PREFIX/venv/bin/python" -V >/dev/null \
     || die "The virtualenv Python is not readable by $SERVICE_USER (check $PREFIX/python permissions)."
 }

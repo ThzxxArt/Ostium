@@ -98,6 +98,13 @@ def test_static_source_and_chart_bundle_are_production_safe() -> None:
     assert "sourceMappingURL" not in chart
 
 
+def test_installer_restores_umask_and_normalizes_venv_permissions() -> None:
+    script = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert 'old_umask="$(umask)"' in script
+    assert 'umask "$old_umask"' in script
+    assert 'chmod -R a+rX "$PREFIX/venv" "$UV_PYTHON_INSTALL_DIR"' in script
+
+
 def test_installer_forces_a_managed_python_readable_by_the_service_user() -> None:
     script = (ROOT / "install.sh").read_text(encoding="utf-8")
     assert "UV_PYTHON_PREFERENCE" in script
