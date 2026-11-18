@@ -93,8 +93,12 @@ cp ostium.env.example ostium.env
 openssl rand -base64 32   # OSTIUM_FIELD_KEY
 openssl rand -hex 32      # OSTIUM_SECRET_KEY
 
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+镜像：`ghcr.io/thzxxart/ostium-server:0.2.0`。需要本地构建时使用
+`docker compose up -d --build`。
 
 使用 Caddy profile 时，需要先把证书复制到宿主机 `/etc/ostium/tls/<domain>/`；
 Compose 会把它以只读方式挂载进 Caddy 容器。没有证书时不要启用 caddy profile。

@@ -363,8 +363,12 @@ sudo bash install.sh uninstall --purge  # remove data and user
 cd deploy/docker
 cp ostium.env.example ostium.env
 # fill OSTIUM_SECRET_KEY, OSTIUM_FIELD_KEY and your domain
-docker compose up -d --build
+docker compose up -d
 ```
+
+Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.0`. Run
+`docker compose pull` on first use, or `docker compose up -d --build` after
+local changes.
 
 | Service | Role | Ports |
 |---|---|---|

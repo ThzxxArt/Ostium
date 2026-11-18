@@ -1,7 +1,7 @@
 name: ostium
 
 x-common: &ostium-common
-  image: ostium-server:${OSTIUM_VERSION:-0.2.0}
+  image: ghcr.io/thzxxart/ostium-server:${OSTIUM_VERSION:-0.2.0}
   build:
     context: ../..
     dockerfile: Dockerfile

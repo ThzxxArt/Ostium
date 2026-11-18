@@ -5,6 +5,15 @@ Ostium Server 的 Python 包名沿用 0.1.x 的 **`ostium-ctl`**，命令仍是 
 这样可以直接复用已有的 PyPI 项目和 `release.yml` trusted publisher，
 不需要为 0.2.0 新建项目名。
 
+## 0.2.0 发布记录
+
+2026-11-18 已完成全量发布：
+
+- PyPI：https://pypi.org/project/ostium-ctl/0.2.0/
+- GHCR：`ghcr.io/thzxxart/ostium-server:0.2.0` / `:latest`
+- GitHub Release：https://github.com/ThzxxArt/Ostium/releases/tag/v0.2.0
+- tag：`v0.2.0`
+
 ## 这个包包含什么
 
 PyPI wheel 包含：

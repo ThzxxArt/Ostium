@@ -371,8 +371,11 @@ sudo bash install.sh uninstall --purge  # 删除数据与用户
 cd deploy/docker
 cp ostium.env.example ostium.env
 # 填入 OSTIUM_SECRET_KEY、OSTIUM_FIELD_KEY、域名
-docker compose up -d --build
+docker compose up -d
 ```
+
+预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.0`。首次使用可
+`docker compose pull`；本地改动可用 `docker compose up -d --build`。
 
 服务：
 

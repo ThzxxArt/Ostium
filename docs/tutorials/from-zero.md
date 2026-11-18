@@ -485,13 +485,16 @@ export OSTIUM_ACME_EMAIL=admin@example.com
 
 ### 5.4 启动
 
-先启动 web/worker/jobs：
+先启动 web/worker/jobs。使用发布镜像：
 
 ```bash
 cd Ostium/deploy/docker
-docker compose up -d --build web worker jobs
+docker compose pull web worker jobs
+docker compose up -d web worker jobs
 docker compose ps
 ```
+
+需要本地构建时，把 `pull` 换成 `up -d --build`。
 
 首次初始化：
 
