@@ -727,3 +727,197 @@ def test_last_good_meta_records_dns_and_build_provenance(tmp_path: Path) -> None
     assert meta["dns_probed_at"] == "2026-11-17T00:00:00+00:00"
     assert meta["app_version"] == __version__
     assert meta["config_sha256"] == config_digest(config)
+
+
+def test_terminate_calls_windows_cleanup_when_no_process_is_left(
+    tmp_path: Path, monkeypatch
+) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+    calls: list[bool] = []
+
+    async def cleanup() -> None:
+        calls.append(True)
+
+    monkeypatch.setattr(supervisor, "_cleanup_windows_tun", cleanup)
+    supervisor._process = None
+    supervisor._running_has_tun = True
+    asyncio.run(supervisor._terminate())
+    assert calls == [True]
+    assert supervisor._running_has_tun is False
+
+
+def test_terminate_windows_graceful_path(tmp_path: Path, monkeypatch) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+    calls: list[bool] = []
+
+    async def cleanup() -> None:
+        calls.append(True)
+
+    class Process:
+        returncode: int | None = None
+        pid = 4242
+
+        def __init__(self) -> None:
+            self.signal: int | None = None
+            self.terminated = False
+
+        def send_signal(self, number: int) -> None:
+            self.signal = number
+
+        async def wait(self) -> int:
+            self.returncode = 0
+            return 0
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            pass
+
+    process = Process()
+    monkeypatch.setattr(supervisor_module.os, "name", "nt")
+    monkeypatch.setattr(supervisor_module.signal, "CTRL_BREAK_EVENT", 21, raising=False)
+    monkeypatch.setattr(supervisor, "_cleanup_windows_tun", cleanup)
+    supervisor._process = process  # type: ignore[assignment]
+    supervisor._running_has_tun = True
+    asyncio.run(supervisor._terminate())
+    assert process.signal == 21
+    assert process.terminated is False
+    assert calls == [True]
+    assert supervisor._process is None
+    assert supervisor._running_has_tun is False
+
+
+def test_terminate_windows_falls_back_to_terminate(tmp_path: Path, monkeypatch) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+
+    class Process:
+        returncode: int | None = None
+        pid = 4243
+
+        def __init__(self) -> None:
+            self.terminated = False
+
+        def send_signal(self, number: int) -> None:
+            raise OSError("no console")
+
+        async def wait(self) -> int:
+            self.returncode = 0
+            return 0
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            pass
+
+    process = Process()
+    monkeypatch.setattr(supervisor_module.os, "name", "nt")
+    monkeypatch.setattr(supervisor_module.signal, "CTRL_BREAK_EVENT", 21, raising=False)
+    supervisor._process = process  # type: ignore[assignment]
+    supervisor._running_has_tun = False
+    asyncio.run(supervisor._terminate())
+    assert process.terminated is True
+    assert supervisor._process is None
+
+
+def test_windows_cleanup_is_gated_by_role_and_tun_state(tmp_path: Path, monkeypatch) -> None:
+    from ostium.system import windows_tun
+
+    server = CoreSupervisor(_settings(tmp_path))
+    client_settings = _settings(tmp_path)
+    client_settings.role = Role.CLIENT
+    client = CoreSupervisor(client_settings)
+    calls: list[str] = []
+    monkeypatch.setattr(supervisor_module.os, "name", "nt")
+    monkeypatch.setattr(
+        windows_tun, "cleanup_stale_tun", lambda name: calls.append(name) or {"ok": True}
+    )
+    server._running_has_tun = True
+    asyncio.run(server._cleanup_windows_tun())
+    assert calls == []
+
+    client._running_has_tun = True
+    asyncio.run(client._cleanup_windows_tun())
+    assert calls == [client_settings.tun_interface]
+    client._running_has_tun = False
+    asyncio.run(client._cleanup_windows_tun())
+    assert calls == [client_settings.tun_interface]
+
+
+def test_start_runs_windows_tun_cleanup(tmp_path: Path, monkeypatch) -> None:
+    from ostium.system import windows_tun
+
+    settings = _settings(tmp_path)
+    settings.role = Role.CLIENT
+    supervisor = CoreSupervisor(settings)
+    calls: list[str] = []
+    monkeypatch.setattr(supervisor_module.os, "name", "nt")
+    monkeypatch.setattr(
+        windows_tun, "cleanup_stale_tun", lambda name: calls.append(name) or {"ok": True}
+    )
+    asyncio.run(supervisor.start())
+    assert calls == [settings.tun_interface]
+
+
+def test_config_has_tun_handles_missing_invalid_and_plain_configs(tmp_path: Path) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+    assert supervisor._config_has_tun(tmp_path / "missing.json") is False
+
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{", encoding="utf-8")
+    assert supervisor._config_has_tun(invalid) is False
+
+    no_inbounds = tmp_path / "no-inbounds.json"
+    no_inbounds.write_text("{}", encoding="utf-8")
+    assert supervisor._config_has_tun(no_inbounds) is False
+
+    not_a_list = tmp_path / "not-a-list.json"
+    not_a_list.write_text('{"inbounds": {}}', encoding="utf-8")
+    assert supervisor._config_has_tun(not_a_list) is False
+
+    tun = tmp_path / "tun.json"
+    tun.write_text('{"inbounds": [{"type": "tun"}, "ignored"]}', encoding="utf-8")
+    assert supervisor._config_has_tun(tun) is True
+
+    mixed = tmp_path / "mixed.json"
+    mixed.write_text('{"inbounds": [{"type": "mixed"}]}', encoding="utf-8")
+    assert supervisor._config_has_tun(mixed) is False
+
+
+def test_windows_cleanup_skips_off_windows(tmp_path: Path) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+    supervisor._running_has_tun = True
+    asyncio.run(supervisor._cleanup_windows_tun())
+    assert supervisor._running_has_tun is True
+
+
+def test_rollback_handles_invalid_previous_json_as_client(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    settings.role = Role.CLIENT
+    supervisor = CoreSupervisor(settings)
+
+    async def spawn() -> None:
+        return None
+
+    monkeypatch.setattr(supervisor, "_spawn", spawn)
+    asyncio.run(supervisor._rollback(b"{", None))
+    assert supervisor._running_config_sha is None
+    assert supervisor._last_error is None
+
+
+def test_rollback_rejects_server_config_from_old_policy(tmp_path: Path, monkeypatch) -> None:
+    supervisor = CoreSupervisor(_settings(tmp_path))
+
+    async def spawn() -> None:
+        raise AssertionError("old-policy rollback must not spawn")
+
+    monkeypatch.setattr(supervisor, "_spawn", spawn)
+    asyncio.run(
+        supervisor._rollback(
+            json.dumps({"inbounds": []}).encode(),
+            json.dumps({"policy_version": CONFIG_POLICY_VERSION - 1}).encode(),
+        )
+    )
+    assert supervisor._running_config_sha is None
+    assert "predates the current security policy" in str(supervisor._last_error)
