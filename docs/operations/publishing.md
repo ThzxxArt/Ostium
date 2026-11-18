@@ -20,7 +20,7 @@ PyPI wheel **不包含**：
 
 所以：
 
-- 只想在 Python 项目里使用 `ostium` 命令：可以 `pip install ostium-ctl`。
+- 只想在 Python 项目里使用 `ostium` 命令：可以 `pip install ostium-ctl==0.2.0`。
 - 要部署完整服务端：使用 [一键在线安装](../tutorials/from-zero.md) 或源码
   `install.sh`，它会同时安装部署资产。
 
