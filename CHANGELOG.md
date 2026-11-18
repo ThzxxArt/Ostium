@@ -3,6 +3,15 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.3 — 2026-11-19
+
+### Fixed
+
+- `ostium web` now resolves `gunicorn` next to the running venv Python before
+  falling back to `PATH`. This fixes systemd startup
+  (`CommandError: gunicorn is not installed in this environment`) when the
+  console script is invoked by absolute path.
+
 ## 0.2.2 — 2026-11-19
 
 ### Fixed

@@ -4,8 +4,23 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
+from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
+
+
+def gunicorn_binary() -> str | None:
+    """Prefer the gunicorn installed next to the running venv Python.
+
+    systemd does not put /opt/ostium/venv/bin on PATH when it invokes the
+    absolute console-script path, so ``shutil.which`` alone is not enough.
+    """
+
+    candidate = Path(sys.executable).with_name("gunicorn")
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate)
+    return shutil.which("gunicorn")
 
 
 class Command(BaseCommand):
@@ -17,7 +32,7 @@ class Command(BaseCommand):
         parser.add_argument("--timeout", default="60")
 
     def handle(self, *args, **options):
-        gunicorn = shutil.which("gunicorn")
+        gunicorn = gunicorn_binary()
         if not gunicorn:
             raise CommandError("gunicorn is not installed in this environment.")
         env = os.environ.copy()
