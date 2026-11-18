@@ -10,7 +10,12 @@ GO_SHA256_AMD64="7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab2484
 GO_SHA256_ARM64="3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92"
 UV_VERSION="0.11.14"
 PREFIX="/opt/ostium"
+# Root's PATH may contain a uv-managed or distro Python under /root, which the
+# unprivileged ostium user cannot execute. Force the interpreter we install
+# under /opt/ostium and keep uv's executable links out of /root.
 export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$PREFIX/python}"
+export UV_PYTHON_BIN_DIR="${UV_PYTHON_BIN_DIR:-$PREFIX/bin}"
+export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-managed}"
 CONF_DIR="/etc/ostium"
 DATA_DIR="/var/lib/ostium"
 SERVICE_USER="ostium"
@@ -199,16 +204,33 @@ install_uv() {
     log "Installing uv ${UV_VERSION}"
     curl -LsSf --retry 5 https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_VERSION="$UV_VERSION" sh
   fi
+  install -d -m 0755 "$PREFIX" "$PREFIX/bin"
   uv python install 3.14
-  chmod -R a+rX "$UV_PYTHON_INSTALL_DIR" 2>/dev/null || true
+  chmod -R a+rX "$UV_PYTHON_INSTALL_DIR" "$PREFIX/bin" 2>/dev/null || true
 }
 
 install_app() {
+  local python_real python_root
   install -d -m 0755 "$PREFIX" "$PREFIX/core"
   if [ ! -x "$PREFIX/venv/bin/python" ] || [ "$MODE" = "upgrade" ]; then
     log "Creating Python environment"
     uv venv --python 3.14 --clear "$PREFIX/venv"
   fi
+  python_root="$(readlink -f "$UV_PYTHON_INSTALL_DIR")"
+  python_real="$(readlink -f "$PREFIX/venv/bin/python")"
+  case "$python_real" in
+    "$python_root"/*) ;;
+    *)
+      warn "Existing venv uses $python_real; recreating it with the managed Python"
+      uv venv --python 3.14 --clear "$PREFIX/venv"
+      python_real="$(readlink -f "$PREFIX/venv/bin/python")"
+      ;;
+  esac
+  case "$python_real" in
+    "$python_root"/*) ;;
+    *) die "The venv Python resolves outside $python_root: $python_real" ;;
+  esac
+  chmod -R a+rX "$PREFIX/venv" 2>/dev/null || true
   if [ "$PYPI" -eq 1 ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "ostium-ctl==${PYPI_VERSION}"
   elif [ -n "${WHEEL:-}" ]; then

@@ -70,6 +70,16 @@ def test_installer_enforces_option_and_caddy_preconditions() -> None:
     assert "constant.Version=v${SINGBOX_VERSION}" in script
 
 
+def test_installer_forces_a_managed_python_readable_by_the_service_user() -> None:
+    script = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert "UV_PYTHON_PREFERENCE" in script
+    assert "only-managed" in script
+    assert "UV_PYTHON_BIN_DIR" in script
+    assert 'readlink -f "$PREFIX/venv/bin/python"' in script
+    assert "The venv Python resolves outside" in script
+    assert 'chmod -R a+rX "$PREFIX/venv"' in script
+
+
 def test_container_base_images_are_digest_pinned() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     compose = (ROOT / "deploy/docker/compose.yml").read_text(encoding="utf-8")

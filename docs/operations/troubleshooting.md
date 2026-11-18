@@ -23,6 +23,34 @@ curl -s http://127.0.0.1:8000/readyz | python -m json.tool
 ostium axes_reset
 ```
 
+## 安装时报 `venv/bin/python: Permission denied`
+
+安装器必须使用 `/opt/ostium/python` 下由 uv 管理的解释器，不能用 `/root`
+下的 Python。若 root 的 `PATH` 先命中 `/root/.local/bin/python3.14`，venv 可能
+链接到 `ostium` 用户不可读的路径。
+
+先检查：
+
+```bash
+readlink -f /opt/ostium/venv/bin/python
+namei -l /opt/ostium/venv/bin/python
+```
+
+修复并重新安装：
+
+```bash
+export UV_PYTHON_INSTALL_DIR=/opt/ostium/python
+export UV_PYTHON_BIN_DIR=/opt/ostium/bin
+export UV_PYTHON_PREFERENCE=only-managed
+uv python install 3.14
+uv venv --python 3.14 --clear /opt/ostium/venv
+chmod -R a+rX /opt/ostium/python /opt/ostium/venv
+runuser -u ostium -- /opt/ostium/venv/bin/python -V
+```
+
+然后重新执行一键安装命令。新版安装器会自动强制 managed Python，并自动
+重建指向错误路径的旧 venv。
+
 ## 配置一直“待应用”
 
 1. `ostium status` 查看 `last_error`。
