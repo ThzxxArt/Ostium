@@ -543,20 +543,46 @@ class WindowsProxy(BaseProxy):
             values.get("ProxyServer"), expected_port
         )
 
+    @staticmethod
+    def _registry_is_ours(values: dict[str, Any], port: int) -> bool:
+        # A PAC URL takes precedence over the manual proxy.  Treating it as
+        # "enabled" would make the UI claim traffic is proxied while WinINET
+        # still evaluates someone else's PAC.
+        return (
+            bool(values.get("ProxyEnable"))
+            and not values.get("AutoConfigURL")
+            and _proxy_targets_local(values.get("ProxyServer"), port)
+        )
+
     def status(self) -> dict[str, Any]:
         status = super().status()
-        if status["enabled"] or sys.platform != "win32":  # pragma: no cover - Windows only
+        if sys.platform != "win32":  # pragma: no cover - Windows only
             return status
         try:
             values = self._registry_values()
         except OSError:  # pragma: no cover - Windows only
             return status
-        if values.get("ProxyEnable") and _proxy_targets_local(
-            values.get("ProxyServer"), self.settings.mixed_port
-        ):
+        try:
+            intended_port = int(status.get("port") or self.settings.mixed_port)
+        except (TypeError, ValueError):
+            intended_port = self.settings.mixed_port
+        live = self._registry_is_ours(values, intended_port)
+        status["registry_enabled"] = live
+        if live:
             status["enabled"] = True
             status["host"] = "127.0.0.1"
-            status["port"] = self.settings.mixed_port
+            status["port"] = intended_port
+            status["stale"] = False
+        elif status["enabled"]:
+            # The state file says enabled, but WinINET does not point at this
+            # install any more.  Another proxy client (or the user) rewrote the
+            # registry after we enabled it.  Report the truth so connect()
+            # re-applies instead of returning early, and so the watchdog can
+            # take the proxy back.
+            status["enabled"] = False
+            status["stale"] = True
+        else:
+            status["stale"] = False
         return status
 
     def recover_if_stale(self) -> None:
@@ -577,7 +603,9 @@ class WindowsProxy(BaseProxy):
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, Any]:
         port = port or self.settings.mixed_port
-        if self._already_enabled(host, port):
+        if self._already_enabled(host, port) and self._registry_is_ours(
+            self._registry_values(), port
+        ):
             return self.status()
         import winreg  # pragma: no cover - Windows only
 
@@ -592,6 +620,12 @@ class WindowsProxy(BaseProxy):
                 except FileNotFoundError:
                     original[name] = None
             state = _read_state(self.state_path)
+            previous = state.get(STATE_KEY, {})
+            if previous.get("enabled") and previous.get("original"):
+                # Re-asserting after an external rewrite must restore the
+                # proxy values that existed before Ostium first took over, not
+                # the values the other client left behind.
+                original = dict(previous["original"])
             state[STATE_KEY] = {
                 "platform": self.platform,
                 "enabled": True,

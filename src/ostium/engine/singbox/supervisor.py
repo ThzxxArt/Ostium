@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import json
 import os
+import signal
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -127,6 +128,26 @@ class CoreSupervisor:
         self._last_error: str | None = None
         self._started_at: datetime | None = None
         self._running_config_sha: str | None = None
+        self._running_has_tun = False
+
+    @staticmethod
+    def _config_has_tun(path: Path) -> bool:
+        try:
+            config = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return False
+        inbounds = config.get("inbounds")
+        return isinstance(inbounds, list) and any(
+            isinstance(item, dict) and item.get("type") == "tun" for item in inbounds
+        )
+
+    async def _cleanup_windows_tun(self) -> None:
+        if os.name != "nt" or self.settings.role is not Role.CLIENT or not self._running_has_tun:
+            return
+        from ostium.system.windows_tun import cleanup_stale_tun
+
+        result = await asyncio.to_thread(cleanup_stale_tun, self.settings.tun_interface)
+        self._append_log("supervisor", f"stopped TUN cleanup: {result}")
 
     def _materialise_artifacts(
         self, config: dict[str, Any], artifacts: dict[str, str] | None
@@ -222,6 +243,11 @@ class CoreSupervisor:
         # invalid or stale last-good file leaves the orphan running and the
         # next apply fails on a port conflict.
         self._cleanup_orphan()
+        if os.name == "nt" and self.settings.role is Role.CLIENT:  # pragma: no cover
+            from ostium.system.windows_tun import cleanup_stale_tun
+
+            cleanup = await asyncio.to_thread(cleanup_stale_tun, self.settings.tun_interface)
+            self._append_log("supervisor", f"stale TUN cleanup: {cleanup}")
         if not self.last_good.is_file():
             return
         if self.settings.role is Role.SERVER:
@@ -507,6 +533,7 @@ class CoreSupervisor:
         self._cleanup_orphan()
         if not self.last_good.is_file():
             raise EngineUnavailable("no last-good configuration is available")
+        self._running_has_tun = self._config_has_tun(self.last_good)
         self._rotate_logs()
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         handle = self.log_path.open("ab", buffering=0)
@@ -519,7 +546,13 @@ class CoreSupervisor:
         if os.name == "posix":
             kwargs["start_new_session"] = True
         else:  # pragma: no cover - exercised on Windows
-            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            # A hidden console plus its own process group lets the supervisor
+            # deliver CTRL_BREAK_EVENT on stop.  TerminateProcess skips
+            # sing-box's cleanup, which can leave a Wintun adapter or route
+            # behind and blackhole traffic until the next reboot.
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+            )
         try:
             process = await asyncio.create_subprocess_exec(*command, **kwargs)
         except OSError as exc:
@@ -604,7 +637,29 @@ class CoreSupervisor:
         process = self._process
         if process is None or process.returncode is not None:
             self._process = None
+            if self._running_has_tun:
+                await self._cleanup_windows_tun()
+                self._running_has_tun = False
             return
+        if os.name == "nt":  # pragma: no cover - exercised on Windows
+            # TerminateProcess does not unwind sing-box's Wintun/TUN cleanup.
+            # CTRL_BREAK_EVENT reaches the hidden console process group and
+            # lets the core remove its adapter and routes before it exits.
+            try:
+                ctrl_break = getattr(signal, "CTRL_BREAK_EVENT", None)
+                if ctrl_break is None:
+                    raise OSError("CTRL_BREAK_EVENT is unavailable")
+                process.send_signal(ctrl_break)
+                await asyncio.wait_for(process.wait(), timeout=5)
+                self._process = None
+                self._append_log("supervisor", "stopped sing-box gracefully")
+                await self._cleanup_windows_tun()
+                self._running_has_tun = False
+                return
+            except (OSError, ValueError, ProcessLookupError):
+                pass
+            except TimeoutError:
+                pass
         try:
             process.terminate()
             await asyncio.wait_for(process.wait(), timeout=10)
@@ -616,6 +671,9 @@ class CoreSupervisor:
         finally:
             self._process = None
             self._append_log("supervisor", "stopped sing-box")
+        if self._running_has_tun:
+            await self._cleanup_windows_tun()
+            self._running_has_tun = False
 
     def _cleanup_orphan(self) -> None:
         """Terminate a sing-box child left behind by a killed core process.

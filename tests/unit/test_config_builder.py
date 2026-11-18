@@ -105,6 +105,12 @@ def test_client_config_shape() -> None:
     assert config["outbounds"][-2]["type"] == "selector"
     assert config["route"]["final"] == "proxy"
     assert config["route"]["rule_set"] == []
+    remote = next(server for server in config["dns"]["servers"] if server["tag"] == "remote")
+    assert remote["type"] == "https"
+    assert remote["server"] == "1.1.1.1"
+    assert remote["path"] == "/dns-query"
+    assert remote["detour"] == "proxy"
+    assert remote["tls"]["server_name"] == "cloudflare-dns.com"
 
 
 def test_client_tun_config_shape() -> None:
@@ -128,7 +134,7 @@ def test_client_tun_config_shape() -> None:
     tun = config["inbounds"][0]
     assert tun["type"] == "tun"
     assert tun["interface_name"] == "ostium0"
-    assert tun["strict_route"] is True
+    assert tun["strict_route"] is False
     assert "route_exclude_address" in tun
 
 
@@ -340,3 +346,25 @@ def test_doh_url_path_is_not_treated_as_a_filesystem_path(tmp_path: Path) -> Non
         allowed_paths=[tmp_path],
         allow_lan=False,
     )
+
+
+def test_client_doh_uses_the_url_host_and_sni() -> None:
+    endpoint = Endpoint(
+        tag="reality",
+        protocol=Protocol.VLESS_REALITY,
+        name="HK",
+        server="vpn.example.com",
+        port=443,
+        uuid="2d4f2f26-6f4f-4f17-9a1f-1a5d63500f0e",
+        tls=TLSConfig(reality_public_key="pub", reality_short_id="sid"),
+    )
+    config = build_client_config(
+        ClientConfigSpec(
+            endpoints=[endpoint],
+            clash_secret="secret",
+            dns_remote="https://dns.google/dns-query",
+        )
+    )
+    remote = next(server for server in config["dns"]["servers"] if server["tag"] == "remote")
+    assert remote["server"] == "dns.google"
+    assert remote["tls"]["server_name"] == "dns.google"

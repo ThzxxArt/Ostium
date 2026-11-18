@@ -211,7 +211,12 @@ class ClientTunSpec:
     stack: str = "gvisor"
     ipv6: bool = True
     auto_route: bool = True
-    strict_route: bool = True
+    # sing-box implements strict_route on Windows with WFP filters.  A hard
+    # kill (TerminateProcess) does not run its cleanup, and a leftover filter
+    # can blackhole all outbound TCP until the machine reboots.  Ostium has no
+    # firewall-level kill switch, so leaking around a stopped TUN is already
+    # the documented behaviour; do not pay the Windows WFP risk for it.
+    strict_route: bool = False
     dns_mode: str = "hijack"
 
 
@@ -567,6 +572,20 @@ def _local_dns_server(value: str) -> dict[str, Any]:
     return {"type": "udp", "tag": "local", "server": candidate}
 
 
+def _client_remote_dns(value: str) -> dict[str, Any]:
+    host, path, tls_name = doh_host_and_path(value)
+    entry: dict[str, Any] = {
+        "type": "https",
+        "tag": "remote",
+        "server": host,
+        "path": path,
+        "detour": "proxy",
+    }
+    if tls_name:
+        entry["tls"] = {"server_name": tls_name}
+    return entry
+
+
 def _client_dns(spec: ClientConfigSpec, tun_enabled: bool) -> dict[str, Any]:
     if spec.routing_mode == "direct":
         # Direct mode must not send DNS queries through a proxy outbound that
@@ -577,12 +596,7 @@ def _client_dns(spec: ClientConfigSpec, tun_enabled: bool) -> dict[str, Any]:
             "final": "local",
         }
     servers: list[dict[str, Any]] = [
-        {
-            "type": "https",
-            "tag": "remote",
-            "server": spec.dns_remote.removeprefix("https://").split("/")[0],
-            "detour": "proxy",
-        },
+        _client_remote_dns(spec.dns_remote),
         _local_dns_server(spec.dns_local),
     ]
     rules: list[dict[str, Any]] = []

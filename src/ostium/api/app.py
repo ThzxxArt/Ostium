@@ -979,12 +979,13 @@ async def _watchdog_tick(services: Services) -> None:
 
 
 class _ProxyWatchdogState:
-    __slots__ = ("alerted", "down_since", "reconcile_attempted")
+    __slots__ = ("alerted", "down_since", "proxy_reasserted", "reconcile_attempted")
 
     def __init__(self) -> None:
         self.down_since: float | None = None
         self.reconcile_attempted = False
         self.alerted = False
+        self.proxy_reasserted = False
 
 
 async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, now: float) -> None:
@@ -1009,6 +1010,31 @@ async def _proxy_watchdog_tick(services: Services, state: _ProxyWatchdogState, n
         services.proxy_fail_open_active = False
         return
     proxy_status = await asyncio.to_thread(lambda: services.proxy.status())
+    if proxy_status.get("stale") and not services.proxy_fail_open_active:
+        # Another proxy client rewrote WinINET after we enabled it.  The core
+        # is healthy, so silently falling back to direct traffic is wrong:
+        # take the system proxy back and record it once.
+        running = False
+        try:
+            running = bool((await services.engine.client.status()).get("running"))
+        except Exception:
+            running = False
+        if running:
+            try:
+                await asyncio.to_thread(
+                    lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+                )
+                if not state.proxy_reasserted:
+                    services.bus.log(
+                        "warning",
+                        "another application changed the system proxy; re-applied it",
+                    )
+                    state.proxy_reasserted = True
+                proxy_status = await asyncio.to_thread(lambda: services.proxy.status())
+            except Exception as exc:
+                services.bus.log("error", "could not re-apply the system proxy", error=str(exc))
+    else:
+        state.proxy_reasserted = False
     if not proxy_status.get("enabled") and not services.proxy_fail_open_active:
         state.down_since = None
         state.reconcile_attempted = False

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any, Literal
 
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ostium import __version__
 from ostium.api.deps import Services, client_ip, get_current_admin, get_services, get_session
 from ostium.api.errors import ApiError
+from ostium.config import Mode
 from ostium.db.models import AdminUser, ApiToken, Certificate
 from ostium.services.audit import audit
 from ostium.services.settings import all_settings, get_setting, set_setting
@@ -349,6 +351,26 @@ async def update_settings(
         try:
             result = await services.engine.apply_client(session)
             applied = {"applied": True, "revision": result["status"].get("revision")}
+            if (
+                "mixed_port" in changes
+                and services.settings.mode is Mode.SYSTEM_PROXY
+                and not services.settings.tun_enabled
+            ):
+                # The core just moved to a new port.  Windows still has the
+                # old IP:port in WinINET, so the browser would keep talking to
+                # a closed listener until the next full reconnect.  Move the
+                # system proxy in the same operation while it is ours.
+                status = await asyncio.to_thread(lambda: services.proxy.status())
+                if status.get("enabled") or status.get("stale"):
+                    try:
+                        await asyncio.to_thread(
+                            lambda: services.proxy.enable("127.0.0.1", services.settings.mixed_port)
+                        )
+                    except Exception as exc:
+                        applied["warning"] = (
+                            "core moved to the new mixed port, but the system proxy "
+                            f"still points at the old port: {exc}"
+                        )
         except Exception as exc:
             if "allow_lan" in changes:
                 # The switch must reflect reality: never leave the UI showing

@@ -422,6 +422,57 @@ def test_windows_proxy_double_enable_keeps_the_original_values(
     assert store["ProxyOverride"] == "<local>"
 
 
+def test_windows_proxy_reports_and_repairs_an_external_rewrite(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A second proxy client such as Clash can rewrite WinINET after Ostium
+    # enabled the proxy.  The state file must not keep claiming "enabled": the
+    # browser would go direct while the UI and Test Connection report success.
+    store: dict[str, Any] = {"ProxyEnable": 0, "ProxyServer": "corp.example:8080"}
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    assert proxy.enable()["enabled"] is True
+    assert store["ProxyServer"] == f"127.0.0.1:{settings.mixed_port}"
+
+    store["ProxyEnable"] = 0
+    stale = proxy.status()
+    assert stale["enabled"] is False
+    assert stale["stale"] is True
+    assert stale["registry_enabled"] is False
+
+    # Reconnecting re-asserts the proxy instead of trusting the state file.
+    repaired = proxy.enable()
+    assert repaired["enabled"] is True
+    assert repaired["stale"] is False
+    assert store["ProxyEnable"] == 1
+    assert store["ProxyServer"] == f"127.0.0.1:{settings.mixed_port}"
+
+    # The values captured before the first takeover still win on disconnect.
+    proxy.disable()
+    assert store["ProxyEnable"] == 0
+    assert store["ProxyServer"] == "corp.example:8080"
+
+
+def test_windows_proxy_treats_an_external_pac_as_not_ours(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: dict[str, Any] = {"ProxyEnable": 0}
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(store))
+    monkeypatch.setattr(proxy_module, "_notify_wininet", lambda: None)
+    monkeypatch.setattr(proxy_module.sys, "platform", "win32")
+    proxy = WindowsProxy(settings)
+    proxy.enable()
+    store["AutoConfigURL"] = "http://pac.example/proxy.pac"
+    stale = proxy.status()
+    assert stale["enabled"] is False
+    assert stale["stale"] is True
+    repaired = proxy.enable()
+    assert repaired["enabled"] is True
+    assert "AutoConfigURL" not in store
+
+
 def test_system_proxy_factory(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(proxy_module.sys, "platform", "win32")
     assert isinstance(system_proxy(settings), WindowsProxy)

@@ -15,16 +15,23 @@ from ostium.services.events import EventBus
 class FakeProxy:
     def __init__(self) -> None:
         self.enabled = True
+        self.stale = False
         self.disable_calls = 0
         self.enable_calls = 0
         self.fail_enable = False
 
     def status(self) -> dict[str, object]:
-        return {"enabled": self.enabled, "supported": True, "platform": "test"}
+        return {
+            "enabled": self.enabled,
+            "stale": self.stale,
+            "supported": True,
+            "platform": "test",
+        }
 
     def disable(self) -> dict[str, object]:
         self.disable_calls += 1
         self.enabled = False
+        self.stale = False
         return self.status()
 
     def enable(self, host: str = "127.0.0.1", port: int | None = None) -> dict[str, object]:
@@ -33,6 +40,7 @@ class FakeProxy:
             raise RuntimeError("cannot enable")
         self.enable_calls += 1
         self.enabled = True
+        self.stale = False
         return self.status()
 
 
@@ -105,6 +113,44 @@ def test_fail_open_threshold_and_recovery(tmp_path: Path) -> None:
         assert proxy.enable_calls == 1
         assert services.proxy_fail_open_active is False
         assert services.proxy_restore_pending is False
+        await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_external_proxy_rewrite_is_reasserted(tmp_path: Path) -> None:
+    async def _run() -> None:
+        settings = _settings(tmp_path)
+        engine = create_engine(settings.paths.db_path)
+        await create_schema(engine)
+        factory = create_session_factory(engine)
+        proxy = FakeProxy()
+        engine_stub = FakeEngine()
+        engine_stub.running = True
+        services = SimpleNamespace(
+            settings=settings,
+            session_factory=factory,
+            bus=EventBus(),
+            proxy=proxy,
+            engine=engine_stub,
+            client_paused=False,
+            proxy_fail_open_active=False,
+            proxy_fail_open_since=None,
+            proxy_restore_pending=False,
+        )
+        state = _ProxyWatchdogState()
+
+        # Another proxy client rewrote the OS setting after Ostium enabled it.
+        proxy.enabled = False
+        proxy.stale = True
+        await _proxy_watchdog_tick(services, state, 100.0)
+        assert proxy.enable_calls == 1
+        assert proxy.enabled is True
+        assert state.proxy_reasserted is True
+
+        # A healthy proxy is not touched on the next tick.
+        await _proxy_watchdog_tick(services, state, 105.0)
+        assert proxy.enable_calls == 1
         await engine.dispose()
 
     asyncio.run(_run())

@@ -4,7 +4,7 @@ import pyotp
 import pytest
 from fastapi.testclient import TestClient
 
-from ostium.config import Settings
+from ostium.config import Mode, Settings
 from tests.conftest import csrf, setup_admin
 
 
@@ -128,6 +128,35 @@ def test_allow_lan_rejects_tun_mode(client_api: TestClient) -> None:
     assert response.status_code == 409
     assert response.json()["code"] == "mode_conflict"
     assert services.settings.allow_lan is False
+
+
+def test_mixed_port_change_moves_the_system_proxy(
+    client_api: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = setup_admin(client_api, role="client")
+    headers = _headers(token)
+    services = client_api.app.state.services
+    services.settings.mode = Mode.SYSTEM_PROXY
+    enabled: list[tuple[str, int]] = []
+
+    async def apply(session) -> dict:  # type: ignore[no-untyped-def]
+        return {"status": {"revision": "port-revision"}}
+
+    class Proxy:
+        def status(self) -> dict:
+            return {"enabled": True, "stale": False}
+
+        def enable(self, host: str, port: int) -> dict:
+            enabled.append((host, port))
+            return {"enabled": True}
+
+    monkeypatch.setattr(services.engine, "apply_client", apply)
+    monkeypatch.setattr(services, "proxy_manager", Proxy())
+    response = client_api.patch("/api/v1/settings", json={"mixed_port": 7899}, headers=headers)
+    assert response.status_code == 200, response.text
+    assert services.settings.mixed_port == 7899
+    # The old WinINET value points at a closed port; the update must move it.
+    assert enabled == [("127.0.0.1", 7899)]
 
 
 def test_settings_save_failure(api_client: TestClient, monkeypatch) -> None:
