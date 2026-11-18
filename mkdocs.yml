@@ -1,0 +1,65 @@
+site_name: Ostium Server
+site_description: Linux single-host private proxy server with standard subscriptions
+site_url: https://github.com/ostium-dev/ostium
+repo_url: https://github.com/ostium-dev/ostium
+repo_name: ostium-dev/ostium
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: 切换到浅色
+    - scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到深色
+  features:
+    - navigation.instant
+    - navigation.sections
+    - content.code.copy
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - 首页: index.md
+  - 快速开始: getting-started.md
+  - 安装: installation.md
+  - 配置: configuration.md
+  - 订阅: subscriptions.md
+  - 协议: protocols.md
+  - 证书: certificates.md
+  - 架构: architecture.md
+  - 安全: security.md
+  - API: api.md
+  - CLI: cli.md
+  - 运维:
+      - 备份与恢复: operations/backup-restore.md
+      - 升级: operations/upgrade.md
+      - 监控: operations/monitoring.md
+      - 排障: operations/troubleshooting.md
+      - E2E 验证: operations/e2e-evidence.md
+  - 参考:
+      - 设置项: reference/settings.md
+      - 订阅格式: reference/formats.md
+      - 端口: reference/ports.md
+  - 设计文档:
+      - 最终方案: design/v0.2.0-final.md
+      - 实施决策: design/decisions.md
+
+strict: true

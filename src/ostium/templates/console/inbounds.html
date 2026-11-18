@@ -1,0 +1,166 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}线路{% endblock %}
+{% block breadcrumb %}线路{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "lan" "w-3.5 h-3.5" %} Inbounds</div>
+            <h1 class="page-title">线路与协议</h1>
+            <p class="page-desc">四条服务端线路。保存后由 worker 生成配置、用 sing-box check 校验，再平滑应用。</p>
+        </div>
+        <div class="page-actions">
+            <span class="status-pill {% if state.desired_revision == state.applied_revision %}status-pill--success{% else %}status-pill--warning{% endif %}">
+                {% if state.desired_revision == state.applied_revision %}配置已同步{% else %}等待应用 rev {{ state.desired_revision }}{% endif %}
+            </span>
+            <a class="btn" href="{% url 'admin:proxy_inbound_changelist' %}">{% icon "settings" %} 高级编辑</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    {% if state.last_error %}
+        <div class="alert-banner alert-banner--danger mt-2">
+            {% icon "alert" %}
+            <div><strong>最近一次应用失败：</strong>{{ state.last_error|truncatechars:300 }}</div>
+        </div>
+    {% endif %}
+    <div class="inbound-grid mt-4">
+        {% for record in records %}
+            {% with form=forms|get_item:record.kind %}
+                <section class="inbound-card">
+                    <div class="inbound-head">
+                        <div>
+                            <div class="inbound-title">
+                                <span class="protocol-glyph">
+                                    {% if record.kind == "vless" %}VL{% elif record.kind == "hysteria2" %}H2{% elif record.kind == "trojan" %}TR{% else %}SS{% endif %}
+                                </span>
+                                <span>{{ record.label }}</span>
+                            </div>
+                            <div class="muted text-xs" style="margin-top:6px">
+                                {% if record.kind == "vless" %}VLESS + Reality + XTLS Vision
+                                {% elif record.kind == "hysteria2" %}QUIC / UDP，低延迟高吞吐
+                                {% elif record.kind == "trojan" %}TLS 伪装，兼容性广
+            {% else %}Shadowsocks 2022，多用户密钥{% endif %}
+                </div>
+                </div>
+                <span class="badge {% if record.enabled %}badge--success{% else %}badge--muted{% endif %}">{% if record.enabled %}已启用{% else %}未启用{% endif %}</span>
+                </div>
+                {% if form.non_field_errors %}
+                    <div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <form method="post" class="stack">
+                    {% csrf_token %}
+                    <input type="hidden" name="kind" value="{{ record.kind }}">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="{{ form.listen.id_for_label }}">监听地址</label>
+                            {{ form.listen }}
+                            {{ form.listen.errors }}
+                        </div>
+                        <div class="field">
+                            <label for="{{ form.port.id_for_label }}">端口</label>
+                            {{ form.port }}
+                            {{ form.port.errors }}
+                        </div>
+                        {% if record.needs_certificate %}
+                            <div class="field full">
+                                <label for="{{ form.certificate.id_for_label }}">TLS 证书</label>
+                                {{ form.certificate }}
+                                {{ form.certificate.errors }}
+                                {% if not record.certificate %}<span class="helptext">此协议需要先导入并分配证书。</span>{% endif %}
+                            </div>
+                        {% endif %}
+                        <div class="field full">
+                            <label class="checkbox-row" for="{{ form.enabled.id_for_label }}">
+                                {{ form.enabled }} <span>启用此线路</span>
+                            </label>
+                            {{ form.enabled.errors }}
+                        </div>
+                    </div>
+                    <div class="inbound-meta">
+                        {% if record.kind == "vless" %}
+                            <div class="meta-chip">
+                                <div class="meta-label">Reality 公钥</div>
+                                <div class="meta-value">{{ record.params.public_key|default:"—" }}</div>
+                            </div>
+                            <div class="meta-chip">
+                                <div class="meta-label">Short ID</div>
+                                <div class="meta-value">{{ record.params.short_id|default:"—" }}</div>
+                            </div>
+                            <div class="meta-chip">
+                                <div class="meta-label">SNI</div>
+                                <div class="meta-value">{{ record.params.server_name|default:"—" }}</div>
+                            </div>
+                        {% elif record.kind == "shadowsocks" %}
+                            <div class="meta-chip">
+                                <div class="meta-label">加密方法</div>
+                                <div class="meta-value">{{ record.params.method|default:"—" }}</div>
+                            </div>
+                            <div class="meta-chip">
+                                <div class="meta-label">多用户</div>
+                                <div class="meta-value">2022 用户密钥</div>
+                            </div>
+                        {% elif record.kind == "hysteria2" %}
+                            <div class="meta-chip"><div class="meta-label">混淆</div><div class="meta-value">{% if record.params.obfs_password %}salamander{% else %}未启用{% endif %}</div></div>
+                            <div class="meta-chip">
+                                <div class="meta-label">传输</div>
+                                <div class="meta-value">QUIC / UDP</div>
+                            </div>
+                        {% else %}
+                            <div class="meta-chip">
+                                <div class="meta-label">传输</div>
+                                <div class="meta-value">TLS / TCP</div>
+                            </div>
+                            <div class="meta-chip">
+                                <div class="meta-label">证书</div>
+                                <div class="meta-value">{{ record.certificate.domain|default:"未分配" }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if record.validation_errors %}
+                        <div class="alert-banner alert-banner--warning">
+                            {% icon "alert" %}
+                            <div>
+                                <strong>还不能启用：</strong>
+                                {% for error in record.validation_errors %}{{ error }}{% if not forloop.last %}；{% endif %}{% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="form-actions" style="margin-top:0">
+                        {% if record.kind != "trojan" %}
+                            <button class="btn btn--ghost btn--sm"
+                                    type="submit"
+                                    name="action"
+                                    value="rotate_keys"
+                                    formnovalidate
+                                    data-confirm="轮换密钥会使现有客户端失效，直到重新导入订阅。继续？">{% icon "refresh" %} 轮换密钥</button>
+                        {% endif %}
+                        <button class="btn btn--primary btn--sm"
+                                type="submit"
+                                name="action"
+                                value="save">{% icon "check" %} 保存</button>
+                    </div>
+                </form>
+                </section>
+            {% endwith %}
+        {% empty %}
+            <div class="panel span-12">
+                <div class="empty-state">
+                    <span class="empty-icon">{% icon "lan" %}</span>
+                    <div class="empty-title">还没有线路</div>
+                    <div class="empty-copy">运行 <code class="mono">ostium inbound init</code> 创建四条默认线路。</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <section class="panel mt-6">
+        <div class="panel-head">
+            <div class="panel-title">{% icon "shield" %} 端口与证书提示</div>
+        </div>
+        <div class="panel-body text-sm muted">
+            <p>· 同一 TCP 端口不能同时被 VLESS、Trojan 或 Shadowsocks 使用；Hysteria2 使用 UDP，可与 TCP 443 共存。</p>
+            <p>· Hysteria2 与 Trojan 必须分配状态为“可用”的证书；证书到期会阻止配置应用。</p>
+            <p>· Reality 使用自己的密钥对与 SNI，不需要证书；轮换后请重新分发订阅。</p>
+        </div>
+    </section>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}审计{% endblock %}
+{% block breadcrumb %}审计{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "history" "w-3.5 h-3.5" %} Audit trail</div>
+            <h1 class="page-title">审计日志</h1>
+            <p class="page-desc">敏感操作留痕：登录、token 展示/轮换、证书、备份、设置与配置变更。敏感字段不记录。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn" href="{% url 'admin:operations_auditevent_changelist' %}">{% icon "settings" %} Admin 视图</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <section class="panel">
+        <div class="panel-head">
+            <form method="get" class="search-bar">
+                <select class="select"
+                        name="action"
+                        style="width:auto;
+                               min-width:190px"
+                        aria-label="动作筛选">
+                    <option value="">全部动作</option>
+                    {% for action in actions %}
+                        <option value="{{ action }}"
+                                {% if action == action_filter %}selected{% endif %}>{{ action }}</option>
+                    {% endfor %}
+                </select>
+                <label class="search-input" style="min-width:190px">
+                    <span class="sr-only">按 actor 搜索</span>
+                    {% icon "search" %}
+                    <input class="input"
+                           type="search"
+                           name="actor"
+                           value="{{ actor }}"
+                           placeholder="操作者…">
+                </label>
+                <button class="btn btn--sm" type="submit">筛选</button>
+            </form>
+            <span class="badge">{{ page.paginator.count }} 条</span>
+        </div>
+        {% if page.object_list %}
+            <div class="table-wrap">
+                <table class="data-table data-table--cards">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>动作</th>
+                            <th>操作者</th>
+                            <th>目标</th>
+                            <th>IP</th>
+                            <th>详情</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in page %}
+                            <tr>
+                                <td data-label="时间" class="muted mono text-xs">{{ event.created_at|datetimefmt }}</td>
+                                <td data-label="动作"><span class="badge">{{ event.action }}</span></td>
+                                <td data-label="操作者"
+                                    class="cell-strong">{{ event.actor.username|default:"system" }}</td>
+                                <td data-label="目标" class="muted">{{ event.target|default:"—" }}</td>
+                                <td data-label="IP" class="mono text-xs">{{ event.ip|default:"local" }}</td>
+                                <td data-label="详情">
+                                    {% if event.detail %}
+                                        <details>
+                                            <summary class="link-quiet">展开</summary>
+                                            <pre class="code-block mt-1"
+                                                 style="max-height:160px">{{ event.detail }}</pre>
+                                        </details>
+                        {% else %}<span class="muted">—</span>{% endif %}
+                            </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "partials/pagination.html" with page=page action_filter=action_filter actor=actor %}
+        {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "history" %}</span>
+                <div class="empty-title">暂无审计记录</div>
+                <div class="empty-copy">执行敏感操作后，这里会显示时间线。</div>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

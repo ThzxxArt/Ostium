@@ -1,0 +1,49 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare environment
+        run: |
+          cp deploy/docker/ostium.env.example deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_SECRET_KEY=.*|OSTIUM_SECRET_KEY=$(openssl rand -hex 32)|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_FIELD_KEY=.*|OSTIUM_FIELD_KEY=$(openssl rand -base64 32 | tr -d '\\n')|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_ALLOWED_HOSTS=.*|OSTIUM_ALLOWED_HOSTS=localhost,127.0.0.1|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_PUBLIC_BASE_URL=.*|OSTIUM_PUBLIC_BASE_URL=http://127.0.0.1:8000|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_BEHIND_PROXY=.*|OSTIUM_BEHIND_PROXY=false|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_SECURE_COOKIES=.*|OSTIUM_SECURE_COOKIES=false|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_REQUIRE_TOTP=.*|OSTIUM_REQUIRE_TOTP=false|" deploy/docker/ostium.env
+      - name: Build and start
+        run: docker compose -f deploy/docker/compose.yml up -d --build web worker
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose -f deploy/docker/compose.yml exec -T web \
+              python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f deploy/docker/compose.yml logs --no-color
+          exit 1
+      - name: Create user and fetch subscriptions
+        run: |
+          docker compose -f deploy/docker/compose.yml exec -T web ostium init --username admin --password "Ostium-E2E-Password-2026"
+          docker compose -f deploy/docker/compose.yml exec -T web ostium user add e2e --quota 1G
+          docker compose -f deploy/docker/compose.yml exec -T web ostium status
+      - name: Logs
+        if: always()
+        run: docker compose -f deploy/docker/compose.yml logs --no-color
+      - name: Stop
+        if: always()
+        run: docker compose -f deploy/docker/compose.yml down -v

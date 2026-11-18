@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/app.css' %}">{% endblock %}
+{% block content_title %}<h1 class="text-lg font-semibold">{{ title }}</h1>{% endblock %}
+{% block content %}
+    <div class="ostium-admin-wrap" style="max-width:980px">
+        <div class="panel panel--solid">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-title">{% trans "Subscription token" %}</div>
+                    <div class="panel-sub">{% trans "Full URLs are shown only after an explicit reveal." %}</div>
+                </div>
+                <span class="badge {% if revealed %}badge--warning{% else %}badge--muted{% endif %}">
+                    {% if revealed %}
+                        {% trans "revealed" %}
+                    {% else %}
+                        {% trans "masked" %}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="panel-body">
+                <div class="copy-field"><code>{{ token }}</code></div>
+                <div class="form-actions" style="justify-content:flex-start">
+                    {% if not revealed %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="reveal">
+                            <button class="btn btn--primary" type="submit">{% trans "Reveal full links" %}</button>
+                        </form>
+                    {% endif %}
+                    <form method="post"
+                          onsubmit="return confirm('{% trans "Rotate the token? Old URLs stop working immediately." %}')">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="rotate">
+                        <button class="btn btn--danger" type="submit">{% trans "Rotate token" %}</button>
+                    </form>
+                    <a class="btn"
+                       href="{% url 'admin:proxy_proxyuser_change' original.pk %}">{% trans "Back to user" %}</a>
+                </div>
+            </div>
+        </div>
+        {% if revealed %}
+            <div class="grid grid--12 mt-6">
+                <div class="span-8 stack">
+                    {% for link in links %}
+                        <div class="panel panel--solid">
+                            <div class="panel-body">
+                                <div class="row-split">
+                                    <div>
+                                        <div class="meta-label">{{ link.label }}</div>
+                                        <div class="muted text-xs">{{ link.description }}</div>
+                                    </div>
+                                    <button class="btn btn--sm"
+                                            type="button"
+                                            onclick="navigator.clipboard.writeText('{{ link.url|escapejs }}')">{% trans "Copy" %}</button>
+                                </div>
+                                <div class="copy-field mt-2"><code>{{ link.url }}</code></div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="span-4">
+                    <div class="panel panel--solid">
+                        <div class="panel-body"
+                             style="display:flex;
+                                    flex-direction:column;
+                                    align-items:center;
+                                    gap:10px">
+                            <div class="qr-card">
+                                <img src="{{ qr }}" alt="QR" width="180" height="180">
+                            </div>
+                            <div class="muted text-xs">Base64 · v2rayN / Shadowrocket</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        <div class="panel mt-6">
+            <div class="panel-body muted text-xs">
+                Subscription-Userinfo: <code>{{ userinfo }}</code>
+            </div>
+        </div>
+    </div>
+{% endblock %}

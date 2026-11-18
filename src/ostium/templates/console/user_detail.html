@@ -1,0 +1,300 @@
+{% extends "console/base.html" %}
+{% load static ostium_ui %}
+{% block title %}{{ user.name }}{% endblock %}
+{% block breadcrumb %}用户 / {{ user.name }}{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "users" "w-3.5 h-3.5" %} User profile</div>
+            <div class="flex items-center gap-3" style="margin-top:4px">
+                <span class="avatar"
+                      style="width:44px;
+                             height:44px;
+                             border-radius:13px;
+                             font-size:16px">{{ user.name|first|upper }}</span>
+                <div>
+                    <h1 class="page-title" style="font-size:24px">{{ user.name }}</h1>
+                    <p class="page-desc" style="margin-top:2px">
+                        <span class="{{ user.status|status_class }}">{{ user.status|status_label }}</span>
+                        <span class="muted" style="margin-left:8px">创建于 {{ user.created_at|datetimefmt }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn--ghost" href="{% url 'console:users' %}">返回列表</a>
+            <a class="btn" href="{% url 'admin:proxy_proxyuser_change' user.pk %}">{% icon "settings" %} Admin 编辑</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <div class="span-7 stack">
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">{% icon "settings" %} 账号设置</div>
+                    <span class="panel-sub">修改后自动应用</span>
+                </div>
+                <form method="post" class="panel-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save">
+                    {% if form.non_field_errors %}<div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>{% endif %}
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="{{ form.name.id_for_label }}">用户名</label>
+                            {{ form.name }}
+                            {{ form.name.errors }}
+                            <span class="helptext">同时作为 sing-box 统计键；改名不会保留旧统计。</span>
+                        </div>
+                        <div class="field">
+                            <label for="{{ form.quota.id_for_label }}">流量配额</label>
+                            {{ form.quota }}
+                            {{ form.quota.errors }}
+                            <span class="helptext">{{ form.quota.help_text }}</span>
+                        </div>
+                        <div class="field">
+                            <label for="{{ form.quota_cycle.id_for_label }}">配额周期</label>
+                            {{ form.quota_cycle }}
+                            {{ form.quota_cycle.errors }}
+                        </div>
+                        <div class="field">
+                            <label for="{{ form.expires_at.id_for_label }}">到期时间</label>
+                            {{ form.expires_at }}
+                            {{ form.expires_at.errors }}
+                            <span class="helptext">留空表示永不过期。</span>
+                        </div>
+                        <div class="field full">
+                            <label for="{{ form.note.id_for_label }}">备注</label>
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </div>
+                        <div class="field full">
+                            <label class="checkbox-row" for="{{ form.enabled.id_for_label }}">
+                                {{ form.enabled }} <span>启用此用户（关闭后立即从核心配置中移除）</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn--primary" type="submit">{% icon "check" %} 保存设置</button>
+                    </div>
+                </form>
+            </section>
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">{% icon "key" %} 凭据</div>
+                    <span class="panel-sub">轮换后客户端需重新导入</span>
+                </div>
+                <div class="panel-body stack">
+                    <div class="detail-list">
+                        <div class="detail-item">
+                            <div class="meta-label">VLESS UUID</div>
+                            <div class="meta-value mono">{{ user.uuid }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="meta-label">最近在线</div>
+                            <div class="meta-value">{{ user.last_seen_at|ago }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="meta-label">实时上行</div>
+                            <div class="meta-value mono">{{ live.uplink_rate|default:0|bps }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="meta-label">实时下行</div>
+                            <div class="meta-value mono">{{ live.downlink_rate|default:0|bps }}</div>
+                        </div>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="row-split flex-wrap">
+                        <div>
+                            <div class="meta-label">密码 / Shadowsocks 用户密钥</div>
+                            <div class="muted text-xs">出于安全原因永不显示，只允许轮换。</div>
+                        </div>
+                        <form method="post" data-confirm="轮换后所有已导入的客户端都会断开，直到重新导入订阅。继续？">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="rotate_credentials">
+                            <button class="btn btn--sm" type="submit">{% icon "refresh" %} 轮换凭据</button>
+                        </form>
+                    </div>
+                    <div class="row-split flex-wrap">
+                        <div>
+                            <div class="meta-label">已用流量</div>
+                            <div class="text-xs muted">{{ user.used_bytes|bytes }} · 重置只清零计数，不影响连接。</div>
+                        </div>
+                        <form method="post" data-confirm="确定把已用流量清零？">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="reset_usage">
+                            <button class="btn btn--sm" type="submit">{% icon "refresh" %} 重置用量</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+            <section class="panel danger-zone">
+                <div class="panel-head">
+                    <div class="panel-title">{% icon "alert" %} 危险操作</div>
+                </div>
+                <div class="panel-body row-split flex-wrap">
+                    <div>
+                        <div class="meta-label">删除用户</div>
+                        <div class="muted text-xs">立即从数据库移除，所有订阅链接同时失效，无法撤销。</div>
+                    </div>
+                    <form method="post" data-confirm="确定永久删除用户 {{ user.name }}？此操作不可撤销。">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <button class="btn btn--danger btn--sm" type="submit">{% icon "trash" %} 删除用户</button>
+                    </form>
+                </div>
+            </section>
+        </div>
+        <div class="span-5 stack">
+            <section class="panel panel--accent">
+                <div class="panel-head">
+                    <div class="panel-title">{% icon "link" %} 订阅</div>
+                    {% if revealed %}<span class="badge badge--warning">token 已显示</span>{% else %}<span class="badge">已打码</span>{% endif %}
+                </div>
+                <div class="panel-body stack">
+                    <div class="copy-field">
+                        <code>{{ token }}</code>
+                        {% if revealed %}
+                            <button class="copy-btn"
+                                    type="button"
+                                    data-copy="{{ token }}"
+                                    aria-label="复制订阅 token">{% icon "copy" %}</button>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        {% if not revealed %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="reveal">
+                                <button class="btn btn--sm btn--primary" type="submit">{% icon "eye" %} 显示完整链接</button>
+                            </form>
+                        {% endif %}
+                        <form method="post" data-confirm="轮换后旧订阅 URL 立即失效。继续？">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="rotate_subscription">
+                            <button class="btn btn--sm" type="submit">{% icon "refresh" %} 轮换 token</button>
+                        </form>
+                    </div>
+                    <div class="muted text-xs">Subscription-Userinfo：{{ userinfo }}</div>
+                    {% if revealed %}
+                        <div class="divider"></div>
+                        <div class="grid" style="gap:10px">
+                            {% for link in links %}
+                                <div class="meta-chip">
+                                    <div class="row-split">
+                                        <div>
+                                            <div class="meta-label">{{ link.label }}</div>
+                                            <div class="muted text-xs">{{ link.description }}</div>
+                                        </div>
+                                        <button class="copy-btn"
+                                                type="button"
+                                                data-copy="{{ link.url }}"
+                                                aria-label="复制 {{ link.label }} 订阅">{% icon "copy" %}</button>
+                                    </div>
+                                    <div class="copy-field" style="margin-top:8px"><code>{{ link.url }}</code></div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="divider"></div>
+                        <div class="flex items-center gap-3">
+                            <div class="qr-card">
+                                <img src="{{ qr }}" alt="Base64 订阅二维码" width="180" height="180">
+                            </div>
+                            <div>
+                                <div class="meta-label">扫码导入</div>
+                                <div class="muted text-xs">Base64 订阅。Clash / sing-box 请复制上方对应链接。</div>
+                            </div>
+                        </div>
+                        {% if endpoints %}
+                            <div class="divider"></div>
+                            <div class="meta-label">单节点链接</div>
+                            <div class="stack" style="gap:8px;margin-top:6px">
+                                {% for endpoint in endpoints %}
+                                    <div class="copy-field">
+                                        <span class="proto-badge">{{ endpoint.label }}</span>
+                                        <code>{{ endpoint.to_uri }}</code>
+                                        <button class="copy-btn"
+                                                type="button"
+                                                data-copy="{{ endpoint.to_uri }}"
+                                                aria-label="复制 {{ endpoint.label }}">{% icon "copy" %}</button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert-banner alert-banner--info">
+                            {% icon "lock" %}
+                            <div>token 默认打码。显示完整链接需要一次明确的 POST 操作，并会写入审计日志。</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">{% icon "chart" %} 配额</div>
+                </div>
+                <div class="panel-body">
+                    <div class="flex items-center gap-4">
+                        <div class="hero-ring"
+                             style="width:118px;
+                                    height:118px;
+                                    --value:{% if user.quota_percent is not None %}{{ user.quota_percent }}{% else %}100{% endif %};
+                                    --tone:{% if user.quota_percent is None %}var(--accent){% elif user.quota_percent >= 90 %}var(--danger){% elif user.quota_percent >= 80 %}var(--warning){% else %}var(--success){% endif %}">
+                            <div class="hero-ring-inner">
+                                <div class="hero-ring-value" style="font-size:19px">{% if user.quota_percent is not None %}{{ user.quota_percent|floatformat:0 }}%{% else %}∞{% endif %}</div>
+                                <div class="hero-ring-label">已用</div>
+                            </div>
+                        </div>
+                        <div class="stack" style="gap:4px">
+                            <div class="stat-inline"><strong>{{ user.used_bytes|bytes }}</strong><span>已用</span></div>
+                            <div class="stat-inline"><strong>{% if user.quota_bytes %}{{ user.quota_bytes|bytes }}{% else %}不限{% endif %}</strong><span>配额</span></div>
+                            <div class="stat-inline"><strong>{% if user.remaining_bytes is not None %}{{ user.remaining_bytes|bytes }}{% else %}—{% endif %}</strong><span>剩余</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <section class="panel span-12">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "chart" %} 最近 30 天流量</div>
+                <div class="chart-legend">
+                    <span><i style="background:var(--accent)"></i> 上行</span>
+                    <span><i style="background:var(--accent-2)"></i> 下行</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="chart-box">
+                    <canvas id="traffic-chart" aria-label="用户最近三十天流量" role="img"></canvas>
+                </div>
+            </div>
+        </section>
+        <section class="panel span-12">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "history" %} 最近审计</div>
+                <a class="link-quiet"
+                   href="{% url 'console:audit' %}?actor={{ user.name|urlencode }}">全部审计</a>
+            </div>
+            <div class="panel-body">
+                {% if audit_events %}
+                    <div class="timeline">
+                        {% for event in audit_events %}
+                            <div class="timeline-item">
+                                <span class="timeline-dot timeline-dot--muted"></span>
+                                <div>
+                                    <div class="timeline-title">{{ event.action }}</div>
+                                    <div class="timeline-meta">{{ event.created_at|datetimefmt }} · {{ event.ip|default:"本地" }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="muted text-sm">暂无与该用户相关的敏感操作记录。</div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+    {{ series|json_script:"traffic-data" }}
+{% endblock %}
+{% block scripts %}
+    <script src="{% static 'js/chart.umd.min.js' %}" defer></script>
+{% endblock %}

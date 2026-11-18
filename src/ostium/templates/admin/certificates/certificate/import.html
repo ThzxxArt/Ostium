@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/app.css' %}">{% endblock %}
+{% block content_title %}<h1 class="text-lg font-semibold">{{ title }}</h1>{% endblock %}
+{% block content %}
+    <div class="ostium-admin-wrap" style="max-width:760px">
+        <div class="panel panel--solid">
+            <div class="panel-head">
+                <div class="panel-title">{% trans "Import certificate" %}</div>
+            </div>
+            <form method="post" class="panel-body">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>{% endif %}
+                <div class="field">
+                    <label for="{{ form.domain.id_for_label }}">{{ form.domain.label }}</label>
+                    {{ form.domain }}{{ form.domain.errors }}
+                    <span class="helptext">{% trans "The certificate must contain this domain in SAN or CN." %}</span>
+                </div>
+                <div class="field mt-3">
+                    <label for="{{ form.certificate.id_for_label }}">{{ form.certificate.label }}</label>
+                    {{ form.certificate }}{{ form.certificate.errors }}
+                    <span class="helptext">{% trans "Paste the full chain PEM, including the leaf certificate." %}</span>
+                </div>
+                <div class="field mt-3">
+                    <label for="{{ form.private_key.id_for_label }}">{{ form.private_key.label }}</label>
+                    {{ form.private_key }}{{ form.private_key.errors }}
+                    <span class="helptext">{% trans "Unencrypted PKCS#8 or PKCS#1 PEM. Must match the certificate." %}</span>
+                </div>
+                <div class="field mt-3">
+                    <label class="checkbox-row">{{ form.auto_renew }} <span>{{ form.auto_renew.label }}</span></label>
+                </div>
+                <div class="form-actions">
+                    <a class="btn"
+                       href="{% url 'admin:certificates_certificate_changelist' %}">{% trans "Cancel" %}</a>
+                    <button class="btn btn--primary" type="submit">{% trans "Validate and import" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

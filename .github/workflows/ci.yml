@@ -1,0 +1,119 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "rewrite/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.14"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src
+      - run: uv run djlint src/ostium/templates --check
+      - run: uv run python manage.py check
+        env:
+          DJANGO_SETTINGS_MODULE: ostium.config.settings.test
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: ostium
+          POSTGRES_USER: ostium
+          POSTGRES_PASSWORD: ostium
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ostium -d ostium"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: ostium.config.settings.test
+      OSTIUM_DB_URL: ${{ matrix.database == 'postgres' && 'postgres://ostium:ostium@127.0.0.1:5432/ostium' || 'sqlite:////tmp/ostium-ci.db' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev --extra postgres
+      - run: uv run pytest -q --cov=src/ostium --cov-report=term
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: mkdir -p .cache/bin .cache/mihomo && SINGBOX_VERSION=1.14.4 scripts/build-core.sh
+      - run: cp dist/sing-box .cache/bin/sing-box
+      - name: Download mihomo
+        run: |
+          curl -fsSL --retry 5 -o /tmp/mihomo.gz \
+            https://github.com/MetaCubeX/mihomo/releases/download/v1.19.34/mihomo-linux-amd64-compatible-v1.19.34.gz
+          gunzip -c /tmp/mihomo.gz > .cache/bin/mihomo
+          chmod +x .cache/bin/mihomo
+      - name: Download GeoIP database
+        run: |
+          curl -fsSL --retry 5 -o .cache/mihomo/geoip.metadb \
+            https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb
+      - run: uv run pytest tests/contract -q
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run pip-audit
+      - run: uv run bandit -q -r src
+      - name: Django deployment checks
+        env:
+          DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
+          OSTIUM_SECRET_KEY: ci-deploy-check-secret-key-0123456789
+          OSTIUM_FIELD_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+          OSTIUM_ALLOWED_HOSTS: vpn.example.com
+          OSTIUM_PUBLIC_BASE_URL: https://vpn.example.com
+          OSTIUM_REQUIRE_TOTP: "true"
+          OSTIUM_SSL_REDIRECT: "true"
+          OSTIUM_DATA_DIR: /tmp/ostium-ci
+        run: uv run python manage.py check --deploy
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run mkdocs build --strict

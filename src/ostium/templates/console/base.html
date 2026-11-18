@@ -1,0 +1,304 @@
+{% load static ostium_ui %}
+<!DOCTYPE html>
+<html lang="zh-Hans" data-theme="dark">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <meta name="color-scheme" content="dark light">
+        <title>{% block title %}控制台{% endblock %} · Ostium Server</title>
+        <script {% csp_nonce_attr %}>
+    (function () {
+      try {
+        var stored = localStorage.getItem("ostium-theme");
+        var theme = stored || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    })();
+        </script>
+        <link rel="icon"
+              type="image/svg+xml"
+              href="{% static 'icons/ostium-icon.svg' %}">
+        <link rel="stylesheet" href="{% static 'css/app.css' %}">
+        <script {% csp_nonce_attr %}>
+      document.addEventListener("alpine:init", function () {
+        Alpine.data("shell", function () {
+          return {
+            sidebarOpen: false,
+            get sidebarClass() { return this.sidebarOpen ? "sidebar--open" : ""; },
+            get backdropClass() { return this.sidebarOpen ? "is-open" : ""; },
+            openSidebar: function () { this.sidebarOpen = true; },
+            closeSidebar: function () { this.sidebarOpen = false; }
+          };
+        });
+        Alpine.data("menu", function () {
+          return {
+            open: false,
+            toggleMenu: function () { this.open = !this.open; },
+            closeMenu: function () { this.open = false; }
+          };
+        });
+        Alpine.data("toast", function () {
+          return {
+            show: true,
+            start: function () { var self = this; setTimeout(function () { self.show = false; }, 5000); }
+          };
+        });
+      });
+        </script>
+        <script src="{% static 'js/htmx.min.js' %}" defer></script>
+        <script src="{% static 'js/alpine.min.js' %}" defer></script>
+        <script src="{% static 'js/console.js' %}" defer></script>
+        {% block head %}{% endblock %}
+    </head>
+    <body>
+        <a class="skip-link" href="#main">跳到主要内容</a>
+        <div class="app-shell" x-data="shell">
+            <div class="sidebar-backdrop"
+                 x-show="sidebarOpen"
+                 x-bind:class="backdropClass"
+                 x-cloak
+                 @click="closeSidebar"></div>
+            <aside class="sidebar" x-bind:class="sidebarClass" aria-label="主导航">
+                <a class="brand"
+                   href="{% url 'console:dashboard' %}"
+                   aria-label="Ostium 控制台首页">
+                    <span class="brand-mark">
+                        <img src="{% static 'icons/ostium-icon.svg' %}" alt="">
+                    </span>
+                    <span class="brand-text">
+                        <span class="brand-name">Ostium</span>
+                        <span class="brand-sub">Server Console</span>
+                    </span>
+                </a>
+                <div class="nav-scroll">
+                    <nav class="nav-group" aria-label="控制台">
+                        <div class="nav-label">控制台</div>
+                        <a class="nav-item {% if active_nav == 'dashboard' %}is-active{% endif %}"
+                           href="{% url 'console:dashboard' %}"
+                           @click="closeSidebar">
+                            {% icon "dashboard" %}<span>总览</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'users' %}is-active{% endif %}"
+                           href="{% url 'console:users' %}"
+                           @click="closeSidebar">
+                            {% icon "users" %}<span>用户</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'subscriptions' %}is-active{% endif %}"
+                           href="{% url 'console:subscriptions' %}"
+                           @click="closeSidebar">
+                            {% icon "link" %}<span>订阅</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'inbounds' %}is-active{% endif %}"
+                           href="{% url 'console:inbounds' %}"
+                           @click="closeSidebar">
+                            {% icon "lan" %}<span>线路</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'connections' %}is-active{% endif %}"
+                           href="{% url 'console:connections' %}"
+                           @click="closeSidebar">
+                            {% icon "swap" %}<span>连接</span>
+                        </a>
+                    </nav>
+                    <nav class="nav-group" aria-label="运维">
+                        <div class="nav-label">运维</div>
+                        <a class="nav-item {% if active_nav == 'certificates' %}is-active{% endif %}"
+                           href="{% url 'console:certificates' %}"
+                           @click="closeSidebar">
+                            {% icon "certificate" %}<span>证书</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'logs' %}is-active{% endif %}"
+                           href="{% url 'console:logs' %}"
+                           @click="closeSidebar">
+                            {% icon "file" %}<span>日志</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'jobs' %}is-active{% endif %}"
+                           href="{% url 'console:jobs' %}"
+                           @click="closeSidebar">
+                            {% icon "clock" %}<span>任务</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'system' %}is-active{% endif %}"
+                           href="{% url 'console:system' %}"
+                           @click="closeSidebar">
+                            {% icon "activity" %}<span>系统</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'audit' %}is-active{% endif %}"
+                           href="{% url 'console:audit' %}"
+                           @click="closeSidebar">
+                            {% icon "history" %}<span>审计</span>
+                        </a>
+                        <a class="nav-item {% if active_nav == 'settings' %}is-active{% endif %}"
+                           href="{% url 'console:settings' %}"
+                           @click="closeSidebar">
+                            {% icon "settings" %}<span>设置</span>
+                        </a>
+                    </nav>
+                    <nav class="nav-group" aria-label="Django Admin">
+                        <div class="nav-label">高级</div>
+                        <a class="nav-item" href="{% url 'admin:index' %}" @click="closeSidebar">
+                            {% icon "shield" %}<span>Django Admin</span>
+                        </a>
+                        <a class="nav-item"
+                           href="{% url 'docs' %}"
+                           target="_blank"
+                           rel="noopener"
+                           @click="closeSidebar">
+                            {% icon "terminal" %}<span>API 文档</span>
+                        </a>
+                    </nav>
+                </div>
+                <div class="sidebar-foot">
+                    <div class="sidebar-status">
+                        {% if runtime_state.worker_alive and runtime_state.singbox_running %}
+                            <span class="status-pill status-pill--success">运行中</span>
+                        {% elif runtime_state.worker_alive %}
+                            <span class="status-pill status-pill--warning">降级</span>
+                        {% else %}
+                            <span class="status-pill status-pill--danger">已停止</span>
+                        {% endif %}
+                        {% if runtime_state.desired_revision > runtime_state.applied_revision %}
+                            <span class="status-pill status-pill--warning">待应用</span>
+                        {% endif %}
+                    </div>
+                    <div class="sidebar-version">
+                        <span>v{{ app_version }}</span>
+                        <span class="mono">{{ build_commit|default:"dev" }}</span>
+                    </div>
+                </div>
+            </aside>
+            <div class="main">
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <button class="icon-btn mobile-menu-btn"
+                                type="button"
+                                @click="openSidebar"
+                                aria-label="打开导航">{% icon "menu" %}</button>
+                        <div class="crumb">
+                            <span class="crumb-root">Ostium</span>
+                            {% icon "chevron-right" %}
+                            <strong>{% block breadcrumb %}总览{% endblock %}</strong>
+                        </div>
+                    </div>
+                    <div class="topbar-actions">
+                        {% if runtime_state.desired_revision > runtime_state.applied_revision %}
+                            <span class="status-pill status-pill--warning">配置待应用</span>
+                        {% endif %}
+                        <button class="icon-btn"
+                                type="button"
+                                id="command-open"
+                                aria-label="搜索或跳转（Ctrl+K）"
+                                title="搜索 · Ctrl K">{% icon "search" %}</button>
+                        <a class="icon-btn {% if unack_alerts_count %}icon-btn--dot{% endif %}"
+                           href="{% url 'console:dashboard' %}#alerts"
+                           aria-label="未确认告警 {{ unack_alerts_count }} 条"
+                           title="告警">{% icon "bell" %}</a>
+                        <button class="icon-btn"
+                                type="button"
+                                id="theme-toggle"
+                                aria-label="切换深浅色主题"
+                                title="切换主题">
+                            <span class="theme-toggle-dark">{% icon "moon" %}</span>
+                            <span class="theme-toggle-light">{% icon "sun" %}</span>
+                        </button>
+                        <div class="user-menu" x-data="menu" @keydown.escape.window="closeMenu">
+                            <button class="avatar"
+                                    type="button"
+                                    @click="toggleMenu"
+                                    x-bind:aria-expanded="open"
+                                    aria-label="管理员菜单">{{ request.user.username|first|upper }}</button>
+                            <div class="dropdown-panel"
+                                 x-show="open"
+                                 x-cloak
+                                 @click.outside="closeMenu">
+                                <div class="dropdown-head">
+                                    <strong>{{ request.user.username }}</strong>
+                                    <span class="muted text-xs">管理员</span>
+                                </div>
+                                <a class="dropdown-item"
+                                   href="{% url 'admin:index' %}">{% icon "shield" %} Django Admin</a>
+                                <a class="dropdown-item"
+                                   href="{% url 'accounts:password_change' %}">{% icon "key" %} 修改密码</a>
+                                <a class="dropdown-item"
+                                   href="{% url 'accounts:totp_setup' %}">{% icon "lock" %} 两步验证</a>
+                                <form method="post" action="{% url 'accounts:logout' %}">
+                                    {% csrf_token %}
+                                    <button class="dropdown-item dropdown-item--danger"
+                                            type="submit">{% icon "logout" %} 退出登录</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                <main id="main" class="content">
+                    {% block page_header %}{% endblock %}
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
+            <nav class="mobile-nav" aria-label="移动端导航">
+                <a class="{% if active_nav == 'dashboard' %}is-active{% endif %}"
+                   href="{% url 'console:dashboard' %}">{% icon "dashboard" %}<span>总览</span></a>
+                <a class="{% if active_nav == 'users' %}is-active{% endif %}"
+                   href="{% url 'console:users' %}">{% icon "users" %}<span>用户</span></a>
+                <a class="{% if active_nav == 'subscriptions' %}is-active{% endif %}"
+                   href="{% url 'console:subscriptions' %}">{% icon "link" %}<span>订阅</span></a>
+                <a class="{% if active_nav == 'system' %}is-active{% endif %}"
+                   href="{% url 'console:system' %}">{% icon "activity" %}<span>系统</span></a>
+            </nav>
+        </div>
+        <div id="command-palette"
+             class="modal-backdrop hidden"
+             role="dialog"
+             aria-modal="true"
+             aria-label="命令面板">
+            <div class="modal">
+                <div class="modal-head">
+                    <strong>跳转</strong>
+                    <button class="icon-btn" type="button" id="command-close" aria-label="关闭">{% icon "x" %}</button>
+                </div>
+                <div class="modal-body">
+                    <input class="input"
+                           id="command-input"
+                           type="search"
+                           placeholder="搜索页面、用户、操作…"
+                           autocomplete="off">
+                    <div class="command-list" id="command-list">
+                        <a class="command-item" href="{% url 'console:dashboard' %}">{% icon "dashboard" %} 总览</a>
+                        <a class="command-item" href="{% url 'console:users' %}">{% icon "users" %} 用户</a>
+                        <a class="command-item" href="{% url 'console:subscriptions' %}">{% icon "link" %} 订阅</a>
+                        <a class="command-item" href="{% url 'console:inbounds' %}">{% icon "lan" %} 线路</a>
+                        <a class="command-item" href="{% url 'console:connections' %}">{% icon "swap" %} 连接</a>
+                        <a class="command-item" href="{% url 'console:certificates' %}">{% icon "certificate" %} 证书</a>
+                        <a class="command-item" href="{% url 'console:logs' %}">{% icon "file" %} 日志</a>
+                        <a class="command-item" href="{% url 'console:system' %}">{% icon "activity" %} 系统</a>
+                        <a class="command-item" href="{% url 'console:settings' %}">{% icon "settings" %} 设置</a>
+                        <a class="command-item" href="{% url 'console:audit' %}">{% icon "history" %} 审计</a>
+                        <a class="command-item" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if messages %}
+            <div class="toast-stack" aria-live="polite">
+                {% for message in messages %}
+                    <div class="toast toast--{{ message.tags|default:'info' }}"
+                         x-data="toast"
+                         x-show="show"
+                         x-init="start"
+                         x-transition.opacity>
+                        {% if message.tags == "success" %}
+                            {% icon "check" %}
+                        {% elif message.tags == "error" %}
+                            {% icon "alert" %}
+                        {% elif message.tags == "warning" %}
+                            {% icon "alert" %}
+                        {% else %}
+                            {% icon "activity" %}
+                        {% endif %}
+                        <div>{{ message }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block scripts %}{% endblock %}
+    </body>
+</html>

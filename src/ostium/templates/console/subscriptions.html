@@ -1,0 +1,110 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}订阅{% endblock %}
+{% block breadcrumb %}订阅{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "link" "w-3.5 h-3.5" %} Distribution</div>
+            <h1 class="page-title">通用订阅</h1>
+            <p class="page-desc">标准 Base64、Clash / Mihomo、sing-box 与纯 URI。不依赖私有客户端，任何主流工具都能导入。</p>
+        </div>
+        <div class="page-actions">
+            <span class="badge {% if enabled_inbounds %}badge--success{% else %}badge--warning{% endif %}">{{ enabled_inbounds }} 条线路已启用</span>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "users" %} 用户订阅</div>
+                <form method="get" class="search-bar">
+                    <label class="search-input" style="min-width:220px">
+                        <span class="sr-only">搜索用户</span>
+                        {% icon "search" %}
+                        <input class="input"
+                               type="search"
+                               name="q"
+                               value="{{ query }}"
+                               placeholder="搜索用户名…">
+                    </label>
+                    <button class="btn btn--sm" type="submit">搜索</button>
+                </form>
+            </div>
+            {% if page.object_list %}
+                <div class="table-wrap">
+                    <table class="data-table data-table--cards">
+                        <thead>
+                            <tr>
+                                <th>用户</th>
+                                <th>状态</th>
+                                <th>Token</th>
+                                <th>最近在线</th>
+                                <th class="cell-actions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in page %}
+                                <tr>
+                                    <td data-label="用户">
+                                        <a class="table-link" href="{% url 'console:user_detail' user.pk %}">
+                                            <span class="row-avatar">{{ user.name|first|upper }}</span>{{ user.name }}
+                                        </a>
+                                    </td>
+                                    <td data-label="状态"><span class="{{ user.status|status_class }}">{{ user.status|status_label }}</span></td>
+                                    <td data-label="Token"><code class="mono text-xs">{{ user.token_masked }}</code></td>
+                                    <td data-label="最近在线" class="muted">{{ user.last_seen_at|ago }}</td>
+                                    <td class="cell-actions" data-label="操作">
+                                        <a class="btn btn--sm"
+                                           href="{% url 'console:user_detail' user.pk %}">{% icon "eye" %} 打开</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% include "partials/pagination.html" with page=page query=query %}
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-icon">{% icon "inbox" %}</span>
+                    <div class="empty-title">还没有可分发订阅</div>
+                    <div class="empty-copy">先创建用户，再启用至少一条线路，订阅就会自动生成。</div>
+                    <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                </div>
+            {% endif %}
+        </section>
+        <div class="span-4 stack">
+            <section class="panel">
+                <div class="panel-head"><div class="panel-title">{% icon "download" %} 客户端对照</div></div>
+                <div class="panel-body stack" style="gap:12px">
+                    <div>
+                        <div class="meta-label">默认 · Base64</div>
+                        <div class="muted text-xs">v2rayN、v2rayNG、Shadowrocket、NekoBox</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">Clash / Mihomo</div>
+                        <div class="muted text-xs">Clash Verge Rev、Mihomo Party、OpenClash</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">sing-box</div>
+                        <div class="muted text-xs">官方 sing-box 客户端、SFI / SFA / SFM</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">纯 URI</div>
+                        <div class="muted text-xs">手动导入、调试、单节点分享</div>
+                    </div>
+                </div>
+            </section>
+            <section class="panel">
+                <div class="panel-head"><div class="panel-title">{% icon "shield" %} 安全提示</div></div>
+                <div class="panel-body text-sm muted">
+                    <p>· 订阅链接等同密码，请通过安全渠道发送。</p>
+                    <p class="mt-2">· token 默认打码；显示与轮换都会写入审计。</p>
+                    <p class="mt-2">· 轮换后旧 URL 立即失效，客户端需要重新导入。</p>
+                    <p class="mt-2">· 订阅响应禁止缓存、禁止索引、禁止 Referer 泄露。</p>
+                </div>
+            </section>
+        </div>
+    </div>
+{% endblock %}

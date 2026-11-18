@@ -1,0 +1,59 @@
+{% load static ostium_ui %}
+<!DOCTYPE html>
+<html lang="zh-Hans" data-theme="dark">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{% block title %}登录{% endblock %} · Ostium Server</title>
+        <script {% csp_nonce_attr %}>
+    (function () {
+      try {
+        var stored = localStorage.getItem("ostium-theme");
+        if (stored) document.documentElement.dataset.theme = stored;
+      } catch (e) {}
+    })();
+        </script>
+        <link rel="icon"
+              type="image/svg+xml"
+              href="{% static 'icons/ostium-icon.svg' %}">
+        <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    </head>
+    <body>
+        <div class="auth-page">
+            <aside class="auth-visual" aria-label="Ostium 介绍">
+                <div class="auth-brand">
+                    <img src="{% static 'icons/ostium-icon.svg' %}" alt="">
+                    <span class="auth-brand-text">Ostium<span style="color:#5eead4">.</span></span>
+                </div>
+                <div class="auth-hero">
+                    <h1>
+                        你的私人代理
+                        <br>
+                        <span>服务端控制台</span>
+                    </h1>
+                    <p>Linux 单机、单管理员、标准订阅。没有客户端噱头，只有稳定、清晰、漂亮的服务端。</p>
+                    <div class="auth-points" style="margin-top:28px">
+                        <span class="auth-point"><i></i> VLESS Reality</span>
+                        <span class="auth-point"><i></i> Hysteria2</span>
+                        <span class="auth-point"><i></i> Trojan</span>
+                        <span class="auth-point"><i></i> Shadowsocks 2022</span>
+                        <span class="auth-point"><i></i> Clash / sing-box</span>
+                    </div>
+                </div>
+                <div style="position:relative;z-index:1;color:#6f819b;font-size:11px">
+                    Aurora Server Console · v{{ app_version|default:"0.2.0" }}
+                </div>
+            </aside>
+            <main class="auth-panel">
+                <div class="auth-card">
+                    {% block auth_content %}{% endblock %}
+                    <div class="auth-foot">
+                        Ostium Server {{ app_version|default:"0.2.0" }} · 管理面默认仅监听回环地址。
+                        <br>
+                        公网访问请使用 TLS + 两步验证，或通过 SSH 隧道。
+                    </div>
+                </div>
+            </main>
+        </div>
+    </body>
+</html>

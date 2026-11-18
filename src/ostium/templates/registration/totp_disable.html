@@ -1,0 +1,25 @@
+{% extends "registration/auth_base.html" %}
+{% load ostium_ui %}
+{% block title %}关闭两步验证{% endblock %}
+{% block auth_content %}
+    <div class="page-eyebrow" style="margin-bottom:8px">{% icon "alert" "w-3.5 h-3.5" %} Danger</div>
+    <h2>关闭两步验证</h2>
+    <p class="auth-sub">关闭后，仅凭密码即可登录管理面。公网部署不建议这样做。</p>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="auth-error">{% icon "alert" %}<div>{{ form.non_field_errors.0 }}</div></div>{% endif %}
+        <div class="field">
+            <label for="{{ form.password.id_for_label }}">当前密码</label>
+            {{ form.password }}
+            {{ form.password.errors }}
+        </div>
+        <div class="field">
+            <label for="{{ form.token.id_for_label }}">当前验证码</label>
+            {{ form.token }}
+            {{ form.token.errors }}
+        </div>
+        <button class="btn btn--danger btn--block" type="submit">{% icon "trash" %} 关闭两步验证</button>
+    </form>
+    <a class="btn btn--ghost btn--block mt-3"
+       href="{% url 'console:system' %}">取消</a>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "registration/auth_base.html" %}
+{% load ostium_ui %}
+{% block title %}两步验证{% endblock %}
+{% block auth_content %}
+    <div class="page-eyebrow" style="margin-bottom:8px">{% icon "shield" "w-3.5 h-3.5" %} Two-factor</div>
+    <h2>输入验证码</h2>
+    <p class="auth-sub">账号 <strong style="color:var(--text)">{{ username }}</strong> 已启用两步验证。请输入认证器中的 6 位验证码，或一枚恢复码。</p>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="auth-error">{% icon "alert" %}<div>{{ form.non_field_errors.0 }}</div></div>{% endif %}
+        <div class="field">
+            <label for="{{ form.token.id_for_label }}">验证码</label>
+            {{ form.token }}
+            {{ form.token.errors }}
+        </div>
+        <button class="btn btn--primary btn--block" type="submit">{% icon "check" %} 验证并继续</button>
+    </form>
+    <a class="btn btn--ghost btn--block mt-3"
+       href="{% url 'accounts:login' %}">返回登录</a>
+    <p class="auth-foot">验证码每 30 秒更新。若设备丢失，请使用恢复码；全部丢失时在服务器上重置 TOTP。</p>
+{% endblock %}

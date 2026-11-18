@@ -1,0 +1,34 @@
+# Changelog
+
+All notable changes to Ostium Server are documented here. This project follows
+[Semantic Versioning](https://semver.org/).
+
+## 0.2.0 — 2026-11-18
+
+### Added
+
+- Django 6.1 control plane with Unfold admin and the Aurora Server Console.
+- VLESS Reality, Hysteria2, Trojan and Shadowsocks 2022 inbounds.
+- Standard subscriptions: Base64 URI, Clash/Mihomo YAML, sing-box JSON, plain URI.
+- Worker that supervises a pinned sing-box binary, validates configuration with
+  `sing-box check`, applies atomically and rolls back on failure.
+- V2Ray gRPC traffic accounting, quota enforcement, monthly rollover, daily history.
+- TOTP, recovery codes, login lockout, API keys with scopes, audit trail.
+- Encrypted backups, certbot synchronisation, doctor and redacted diagnostics.
+- systemd units, Docker Compose, installer, release scripts and CI.
+- Aurora design system with dark/light themes, responsive layouts and WCAG 2.2 AA targets.
+
+### Changed
+
+- The project is server-only. There is no client, SPA, TUN or system proxy.
+- TLS is handled by certbot and Caddy; the built-in ACME implementation is gone.
+- The API is a new `/api/v1` contract with RFC 9457 errors.
+
+### Removed
+
+- FastAPI, SQLAlchemy, Alembic, Typer, the custom core API and the Vue SPA.
+- Windows, macOS, DEB, AppImage, DMG and PyInstaller packaging.
+- All 0.1.x data migration, compatibility and upgrade paths.
+
+> 0.1.x installations are not supported by this release. Install fresh and
+> recreate users, certificates and subscriptions.

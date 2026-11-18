@@ -1,0 +1,40 @@
+# Ostium management plane.
+#
+# Certbot writes certificates under /etc/letsencrypt/live/$OSTIUM_DOMAIN/.
+# The :80 block serves ACME HTTP-01 challenges from /var/www/certbot and
+# redirects everything else to HTTPS. Caddy listens on 8443 to avoid clashing
+# with sing-box on 443.
+{
+	admin off
+	email {$OSTIUM_ACME_EMAIL}
+}
+
+:80 {
+	root * /var/www/certbot
+	file_server
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/certbot
+		file_server
+	}
+	handle {
+		redir https://{host}:8443{uri} permanent
+	}
+}
+
+https://{$OSTIUM_DOMAIN}:8443 {
+	tls /etc/letsencrypt/live/{$OSTIUM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/{$OSTIUM_DOMAIN}/privkey.pem
+
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000 {
+		header_up X-Forwarded-Proto https
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

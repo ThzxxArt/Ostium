@@ -1,0 +1,70 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}任务{% endblock %}
+{% block breadcrumb %}任务{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "clock" "w-3.5 h-3.5" %} Background jobs</div>
+            <h1 class="page-title">任务</h1>
+            <p class="page-desc">django-q2 执行的后台工作：备份、证书同步、维护与导出。</p>
+        </div>
+        <div class="page-actions"><a class="btn" href="{% url 'console:jobs' %}">{% icon "refresh" %} 刷新</a></div>
+    </div>
+{% endblock %}
+{% block content %}
+    <section class="panel">
+        {% if page.object_list %}
+            <div class="table-wrap">
+                <table class="data-table data-table--cards">
+                    <thead>
+                        <tr>
+                            <th>任务</th>
+                            <th>函数</th>
+                            <th>状态</th>
+                            <th>开始</th>
+                            <th>耗时</th>
+                            <th class="cell-actions">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in page %}
+                            <tr>
+                                <td data-label="任务" class="cell-strong">{{ job.name|default:"—" }}</td>
+                                <td data-label="函数" class="mono text-xs">{{ job.func }}</td>
+                                <td data-label="状态">
+                                    <span class="badge {% if job.success %}badge--success{% else %}badge--danger{% endif %}">{% if job.success %}成功{% else %}失败{% endif %}</span>
+                                </td>
+                                <td data-label="开始" class="muted">{{ job.started|datetimefmt }}</td>
+                                <td data-label="耗时" class="mono">{{ job.time_taken|floatformat:1 }}s</td>
+                                <td class="cell-actions" data-label="操作">
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="cancel">
+                                        <input type="hidden" name="task_id" value="{{ job.id }}">
+                                        <button class="btn btn--sm" type="submit">取消</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% if job.result %}
+                                <tr>
+                                    <td colspan="6" data-label="结果">
+                                        <pre class="code-block"
+                                             style="max-height:120px">{{ job.result|truncatechars:800 }}</pre>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "partials/pagination.html" with page=page %}
+        {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "clock" %}</span>
+                <div class="empty-title">还没有后台任务</div>
+                <div class="empty-copy">启动 qcluster 后，定时备份与证书同步任务会记录在这里。</div>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

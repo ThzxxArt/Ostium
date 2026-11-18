@@ -1,0 +1,91 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}连接{% endblock %}
+{% block breadcrumb %}连接{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "swap" "w-3.5 h-3.5" %} Live connections</div>
+            <h1 class="page-title">实时连接</h1>
+            <p class="page-desc">来自 sing-box Clash API 的实时会话。只监听回环地址，不暴露到公网。</p>
+        </div>
+        <div class="page-actions">
+            <form method="post" data-confirm="确定关闭全部连接？">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="close_all">
+                <button class="btn btn--danger" type="submit">{% icon "x" %} 关闭全部</button>
+            </form>
+            <a class="btn" href="{% url 'console:connections' %}">{% icon "refresh" %} 刷新</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    {% if error %}
+        <div class="alert-banner alert-banner--warning">
+            {% icon "alert" %}
+            <div><strong>核心未就绪：</strong>{{ error }}。这不会影响其他页面与管理操作。</div>
+        </div>
+    {% endif %}
+    <section class="panel mt-4">
+        <div class="panel-head">
+            <div class="panel-title">{% icon "activity" %} {{ connections|length }} 条会话</div>
+            <form method="get" class="search-bar">
+                <label class="search-input" style="min-width:220px">
+                    <span class="sr-only">搜索连接</span>
+                    {% icon "search" %}
+                    <input class="input"
+                           type="search"
+                           name="q"
+                           value="{{ query }}"
+                           placeholder="用户、目标、入站…">
+                </label>
+                <button class="btn btn--sm" type="submit">搜索</button>
+            </form>
+        </div>
+        {% if connections %}
+            <div class="table-wrap">
+                <table class="data-table data-table--cards">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>入站</th>
+                            <th>目标</th>
+                            <th>规则</th>
+                            <th>链路</th>
+                            <th>上行</th>
+                            <th>下行</th>
+                            <th class="cell-actions">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in connections %}
+                            <tr>
+                                <td data-label="用户" class="cell-strong">{{ item.user }}</td>
+                                <td data-label="入站"><span class="proto-badge">{{ item.inbound }}</span></td>
+                                <td data-label="目标" class="mono text-xs">{{ item.host }}</td>
+                                <td data-label="规则" class="muted">{{ item.rule }}</td>
+                                <td data-label="链路" class="muted text-xs">{{ item.chains|join:" → " }}</td>
+                                <td data-label="上行" class="mono">{{ item.upload|bytes }}</td>
+                                <td data-label="下行" class="mono">{{ item.download|bytes }}</td>
+                                <td class="cell-actions" data-label="操作">
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="close">
+                                        <input type="hidden" name="connection_id" value="{{ item.id }}">
+                                        <button class="btn btn--sm btn--danger" type="submit">关闭</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "wifi" %}</span>
+                <div class="empty-title">{% if error %}核心 API 不可用{% else %}当前没有活动连接{% endif %}</div>
+                <div class="empty-copy">{% if error %}确认 sing-box 正在运行，且 Clash API 监听在 127.0.0.1:19090。{% else %}客户端产生流量后，连接会出现在这里。{% endif %}</div>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}
