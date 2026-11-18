@@ -10,20 +10,20 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 |---|---|
 | Version | **0.1.12** |
 | Status | **Published** |
-| Tag | `v0.1.12` (annotated) |
-| Assets | GitHub Release `v0.1.12` — produced from this status commit |
+| Tag | `v0.1.12` (annotated, commit `b9aa539`) |
+| Assets | GitHub Release `v0.1.12` — 23 assets, marked Latest |
 | PyPI | `ostium-ctl==0.1.12` (wheel + sdist) |
 | GHCR | `0.1.12`, `v0.1.12`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | release run from the `v0.1.12` tag |
+| Release workflow | run `44231382159` — success |
 | Previous release | `v0.1.11`, published 2026-11-17 (23 assets, unchanged) |
 | Release type | Windows TUN and system-proxy state cleanup |
 | Source branch | `main` |
 
-`v0.1.12` is the current release. The status is recorded here **before** the
-tag is created: the wheel, sdist and Release assets are immutable once
-published, so the tagged tree must already say `0.1.12` / published. The tag
-must be created from this commit; artifact names, run IDs and hashes are
-appended after the release workflow completes.
+`v0.1.12` was published on 2026-11-18. The tag targets `b9aa539`; the release
+workflow passed verification, integration, upgrade-e2e, wheel, core, Windows,
+macOS, Linux package, Docker and publish jobs. The GitHub Release has 23
+assets, PyPI serves `ostium-ctl==0.1.12` (wheel + sdist), and GHCR has the
+`0.1.12`/`v0.1.12`/`latest` tags.
 
 ## 0.1.12 verification status
 
@@ -41,6 +41,9 @@ appended after the release workflow completes.
 - `npm audit` gate: one exact, expiring exception for
   `GHSA-fc5q-39xc-vjpf` (`picomatch`, build/test toolchain only, no fixed
   upstream release as of 2026-11-18); all other advisories still fail.
+- Release workflow `44231382159` passed every job; the companion Core build
+  workflow `44231381973` passed. The GitHub Release is public with 23 assets,
+  PyPI has `ostium-ctl==0.1.12`, and GHCR has `0.1.12`/`v0.1.12`/`latest`.
 
 ### Not verified in this workspace (0.1.12)
 
@@ -49,8 +52,9 @@ appended after the release workflow completes.
 - Debian/RHEL real machines, Nginx, Docker runtime, ACME, real TUN, 72-hour
   soak and performance.
 - The release workflow, platform assets and PyPI/GHCR publication are produced
-  from this status commit; unexecuted checks remain blockers and must not be
-  claimed as verified.
+  from the `v0.1.12` tag; run `44231382159` passed and the artifacts are
+  published. Unexecuted platform checks in the list above remain blockers and
+  must not be claimed as verified.
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.
