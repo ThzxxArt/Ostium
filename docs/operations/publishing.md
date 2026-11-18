@@ -38,26 +38,33 @@ unzip -l dist/ostium_server-0.2.0-py3-none-any.whl | head
 
 ## 方式一：GitHub Actions 可信发布
 
-1. 在 PyPI 创建项目 `ostium-server`。
+发布入口统一在 **`release.yml`**，不再使用单独的 `pypi.yml`。
+
+1. 在 PyPI 创建项目 `ostium-server`（或配置 pending trusted publisher）。
 2. 在 PyPI 的 Publishing 设置中添加 trusted publisher：
    - owner：`ThzxxArt`
    - repository：`Ostium`
-   - workflow：`pypi.yml`
+   - workflow：`release.yml`
    - environment：`pypi`
 3. 在 GitHub 仓库创建 `pypi` environment（可加审批）。
 4. 手动运行 workflow：
 
 ```text
-Actions -> pypi -> Run workflow -> repository=pypi
+Actions -> release -> Run workflow
+  version: 0.2.0
+  publish_pypi: true
 ```
 
-首次建议先发 TestPyPI：
+`publish_pypi=false` 时只构建并上传 GitHub Actions artifact，不访问 PyPI。
 
-```text
-Actions -> pypi -> Run workflow -> repository=testpypi
-```
-
-TestPyPI 需要在 TestPyPI 单独配置 trusted publisher。
+> **重要：** 0.1.x 发布的是 `ostium-ctl`，0.2.0 的包名是
+> `ostium-server`。PyPI 的 trusted publisher 是按“项目名 + workflow +
+> environment”绑定的；只给旧的 `ostium-ctl` 配置 `release.yml` 不会授权
+> 新的 `ostium-server`。需要在 PyPI 为 `ostium-server` 单独添加
+> trusted publisher（pending publisher 也可以），或者改用 API token。
+>
+> 如果确实希望继续用 `ostium-ctl` 这个名字，需要同时修改 `pyproject.toml`
+> 的 `name` 和所有发布文档，这会偏离 0.2.0 的包名决策，需单独确认。
 
 ## 方式二：本地发布
 
@@ -85,5 +92,7 @@ OSTIUM_DEBUG=1 OSTIUM_DATA_DIR=/tmp/ostium-pypi-data \
 ## 为什么之前没有 PyPI 发布物
 
 0.2.0 验收阶段明确要求“不发布 PyPI/GHCR/GitHub Release、不打新 tag”，
-因此仓库只有可构建的 wheel/sdist，没有实际上架。本页和 `pypi.yml` 是发布
-配置；真正上架需要在 PyPI 配置 trusted publisher 或提供 token 后手动触发。
+因此仓库只有可构建的 wheel/sdist，没有实际上架。现在发布入口已并入
+`release.yml`；真正上架需要在 PyPI 为 `ostium-server` 配置 trusted
+publisher 或提供 token 后手动触发。旧项目 `ostium-ctl` 的 trusted
+publisher 不会自动授权新项目名。

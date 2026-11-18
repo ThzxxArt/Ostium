@@ -6,6 +6,10 @@ on:
       version:
         description: "Version, e.g. 0.2.0"
         required: true
+      publish_pypi:
+        description: "Publish the built wheel/sdist to PyPI"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -53,7 +57,29 @@ jobs:
             sing-box.sha256
             sing-box.sbom.json
             SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
       - name: Summary
         run: |
           echo "Ostium Server ${{ inputs.version }} artifacts" >> "$GITHUB_STEP_SUMMARY"
           cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+
+  publish-pypi:
+    needs: build
+    if: ${{ inputs.publish_pypi }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi-dist
+          path: dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
