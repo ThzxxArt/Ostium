@@ -98,13 +98,19 @@
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/screenshots/users-light.png" alt="用户与配额"></td>
-    <td width="50%"><img src="docs/assets/screenshots/dashboard-mobile.png" alt="移动端 Dashboard"></td>
+    <td width="50%"><img src="docs/assets/screenshots/subscriptions-light.png" alt="订阅管理"></td>
   </tr>
   <tr>
     <td align="center"><sub>用户与配额</sub></td>
-    <td align="center"><sub>移动端 · 390px</sub></td>
+    <td align="center"><sub>订阅管理</sub></td>
   </tr>
 </table>
+
+<div align="center">
+  <img src="docs/assets/screenshots/dashboard-mobile.png" alt="移动端 Dashboard" width="300">
+  <br>
+  <sub>移动端 · 390px 首屏</sub>
+</div>
 
 界面包含：
 

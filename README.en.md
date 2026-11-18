@@ -98,13 +98,19 @@ create users, enable inbounds, import certificates, hand out subscriptions, and 
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/screenshots/users-light.png" alt="Users and quotas"></td>
-    <td width="50%"><img src="docs/assets/screenshots/dashboard-mobile.png" alt="Mobile dashboard"></td>
+    <td width="50%"><img src="docs/assets/screenshots/subscriptions-light.png" alt="Subscriptions"></td>
   </tr>
   <tr>
     <td align="center"><sub>Users & quotas</sub></td>
-    <td align="center"><sub>Mobile · 390px</sub></td>
+    <td align="center"><sub>Subscriptions</sub></td>
   </tr>
 </table>
+
+<div align="center">
+  <img src="docs/assets/screenshots/dashboard-mobile.png" alt="Mobile dashboard" width="300">
+  <br>
+  <sub>Mobile · 390px viewport</sub>
+</div>
 
 The console includes:
 

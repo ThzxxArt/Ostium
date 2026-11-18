@@ -126,11 +126,12 @@ def test_screenshots_and_axe(page, live_server, browser_user):
             page.evaluate("document.documentElement.dataset.theme = 'dark'")
             page.wait_for_timeout(250)
             name = route.strip("/").replace("/", "-") or "dashboard"
-            page.screenshot(path=str(SCREENSHOTS / f"{name}-{width}-dark.png"), full_page=True)
+            full_page = width >= 768
+            page.screenshot(path=str(SCREENSHOTS / f"{name}-{width}-dark.png"), full_page=full_page)
             page.emulate_media(color_scheme="light")
             page.evaluate("document.documentElement.dataset.theme = 'light'")
             page.wait_for_timeout(250)
-            page.screenshot(path=str(SCREENSHOTS / f"{name}-{width}-light.png"), full_page=True)
+            page.screenshot(path=str(SCREENSHOTS / f"{name}-{width}-light.png"), full_page=full_page)
 
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(f"{live_server.url}/")
