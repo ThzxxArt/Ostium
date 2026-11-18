@@ -1,26 +1,22 @@
-# Ostium Server 0.2.1 — Release Notes
+# Ostium Server 0.2.2 — Release Notes
 
-Ostium 0.2.1 is a patch release for the server-only 0.2.x line. It fixes the
-online installer on hosts where root already had a Python 3.14 executable in
-`/root/.local/bin`.
+Ostium 0.2.2 fixes the 0.2.1 installer and production static-file pipeline.
 
 ## Fixed
 
-- The installer forces `UV_PYTHON_PREFERENCE=only-managed`, installs Python
-  under `/opt/ostium/python`, and writes uv executable links to
-  `/opt/ostium/bin` instead of `/root/.local/bin`.
-- Existing venvs that resolve outside `/opt/ostium/python` are detected and
-  rebuilt automatically.
-- The installer verifies the venv interpreter with `runuser -u ostium` before
-  continuing, and normalizes directory permissions.
-
-This fixes:
-
-```text
-runuser: failed to execute /opt/ostium/venv/bin/python: Permission denied
-```
-
-No database schema changes. 0.2.0 installations can upgrade in place.
+- **Release assets are now the default.** The installer downloads the immutable
+  GitHub Release wheel, sdist, prebuilt sing-box and `SHA256SUMS`; it verifies
+  checksums and installs them. It no longer clones or builds source by default.
+- `--from-source` remains available for development and still builds sing-box
+  locally with the pinned Go toolchain.
+- Removed the Chart.js `sourceMappingURL` comment and moved the Tailwind source
+  stylesheet out of `static/`. `collectstatic` with
+  `CompressedManifestStaticFilesStorage` now completes.
+- Added a regression test that runs `collectstatic` with the real manifest
+  storage backend.
+- The installer continues to force a managed Python under `/opt/ostium/python`
+  that the `ostium` user can execute, and auto-repairs old venvs pointing at
+  `/root`.
 
 ## Install
 
@@ -29,33 +25,32 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
   | sudo bash -s -- --domain vpn.example.com --with-caddy
 ```
 
+Pin the release explicitly if needed:
+
 ```bash
-pip install ostium-ctl==0.2.1
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- --version 0.2.2 --domain vpn.example.com --with-caddy
 ```
 
 ```bash
-docker pull ghcr.io/thzxxart/ostium-server:0.2.1
+pip install ostium-ctl==0.2.2
+```
+
+```bash
+docker pull ghcr.io/thzxxart/ostium-server:0.2.2
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.1/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.1` and `:latest`
-- GitHub Release: `v0.2.1`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.2/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.2` and `:latest`
+- GitHub Release: `v0.2.2`
 
-## 0.2.0 highlights
+## Upgrade
 
-- One host, one admin: Django 6.1 + SQLite/PostgreSQL.
-- VLESS Reality, Hysteria2, Trojan, Shadowsocks 2022.
-- Base64, Clash/Mihomo, sing-box and plain URI subscriptions.
-- Pinned sing-box with `sing-box check`, atomic apply and rollback.
-- Aurora Console, TOTP, scoped API keys, audit, encrypted backups, doctor,
-  diagnostics, Prometheus and certbot sync.
-- systemd, Docker Compose, one-line installer and pinned container image.
+0.2.0/0.2.1 can upgrade in place; there are no database schema changes:
 
-## Breaking changes from 0.1.x
-
-- 0.1.x databases, configuration, certificates, tokens, APIs and subscription
-  formats are not read or migrated.
-- The client, TUN, system proxy, SPA and custom core API are removed.
-- Python 3.14 and Django 6.1 are required.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- upgrade --version 0.2.2
+```

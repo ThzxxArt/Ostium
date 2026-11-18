@@ -1,6 +1,6 @@
 [project]
 name = "ostium-ctl"
-version = "0.2.1"
+version = "0.2.2"
 description = "Ostium Server — a single-host private proxy server for Linux"
 readme = "docs/pypi-readme.md"
 requires-python = ">=3.14,<3.15"

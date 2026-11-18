@@ -307,7 +307,9 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
   | sudo bash -s -- --domain vpn.example.com --with-caddy
 ```
 
-脚本会自动下载对应源码、构建带统计标签的 sing-box、安装 systemd 服务并申请证书。
+脚本默认下载 GitHub Release 资产（wheel、sdist、预构建 sing-box），校验
+SHA256 后安装 systemd 服务并申请证书。不会默认源码构建；开发时用
+`--from-source`。
 不使用 Caddy：
 
 ```bash
@@ -336,8 +338,8 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 安装器会完成：
 
 1. 安装运行时依赖，下载静态 `uv` 与 Python 3.14。
-2. 创建 `/opt/ostium/venv`，安装 wheel 或当前源码。
-3. 从 pinned 上游源码构建带统计标签的 sing-box 到 `/opt/ostium/core/sing-box`。
+2. 下载并校验 release 的 wheel、sdist 和预构建 sing-box。
+3. 创建 `/opt/ostium/venv` 并安装 release wheel；sing-box 安装到 `/opt/ostium/core/sing-box`。
 4. 创建 `ostium` 用户、`/var/lib/ostium` 与 `/etc/ostium/ostium.env`。
 5. 生成 `OSTIUM_SECRET_KEY` / `OSTIUM_FIELD_KEY`，权限 0640。
 6. 执行 migrate、collectstatic、init，打印一次性管理员密码。
@@ -356,7 +358,7 @@ ssh -L 8000:127.0.0.1:8000 user@server
 ```bash
 # 在线升级（不需要本地 checkout）
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --ref main
+  | sudo bash -s -- upgrade
 
 # 或从本地 checkout 升级
 sudo bash install.sh upgrade --from-source
@@ -374,7 +376,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.1`。首次使用可
+预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.2`。首次使用可
 `docker compose pull`；本地改动可用 `docker compose up -d --build`。
 
 服务：
@@ -740,6 +742,6 @@ Inter 字体遵循 SIL Open Font License 1.1。
 
 **一台 Linux。一个管理员。一份通用订阅。**
 
-<sub>Ostium Server 0.2.1 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.2 · Made for the quiet corner of the internet.</sub>
 
 </div>

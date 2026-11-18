@@ -18,5 +18,5 @@ echo "${SHA256}  ${BIN}" | sha256sum -c -
 chmod +x "$BIN"
 
 cd "$ROOT"
-"$BIN" -i src/ostium/static/src/app.css -o src/ostium/static/css/app.css --minify
+"$BIN" -i src/ostium/static_src/app.css -o src/ostium/static/css/app.css --minify
 echo "Built src/ostium/static/css/app.css ($(wc -c < src/ostium/static/css/app.css) bytes)"

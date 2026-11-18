@@ -2,7 +2,8 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.1"
+VERSION="0.2.2"
+RELEASE_VERSION="${OSTIUM_RELEASE_VERSION:-$VERSION}"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
 GO_VERSION="1.27.4"
@@ -30,7 +31,9 @@ SOURCE_REF="${OSTIUM_SOURCE_REF:-main}"
 SOURCE_URL="${OSTIUM_SOURCE_URL:-}"
 SOURCE_TMP=""
 PYPI=0
-PYPI_VERSION="${OSTIUM_PYPI_VERSION:-$VERSION}"
+PYPI_VERSION="${OSTIUM_PYPI_VERSION:-}"
+RELEASE_WHEEL=""
+RELEASE_SINGBOX=""
 
 usage() {
   cat <<'EOF'
@@ -40,11 +43,12 @@ Options:
   --domain DOMAIN      Public hostname; configures Caddy and subscription URLs
   --with-caddy         Install and configure Caddy on 8443
   --no-service         Prepare files but do not enable systemd units
-  --from-source        Install this checkout instead of a release wheel
+  --version VERSION    Release version to install (default: 0.2.2)
+  --from-source        Build/install from source instead of release assets
   --wheel PATH         Install a specific wheel
   --pypi               Install ostium-ctl from PyPI (requires a published release)
-  --ref REF            Source ref for online install (default: main)
-  --source-url URL     Source tarball URL for online install
+  --ref REF            Source ref for --from-source (default: main)
+  --source-url URL     Source tarball URL for --from-source
   --singbox PATH       Use a local sing-box binary instead of downloading
   --purge              With uninstall: delete data, config and the service user
   -h, --help           Show this help
@@ -61,11 +65,12 @@ while [ $# -gt 0 ]; do
     --domain) DOMAIN="${2:?}"; shift ;;
     --with-caddy) WITH_CADDY=1 ;;
     --no-service) NO_SERVICE=1 ;;
+    --version) RELEASE_VERSION="${2:?}"; shift ;;
     --from-source) FROM_SOURCE=1 ;;
     --wheel) WHEEL="${2:?}"; shift ;;
     --pypi) PYPI=1 ;;
-    --ref) SOURCE_REF="${2:?}"; shift ;;
-    --source-url) SOURCE_URL="${2:?}"; shift ;;
+    --ref) SOURCE_REF="${2:?}"; FROM_SOURCE=1; shift ;;
+    --source-url) SOURCE_URL="${2:?}"; FROM_SOURCE=1; shift ;;
     --singbox) SINGBOX_PATH="${2:?}"; shift ;;
     --purge) PURGE=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -73,6 +78,8 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+PYPI_VERSION="${PYPI_VERSION:-$RELEASE_VERSION}"
 
 [ "$(id -u)" -eq 0 ] || die "Run as root."
 if [ -n "$DOMAIN" ]; then
@@ -110,8 +117,8 @@ if [ "$WITH_CADDY" -eq 1 ]; then
   command -v certbot >/dev/null || die "Install certbot first."
 fi
 
-# A piped invocation has no script path. Keep ROOT empty so prepare_source
-# downloads the requested source instead of trusting the current directory.
+# A piped invocation has no script path. Keep ROOT empty; the release-asset or
+# source preparation step will populate it instead of trusting the cwd.
 if [ -n "${BASH_SOURCE[0]:-}" ]; then
   ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 else
@@ -125,10 +132,40 @@ install_packages() {
   fi
 }
 
+prepare_release_assets() {
+  # Production installs use the immutable GitHub Release assets: wheel, sdist
+  # (for systemd/Caddy/certbot files) and the pinned sing-box binary.
+  [ -n "$SOURCE_TMP" ] && return
+  command -v curl >/dev/null || die "curl is required for online installation."
+  command -v tar >/dev/null || die "tar is required for online installation."
+  command -v sha256sum >/dev/null || die "sha256sum is required for release verification."
+  local base wheel sdist asset
+  base="${OSTIUM_RELEASE_BASE:-https://github.com/ThzxxArt/Ostium/releases/download/v${RELEASE_VERSION}}"
+  base="${base%/}"
+  wheel="ostium_ctl-${RELEASE_VERSION}-py3-none-any.whl"
+  sdist="ostium_ctl-${RELEASE_VERSION}.tar.gz"
+  SOURCE_TMP="$(mktemp -d)"
+  trap 'rm -rf "$SOURCE_TMP"' EXIT
+  log "Downloading Ostium ${RELEASE_VERSION} release assets"
+  for asset in "$wheel" "$sdist" sing-box SHA256SUMS; do
+    curl -fsSL --retry 5 "$base/$asset" -o "$SOURCE_TMP/$asset" \
+      || die "Could not download release asset: $base/$asset"
+  done
+  (cd "$SOURCE_TMP" && sha256sum -c --ignore-missing SHA256SUMS) \
+    || die "Release asset checksum verification failed."
+  tar -xzf "$SOURCE_TMP/$sdist" -C "$SOURCE_TMP"
+  ROOT="$(find "$SOURCE_TMP" -maxdepth 1 -mindepth 1 -type d | head -n 1)"
+  if [ ! -f "$ROOT/pyproject.toml" ] || [ ! -d "$ROOT/deploy/systemd" ]; then
+    die "Downloaded release sdist is missing deployment assets."
+  fi
+  RELEASE_WHEEL="$SOURCE_TMP/$wheel"
+  RELEASE_SINGBOX="$SOURCE_TMP/sing-box"
+  chmod 0755 "$RELEASE_SINGBOX"
+}
+
 prepare_source() {
-  # When invoked as `curl .../install.sh | sudo bash -s -- ...`, there is no
-  # checkout next to the script. Download the matching source tarball so the
-  # systemd/Caddy/certbot assets are still available.
+  # --from-source keeps the development workflow: download a source ref and
+  # build sing-box locally. It is never the default production path.
   if [ -n "$ROOT" ] && [ -f "$ROOT/pyproject.toml" ] && [ -d "$ROOT/src/ostium/config" ]; then
     return
   fi
@@ -235,10 +272,12 @@ install_app() {
     uv pip install --python "$PREFIX/venv/bin/python" "ostium-ctl==${PYPI_VERSION}"
   elif [ -n "${WHEEL:-}" ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "$WHEEL"
+  elif [ -n "${RELEASE_WHEEL:-}" ]; then
+    uv pip install --python "$PREFIX/venv/bin/python" "$RELEASE_WHEEL"
   elif [ "$FROM_SOURCE" -eq 1 ] || { [ -n "$ROOT" ] && [ -f "$ROOT/pyproject.toml" ]; }; then
     uv pip install --python "$PREFIX/venv/bin/python" "$ROOT"
   else
-    die "No wheel supplied. Use --wheel, --from-source, or run from the repository."
+    die "No wheel supplied. Use the release assets, --wheel, or --from-source."
   fi
   runuser -u "$SERVICE_USER" -- "$PREFIX/venv/bin/python" -V >/dev/null \
     || die "The virtualenv Python is not readable by $SERVICE_USER (check $PREFIX/python permissions)."
@@ -320,6 +359,18 @@ install_singbox() {
     install -m 0755 "$SINGBOX_PATH" "$target"
     if ! singbox_binary_ok "$target"; then
       die "--singbox binary was not built with with_v2ray_api; traffic statistics would be unavailable."
+    fi
+    record_singbox_digest "$target"
+    return
+  fi
+  if [ -n "${RELEASE_SINGBOX:-}" ]; then
+    log "Installing prebuilt sing-box v${SINGBOX_VERSION} from release assets"
+    install -m 0755 "$RELEASE_SINGBOX" "$target"
+    if ! singbox_binary_ok "$target"; then
+      die "Release sing-box was not built with with_v2ray_api."
+    fi
+    if ! singbox_version_ok "$target"; then
+      die "Release sing-box version does not match v${SINGBOX_VERSION}."
     fi
     record_singbox_digest "$target"
     return
@@ -447,7 +498,11 @@ health_check() {
 
 do_install() {
   install_packages
-  prepare_source
+  if [ "$FROM_SOURCE" -eq 1 ]; then
+    prepare_source
+  else
+    prepare_release_assets
+  fi
   create_user
   write_env
   install_uv
@@ -461,7 +516,7 @@ do_install() {
     health_check
   fi
   echo
-  log "Ostium ${VERSION} installed."
+  log "Ostium ${RELEASE_VERSION} installed."
   echo "  Console (loopback): http://127.0.0.1:8000/"
   echo "  SSH tunnel:         ssh -L 8000:127.0.0.1:8000 user@server"
   echo "  Enable TOTP at:     http://127.0.0.1:8000/accounts/totp/setup/"
@@ -477,7 +532,11 @@ do_upgrade() {
   else
     warn "OSTIUM_BACKUP_PASSWORD is not set; skipping the automatic pre-upgrade backup."
   fi
-  prepare_source
+  if [ "$FROM_SOURCE" -eq 1 ]; then
+    prepare_source
+  else
+    prepare_release_assets
+  fi
   install_app
   install_singbox
   run_as_ostium "$PREFIX/venv/bin/ostium" migrate --noinput

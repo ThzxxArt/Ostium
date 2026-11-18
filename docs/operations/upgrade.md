@@ -15,7 +15,7 @@ Ostium 不提供 0.1.x 迁移路径。0.2.0 是全新安装版本。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --ref main
+  | sudo bash -s -- upgrade
 ```
 
 或从本地 checkout 升级：

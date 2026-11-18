@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@source "../../templates/**/*.html";
-@source "../../templatetags/**/*.py";
+@source "../templates/**/*.html";
+@source "../templatetags/**/*.py";
 
 @font-face {
   font-family: "Inter";

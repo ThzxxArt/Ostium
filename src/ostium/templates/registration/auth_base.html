@@ -41,14 +41,14 @@
                     </div>
                 </div>
                 <div style="position:relative;z-index:1;color:#6f819b;font-size:11px">
-                    Aurora Server Console · v{{ app_version|default:"0.2.1" }}
+                    Aurora Server Console · v{{ app_version|default:"0.2.2" }}
                 </div>
             </aside>
             <main class="auth-panel">
                 <div class="auth-card">
                     {% block auth_content %}{% endblock %}
                     <div class="auth-foot">
-                        Ostium Server {{ app_version|default:"0.2.1" }} · 管理面默认仅监听回环地址。
+                        Ostium Server {{ app_version|default:"0.2.2" }} · 管理面默认仅监听回环地址。
                         <br>
                         公网访问请使用 TLS + 两步验证，或通过 SSH 隧道。
                     </div>

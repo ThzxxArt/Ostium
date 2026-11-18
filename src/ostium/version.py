@@ -6,7 +6,7 @@ import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-_FALLBACK = "0.2.1"
+_FALLBACK = "0.2.2"
 
 
 def _read_version_file() -> str | None:

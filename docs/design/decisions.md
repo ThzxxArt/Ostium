@@ -120,6 +120,21 @@ restore 的 `flush` 中使用 `inhibit_post_migrate`。否则 `auditlog` 的外�
 指向重新生成后 ID 不同的 content type，导致备份无法恢复。恢复失败时会用
 flush 前的安全快照回滚，避免留下空数据库。
 
+## 安装器默认使用 release 资产
+
+`install.sh` 默认下载 GitHub Release 的 wheel、sdist、预构建 sing-box 和
+`SHA256SUMS`，校验后安装；源码下载与 sing-box 编译只在 `--from-source` 时
+使用。这样发布资产和线上安装保持一致，也避免每次安装都依赖 Go 工具链。
+`--version` 用于固定 release 版本，`--ref` 仅用于源码模式。
+
+## 静态源文件不参与 collectstatic
+
+Tailwind 源文件移到 `src/ostium/static_src/app.css`，不放在 `static/` 下；
+同时移除 vendored Chart.js 的 `sourceMappingURL`。生产
+`CompressedManifestStaticFilesStorage` 不再因缺少 source map 或把
+`@import "tailwindcss"` 当静态 URL 而失败。CI 增加真实 manifest storage 的
+collectstatic 回归测试。
+
 ## 订阅的 Referrer-Policy 作用域
 
 Caddy 只对非 `/sub/*` 响应设置 `Referrer-Policy: same-origin`，避免覆盖

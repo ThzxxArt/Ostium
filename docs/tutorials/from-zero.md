@@ -139,8 +139,8 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 安装器会：
 
 1. 安装运行时依赖，下载固定版本 `uv` 与 Python 3.14 到 `/opt/ostium`。
-2. 安装本仓库到 `/opt/ostium/venv`。
-3. 从 sing-box `v1.14.4` 源码构建带统计标签的数据面二进制。
+2. 下载并校验 GitHub Release 的 wheel、sdist 和预构建 sing-box。
+3. 安装 wheel 到 `/opt/ostium/venv`，安装 sing-box 到 `/opt/ostium/core/`。
 4. 创建 `ostium` 系统用户、`/var/lib/ostium`、`/etc/ostium`。
 5. 生成 `OSTIUM_SECRET_KEY`、`OSTIUM_FIELD_KEY`、`/etc/ostium/ostium.env`。
 6. 执行 migrate、collectstatic、init，并打印一次性管理员密码。
@@ -149,7 +149,8 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 9. 把证书复制到 `/etc/ostium/tls/vpn.example.com/`，配置 Caddy 8443。
 10. 安装证书续期 pre/post/deploy hook，并启用 `certbot.timer`。
 
-> 首次安装需要下载 Go/sing-box 源码并编译，通常 3–10 分钟。
+> 默认使用 release 资产，不需要编译 sing-box。只有 `--from-source` 才会下载
+> Go/源码并构建；开发调试时再用。
 > 如果 certbot 申请失败，先检查 DNS、80 端口和安全组。
 
 记下安装器输出的：
@@ -369,7 +370,7 @@ OSTIUM_BACKUP_PASSWORD=...
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --ref main
+  | sudo bash -s -- upgrade
 ```
 
 或从本地 checkout 升级：

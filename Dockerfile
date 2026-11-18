@@ -2,7 +2,7 @@
 ARG SINGBOX_VERSION=v1.14.4
 ARG TAILWIND_VERSION=v4.3.5
 ARG TAILWIND_SHA256=e47695cee3f0d90623a91f3939b08bdee610eb5ad99340adff9d4145b284d6cc
-ARG VERSION=0.2.1
+ARG VERSION=0.2.2
 ARG BUILD_COMMIT=unknown
 
 FROM golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS core
@@ -50,7 +50,7 @@ RUN uv sync --frozen --no-dev --no-install-project \
 # Build CSS in the final dependency environment so Tailwind sees both the
 # project templates and Unfold's admin templates. Flattening paths in a
 # separate stage silently drops the admin utilities.
-RUN tailwindcss -i src/ostium/static/src/app.css -o src/ostium/static/css/app.css --minify \
+RUN tailwindcss -i src/ostium/static_src/app.css -o src/ostium/static/css/app.css --minify \
     && test -s src/ostium/static/css/app.css \
     && grep -q '\.table{' src/ostium/static/css/app.css \
     && rm -f /usr/local/bin/tailwindcss

@@ -307,8 +307,10 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
   | sudo bash -s -- --domain vpn.example.com --with-caddy
 ```
 
-The script downloads the source, builds sing-box with statistics tags, installs
-the systemd units and requests a certificate. Without Caddy:
+The script downloads the GitHub Release assets (wheel, sdist and prebuilt
+sing-box), verifies SHA256, installs the systemd units and requests a
+certificate. It does **not** build from source by default; use `--from-source`
+for development. Without Caddy:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
@@ -328,8 +330,8 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 The installer:
 
 1. Installs runtime dependencies and static `uv` + Python 3.14.
-2. Creates `/opt/ostium/venv` and installs the wheel or this source tree.
-3. Builds the pinned sing-box source with statistics tags.
+2. Downloads and verifies the release wheel, sdist and prebuilt sing-box.
+3. Creates `/opt/ostium/venv`, installs the wheel and places sing-box in `/opt/ostium/core/`.
 4. Creates the `ostium` user, `/var/lib/ostium` and `/etc/ostium/ostium.env`.
 5. Generates `OSTIUM_SECRET_KEY` / `OSTIUM_FIELD_KEY` (mode 0640).
 6. Runs migrate, collectstatic and init; prints a one-time admin password.
@@ -348,7 +350,7 @@ Upgrade / uninstall:
 ```bash
 # Online upgrade (no local checkout required)
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --ref main
+  | sudo bash -s -- upgrade
 
 # Or from a local checkout
 sudo bash install.sh upgrade --from-source
@@ -366,7 +368,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.1`. Run
+Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.2`. Run
 `docker compose pull` on first use, or `docker compose up -d --build` after
 local changes.
 
@@ -733,6 +735,6 @@ Inter is licensed under the SIL Open Font License 1.1.
 
 **One Linux box. One administrator. One universal subscription.**
 
-<sub>Ostium Server 0.2.1 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.2 · Made for the quiet corner of the internet.</sub>
 
 </div>

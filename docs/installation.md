@@ -21,23 +21,27 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
   | sudo bash -s -- --domain vpn.example.com --with-caddy
 ```
 
-不需要手动下载脚本；安装器会自动下载源码和部署资产。也可以 clone 后执行：
+不需要手动下载脚本；安装器默认下载 **GitHub Release 资产**：
+wheel、sdist（提供 systemd/Caddy/certbot 部署文件）、预构建 sing-box 和
+`SHA256SUMS`。不会默认克隆源码或重新编译 sing-box。
+
+需要从源码开发/调试时显式使用 `--from-source`：
 
 ```bash
-sudo bash install.sh --domain vpn.example.com --with-caddy
+sudo bash install.sh --from-source --domain vpn.example.com --with-caddy
 ```
 
 安装器会：
 
 1. 安装 `ca-certificates`、`curl`、`openssl`、`git`（certbot/Caddy 需预先安装）。
-2. 下载静态 `uv`，在 `/opt/ostium/python` 安装 Python 3.14，创建 `/opt/ostium/venv`。
-3. 安装本仓库（或 `--wheel` 指定的 wheel）。
-4. 从固定的 sing-box `v1.14.4` 源码构建带
-   `with_v2ray_api,with_clash_api,with_quic,with_utls` 的数据面二进制；
-   如果系统没有 Go，会自动下载固定版本的 Go 工具链。
+2. 下载静态 `uv`，在 `/opt/ostium/python` 安装 Python 3.14，创建 `/opt/ostium/venv`
+   并强制使用 ostium 用户可读的 managed Python。
+3. 下载并校验 release 的 `ostium_ctl-*.whl`、sdist 和 `sing-box`。
+4. 安装 wheel；把预构建的 sing-box `v1.14.4` 安装到
+   `/opt/ostium/core/sing-box`，并校验 `with_v2ray_api` 和 SHA256。
 5. 创建 `ostium` 用户与 `/var/lib/ostium`、`/etc/ostium`。
 6. 生成 `OSTIUM_SECRET_KEY`、`OSTIUM_FIELD_KEY` 和 `/etc/ostium/ostium.env`，
-   并把构建出的 sing-box SHA256 写入运行期校验变量。
+   并把 sing-box SHA256 写入运行期校验变量。
 7. 执行 migrate、collectstatic、init，打印一次性管理员密码。
 8. 安装并启用 `ostium-web`、`ostium-worker`、`ostium-jobs`。
 9. 可选：申请证书、复制到 `/etc/ostium/tls`、配置 Caddy 8443；certbot
@@ -65,7 +69,7 @@ ssh -L 8000:127.0.0.1:8000 user@server
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --ref main
+  | sudo bash -s -- upgrade
 ```
 
 或从本地 checkout 升级：
@@ -97,7 +101,7 @@ docker compose pull
 docker compose up -d
 ```
 
-镜像：`ghcr.io/thzxxart/ostium-server:0.2.1`。需要本地构建时使用
+镜像：`ghcr.io/thzxxart/ostium-server:0.2.2`。需要本地构建时使用
 `docker compose up -d --build`。
 
 使用 Caddy profile 时，需要先把证书复制到宿主机 `/etc/ostium/tls/<domain>/`；

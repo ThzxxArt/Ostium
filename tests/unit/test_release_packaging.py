@@ -31,10 +31,10 @@ def test_docker_css_build_preserves_tailwind_source_layout() -> None:
     # CSS must be built after uv sync, in the same tree that contains both the
     # project templates and Unfold's admin templates.
     assert "uv sync --frozen --no-dev" in dockerfile
-    assert "tailwindcss -i src/ostium/static/src/app.css -o src/ostium/static/css/app.css" in dockerfile
+    assert "tailwindcss -i src/ostium/static_src/app.css -o src/ostium/static/css/app.css" in dockerfile
     assert "grep -q '\\.table{'" in dockerfile
-    css = (ROOT / "src/ostium/static/src/app.css").read_text(encoding="utf-8")
-    assert '@source "../../templates/**/*.html"' in css
+    css = (ROOT / "src/ostium/static_src/app.css").read_text(encoding="utf-8")
+    assert '@source "../templates/**/*.html"' in css
 
 
 def test_caddy_does_not_override_subscription_referrer_policy() -> None:
@@ -68,6 +68,25 @@ def test_installer_enforces_option_and_caddy_preconditions() -> None:
     assert "ostium-ctl==${PYPI_VERSION}" in script
     assert "singbox_version_ok" in script
     assert "constant.Version=v${SINGBOX_VERSION}" in script
+
+
+def test_installer_uses_release_assets_by_default() -> None:
+    script = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert "prepare_release_assets" in script
+    assert "ostium_ctl-${RELEASE_VERSION}-py3-none-any.whl" in script
+    assert "ostium_ctl-${RELEASE_VERSION}.tar.gz" in script
+    assert "sha256sum -c --ignore-missing SHA256SUMS" in script
+    assert '"$RELEASE_WHEEL"' in script
+    assert '"$RELEASE_SINGBOX"' in script
+    assert "--version VERSION" in script
+    assert 'if [ "$FROM_SOURCE" -eq 1 ]; then\n    prepare_source\n  else\n    prepare_release_assets' in script
+
+
+def test_static_source_and_chart_bundle_are_production_safe() -> None:
+    assert (ROOT / "src/ostium/static_src/app.css").is_file()
+    assert not (ROOT / "src/ostium/static/src/app.css").exists()
+    chart = (ROOT / "src/ostium/static/js/chart.umd.min.js").read_text(encoding="utf-8")
+    assert "sourceMappingURL" not in chart
 
 
 def test_installer_forces_a_managed_python_readable_by_the_service_user() -> None:

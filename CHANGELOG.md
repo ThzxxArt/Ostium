@@ -3,6 +3,19 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.2 — 2026-11-19
+
+### Fixed
+
+- The installer now uses immutable GitHub Release assets by default: the wheel,
+  sdist (for systemd/Caddy/certbot files), prebuilt sing-box and `SHA256SUMS`.
+  Source checkout/build is only used with `--from-source`.
+- Removed the Chart.js `sourceMappingURL` comment from the vendored bundle and
+  moved the Tailwind source stylesheet out of `static/`. Production
+  `collectstatic` with `CompressedManifestStaticFilesStorage` now succeeds.
+- Added a CI regression test that runs `collectstatic` with the real manifest
+  storage backend.
+
 ## 0.2.1 — 2026-11-18
 
 ### Fixed
