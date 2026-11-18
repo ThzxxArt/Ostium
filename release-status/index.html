@@ -2129,6 +2129,9 @@ appended after the release workflow completes.</p>
   files, README, docs and installers agree on <code>0.1.12</code>.</li>
 <li>The Windows cleanup removes only <code>Ostium</code>/<code>ostium0</code>/<code>sing-box</code> routes and
   adapters; it does not touch other VPNs.</li>
+<li><code>npm audit</code> gate: one exact, expiring exception for
+  <code>GHSA-fc5q-39xc-vjpf</code> (<code>picomatch</code>, build/test toolchain only, no fixed
+  upstream release as of 2026-11-18); all other advisories still fail.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace-0112">Not verified in this workspace (0.1.12)<a class="headerlink" href="#not-verified-in-this-workspace-0112" title="Permanent link">&para;</a></h3>
 <ul>
