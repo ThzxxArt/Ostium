@@ -1,6 +1,6 @@
 [Unit]
 Description=Ostium background jobs (django-q2)
-Documentation=https://github.com/ostium-dev/ostium
+Documentation=https://github.com/ThzxxArt/Ostium
 After=network-online.target ostium-worker.service
 Wants=network-online.target
 

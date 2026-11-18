@@ -22,7 +22,23 @@ jobs:
         with:
           version: "0.11.14"
           python-version: "3.14"
-      - run: uv sync --extra dev
+      - run: uv sync --frozen --extra dev
+      - name: Set release version
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          version = "${{ inputs.version }}"
+          Path("VERSION").write_text(version + "\n")
+          path = Path("pyproject.toml")
+          path.write_text(re.sub(r'^version = ".*"$', f'version = "{version}"', path.read_text(), count=1, flags=re.M))
+          PY
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src
+      - run: uv run pytest -q --cov=src/ostium --cov-report=term
+      - run: uv run bandit -q -r src -ll
+      - run: uv run pip-audit
       - run: bash scripts/build-css.sh
       - run: bash scripts/build-core.sh
       - run: uv build

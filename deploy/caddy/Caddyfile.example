@@ -22,10 +22,14 @@
 }
 
 https://{$OSTIUM_DOMAIN}:8443 {
-	tls /etc/letsencrypt/live/{$OSTIUM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/{$OSTIUM_DOMAIN}/privkey.pem
+	tls /etc/ostium/tls/{$OSTIUM_DOMAIN}/fullchain.pem /etc/ostium/tls/{$OSTIUM_DOMAIN}/privkey.pem
 
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:8000 {
+	# Metrics/readiness are for the local host only; Prometheus scrapes the
+	# loopback listener directly.
+	@internal path /metrics /readyz /health/*
+	respond @internal 404
+	reverse_proxy {$OSTIUM_UPSTREAM:127.0.0.1:8000} {
 		header_up X-Forwarded-Proto https
 		header_up X-Real-IP {remote_host}
 	}
@@ -34,7 +38,10 @@ https://{$OSTIUM_DOMAIN}:8443 {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
-		Referrer-Policy "no-referrer"
+		# The console relies on form POSTs with an Origin header. A
+		# no-referrer policy makes Chromium send Origin: null and breaks CSRF.
+		# Subscription responses still set no-referrer in Django.
+		Referrer-Policy "same-origin"
 		-Server
 	}
 }

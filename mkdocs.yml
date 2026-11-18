@@ -1,8 +1,8 @@
 site_name: Ostium Server
 site_description: Linux single-host private proxy server with standard subscriptions
-site_url: https://github.com/ostium-dev/ostium
-repo_url: https://github.com/ostium-dev/ostium
-repo_name: ostium-dev/ostium
+site_url: https://github.com/ThzxxArt/Ostium
+repo_url: https://github.com/ThzxxArt/Ostium
+repo_name: ThzxxArt/Ostium
 edit_uri: edit/main/docs/
 
 theme:

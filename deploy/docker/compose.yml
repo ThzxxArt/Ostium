@@ -1,17 +1,21 @@
 name: ostium
 
 x-common: &ostium-common
-  image: ostium-server:0.2.0
+  image: ostium-server:${OSTIUM_VERSION:-0.2.0}
   build:
     context: ../..
     dockerfile: Dockerfile
+    args:
+      VERSION: ${OSTIUM_VERSION:-0.2.0}
+      BUILD_COMMIT: ${OSTIUM_BUILD_COMMIT:-unknown}
   env_file:
     - ./ostium.env
   environment:
     DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
     OSTIUM_DATA_DIR: /var/lib/ostium
     OSTIUM_SINGBOX_PATH: /opt/ostium/core/sing-box
-    OSTIUM_DB_URL: sqlite:////var/lib/ostium/ostium.db
+    # OSTIUM_DB_URL comes from ./ostium.env (env_file) so the postgres
+    # profile can be selected without editing this file.
   volumes:
     - ostium-data:/var/lib/ostium
   restart: unless-stopped
@@ -24,6 +28,11 @@ x-common: &ostium-common
 services:
   web:
     <<: *ostium-common
+    environment:
+      DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
+      OSTIUM_DATA_DIR: /var/lib/ostium
+      OSTIUM_SINGBOX_PATH: /opt/ostium/core/sing-box
+      OSTIUM_CLASH_URL: http://worker:19090
     entrypoint: ["/bin/sh", "-c"]
     command:
       - "ostium migrate --noinput && ostium collectstatic --noinput && ostium web --bind 0.0.0.0:8000 --workers 2"
@@ -36,9 +45,16 @@ services:
 
   worker:
     <<: *ostium-common
+    environment:
+      DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
+      OSTIUM_DATA_DIR: /var/lib/ostium
+      OSTIUM_SINGBOX_PATH: /opt/ostium/core/sing-box
+      OSTIUM_CLASH_BIND: 0.0.0.0:19090
     command: ["worker"]
     cap_add:
       - NET_BIND_SERVICE
+    healthcheck:
+      disable: true
     depends_on:
       web:
         condition: service_healthy
@@ -50,6 +66,8 @@ services:
   jobs:
     <<: *ostium-common
     command: ["qcluster"]
+    healthcheck:
+      disable: true
     depends_on:
       web:
         condition: service_healthy
@@ -64,9 +82,11 @@ services:
     environment:
       OSTIUM_DOMAIN: ${OSTIUM_DOMAIN:-localhost}
       OSTIUM_ACME_EMAIL: ${OSTIUM_ACME_EMAIL:-admin@localhost}
+      OSTIUM_UPSTREAM: web:8000
     volumes:
       - ../caddy/Caddyfile.example:/etc/caddy/Caddyfile:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/ostium/tls:/etc/ostium/tls:ro
       - /var/www/certbot:/var/www/certbot:ro
       - caddy-data:/data
     depends_on:

@@ -1,6 +1,6 @@
 [Unit]
 Description=Ostium web console (Gunicorn)
-Documentation=https://github.com/ostium-dev/ostium
+Documentation=https://github.com/ThzxxArt/Ostium
 After=network-online.target
 Wants=network-online.target
 

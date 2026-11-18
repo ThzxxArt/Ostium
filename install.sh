@@ -4,7 +4,11 @@ set -euo pipefail
 
 VERSION="0.2.0"
 SINGBOX_VERSION="1.14.4"
+SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
+GO_VERSION="1.27.4"
+UV_VERSION="0.11.14"
 PREFIX="/opt/ostium"
+export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$PREFIX/python}"
 CONF_DIR="/etc/ostium"
 DATA_DIR="/var/lib/ostium"
 SERVICE_USER="ostium"
@@ -53,15 +57,25 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$(id -u)" -eq 0 ] || die "Run as root."
+if [ -n "$DOMAIN" ]; then
+  case "$DOMAIN" in
+    *://*|*/*|*" "*) die "--domain must be a bare hostname such as vpn.example.com." ;;
+  esac
+fi
+case "$(uname -m)" in
+  x86_64|amd64) ARCH="amd64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  *) die "Unsupported architecture: $(uname -m) (Linux amd64/arm64 only)." ;;
+esac
 command -v systemctl >/dev/null || die "systemd is required (use Docker Compose otherwise)."
 command -v apt-get >/dev/null || warn "Only apt-based distributions are automated; install curl/openssl/certbot manually if needed."
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 install_packages() {
   if command -v apt-get >/dev/null; then
     apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl git
   fi
 }
 
@@ -70,7 +84,9 @@ create_user() {
     useradd --system --home-dir "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
   fi
   install -d -m 0700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR" "$DATA_DIR/runtime" "$DATA_DIR/certs" "$DATA_DIR/logs" "$DATA_DIR/backups" "$DATA_DIR/imports"
-  install -d -m 0750 -o root -g "$SERVICE_USER" "$CONF_DIR"
+  # Traversable by the caddy user so it can read /etc/ostium/tls, while the
+  # environment file itself remains 0640 root:ostium.
+  install -d -m 0751 -o root -g "$SERVICE_USER" "$CONF_DIR"
 }
 
 write_env() {
@@ -99,6 +115,8 @@ OSTIUM_SECURE_COOKIES=$([ -n "$DOMAIN" ] && echo true || echo false)
 OSTIUM_REQUIRE_TOTP=$([ -n "$DOMAIN" ] && echo true || echo false)
 OSTIUM_SINGBOX_PATH=$PREFIX/core/sing-box
 OSTIUM_LOG_LEVEL=INFO
+OSTIUM_DOMAIN=$DOMAIN
+OSTIUM_ACME_EMAIL=${DOMAIN:+admin@$DOMAIN}
 EOF
   chown root:"$SERVICE_USER" "$env_file"
   chmod 0640 "$env_file"
@@ -106,10 +124,11 @@ EOF
 
 install_uv() {
   if ! command -v uv >/dev/null; then
-    log "Installing uv"
-    curl -LsSf --retry 5 https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+    log "Installing uv ${UV_VERSION}"
+    curl -LsSf --retry 5 https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_VERSION="$UV_VERSION" sh
   fi
   uv python install 3.14
+  chmod -R a+rX "$PREFIX/python" 2>/dev/null || true
 }
 
 install_app() {
@@ -125,34 +144,104 @@ install_app() {
   else
     die "No wheel supplied. Use --wheel, --from-source, or run from the repository."
   fi
+  runuser -u "$SERVICE_USER" -- "$PREFIX/venv/bin/python" -V >/dev/null \
+    || die "The virtualenv Python is not readable by $SERVICE_USER (check $PREFIX/python permissions)."
+}
+
+singbox_binary_ok() {
+  local binary="$1"
+  [ -x "$binary" ] || return 1
+  "$binary" version 2>/dev/null | grep -q "with_v2ray_api"
+}
+
+record_singbox_digest() {
+  local target="$1"
+  local digest
+  digest="$(sha256sum "$target" | awk '{print $1}')"
+  printf '%s  %s\n' "$digest" "$(basename "$target")" >"$PREFIX/core/sing-box.sha256"
+  cat >"$PREFIX/core/sing-box.sbom.json" <<EOF
+{"component":"sing-box","version":"v${SINGBOX_VERSION}","source":"https://github.com/SagerNet/sing-box","build_tags":"${SINGBOX_TAGS}","platform":"linux-${ARCH}","sha256":"${digest}"}
+EOF
+  if [ -f "$CONF_DIR/ostium.env" ]; then
+    if grep -q '^OSTIUM_SINGBOX_BINARY_SHA256=' "$CONF_DIR/ostium.env"; then
+      sed -i "s|^OSTIUM_SINGBOX_BINARY_SHA256=.*|OSTIUM_SINGBOX_BINARY_SHA256=${digest}|" "$CONF_DIR/ostium.env"
+    else
+      printf 'OSTIUM_SINGBOX_BINARY_SHA256=%s\n' "$digest" >>"$CONF_DIR/ostium.env"
+    fi
+  fi
+  log "sing-box SHA256: ${digest}"
+}
+
+install_go() {
+  if command -v go >/dev/null; then
+    GO_BIN="$(command -v go)"
+    return
+  fi
+  local tmp url
+  tmp="$(mktemp -d)"
+  url="https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  log "Downloading Go ${GO_VERSION} for ${ARCH}"
+  curl -fsSL --retry 5 -o "$tmp/go.tar.gz" "$url"
+  if curl -fsSL --retry 3 -o "$tmp/go.tar.gz.sha256" "$url.sha256" 2>/dev/null; then
+    expected="$(awk '{print $1}' "$tmp/go.tar.gz.sha256")"
+    (cd "$tmp" && echo "${expected}  go.tar.gz" | sha256sum -c -)
+  else
+    warn "Go checksum file unavailable; continuing without verification."
+  fi
+  tar -xzf "$tmp/go.tar.gz" -C "$tmp"
+  GO_BIN="$tmp/go/bin/go"
+  GO_TMP="$tmp"
 }
 
 install_singbox() {
   local target="$PREFIX/core/sing-box"
-  if [ "$MODE" = "upgrade" ] && [ -x "$target" ]; then
+  if [ "$MODE" = "upgrade" ] && singbox_binary_ok "$target"; then
+    log "Keeping existing sing-box binary with with_v2ray_api"
+    record_singbox_digest "$target"
     return
   fi
   if [ -n "$SINGBOX_PATH" ]; then
     install -m 0755 "$SINGBOX_PATH" "$target"
+    if ! singbox_binary_ok "$target"; then
+      die "--singbox binary was not built with with_v2ray_api; traffic statistics would be unavailable."
+    fi
+    record_singbox_digest "$target"
     return
   fi
+  if [ -n "${OSTIUM_SINGBOX_BINARY_URL:-}" ]; then
+    log "Downloading custom sing-box binary"
+    curl -fsSL --retry 5 -o "$target" "$OSTIUM_SINGBOX_BINARY_URL"
+    chmod 0755 "$target"
+    if ! singbox_binary_ok "$target"; then
+      die "OSTIUM_SINGBOX_BINARY_URL does not provide with_v2ray_api."
+    fi
+    record_singbox_digest "$target"
+    return
+  fi
+
+  log "Building sing-box ${SINGBOX_VERSION} with statistics support"
+  install_go
   local tmp
   tmp="$(mktemp -d)"
-  log "Downloading sing-box ${SINGBOX_VERSION}"
-  curl -fsSL --retry 5 -o "$tmp/sing-box.tar.gz" \
-    "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz"
-  tar -xzf "$tmp/sing-box.tar.gz" -C "$tmp"
-  install -m 0755 "$tmp/sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box" "$target"
-  if [ -n "${OSTIUM_SINGBOX_SHA256:-}" ]; then
-    echo "${OSTIUM_SINGBOX_SHA256}  $target" | sha256sum -c -
-  else
-    warn "OSTIUM_SINGBOX_SHA256 is not set; pin it in production."
+  git clone --depth 1 --branch "v${SINGBOX_VERSION}" https://github.com/SagerNet/sing-box.git "$tmp/src"
+  (cd "$tmp/src" && CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" "$GO_BIN" build \
+    -trimpath -ldflags "-s -w" -tags "$SINGBOX_TAGS" -o "$tmp/sing-box" ./cmd/sing-box)
+  install -m 0755 "$tmp/sing-box" "$target"
+  rm -rf "$tmp" "${GO_TMP:-}"
+  if ! singbox_binary_ok "$target"; then
+    die "sing-box build did not include with_v2ray_api."
   fi
-  rm -rf "$tmp"
+  record_singbox_digest "$target"
 }
 
 run_as_ostium() {
-  runuser -u "$SERVICE_USER" -- env $(grep -v '^#' "$CONF_DIR/ostium.env" | xargs) "$@"
+  (
+    set -a
+    # shellcheck disable=SC1090,SC1091
+    . "$CONF_DIR/ostium.env"
+    set +a
+    runuser -u "$SERVICE_USER" -- "$@"
+  )
 }
 
 setup_app() {
@@ -201,6 +290,11 @@ setup_caddy() {
     systemctl stop caddy 2>/dev/null || true
     certbot certonly --standalone -d "$DOMAIN" --agree-tos --non-interactive -m "admin@$DOMAIN" || warn "certbot failed; configure DNS and retry."
   fi
+  install -d -m 0750 -o root -g caddy "/etc/ostium/tls/$DOMAIN"
+  install -m 0640 -o root -g caddy "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" \
+    "/etc/ostium/tls/$DOMAIN/fullchain.pem"
+  install -m 0640 -o root -g caddy "/etc/letsencrypt/live/$DOMAIN/privkey.pem" \
+    "/etc/ostium/tls/$DOMAIN/privkey.pem"
   install -d -m 0755 /etc/systemd/system/caddy.service.d
   cat >/etc/systemd/system/caddy.service.d/ostium.conf <<EOF
 [Service]
@@ -209,16 +303,23 @@ EOF
   install -m 0644 "$ROOT/deploy/caddy/Caddyfile.example" /etc/caddy/Caddyfile
   systemctl daemon-reload
   systemctl enable --now caddy
-  install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+  install -d -m 0755 /etc/letsencrypt/renewal-hooks/{pre,deploy,post}
   install -m 0755 "$ROOT/deploy/certbot/deploy-hook.sh" /etc/letsencrypt/renewal-hooks/deploy/ostium.sh
+  install -m 0755 "$ROOT/deploy/certbot/pre-hook.sh" /etc/letsencrypt/renewal-hooks/pre/ostium-stop-caddy.sh
+  install -m 0755 "$ROOT/deploy/certbot/post-hook.sh" /etc/letsencrypt/renewal-hooks/post/ostium-start-caddy.sh
+  certbot renew --dry-run >/dev/null 2>&1 || warn "certbot renew --dry-run failed; check hooks and port 80."
   log "Caddy is serving https://$DOMAIN:8443"
 }
 
 health_check() {
-  sleep 3
-  if command -v curl >/dev/null; then
-    curl -fsS http://127.0.0.1:8000/healthz >/dev/null && log "Management plane is healthy"
-  fi
+  for _ in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:8000/healthz >/dev/null 2>&1; then
+      log "Management plane is healthy"
+      return 0
+    fi
+    sleep 2
+  done
+  die "Management plane did not become healthy on 127.0.0.1:8000."
 }
 
 do_install() {
@@ -245,6 +346,12 @@ do_install() {
 do_upgrade() {
   install_packages
   install_uv
+  if grep -q '^OSTIUM_BACKUP_PASSWORD=..' "$CONF_DIR/ostium.env"; then
+    log "Creating a pre-upgrade backup"
+    run_as_ostium "$PREFIX/venv/bin/ostium" backup create --note "pre-upgrade" || die "Pre-upgrade backup failed."
+  else
+    warn "OSTIUM_BACKUP_PASSWORD is not set; skipping the automatic pre-upgrade backup."
+  fi
   install_app
   install_singbox
   run_as_ostium "$PREFIX/venv/bin/ostium" migrate --noinput

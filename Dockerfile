@@ -2,6 +2,8 @@
 ARG PYTHON_VERSION=3.14
 ARG SINGBOX_VERSION=v1.14.4
 ARG TAILWIND_VERSION=v4.3.5
+ARG VERSION=0.2.0
+ARG BUILD_COMMIT=unknown
 
 FROM golang:1.27-bookworm AS core
 ARG SINGBOX_VERSION
@@ -27,6 +29,12 @@ RUN tailwindcss -i app.css -o app.css.min --minify
 
 FROM python:${PYTHON_VERSION}-slim AS runtime
 ARG SINGBOX_VERSION
+ARG VERSION
+ARG BUILD_COMMIT
+LABEL org.opencontainers.image.title="Ostium Server" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${BUILD_COMMIT}" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH" \
