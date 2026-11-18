@@ -1191,6 +1191,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operations/upgrade-0.1.11-to-0.1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.11 → 0.1.12 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operations/upgrade-0.1.8-to-0.1.9/" class="md-nav__link">
         
   
@@ -1850,7 +1878,7 @@
 </tr>
 <tr>
 <td>路由</td>
-<td><code>auto_route</code>、<code>strict_route</code>、排除 RFC1918/link-local</td>
+<td><code>auto_route</code>；<code>strict_route</code> 默认关闭（Windows WFP 残留风险）</td>
 </tr>
 <tr>
 <td>IPv6</td>
@@ -1868,16 +1896,28 @@
 <p>如果你用 <code>--run-as-root</code> 安装，核心和控制面都以 root 运行。方便，但失去了控制面与 root 的隔离；不要在没有其他隔离的生产环境使用。</p>
 <h2 id="_3">切换模式<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>系统代理和 TUN 互斥。启用 TUN 会先关闭系统代理。如果 TUN 启动失败，Ostium 会报错，<strong>不会</strong>静默回退到系统代理，避免让你误以为已经全机接管。</p>
-<p>关闭 TUN 会重载仅混合代理的配置，让 sing-box 清理路由和网卡。如果核心被强杀，操作系统可能自动清理路由；崩溃后请用 <strong>Diagnostics</strong> 检查。</p>
+<p>关闭 TUN 会重载仅混合代理的配置，让 sing-box 清理路由和网卡。核心启动和停止时还会清理 <code>ostium0</code>/<code>Ostium</code> 的残留路由；如果核心被强杀，Windows 的 Wintun 路由可能要到下次核心启动才清理。</p>
 <h2 id="kill-switch">Kill switch 边界<a class="headerlink" href="#kill-switch" title="Permanent link">&para;</a></h2>
-<p><code>strict_route</code> 能减少 TUN 运行时的常见泄漏，但 Ostium 当前版本 <strong>不提供独立防火墙 kill switch</strong>。核心退出后，直连可能恢复。UI 会明确提示，这是当前版本的边界，不是“以后再做”的功能。</p>
+<p>Ostium 当前版本 <strong>不提供独立防火墙 kill switch</strong>。核心退出后，直连可能恢复。UI 会明确提示，这是当前版本的边界，不是“以后再做”的功能。</p>
+<p>Windows 上 <code>strict_route</code> 由 sing-box 用 WFP 实现；<code>TerminateProcess</code> 不保证执行 WFP/Wintun 清理，残留过滤器可能让 TCP 一直黑洞化，只有重启才恢复。因此 Windows 客户端默认使用 <code>strict_route: false</code>，并在核心启动/停止时清理 <code>Ostium</code>/<code>ostium0</code>/<code>sing-box</code> 的残留路由。不要为了“防泄漏”重新打开它。</p>
 <h2 id="dns">DNS<a class="headerlink" href="#dns" title="Permanent link">&para;</a></h2>
 <p>TUN 模式下 DNS 查询由核心接管：智能分流会让国内域名走本地解析器，其他流量走代理上的远程 DoH。混合代理/系统代理模式下，应用自己解析 DNS；UI 会提示“未接管 DNS”。</p>
 <h2 id="_4">故障排查<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>permission denied</code> / <code>tun: operation not permitted</code>：核心服务没有所需 capability，或不是 root/SYSTEM。</li>
 <li><code>address already in use</code>：另一个 VPN/TUN 客户端占用网卡或路由。</li>
-<li>断开后无法上网：运行 Diagnostics；如果旧进程崩溃，重启核心清理路由。</li>
+<li>断开后无法上网：先重启 OstiumCore 服务（启动时会清理残留路由）；仍不行则以管理员 PowerShell 执行：
+  <div class="highlight"><pre><span></span><code><span class="nv">$names</span> <span class="p">=</span> <span class="p">@(</span><span class="s1">'ostium0'</span><span class="p">,</span><span class="s1">'Ostium'</span><span class="p">,</span><span class="s1">'sing-box'</span><span class="p">)</span>
+<span class="nv">$adapters</span> <span class="p">=</span> <span class="p">@(</span><span class="nb">Get-NetAdapter</span> <span class="n">-IncludeHidden</span> <span class="p">|</span> <span class="nb">Where-Object</span> <span class="p">{</span>
+  <span class="nv">$names</span> <span class="o">-contains</span> <span class="nv">$_</span><span class="p">.</span><span class="n">Name</span> <span class="o">-or</span> <span class="nv">$_</span><span class="p">.</span><span class="n">InterfaceDescription</span> <span class="o">-match</span> <span class="s1">'Ostium|sing-box'</span>
+<span class="p">})</span>
+<span class="k">foreach</span> <span class="p">(</span><span class="nv">$adapter</span> <span class="k">in</span> <span class="nv">$adapters</span><span class="p">)</span> <span class="p">{</span>
+  <span class="nb">Get-NetRoute</span> <span class="n">-InterfaceIndex</span> <span class="nv">$adapter</span><span class="p">.</span><span class="n">ifIndex</span> <span class="p">|</span>
+    <span class="nb">Remove-NetRoute</span> <span class="n">-Confirm</span><span class="p">:</span><span class="nv">$false</span> <span class="n">-ErrorAction</span> <span class="n">SilentlyContinue</span>
+  <span class="nb">Disable-NetAdapter</span> <span class="n">-Name</span> <span class="nv">$adapter</span><span class="p">.</span><span class="n">Name</span> <span class="n">-Confirm</span><span class="p">:</span><span class="nv">$false</span> <span class="n">-ErrorAction</span> <span class="n">SilentlyContinue</span>
+<span class="p">}</span>
+</code></pre></div>
+  这会删除 Ostium 自己的虚拟网卡路由，不影响其他 VPN。</li>
 <li>TUN 开启后部分应用仍直连：检查路由规则、应用是否使用自己的网络栈，以及是否启用了 <code>strict_route</code>。</li>
 </ul>
 

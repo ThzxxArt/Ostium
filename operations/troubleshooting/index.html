@@ -1078,6 +1078,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../upgrade-0.1.11-to-0.1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.11 → 0.1.12 迁移
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../upgrade-0.1.8-to-0.1.9/" class="md-nav__link">
         
   
@@ -1498,6 +1526,17 @@
     <span class="md-ellipsis">
       
         核心崩溃后整机断网（0.1.11）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#windows-tcp-0112" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows 断开后 TCP 仍然超时（0.1.12）
       
     </span>
   </a>
@@ -1963,6 +2002,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#windows-tcp-0112" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows 断开后 TCP 仍然超时（0.1.12）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2080,6 +2130,14 @@ curl<span class="w"> </span>-fsS<span class="w"> </span>-H<span class="w"> </spa
 直连，同时产生 critical 告警。核心恢复后代理自动恢复；显式 Disconnect 不会被覆盖。</p>
 <p>这不是 kill switch。若关闭 fail-open，核心故障时系统代理会继续指向已停止的本地端口，
 整机流量可能黑洞。可在 Settings 中调整阈值。</p>
+<h2 id="windows-tcp-0112">Windows 断开后 TCP 仍然超时（0.1.12）<a class="headerlink" href="#windows-tcp-0112" title="Permanent link">&para;</a></h2>
+<p>0.1.11 及更早版本在 Windows 上直接用 <code>TerminateProcess</code> 停止 sing-box。如果之前用过
+TUN，<code>Ostium</code>/<code>ostium0</code> 的虚拟网卡或路由可能残留，表现为断开后 TCP 仍然超时、ping
+正常、重启或卸载才恢复。</p>
+<p>0.1.12 的 <code>OstiumCore</code> 会在启动和 TUN 停止时清理这些残留，并默认关闭 Windows 的
+<code>strict_route</code>。升级后重启一次 <code>OstiumCore</code>；仍不通时使用
+<a href="../../guides/tun/"><code>guides/tun.md</code></a> 中的管理员修复脚本，或重启一次电脑。该脚本只删除
+Ostium 自己的路由，不影响其他 VPN。</p>
 <h2 id="_7">安装器拒绝未知端口占用<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>0.1.11 安装器只停止可证明属于 Ostium 的监听进程。遇到未知进程时会输出 PID、路径和
 启动时间并退出。先确认该进程用途，再手动停止或修改 UI 端口；安装器不会盲杀。</p>
