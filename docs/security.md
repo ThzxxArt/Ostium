@@ -16,7 +16,9 @@
 | MIME | `X-Content-Type-Options: nosniff` |
 | Referrer | `same-origin`（订阅响应强制 `no-referrer`） |
 | 默认监听 | `127.0.0.1:8000` |
-| 审计 | `AuditEvent` + django-auditlog |
+| 审计 | `AuditEvent` + django-auditlog（模型注册与关键 action） |
+| Gunicorn 访问日志 | 不记录请求路径，避免订阅 token 落入 journald |
+| Admin CSP | 仅 `/admin/` 允许 Alpine 所需的 `unsafe-eval`；Aurora 控制台保持严格 CSP |
 
 ### 公网暴露清单
 
@@ -26,6 +28,7 @@
 - [ ] `OSTIUM_ALLOWED_HOSTS` 只包含真实域名。
 - [ ] `OSTIUM_CSRF_TRUSTED_ORIGINS` 使用 HTTPS。
 - [ ] 防火墙只放行 443/tcp、443/udp、8443/tcp 与 SSH。
+- [ ] 反向代理只允许本机访问 `/metrics`、`/readyz`、`/health/`。
 - [ ] `ostium doctor` 无 fail。
 
 ## 订阅面
@@ -36,6 +39,8 @@
 - `Cache-Control: private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex`。
 - 每 IP 60 次/分钟；每 token 120 次/分钟。
 - 日志与审计不记录完整 token。
+- 诊断包按 JSON 字段名脱敏 `password`、`server_key`、`obfs_password`、
+  `private_key` 等短密钥，而不是只按长度猜测。
 
 ## 数据面
 
@@ -43,8 +48,10 @@
 - 只执行固定 argv；配置由数据库生成。
 - `sing-box check` 通过后才替换；失败回滚。
 - 非 root，仅 `CAP_NET_BIND_SERVICE`。
-- 出口 ACL：私网、CGNAT、回环、link-local、云 metadata、SMTP 25。
-- Clash API / V2Ray stats 仅回环，secret 0600。
+- 出口 ACL：私网、CGNAT、回环、link-local、benchmark/文档/组播/保留段、
+  云 metadata、SMTP 25。
+- Clash API / V2Ray stats 默认仅回环，secret 0600；Docker 部署可通过
+  `OSTIUM_CLASH_BIND` / `OSTIUM_CLASH_URL` 在内部网络暴露，必须保留 secret。
 
 ## 字段加密
 

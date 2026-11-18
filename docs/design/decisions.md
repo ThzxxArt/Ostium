@@ -54,4 +54,31 @@ django-q2 没有运行中任务取消 API。`/jobs/{id}/cancel` 对已开始任�
 ## 订阅 Profile-Title 编码
 
 非 ASCII 用户名会使 HTTP header 无法用 latin-1 编码；订阅视图对非 ASCII 标题使用
-percent-encoding，保证响应头始终为 ASCII。
+客户端约定的 `base64:` 前缀，而不是 percent-encoding，保证客户端能显示正确的
+中文标题。
+
+## Django Admin 的 CSP 例外
+
+Aurora 控制台使用 Alpine CSP build，保持 `script-src 'self' 'nonce-…'`，不启用
+`unsafe-eval`。Django Admin + Unfold 自带标准 Alpine build，必须使用
+`unsafe-eval` 才能正常渲染遮罩、下拉和快捷键面板。为避免破坏 Admin，CSP 仅在
+`/admin/` 路径追加 `'unsafe-eval' 'unsafe-inline'`；控制台和订阅路径不受影响。
+这是单管理员、内部管理面的明确权衡，已记录在安全文档。
+
+## 备份恢复的字段密钥
+
+备份 manifest 保存创建时的字段密钥。恢复时如果主机的
+`OSTIUM_FIELD_KEY` 不同，会在 loaddata 后用备份密钥解密、再用当前密钥重新
+加密所有凭据，保证备份可跨主机恢复，不需要手工改环境变量。
+
+## Docker 下的 Clash API
+
+默认 Clash API 仍绑定 `127.0.0.1:19090`。Compose 中 web 与 worker 分容器，
+因此 worker 通过 `OSTIUM_CLASH_BIND=0.0.0.0:19090` 在内部网络监听，web 通过
+`OSTIUM_CLASH_URL=http://worker:19090` 访问；secret 仍由共享 runtime 卷提供。
+
+## 统计方向计数
+
+`ProxyUser` 增加 `uploaded_bytes` / `downloaded_bytes`，与 `used_bytes` 一起
+在 flush 时原子累加，并在月度/手动重置时归零。`Subscription-Userinfo` 使用这
+三个权威计数，不再用可能被保留期删除的 `TrafficDaily` 反推。

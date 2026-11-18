@@ -31,14 +31,16 @@ Ostium 只提供通用标准订阅，不使用私有格式。
 
 ```http
 Subscription-Userinfo: upload=...; download=...; total=...; expire=...
-Profile-Update-Interval: 24
-Profile-Title: <user>@<server_name>
+Profile-Update-Interval: <settings.subscription_update_interval>
+Profile-Title: <user>@<server_name> 或 base64:<...>
 Cache-Control: private, no-store
 Referrer-Policy: no-referrer
 X-Robots-Tag: noindex, nofollow
 ```
 
-`total=0` 表示不限；`expire=0` 表示不过期。
+`total=0` 表示不限；`expire=0` 表示不过期。非 ASCII 的
+`Profile-Title` 使用客户端约定的 `base64:` 前缀，而不是百分号编码。
+`upload`/`download` 来自持久化的方向计数，月度重置与手动重置会归零。
 
 ## 状态码
 

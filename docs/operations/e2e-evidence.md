@@ -71,4 +71,23 @@ mihomo -t Clash 订阅: pass
 4. 通过客户端代理访问源站。
 5. 等待 60 秒 flush，查询 `used_bytes` 与 `/sub/<token>`。
 
-生产验收应在 systemd 或容器中绑定 443，并使用真实公网出口。
+## 2026-11-18 复验：Trojan 自签证书 pin + 配额
+
+在修复自签证书 pin、统计 flush 与 pending 配额后重新执行：
+
+- 临时数据目录，Trojan inbound `0.0.0.0:8443`，自签证书 `localhost`
+- 客户端 sing-box 使用订阅生成的 `tls.certificate_public_key_sha256`
+- Clash/V2Ray 端口使用 `29090/29091`，避免与开发机已有实例冲突
+
+```text
+PROXY_BODY=<!doctype html><html lang=en><head>...
+E2E_USED=2016
+QUOTA_STATE=False quota_exceeded 1008
+QUOTA_SUB=403
+E2E_OK
+```
+
+即：自签 Trojan 客户端在仅 pin SPKI 的情况下真实连接成功；代理流量写入
+`used_bytes`；10 字节配额用户在真实流量后被禁用，订阅返回 403。
+
+生产验收仍应在 systemd 或容器中绑定 443，并使用真实公网出口。

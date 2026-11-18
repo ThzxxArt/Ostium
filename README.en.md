@@ -115,7 +115,7 @@ create users, enable inbounds, import certificates, hand out subscriptions, and 
 The console includes:
 
 - **Overview** — Server Pulse hero, live rates, daily traffic, online users, health stack, alert timeline.
-- **Users** — search, status filters, quota rings, expiry, last seen, protocol badges, batch actions.
+- **Users** — search, status filters, quota rings, expiry, last seen, protocol badges; batch actions live in Django Admin.
 - **User detail** — quota/expiry editing, credential rotation, four subscription cards, QR, 30-day chart, audit.
 - **Inbounds** — four protocol cards with enable, port, certificate, Reality keys and apply state.
 - **Subscriptions** — masked tokens, reveal/rotate with audit.
@@ -308,7 +308,7 @@ The installer:
 
 1. Installs runtime dependencies and static `uv` + Python 3.14.
 2. Creates `/opt/ostium/venv` and installs the wheel or this source tree.
-3. Downloads the pinned sing-box binary.
+3. Builds the pinned sing-box source with statistics tags.
 4. Creates the `ostium` user, `/var/lib/ostium` and `/etc/ostium/ostium.env`.
 5. Generates `OSTIUM_SECRET_KEY` / `OSTIUM_FIELD_KEY` (mode 0640).
 6. Runs migrate, collectstatic and init; prints a one-time admin password.
@@ -388,6 +388,9 @@ Required environment variables:
 | `OSTIUM_REQUIRE_TOTP` | `false` | Enforce admin TOTP |
 | `OSTIUM_SINGBOX_PATH` | `.cache/bin/sing-box` | Data-plane binary |
 | `OSTIUM_SINGBOX_BINARY_SHA256` | empty | Verify the binary at startup |
+| `OSTIUM_CLASH_BIND` | `127.0.0.1:19090` | Clash API bind address |
+| `OSTIUM_CLASH_URL` | empty | Web-side Clash API URL |
+| `OSTIUM_STATS_BIND` | `127.0.0.1:19091` | V2Ray stats bind address |
 | `OSTIUM_BACKUP_PASSWORD` | empty | Automatic backup password |
 
 Runtime settings live in the database and are editable in **Settings**:
@@ -600,7 +603,15 @@ uv run ruff format --check src tests
 uv run mypy src
 uv run djlint src/ostium/templates --check
 
-# Release gates
+# Release gates (use production settings and a real-length key)
+DJANGO_SETTINGS_MODULE=ostium.config.settings.prod \
+OSTIUM_SECRET_KEY="$(openssl rand -hex 48)" \
+OSTIUM_FIELD_KEY="MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" \
+OSTIUM_ALLOWED_HOSTS=vpn.example.com \
+OSTIUM_PUBLIC_BASE_URL=https://vpn.example.com \
+OSTIUM_REQUIRE_TOTP=true \
+OSTIUM_SSL_REDIRECT=true \
+OSTIUM_DATA_DIR="$(mktemp -d)" \
 uv run python manage.py check --deploy
 uv run bandit -q -r src -ll
 uv run pip-audit
@@ -611,9 +622,9 @@ Local validation:
 
 | Gate | Result |
 |---|---|
-| pytest | **306 passed**, 1 skipped (UI skipped by default) |
-| Coverage | **90.22%** statements, 90% gate |
-| Contracts | Server/client sing-box configs and Mihomo Clash config pass |
+| pytest | **350 passed**, 1 skipped (UI skipped by default) |
+| Coverage | **90.27%**, 90% gate |
+| Contracts | Four-protocol server/client sing-box and Mihomo Clash configs pass |
 | UI | 1440/1024/390, dark/light, 24 screenshots, axe no critical |
 | Django deploy check | **0 issues** |
 | Ruff / Mypy / Djlint | pass |

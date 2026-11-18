@@ -27,16 +27,19 @@ ostium token create ci --scope read --expires 90
 | Jobs | `GET /jobs`、`GET /jobs/{id}`、`POST /jobs/{id}/cancel` |
 | Backups | `GET/POST /backups`、`POST /backups/{id}/restore`、`DELETE` |
 | Alerts | `GET /alerts`、`POST /alerts/{id}/ack` |
-| Audit | `GET /audit?action=&actor=` |
+| Audit | `GET /audit?action=&actor=&target=` |
 | Settings | `GET/PATCH /settings` |
 | OpenAPI | `/api/schema`、`/api/docs`（docs 需要管理员登录） |
 
 分页：`?page=`，默认 50，最大 500。
-写操作需要 `write` key；读操作接受 `read` key。
+写操作需要 `write` key；读操作接受 `read` key。用户列表不返回 VLESS UUID
+等连接凭据；订阅凭据只在显式 reveal 接口返回。`GET /settings` 对
+`webhook_secret` 返回掩码；未知键、负数保留期和非法 URL 会返回 400。
 
 ## 错误格式
 
-RFC 9457 + `code` + `request_id`：
+RFC 9457 + `code` + `request_id`；未匹配的 `/api/v1/*` 路由和未捕获的
+API 异常也返回 `application/problem+json`：
 
 ```json
 {
@@ -68,8 +71,9 @@ curl -s -X POST -H "Authorization: Api-Key $OSTIUM_API_KEY" \
 
 ## 限速
 
-- 匿名：30/min
-- 用户：240/min
-- 订阅：IP 60/min，token 120/min
+- API key 读：120/min
+- API key 写：30/min
+- 无 key 请求：403（不进入匿名桶）
+- 订阅：IP 60/min，token 120/min（经 Caddy 时使用真实客户端 IP）
 
 超限返回 429；订阅带 `Retry-After`。

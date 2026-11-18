@@ -22,6 +22,9 @@
 | `OSTIUM_SECURE_COOKIES` | `true` | 生产 Cookie Secure |
 | `OSTIUM_SINGBOX_PATH` | `.cache/bin/sing-box` | sing-box 绝对路径 |
 | `OSTIUM_SINGBOX_BINARY_SHA256` | 空 | 启动时校验二进制 |
+| `OSTIUM_CLASH_BIND` | `127.0.0.1:19090` | Clash API 监听地址 |
+| `OSTIUM_CLASH_URL` | 空 | web 访问 Clash API 的地址（Docker 用 `http://worker:19090`） |
+| `OSTIUM_STATS_BIND` | `127.0.0.1:19091` | V2Ray 统计监听地址 |
 | `OSTIUM_LOG_LEVEL` | `INFO` | 应用日志级别 |
 | `OSTIUM_BACKUP_PASSWORD` | 空 | 自动备份密码（可选） |
 
@@ -62,7 +65,8 @@ openssl rand -base64 32       # OSTIUM_FIELD_KEY
 
 默认拒绝：
 
-- RFC1918、CGNAT、loopback、link-local、组播/保留地址；
+- RFC1918、CGNAT（`100.64.0.0/10`）、loopback、link-local；
+- benchmark（`198.18.0.0/15`）、文档/保留、组播地址；
 - 云 metadata：`169.254.169.254`、`100.100.100.200`、`fd00:ec2::254`；
 - SMTP 25/tcp。
 

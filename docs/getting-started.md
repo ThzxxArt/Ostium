@@ -9,7 +9,7 @@
 ## 启动
 
 ```bash
-git clone https://github.com/ostium-dev/ostium.git
+git clone https://github.com/ThzxxArt/Ostium.git
 cd ostium
 uv sync --extra dev
 uv run ostium migrate

@@ -15,7 +15,8 @@ Ostium 不提供 0.1.x 迁移路径。0.2.0 是全新安装版本。
 sudo bash install.sh upgrade --from-source
 ```
 
-或手动：
+安装器在 `OSTIUM_BACKUP_PASSWORD` 已配置时会自动创建 pre-upgrade 备份；
+否则会明确警告并继续。也可以先手动备份：
 
 ```bash
 sudo systemctl stop ostium-web ostium-worker ostium-jobs

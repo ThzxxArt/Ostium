@@ -39,13 +39,15 @@ sudo systemctl start ostium-web ostium-worker ostium-jobs
 1. 解密并校验 manifest/数据库 SHA256；
 2. flush 当前数据库并 loaddata；
 3. migrate；
-4. 覆盖证书与配置；
-5. 递增 desired revision，worker 重新应用。
+4. 如果备份的字段密钥与当前 `OSTIUM_FIELD_KEY` 不同，使用备份密钥解密、
+   再用当前密钥重新加密所有凭据，避免恢复后无法读取；
+5. 覆盖证书与配置；
+6. 递增 desired revision，worker 重新应用。
 
 恢复会替换当前数据库与证书，请先创建当前状态备份。
 
 ## 保留
 
-- 自动备份默认保留 7 份。
-- 手动备份不会被自动清理。
+- 自动备份按 `auto_backup_keep` 保留最近 N 份（默认 7），同时删除磁盘文件。
+- 手动备份不会被自动清理；删除备份会同时删除 `.ostb` 文件。
 - 建议把 `.ostb` 复制到另一台机器或对象存储；不要只留在同一块磁盘。

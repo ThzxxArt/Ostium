@@ -10,7 +10,8 @@
 | `/health/` | django-health-check（DB/cache/storage） |
 
 `/readyz` 在数据库不可用时返回 503；worker/sing-box 异常时返回 200 + `degraded`，
-便于区分“进程挂了”和“数据面降级”。
+便于区分“进程挂了”和“数据面降级”。Caddy 只允许本机访问 `/metrics`、
+`/readyz` 与 `/health/`；Prometheus 应直接抓取 `127.0.0.1:8000`。
 
 ## Prometheus 指标
 
@@ -53,7 +54,9 @@ scrape_configs:
 ## Webhook
 
 设置 `webhook_url` 与 `webhook_secret`。请求体 JSON，HMAC-SHA256 签名放在
-`X-Ostium-Signature`。只允许 HTTPS，禁止私网/metadata 目标。
+`X-Ostium-Signature`（`sha256=<hex>`）。只允许 HTTPS，发送前解析目标并拒绝
+私网、回环、link-local、CGNAT、metadata 与保留地址；最多重试 3 次。
+告警确认后不会因周期性重复触发而重新打开；恢复后再次出现会重新通知。
 
 ## 日志
 

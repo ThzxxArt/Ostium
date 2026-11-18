@@ -36,6 +36,11 @@ Ostium 0.2.0 是一个 **Linux 单机、单管理员、私人代理服务端**�
 - [订阅](subscriptions.md)：把链接导入 v2rayN、Clash Verge、sing-box。
 - [安全](security.md)：公网暴露前的检查清单。
 
+## 质量记录
+
+- [0.2.0 完成度审计](review/0.2.0-completion-audit.md)
+- [0.2.0 全量回归报告](review/0.2.0-regression-report.md)
+
 ## 版本与许可
 
 当前版本 `0.2.0`，AGPL-3.0-or-later。旧版本只存在于 git 历史与 `v0.1.12` tag。

@@ -25,21 +25,25 @@ vless://<uuid>@<host>:<port>?encryption=none&security=reality&sni=<sni>&fp=chrom
 hysteria2://<password>@<host>:<port>?sni=<sni>&insecure=0[&obfs=salamander&obfs-password=<pwd>]#<name>
 ```
 
-自签证书追加 `pinSHA256=<hex>`。
+自签证书追加 `pinSHA256=<hex>`（完整证书 DER 的 SHA-256）。
 
 ### Trojan
 
 ```text
-trojan://<password>@<host>:<port>?security=tls&sni=<sni>&type=tcp&allowInsecure=0#<name>
+trojan://<password>@<host>:<port>?security=tls&sni=<sni>&type=tcp&allowInsecure=0[&pcs=<base64>]#<name>
 ```
+
+自签证书追加 `pcs=<base64(SHA256(certificate DER))>`。
 
 ### Shadowsocks 2022
 
 ```text
-ss://<base64url(method:server_key:user_key)>@<host>:<port>#<name>
+ss://<method>:<percent-encoded(server_key:user_key)>@<host>:<port>#<name>
 ```
 
-实际密码为 `server_key:user_key`，SIP002 URL-safe Base64 无 padding。
+SIP022 规定 2022 方法的 userinfo 不使用 Base64；方法名与
+`server_key:user_key` 按 RFC 3986 百分号编码（`:` → `%3A`、`=` → `%3D`、
+`/` → `%2F`、`+` → `%2B`）。经典 Shadowsocks 仍使用 URL-safe Base64。
 
 ## Clash
 
@@ -52,6 +56,7 @@ ss://<base64url(method:server_key:user_key)>@<host>:<port>#<name>
 
 - mixed 入站 `127.0.0.1:7890`
 - Reality / Hysteria2 / Trojan / Shadowsocks 出站
+- 自签 Hysteria2/Trojan 使用 `tls.certificate_public_key_sha256`（SPKI pin）
 - `Auto` urltest、`Ostium` selector
 - 不启用 TUN
 

@@ -19,15 +19,19 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 
 安装器会：
 
-1. 安装 `ca-certificates`、`curl`、`openssl`（以及可选的 certbot/Caddy 依赖）。
-2. 下载静态 `uv`，安装 Python 3.14，创建 `/opt/ostium/venv`。
+1. 安装 `ca-certificates`、`curl`、`openssl`、`git`（certbot/Caddy 需预先安装）。
+2. 下载静态 `uv`，在 `/opt/ostium/python` 安装 Python 3.14，创建 `/opt/ostium/venv`。
 3. 安装本仓库（或 `--wheel` 指定的 wheel）。
-4. 下载 pinned sing-box 到 `/opt/ostium/core/sing-box`。
+4. 从固定的 sing-box `v1.14.4` 源码构建带
+   `with_v2ray_api,with_clash_api,with_quic,with_utls` 的数据面二进制；
+   如果系统没有 Go，会自动下载固定版本的 Go 工具链。
 5. 创建 `ostium` 用户与 `/var/lib/ostium`、`/etc/ostium`。
-6. 生成 `OSTIUM_SECRET_KEY`、`OSTIUM_FIELD_KEY` 和 `/etc/ostium/ostium.env`。
+6. 生成 `OSTIUM_SECRET_KEY`、`OSTIUM_FIELD_KEY` 和 `/etc/ostium/ostium.env`，
+   并把构建出的 sing-box SHA256 写入运行期校验变量。
 7. 执行 migrate、collectstatic、init，打印一次性管理员密码。
 8. 安装并启用 `ostium-web`、`ostium-worker`、`ostium-jobs`。
-9. 可选：申请证书、配置 Caddy 8443。
+9. 可选：申请证书、复制到 `/etc/ostium/tls`、配置 Caddy 8443；certbot
+   standalone 续期前后会自动停止/启动 Caddy，deploy hook 会把证书同步进 Ostium。
 
 不使用 Caddy 时，通过 SSH 隧道访问：
 
@@ -73,6 +77,9 @@ openssl rand -hex 32      # OSTIUM_SECRET_KEY
 docker compose up -d --build
 ```
 
+使用 Caddy profile 时，需要先把证书复制到宿主机 `/etc/ostium/tls/<domain>/`；
+Compose 会把它以只读方式挂载进 Caddy 容器。没有证书时不要启用 caddy profile。
+
 服务：
 
 | 服务 | 作用 | 端口 |
@@ -92,10 +99,15 @@ docker compose exec web ostium init --username admin
 SQLite 数据必须放在本机卷，不要放 NFS。高并发或多写入场景使用 PostgreSQL：
 
 ```bash
-# ostium.env
+# deploy/docker/ostium.env
 OSTIUM_DB_URL=postgres://ostium:secret@postgres:5432/ostium
+POSTGRES_PASSWORD=secret
 docker compose --profile postgres up -d
 ```
+
+`ostium.env` 通过 Compose 的 `env_file` 注入；`POSTGRES_PASSWORD` 必须在
+shell 环境或项目 `.env` 中提供。首次切换 Postgres 时先启动 postgres，
+等健康检查通过后再启动 web/worker。
 
 ## 安装后检查
 

@@ -115,7 +115,7 @@
 界面包含：
 
 - **总览**：Server Pulse Hero、实时速率、今日流量、在线用户、健康堆叠、告警时间线。
-- **用户**：搜索、状态筛选、配额环、到期、最后在线、协议徽标、批量操作。
+- **用户**：搜索、状态筛选、配额环、到期、最后在线、协议徽标、批量操作（Django Admin）。
 - **用户详情**：配额/到期编辑、凭据轮换、订阅 4 格式卡片、二维码、30 天流量、审计。
 - **线路**：四张协议卡，启停、端口、证书、Reality 密钥、应用状态。
 - **订阅**：所有用户 token 打码展示；显示/轮换写入审计。
@@ -308,7 +308,7 @@ sudo bash install.sh --domain vpn.example.com --with-caddy
 
 1. 安装运行时依赖，下载静态 `uv` 与 Python 3.14。
 2. 创建 `/opt/ostium/venv`，安装 wheel 或当前源码。
-3. 下载 pinned sing-box 到 `/opt/ostium/core/sing-box`。
+3. 从 pinned 上游源码构建带统计标签的 sing-box 到 `/opt/ostium/core/sing-box`。
 4. 创建 `ostium` 用户、`/var/lib/ostium` 与 `/etc/ostium/ostium.env`。
 5. 生成 `OSTIUM_SECRET_KEY` / `OSTIUM_FIELD_KEY`，权限 0640。
 6. 执行 migrate、collectstatic、init，打印一次性管理员密码。
@@ -390,6 +390,9 @@ docker compose exec web ostium init --username admin
 | `OSTIUM_REQUIRE_TOTP` | `false` | 强制管理员 TOTP |
 | `OSTIUM_SINGBOX_PATH` | `.cache/bin/sing-box` | 数据面二进制 |
 | `OSTIUM_SINGBOX_BINARY_SHA256` | 空 | 启动时校验二进制 |
+| `OSTIUM_CLASH_BIND` | `127.0.0.1:19090` | Clash API 监听地址 |
+| `OSTIUM_CLASH_URL` | 空 | web 访问 Clash API 的地址 |
+| `OSTIUM_STATS_BIND` | `127.0.0.1:19091` | V2Ray 统计监听地址 |
 | `OSTIUM_BACKUP_PASSWORD` | 空 | 自动备份密码（可选） |
 
 运行时设置保存在数据库，可在控制台「设置」页修改：
@@ -602,7 +605,15 @@ uv run ruff format --check src tests
 uv run mypy src
 uv run djlint src/ostium/templates --check
 
-# 发布门禁
+# 发布门禁（必须使用 prod settings 与真实长度的密钥）
+DJANGO_SETTINGS_MODULE=ostium.config.settings.prod \
+OSTIUM_SECRET_KEY="$(openssl rand -hex 48)" \
+OSTIUM_FIELD_KEY="MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" \
+OSTIUM_ALLOWED_HOSTS=vpn.example.com \
+OSTIUM_PUBLIC_BASE_URL=https://vpn.example.com \
+OSTIUM_REQUIRE_TOTP=true \
+OSTIUM_SSL_REDIRECT=true \
+OSTIUM_DATA_DIR="$(mktemp -d)" \
 uv run python manage.py check --deploy
 uv run bandit -q -r src -ll
 uv run pip-audit
@@ -613,9 +624,9 @@ uv run mkdocs build --strict
 
 | 项目 | 结果 |
 |---|---|
-| pytest | **306 passed**，1 skipped（UI 默认跳过） |
-| 覆盖率 | **90.22%** statements，覆盖门槛 90% |
-| 契约 | sing-box 服务端/客户端配置、Mihomo Clash 配置 **全绿** |
+| pytest | **350 passed**，1 skipped（UI 默认跳过） |
+| 覆盖率 | **90.27%**，覆盖门槛 90% |
+| 契约 | 四协议 sing-box 服务端/客户端配置、Mihomo Clash 配置 **全绿** |
 | UI | 1440/1024/390、深/浅色，24 张截图；axe 无 critical |
 | Django deploy check | **0 issues** |
 | Ruff / Mypy / Djlint | 通过 |
