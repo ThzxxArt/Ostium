@@ -38,7 +38,7 @@
 ---
 
 > [!IMPORTANT]
-> **Ostium 0.2.0 is a server-only rewrite.**
+> **Ostium 0.2.x is a server-only rewrite.**
 > No desktop client, no TUN, no SPA, no 0.1.x migration.
 > Old releases live only in git history and the `v0.1.12` tag. Upgrading means a **fresh install, new users, new subscriptions**.
 
@@ -60,7 +60,7 @@ create users, enable inbounds, import certificates, hand out subscriptions, and 
 | Config written blindly, one typo kills the tunnel | Real `sing-box check`, atomic apply, automatic rollback |
 | Node/npm/SPA frontend required | **No Node**: Tailwind standalone + HTMX + Alpine + Chart.js |
 | Bespoke auth, jobs, audit, ACME | Mature Django auth/ORM/tasks/audit + certbot/Caddy |
-| Upgrade scripts and compatibility shims | 0.2.0 is **zero-compat, zero-migration**; clean install |
+| Upgrade scripts and compatibility shims | 0.2.x is **zero-compat, zero-migration**; clean install |
 
 ---
 
@@ -79,7 +79,7 @@ create users, enable inbounds, import certificates, hand out subscriptions, and 
 | 🧰 | **Operations** | doctor, redacted diagnostics, Prometheus, django-q2, audit |
 | 🐧 | **Linux native** | systemd or Docker Compose; SQLite default, PostgreSQL optional |
 | 🚫 | **No client baggage** | No TUN, system proxy, kill switch or private profile |
-| 🧼 | **No 0.1.x residue** | `main` contains only the 0.2.0 server |
+| 🧼 | **No 0.1.x residue** | `main` contains only the 0.2.x server |
 
 ---
 
@@ -366,7 +366,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.0`. Run
+Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.1`. Run
 `docker compose pull` on first use, or `docker compose up -d --build` after
 local changes.
 
@@ -689,7 +689,7 @@ Local validation:
 
 ## 🚧 Non-goals
 
-Ostium 0.2.0 deliberately does **not** include:
+Ostium 0.2.x deliberately does **not** include:
 
 - Desktop/mobile clients, TUN, system proxy or kill switch.
 - Multi-node orchestration, CDN, domain fronting, multi-tenancy or RBAC.
@@ -733,6 +733,6 @@ Inter is licensed under the SIL Open Font License 1.1.
 
 **One Linux box. One administrator. One universal subscription.**
 
-<sub>Ostium Server 0.2.0 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.1 · Made for the quiet corner of the internet.</sub>
 
 </div>

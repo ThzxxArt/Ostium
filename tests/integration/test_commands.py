@@ -71,7 +71,9 @@ def test_status_apply_token_commands(admin_user, inbounds):
     out = io.StringIO()
     call_command("status", "--json", stdout=out)
     payload = json.loads(out.getvalue())
-    assert payload["version"] == "0.2.0"
+    from ostium.version import __version__
+
+    assert payload["version"] == __version__
     assert len(payload["inbounds"]) == 4
 
     call_command("apply", stdout=io.StringIO())

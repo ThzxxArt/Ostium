@@ -19,10 +19,12 @@ def test_health_endpoints():
     from django.utils import timezone
 
     client = Client()
+    from ostium.version import __version__
+
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["version"] == "0.2.0"
+    assert response.json()["version"] == __version__
 
     # A fresh installation has no worker heartbeat and no sing-box process.
     response = client.get("/readyz")

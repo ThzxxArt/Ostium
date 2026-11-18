@@ -3,6 +3,21 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 — 2026-11-18
+
+### Fixed
+
+- The installer now forces uv to use a managed Python under `/opt/ostium/python`
+  and keeps uv executable links out of `/root/.local/bin`. This fixes
+  `runuser: failed to execute /opt/ostium/venv/bin/python: Permission denied`
+  on hosts where root's `PATH` already contained an unmanaged Python 3.14.
+- Existing venvs that resolve outside `/opt/ostium/python` are detected and
+  rebuilt automatically during install/upgrade.
+- venv and managed Python permissions are normalized so the `ostium` service
+  user can execute them.
+
+No database schema changes; 0.2.0 installations can upgrade in place.
+
 ## 0.2.0 — 2026-11-18
 
 ### Added

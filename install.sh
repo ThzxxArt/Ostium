@@ -2,7 +2,7 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
 GO_VERSION="1.27.4"

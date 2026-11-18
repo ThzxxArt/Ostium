@@ -38,7 +38,7 @@
 ---
 
 > [!IMPORTANT]
-> **Ostium 0.2.0 是服务端-only 的完全重写。**
+> **Ostium 0.2.x 是服务端-only 的完全重写。**
 > 没有桌面客户端、没有 TUN、没有 SPA、没有 0.1.x 迁移。
 > 旧版本只存在于 git 历史与 `v0.1.12` tag；升级意味着**全新安装、重新建用户、重新发订阅**。
 
@@ -60,7 +60,7 @@
 | 配置随手写文件，出错就断网 | 每次应用前 `sing-box check`，失败保留旧配置并回滚 |
 | 前端必须 npm / Node / SPA | **无 Node**：Tailwind standalone + HTMX + Alpine + Chart.js |
 | 统计、配额、证书各一套自研逻辑 | Django ORM + sing-box V2Ray stats + 成熟认证/任务/审计库 |
-| 升级要读迁移脚本 | 0.2.0 **零兼容、零迁移**；干净安装 |
+| 升级要读迁移脚本 | 0.2.x **零兼容、零迁移**；干净安装 |
 
 ---
 
@@ -79,7 +79,7 @@
 | 🧰 | **运维工具** | doctor、诊断包、Prometheus、django-q2、系统日志、审计 |
 | 🐧 | **Linux 原生** | systemd 或 Docker Compose；SQLite 默认，PostgreSQL 可选 |
 | 🚫 | **无客户端包袱** | 没有 TUN、系统代理、kill switch、私有 Profile |
-| 🧼 | **零 0.1.x 残留** | main 树只有 0.2.0 服务端文件 |
+| 🧼 | **零 0.1.x 残留** | main 树只有 0.2.x 服务端文件 |
 
 ---
 
@@ -374,7 +374,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.0`。首次使用可
+预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.1`。首次使用可
 `docker compose pull`；本地改动可用 `docker compose up -d --build`。
 
 服务：
@@ -697,7 +697,7 @@ uv run mkdocs build --strict
 
 ## 🚧 非目标
 
-Ostium 0.2.0 明确不做：
+Ostium 0.2.x 明确不做：
 
 - 桌面/手机客户端、TUN、系统代理、kill switch。
 - 多节点编排、CDN、域名前置、多租户/RBAC。
@@ -740,6 +740,6 @@ Inter 字体遵循 SIL Open Font License 1.1。
 
 **一台 Linux。一个管理员。一份通用订阅。**
 
-<sub>Ostium Server 0.2.0 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.1 · Made for the quiet corner of the internet.</sub>
 
 </div>
