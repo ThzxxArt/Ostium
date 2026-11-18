@@ -38,6 +38,9 @@ appended after the release workflow completes.
   files, README, docs and installers agree on `0.1.12`.
 - The Windows cleanup removes only `Ostium`/`ostium0`/`sing-box` routes and
   adapters; it does not touch other VPNs.
+- `npm audit` gate: one exact, expiring exception for
+  `GHSA-fc5q-39xc-vjpf` (`picomatch`, build/test toolchain only, no fixed
+  upstream release as of 2026-11-18); all other advisories still fail.
 
 ### Not verified in this workspace (0.1.12)
 

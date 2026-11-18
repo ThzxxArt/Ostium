@@ -24,6 +24,9 @@ SemVer.
   same request instead of leaving the browser pointed at a closed listener.
 - The generated client DoH remote now includes `path` and
   `tls.server_name`, not just a bare server IP.
+- The dependency audit gate now uses an exact GHSA allowlist with an expiry
+  date. The only current entry is the unfixed dev-only `picomatch`
+  ReDoS advisory; any other vulnerability still fails.
 
 ### Documentation
 

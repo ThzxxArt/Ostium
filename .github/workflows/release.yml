@@ -48,8 +48,7 @@ jobs:
           uv run pip-audit --strict -r /tmp/requirements.txt
       - run: npm ci --no-audit --no-fund
         working-directory: web
-      - run: npm audit --registry=https://registry.npmjs.org
-        working-directory: web
+      - run: python3 scripts/npm_audit_gate.py --directory web
       - run: npm run lint
         working-directory: web
       - run: npm run typecheck

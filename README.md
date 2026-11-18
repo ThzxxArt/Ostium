@@ -818,7 +818,7 @@ npx playwright test
 - 后端：**713 passed**（常规测试）+ **10 passed**（真实 sing-box 集成）；语句 **94.33%**、分支 **90.49%**；
 - 前端：**204 passed**，语句 **90.86%**、分支 **85.90%**、函数 **88.63%**、行 **92.40%**；
 - Playwright：**73 passed**，覆盖 1440/1024/390 三档、dashboard/users/settings 深浅色视觉基线、核心页面 axe、LCP/CLS 性能预算、PWA service worker 和导航/命令面板；
-- `pip-audit` / 生产依赖 `npm audit`：0 已知漏洞；开发工具链也已通过破坏性升级/overrides 清零，完整 `npm audit` 为 0；
+- `pip-audit`：0 已知漏洞；`npm audit` 对 `GHSA-fc5q-39xc-vjpf`（`picomatch`，仅构建/测试工具链，上游暂无修复版）做精确到期豁免，其他漏洞仍会让门禁失败；
 - 完整证据与逐文件审计见 [`AUDIT_REPORT.md`](versions/AUDIT_REPORT.md)。
 
 ---

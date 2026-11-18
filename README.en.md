@@ -857,8 +857,9 @@ Current results:
 - Playwright: **73 passed**, covering 1440/1024/390, dashboard/users/settings dark/light visual
   baselines, axe on every core page, LCP/CLS performance budgets, PWA service-worker
   registration, navigation and the command palette.
-- `pip-audit` / production `npm audit`: 0 known vulnerabilities. The full dev
-  toolchain audit is also clean after breaking upgrades/overrides.
+- `pip-audit`: 0 known vulnerabilities. `npm audit` has one exact, expiring
+  exception for `GHSA-fc5q-39xc-vjpf` (`picomatch`, build/test toolchain only;
+  no fixed upstream release yet); every other advisory still fails the gate.
 - Full evidence and per-file audit: [`AUDIT_REPORT.md`](versions/AUDIT_REPORT.md).
 
 ---

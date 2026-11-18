@@ -36,8 +36,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
-      - run: npm audit --registry=https://registry.npmjs.org
-        working-directory: web
+      - run: python3 scripts/npm_audit_gate.py --directory web
 
   trivy:
     runs-on: ubuntu-24.04
