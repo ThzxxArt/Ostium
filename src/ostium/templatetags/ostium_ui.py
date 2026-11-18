@@ -86,7 +86,7 @@ def icon(name: str, css: str = "w-5 h-5"):
         'stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" '
         'class="{}" aria-hidden="true">{}</svg>',
         css,
-        mark_safe(path),  # noqa: S308  # nosec B703 B308 - static icon table
+        mark_safe(path),  # noqa: S308  # nosec B703 B308
     )
 
 

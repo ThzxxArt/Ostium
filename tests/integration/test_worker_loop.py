@@ -59,6 +59,7 @@ def test_run_lock_conflict(monkeypatch, tmp_path, settings):
 @pytest.mark.django_db
 def test_loop_ticks(monkeypatch, tmp_path, settings):
     settings.OSTIUM_DATA_DIR = str(tmp_path)
+    RuntimeState.load()
     RuntimeState.objects.filter(pk=1).update(desired_revision=2, applied_revision=0)
     worker = Worker()
     worker.supervisor = FakeSupervisor()

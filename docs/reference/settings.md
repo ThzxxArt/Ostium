@@ -40,7 +40,7 @@
 | `SECURE_HSTS_SECONDS` | 31536000 |
 | `SECURE_CSP` | self + nonce |
 | `X_FRAME_OPTIONS` | DENY |
-| `SECURE_REFERRER_POLICY` | no-referrer |
+| `SECURE_REFERRER_POLICY` | same-origin（订阅单独 no-referrer） |
 
 ## 数据库
 

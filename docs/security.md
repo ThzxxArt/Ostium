@@ -14,7 +14,7 @@
 | Host | `ALLOWED_HOSTS` + `CSRF_TRUSTED_ORIGINS` |
 | 点击劫持 | `X-Frame-Options: DENY` |
 | MIME | `X-Content-Type-Options: nosniff` |
-| Referrer | `no-referrer` |
+| Referrer | `same-origin`（订阅响应强制 `no-referrer`） |
 | 默认监听 | `127.0.0.1:8000` |
 | 审计 | `AuditEvent` + django-auditlog |
 

@@ -260,7 +260,8 @@ class Inbound(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     kind = models.CharField(max_length=16, choices=Kind.choices, unique=True)
     enabled = models.BooleanField(default=False)
-    listen = models.CharField(max_length=64, default="0.0.0.0")  # nosec B104 - server binds publicly by design
+    # A proxy server deliberately listens on all interfaces.
+    listen = models.CharField(max_length=64, default="0.0.0.0")  # nosec B104
     port = models.PositiveIntegerField(default=443)
     certificate = models.ForeignKey(
         "certificates.Certificate",

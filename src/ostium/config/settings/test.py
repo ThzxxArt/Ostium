@@ -21,7 +21,8 @@ from .base import env
 
 DEBUG = False
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1", "[::1]"]
-CSRF_TRUSTED_ORIGINS = ["http://localhost", "http://127.0.0.1", "null"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost", "http://127.0.0.1"]
+SECURE_REFERRER_POLICY = "same-origin"
 OSTIUM_REQUIRE_TOTP = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False

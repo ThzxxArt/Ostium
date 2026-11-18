@@ -94,7 +94,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --extra dev
       - run: uv run pip-audit
-      - run: uv run bandit -q -r src
+      - run: uv run bandit -q -r src -ll
       - name: Django deployment checks
         env:
           DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
