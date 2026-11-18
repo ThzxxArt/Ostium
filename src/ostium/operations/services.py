@@ -35,6 +35,8 @@ def record_audit(
     if request is not None:
         if actor is None and getattr(request, "user", None) and request.user.is_authenticated:
             actor = request.user
+        if actor is None and getattr(request, "api_key", None) is not None:
+            actor = getattr(request.api_key, "created_by", None)
         ip = client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:300]
     else:
@@ -71,16 +73,27 @@ def raise_alert(
             "last_seen_at": now,
         },
     )
+    reopened = False
     if not created:
-        Alert.objects.filter(pk=alert.pk).update(
-            message=message,
-            level=level,
-            detail=detail or {},
-            last_seen_at=now,
-            acknowledged_at=None,
-        )
+        updates = {
+            "message": message,
+            "level": level,
+            "detail": detail or {},
+            "last_seen_at": now,
+        }
+        # Acknowledging an active condition must survive the periodic
+        # re-raise. Only an alert that was explicitly resolved may reopen.
+        if alert.resolved_at is not None:
+            updates["resolved_at"] = None
+            updates["acknowledged_at"] = None
+            reopened = True
+        Alert.objects.filter(pk=alert.pk).update(**updates)
         alert.refresh_from_db()
     logger.warning("alert raised", extra={"code": code, "level": level})
+    if created or reopened:
+        from .webhook import notify_alert
+
+        notify_alert(alert)
     return alert
 
 
@@ -90,5 +103,24 @@ def acknowledge_alert(alert: Alert) -> Alert:
     return alert
 
 
+def cancel_queued_job(task_id: str) -> bool:
+    """Remove a queued django-q2 message by its task id."""
+
+    from django_q.models import OrmQ
+
+    for queued in OrmQ.objects.all():
+        try:
+            if queued.task_id() == task_id:
+                queued.delete()
+                return True
+        except Exception:  # noqa: S112 - one corrupt queue row must not block cancellation
+            continue
+    return False
+
+
 def resolve_alert(fingerprint: str) -> None:
-    Alert.objects.filter(fingerprint=fingerprint, acknowledged_at__isnull=True).update(acknowledged_at=timezone.now())
+    now = timezone.now()
+    Alert.objects.filter(fingerprint=fingerprint, resolved_at__isnull=True).update(
+        acknowledged_at=now,
+        resolved_at=now,
+    )

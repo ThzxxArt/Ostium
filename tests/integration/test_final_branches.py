@@ -17,16 +17,24 @@ def test_retention_removes_auto_backup_file(tmp_path, settings):
     from ostium import paths
 
     paths.ensure()
-    backup = Backup.objects.create(
+    from constance import config
+
+    config.auto_backup_keep = 1
+    old = Backup.objects.create(
         filename="old.ostb",
         note="auto:worker",
         created_at=timezone.now() - timedelta(days=40),
     )
-    file = paths.backups_dir() / backup.filename
-    file.write_bytes(b"x")
+    new = Backup.objects.create(filename="new.ostb", note="auto:worker", created_at=timezone.now())
+    old_file = paths.backups_dir() / old.filename
+    new_file = paths.backups_dir() / new.filename
+    old_file.write_bytes(b"x")
+    new_file.write_bytes(b"x")
     Worker()._retention()
-    assert not Backup.objects.filter(pk=backup.pk).exists()
-    assert not file.exists()
+    assert not Backup.objects.filter(pk=old.pk).exists()
+    assert not old_file.exists()
+    assert Backup.objects.filter(pk=new.pk).exists()
+    assert new_file.exists()
 
 
 @pytest.mark.django_db

@@ -12,9 +12,13 @@ class AccountsConfig(AppConfig):
     verbose_name = "Accounts"
 
     def ready(self) -> None:
+        from auditlog.registry import auditlog
         from django.contrib.auth import get_user_model
 
-        from .models import AdminProfile
+        from .models import AdminProfile, ApiKey
+
+        auditlog.register(AdminProfile)
+        auditlog.register(ApiKey, exclude_fields=["hashed_key"])
 
         def ensure_profile(sender, instance, created, **kwargs):
             if created:

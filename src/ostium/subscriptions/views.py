@@ -14,7 +14,7 @@ from ostium.proxy.models import ProxyUser, hash_subscription_token
 
 from .endpoints import build_endpoints
 from .renderers import content_type_for, extension_for, render
-from .services import normalize_target, profile_title, public_host, userinfo_header
+from .services import normalize_target, profile_title_header, public_host, userinfo_header
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
 IP_RATE = "60/m"
@@ -25,6 +25,7 @@ def _text(message: str, status: int) -> HttpResponse:
     response = HttpResponse(message + "\n", status=status, content_type="text/plain; charset=utf-8")
     response["Cache-Control"] = "private, no-store"
     response["X-Robots-Tag"] = "noindex, nofollow"
+    response["X-Content-Type-Options"] = "nosniff"
     return response
 
 
@@ -77,11 +78,18 @@ def subscription(request: HttpRequest, token: str, path_target: str | None = Non
     response = HttpResponse(body, content_type=content_type_for(target))
     filename = f"ostium-{user.name}.{extension_for(target)}"
     ascii_name = re.sub(r"[^A-Za-z0-9_.-]", "_", filename)
-    response["Content-Disposition"] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
+    response["Content-Disposition"] = (
+        f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
+    )
     response["Subscription-Userinfo"] = userinfo_header(user)
-    response["Profile-Update-Interval"] = "24"
-    title = profile_title(user)
-    response["Profile-Title"] = title if title.isascii() else quote(title, safe="@._-")
+    from constance import config as runtime_config
+
+    try:
+        interval = int(runtime_config.subscription_update_interval)
+    except TypeError, ValueError:
+        interval = 24
+    response["Profile-Update-Interval"] = str(min(720, max(1, interval)))
+    response["Profile-Title"] = profile_title_header(user)
     response["Cache-Control"] = "private, no-store"
     response["Pragma"] = "no-cache"
     response["Referrer-Policy"] = "no-referrer"

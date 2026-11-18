@@ -90,6 +90,12 @@
   }
 
   function initConfirm() {
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-confirm]");
+      if (!button || !button.form) return;
+      var message = button.getAttribute("data-confirm") || "确认执行此操作？";
+      if (!window.confirm(message)) event.preventDefault();
+    });
     document.addEventListener("submit", function (event) {
       var form = event.target;
       if (!form.matches("form[data-confirm]")) return;
@@ -108,8 +114,10 @@
     if (!modal) return;
     var input = document.getElementById("command-input");
     var list = document.getElementById("command-list");
+    var shell = document.querySelector(".app-shell");
     var open = function () {
       modal.classList.remove("hidden");
+      if (shell) shell.inert = true;
       if (input) {
         input.value = "";
         setTimeout(function () {
@@ -124,6 +132,7 @@
     };
     var close = function () {
       modal.classList.add("hidden");
+      if (shell) shell.inert = false;
     };
     var openButton = document.getElementById("command-open");
     var closeButton = document.getElementById("command-close");
@@ -131,6 +140,23 @@
     if (closeButton) closeButton.addEventListener("click", close);
     modal.addEventListener("click", function (event) {
       if (event.target === modal) close();
+    });
+    modal.addEventListener("keydown", function (event) {
+      if (event.key !== "Tab") return;
+      var focusable = Array.prototype.filter.call(
+        modal.querySelectorAll("a[href], button, input, [tabindex]:not([tabindex='-1'])"),
+        function (node) { return node.offsetParent !== null; }
+      );
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     });
     document.addEventListener("keydown", function (event) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {

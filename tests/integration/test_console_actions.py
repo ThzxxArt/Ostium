@@ -72,8 +72,20 @@ def test_jobs_cancel(admin_client):
     )
     response = admin_client.post("/jobs/", {"action": "cancel", "task_id": task.id})
     assert response.status_code == 302
+    from django_q.models import OrmQ
+    from django_q.signing import SignedPackage
+
+    queued = OrmQ.objects.create(
+        key="ostium",
+        payload=SignedPackage.dumps(
+            {"id": "queued-1", "name": "queued", "func": "ostium.test", "args": (), "kwargs": {}}
+        ),
+    )
+    response = admin_client.post("/jobs/", {"action": "cancel", "task_id": "queued-1"})
+    assert response.status_code == 302
+    assert not OrmQ.objects.filter(pk=queued.pk).exists()
     response = admin_client.post("/jobs/", {"action": "cancel", "task_id": "missing"})
-    assert response.status_code == 404
+    assert response.status_code == 302
 
 
 @pytest.mark.django_db

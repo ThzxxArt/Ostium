@@ -7,7 +7,6 @@ from urllib.parse import urlsplit
 
 import segno
 from django.conf import settings
-from django.db.models import Sum
 from django.http import HttpRequest
 from django.utils import timezone
 
@@ -41,19 +40,37 @@ TARGETS = {
 }
 
 
+def _host_only(value: str) -> str:
+    """Return a bare hostname from a host, host:port or URL string."""
+
+    value = value.strip()
+    if not value:
+        return ""
+    if "://" in value:
+        return urlsplit(value).hostname or ""
+    if value.startswith("["):
+        # Bracketed IPv6, optionally followed by :port.
+        return value[1:].split("]", 1)[0]
+    if value.count(":") == 1:
+        host, _, port = value.rpartition(":")
+        if port.isdigit():
+            return host
+    # Bare hostname or unbracketed IPv6 literal.
+    return value
+
+
 def public_host(request: HttpRequest | None = None) -> str:
     from constance import config
 
-    configured = (config.public_host or "").strip()
+    configured = _host_only(config.public_host or "")
     if configured:
-        return configured.strip("[]")
+        return configured
     if settings.OSTIUM_PUBLIC_BASE_URL:
         hostname = urlsplit(settings.OSTIUM_PUBLIC_BASE_URL).hostname
         if hostname:
             return hostname
     if request is not None:
-        host = request.get_host()
-        return host.rsplit(":", 1)[0] if host.count(":") == 1 else host.strip("[]")
+        return _host_only(request.get_host())
     return "localhost"
 
 
@@ -103,10 +120,11 @@ def qr_data_uri(value: str, *, scale: int = 5) -> str:
 
 
 def userinfo_header(user: ProxyUser) -> str:
-    totals = user.traffic_daily.aggregate(up=Sum("uplink"), down=Sum("downlink"))
-    upload = totals["up"] or 0
-    download = totals["down"] or 0
+    upload = user.uploaded_bytes
+    download = user.downloaded_bytes
     if upload + download == 0 and user.used_bytes:
+        # Backward-compatible fallback for rows created before directional
+        # counters were introduced.
         upload = user.used_bytes
     expire = 0
     if user.expires_at:
@@ -118,7 +136,19 @@ def profile_title(user: ProxyUser) -> str:
     from constance import config
 
     server_name = (config.server_name or "Ostium").replace("\n", " ").replace("\r", " ")
-    return f"{user.name}@{server_name}"
+    name = user.name.replace("\n", " ").replace("\r", " ")
+    return f"{name}@{server_name}"
+
+
+def profile_title_header(user: ProxyUser) -> str:
+    """Encode a non-ASCII subscription title using the client convention."""
+
+    import base64
+
+    title = profile_title(user)
+    if title.isascii():
+        return title
+    return "base64:" + base64.b64encode(title.encode("utf-8")).decode("ascii")
 
 
 def subscription_context(user: ProxyUser, request: HttpRequest | None = None) -> dict:
@@ -157,6 +187,7 @@ __all__ = [
     "masked_token",
     "normalize_target",
     "profile_title",
+    "profile_title_header",
     "public_base_url",
     "public_host",
     "qr_data_uri",

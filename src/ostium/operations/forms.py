@@ -8,7 +8,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from ostium.certificates.models import Certificate
-from ostium.formatting import format_bytes
 from ostium.proxy.models import Inbound, ProxyUser
 from ostium.proxy.services import parse_size
 
@@ -35,9 +34,9 @@ class UserEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
-            self.fields["quota"].initial = (
-                format_bytes(self.instance.quota_bytes, 0) if self.instance.quota_bytes else ""
-            )
+            # Use the exact byte count so opening and saving the form cannot
+            # silently round a value such as 1.5 TiB.
+            self.fields["quota"].initial = str(self.instance.quota_bytes) if self.instance.quota_bytes else ""
             if self.instance.expires_at:
                 self.fields["expires_at"].initial = timezone.localtime(self.instance.expires_at).strftime(
                     "%Y-%m-%dT%H:%M"
@@ -45,9 +44,12 @@ class UserEditForm(forms.ModelForm):
         self.fields["quota"].widget.attrs.update({"placeholder": "100G", "inputmode": "text"})
 
     def clean_name(self) -> str:
-        name = self.cleaned_data["name"].strip()
-        if not name:
-            raise forms.ValidationError(_("Name must not be blank."))
+        from ostium.proxy.models import validate_user_name
+
+        try:
+            name = validate_user_name(self.cleaned_data["name"])
+        except Exception as exc:
+            raise forms.ValidationError(str(exc)) from exc
         duplicate = ProxyUser.objects.filter(name=name).exclude(pk=self.instance.pk)
         if duplicate.exists():
             raise forms.ValidationError(_("Another user already uses this name."))
@@ -142,10 +144,10 @@ class SettingsForm(forms.Form):
             elif key in {"webhook_secret"}:
                 field = forms.CharField(
                     label=label,
-                    initial=initial,
+                    initial="",
                     required=False,
-                    widget=forms.PasswordInput(render_value=True),
-                    help_text=help_text,
+                    widget=forms.PasswordInput(render_value=False),
+                    help_text=_("Leave blank to keep the current secret."),
                 )
             elif key == "log_level":
                 field = forms.ChoiceField(
@@ -158,30 +160,28 @@ class SettingsForm(forms.Form):
                 field = forms.CharField(label=label, initial=initial, required=False, help_text=help_text)
             self.fields[key] = field
 
-    def clean_server_dns_doh_url(self) -> str:
-        value = self.cleaned_data.get("server_dns_doh_url", "")
-        if value and not value.startswith("https://"):
-            raise forms.ValidationError(_("DoH URL must use https://."))
-        return value
+    def clean(self):
+        from ostium.operations.runtime_settings import SettingValidationError, coerce_setting
 
-    def clean_webhook_url(self) -> str:
-        value = self.cleaned_data.get("webhook_url", "")
-        if value and not value.startswith("https://"):
-            raise forms.ValidationError(_("Webhook URL must use https://."))
-        return value
-
-    def clean_public_base_url(self) -> str:
-        value = (self.cleaned_data.get("public_base_url") or "").rstrip("/")
-        if value and not value.startswith(("https://", "http://")):
-            raise forms.ValidationError(_("Public base URL must include a scheme."))
-        return value
+        cleaned = super().clean()
+        for key, value in list(cleaned.items()):
+            if key == "webhook_secret" and not value:
+                continue
+            try:
+                cleaned[key] = coerce_setting(key, value)
+            except SettingValidationError as exc:
+                self.add_error(key, str(exc))
+        return cleaned
 
     def save(self) -> list[str]:
         from constance import config
 
         updated = []
         for key in self.fields:
-            setattr(config, key, self.cleaned_data[key])
+            value = self.cleaned_data.get(key)
+            if key == "webhook_secret" and not value:
+                continue
+            setattr(config, key, value)
             updated.append(key)
         return updated
 

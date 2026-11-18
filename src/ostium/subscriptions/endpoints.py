@@ -36,6 +36,8 @@ class Endpoint:
     obfs: str | None = None
     obfs_password: str | None = None
     cert_fingerprint: str | None = None
+    cert_fingerprint_b64: str | None = None
+    cert_public_key_sha256: str | None = None
     self_signed: bool = False
     extra: dict = field(default_factory=dict)
 
@@ -71,12 +73,16 @@ class Endpoint:
             return f"hysteria2://{userinfo}@{host}:{self.port}?{urlencode(params, quote_via=quote)}#{fragment}"
         if self.protocol == "trojan":
             params = {"security": "tls", "sni": self.sni or self.server, "type": "tcp", "allowInsecure": "0"}
-            if self.cert_fingerprint and self.self_signed:
-                params["pinSHA256"] = self.cert_fingerprint
+            if self.cert_fingerprint_b64 and self.self_signed:
+                params["pcs"] = self.cert_fingerprint_b64
             userinfo = quote(self.password or "", safe="")
             return f"trojan://{userinfo}@{host}:{self.port}?{urlencode(params, quote_via=quote)}#{fragment}"
         if self.protocol == "shadowsocks":
-            userinfo = _b64url(f"{self.method}:{self.ss_password}")
+            if (self.method or "").startswith("2022-"):
+                # SIP022: Shadowsocks 2022 userinfo is not base64 encoded.
+                userinfo = f"{quote(self.method or '', safe='')}:{quote(self.ss_password or '', safe='')}"
+            else:
+                userinfo = _b64url(f"{self.method}:{self.ss_password}")
             return f"ss://{userinfo}@{host}:{self.port}#{fragment}"
         raise ValueError(f"Unsupported protocol: {self.protocol}")
 
@@ -129,6 +135,7 @@ class Endpoint:
                 "type": "ss",
                 "cipher": self.method,
                 "password": self.ss_password,
+                "udp": False,
             }
         raise ValueError(f"Unsupported protocol: {self.protocol}")
 
@@ -153,25 +160,31 @@ class Endpoint:
                 },
             }
         if self.protocol == "hysteria2":
+            tls = {"enabled": True, "server_name": self.sni or self.server}
+            if self.self_signed and self.cert_public_key_sha256:
+                tls["certificate_public_key_sha256"] = self.cert_public_key_sha256
             outbound = {
                 "type": "hysteria2",
                 "tag": self.name,
                 "server": self.server,
                 "server_port": self.port,
                 "password": self.password,
-                "tls": {"enabled": True, "server_name": self.sni or self.server},
+                "tls": tls,
             }
             if self.obfs and self.obfs_password:
                 outbound["obfs"] = {"type": self.obfs, "password": self.obfs_password}
             return outbound
         if self.protocol == "trojan":
+            tls = {"enabled": True, "server_name": self.sni or self.server}
+            if self.self_signed and self.cert_public_key_sha256:
+                tls["certificate_public_key_sha256"] = self.cert_public_key_sha256
             return {
                 "type": "trojan",
                 "tag": self.name,
                 "server": self.server,
                 "server_port": self.port,
                 "password": self.password,
-                "tls": {"enabled": True, "server_name": self.sni or self.server},
+                "tls": tls,
             }
         if self.protocol == "shadowsocks":
             return {
@@ -204,12 +217,17 @@ def build_endpoints(user: ProxyUser, host: str) -> list[Endpoint]:
         if inbound.needs_certificate:
             if certificate is None or not certificate.is_ready:
                 continue
+            from ostium.certificates.services import certificate_pins
+
             sni = certificate.domain
             fingerprint = certificate.fingerprint_sha256
+            fingerprint_b64, public_key_pin = certificate_pins(certificate)
             self_signed = certificate.source == "self_signed"
         else:
             sni = None
             fingerprint = None
+            fingerprint_b64 = None
+            public_key_pin = None
             self_signed = False
 
         if inbound.kind == Inbound.Kind.VLESS:
@@ -242,6 +260,8 @@ def build_endpoints(user: ProxyUser, host: str) -> list[Endpoint]:
                     obfs="salamander" if params.get("obfs_password") else None,
                     obfs_password=params.get("obfs_password"),
                     cert_fingerprint=fingerprint,
+                    cert_fingerprint_b64=fingerprint_b64,
+                    cert_public_key_sha256=public_key_pin,
                     self_signed=self_signed,
                 )
             )
@@ -256,6 +276,8 @@ def build_endpoints(user: ProxyUser, host: str) -> list[Endpoint]:
                     password=user.password,
                     sni=sni,
                     cert_fingerprint=fingerprint,
+                    cert_fingerprint_b64=fingerprint_b64,
+                    cert_public_key_sha256=public_key_pin,
                     self_signed=self_signed,
                 )
             )

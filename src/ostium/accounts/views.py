@@ -105,6 +105,10 @@ def totp_setup(request: HttpRequest) -> HttpResponse:
         return redirect("console:dashboard")
 
     confirmed = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
+    if confirmed and not request.user.is_verified():
+        # A password-only session must never be able to read or reset an
+        # existing TOTP seed.
+        return redirect("accounts:otp")
     if confirmed and request.user.is_verified():
         return redirect("console:dashboard")
 

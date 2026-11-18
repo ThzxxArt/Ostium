@@ -25,8 +25,10 @@
         Alpine.data("shell", function () {
           return {
             sidebarOpen: false,
+            isMobile: window.matchMedia("(max-width: 767px)").matches,
             get sidebarClass() { return this.sidebarOpen ? "sidebar--open" : ""; },
             get backdropClass() { return this.sidebarOpen ? "is-open" : ""; },
+            get sidebarHidden() { return this.isMobile && !this.sidebarOpen; },
             openSidebar: function () { this.sidebarOpen = true; },
             closeSidebar: function () { this.sidebarOpen = false; }
           };
@@ -59,7 +61,11 @@
                  x-bind:class="backdropClass"
                  x-cloak
                  @click="closeSidebar"></div>
-            <aside class="sidebar" x-bind:class="sidebarClass" aria-label="主导航">
+            <aside class="sidebar"
+                   x-bind:class="sidebarClass"
+                   x-bind:inert="sidebarHidden"
+                   x-bind:aria-hidden="sidebarHidden ? 'true' : 'false'"
+                   aria-label="主导航">
                 <a class="brand"
                    href="{% url 'console:dashboard' %}"
                    aria-label="Ostium 控制台首页">

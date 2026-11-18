@@ -356,10 +356,17 @@ button {
   gap: 10px;
 }
 
+.topbar-left {
+  min-width: 0;
+  flex: 1;
+}
+
 .crumb {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-3);
   font-size: 12.5px;
 }
@@ -367,6 +374,9 @@ button {
 .crumb strong {
   color: var(--text);
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crumb svg {
@@ -531,6 +541,7 @@ button {
 .page-title {
   font-size: 26px;
   letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
 }
 
 .page-desc {

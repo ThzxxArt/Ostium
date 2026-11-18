@@ -151,9 +151,79 @@ def decrypt_archive(data: bytes, password: str) -> bytes:
         raise BackupError("Could not decrypt the backup. Check the password and file integrity.") from exc
 
 
+def delete_backup(backup: Backup, *, actor=None) -> None:
+    """Delete a backup record and its archive file."""
+
+    filename = backup.filename
+    (paths.backups_dir() / filename).unlink(missing_ok=True)
+    backup.delete()
+    from .services import record_audit
+
+    record_audit(action="backup.deleted", actor=actor, target=filename)
+
+
 def restore_backup(backup: Backup, *, password: str, actor=None) -> None:
     source = paths.backups_dir() / backup.filename
     restore_file(source, password=password, actor=actor)
+
+
+def _reencrypt_with_field_key(backup_key: str) -> bool:
+    """Re-encrypt restored rows with the host's current field key.
+
+    Backups are portable: the archive contains the field key that was active
+    when it was created. Restoring on a host with a different key must not
+    leave credentials undecryptable.
+    """
+
+    import base64
+
+    from django.db import transaction
+
+    from ostium.accounts.crypto import decrypt_json, decrypt_text, encrypt_json, encrypt_text
+    from ostium.proxy.models import Inbound, ProxyUser
+
+    if backup_key == settings.OSTIUM_FIELD_KEY:
+        return False
+    try:
+        if len(base64.b64decode(backup_key)) != 32:
+            raise ValueError
+    except Exception as exc:
+        raise BackupError("Backup manifest contains an invalid field key.") from exc
+
+    current_key = settings.OSTIUM_FIELD_KEY
+    try:
+        settings.OSTIUM_FIELD_KEY = backup_key
+        users = list(ProxyUser.objects.all())
+        inbounds = list(Inbound.objects.all())
+        plain_users = [
+            (
+                user.pk,
+                decrypt_text(user, "password_enc", user.password_enc),
+                decrypt_text(user, "ss_password_enc", user.ss_password_enc),
+                decrypt_text(user, "subscription_token_enc", user.subscription_token_enc),
+            )
+            for user in users
+        ]
+        plain_inbounds = [(inbound.pk, decrypt_json(inbound, "params_enc", inbound.params_enc)) for inbound in inbounds]
+    except Exception as exc:
+        raise BackupError(
+            "The backup was encrypted with a different field key and its credentials could not be read."
+        ) from exc
+    finally:
+        settings.OSTIUM_FIELD_KEY = current_key
+
+    with transaction.atomic():
+        for pk, password, ss_password, token in plain_users:
+            user = ProxyUser(pk=pk)
+            ProxyUser.objects.filter(pk=pk).update(
+                password_enc=encrypt_text(user, "password_enc", password),
+                ss_password_enc=encrypt_text(user, "ss_password_enc", ss_password),
+                subscription_token_enc=encrypt_text(user, "subscription_token_enc", token),
+            )
+        for pk, params in plain_inbounds:
+            inbound = Inbound(pk=pk)
+            Inbound.objects.filter(pk=pk).update(params_enc=encrypt_json(inbound, "params_enc", params))
+    return True
 
 
 def restore_file(source: Path, *, password: str, actor=None) -> None:
@@ -187,6 +257,10 @@ def restore_file(source: Path, *, password: str, actor=None) -> None:
         call_command("flush", interactive=False, verbosity=0)
         call_command("loaddata", str(database_path), verbosity=0)
         call_command("migrate", interactive=False, verbosity=0)
+        if _reencrypt_with_field_key(str(manifest.get("field_key") or "")):
+            from .services import record_audit
+
+            record_audit(action="backup.field_key_reencrypted", actor=actor, target=source.name)
 
         source_certs = staging / "certs"
         if source_certs.is_dir():

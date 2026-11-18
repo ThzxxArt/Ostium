@@ -21,7 +21,9 @@ def test_sampler_snapshot_and_stale(proxy_user, monkeypatch):
     sampler.sample()
     sampler.last_sample_at = timezone.now() - timedelta(seconds=5)
     sampler.sample()
-    assert "gone" not in sampler.baseline
+    # A temporarily idle user keeps its baseline so its next counters are
+    # still accounted for instead of being dropped.
+    assert sampler.baseline["gone"] == (3, 4)
     snapshot = sampler.snapshot()
     assert snapshot["rates"]["alice"]["uplink_rate"] > 0
 

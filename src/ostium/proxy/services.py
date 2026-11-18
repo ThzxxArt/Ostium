@@ -12,7 +12,7 @@ from django.utils import timezone
 from ostium.operations.models import RuntimeState
 from ostium.operations.services import raise_alert
 
-from .models import Inbound, ProxyUser, StatsEpoch, TrafficDaily
+from .models import Inbound, ProxyUser, StatsEpoch, TrafficDaily, validate_user_name
 
 _SIZE_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kmgtp]?i?b?)?\s*$", re.IGNORECASE)
 _UNITS = {
@@ -67,7 +67,7 @@ def create_proxy_user(
     enabled: bool = True,
 ) -> tuple[ProxyUser, str]:
     user = ProxyUser(
-        name=name.strip(),
+        name=validate_user_name(name),
         quota_bytes=quota_bytes,
         quota_cycle=quota_cycle,
         expires_at=expires_at,
@@ -134,36 +134,54 @@ def account_usage(user: ProxyUser, since_days: int = 30) -> list[dict]:
     return list(rows)
 
 
-def enforce_limits(now: datetime | None = None) -> bool:
-    """Apply expiry, monthly rollover and quota state. Returns True if config changed."""
+def enforce_limits(now: datetime | None = None, *, pending: dict[str, list[int]] | None = None) -> bool:
+    """Apply expiry, monthly rollover and quota state. Returns True if config changed.
+
+    ``pending`` holds sampler counters that have not been flushed yet. Counting
+    them here closes the gap between the 5-second samples and the 60-second
+    database flush, so a user cannot exceed the quota for a full minute.
+    """
 
     now = now or timezone.now()
+    pending = pending or {}
     changed = False
     for user in ProxyUser.objects.all().iterator():
         if user.roll_month_if_needed(now):
             changed = True
         if not user.enabled:
+            if user.disabled_reason == ProxyUser.DisabledReason.QUOTA_EXCEEDED or user.used_bytes == 0:
+                from ostium.operations.services import resolve_alert
+
+                resolve_alert(f"quota:{user.pk}:80")
+                resolve_alert(f"quota:{user.pk}:90")
             continue
         if user.is_expired:
             user.disable(ProxyUser.DisabledReason.EXPIRED)
             changed = True
             continue
-        if user.is_over_quota:
+        pending_uplink, pending_downlink = pending.get(user.name, (0, 0))
+        used = user.used_bytes + pending_uplink + pending_downlink
+        if user.quota_bytes > 0 and used >= user.quota_bytes:
             user.disable(ProxyUser.DisabledReason.QUOTA_EXCEEDED)
             changed = True
             continue
-        percent = user.quota_percent
-        if percent is not None and user.quota_bytes > 0:
-            ratio = user.used_bytes / user.quota_bytes
+        if user.quota_bytes > 0:
+            percent = min(100.0, round(used * 100.0 / user.quota_bytes, 1))
+            ratio = used / user.quota_bytes
+            from ostium.operations.services import resolve_alert
+
             for threshold in (0.8, 0.9):
+                fingerprint = f"quota:{user.pk}:{int(threshold * 100)}"
                 if ratio >= threshold:
                     raise_alert(
                         code=f"quota_{int(threshold * 100)}",
-                        fingerprint=f"quota:{user.pk}:{int(threshold * 100)}",
+                        fingerprint=fingerprint,
                         level="warning" if threshold < 0.9 else "critical",
                         message=f"{user.name} has used {percent:.0f}% of the quota.",
                         detail={"user": str(user.pk)},
                     )
+                else:
+                    resolve_alert(fingerprint)
     if changed:
         mark_dirty()
     return changed

@@ -10,7 +10,11 @@ class CertificatesConfig(AppConfig):
     verbose_name = "Certificates"
 
     def ready(self) -> None:
+        from auditlog.registry import auditlog
+
         from .models import Certificate
+
+        auditlog.register(Certificate)
 
         def bump(sender, instance, **kwargs):
             from django.db.utils import OperationalError, ProgrammingError

@@ -102,6 +102,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "ostium.api.errors.APIProblemMiddleware",
+    "ostium.accounts.middleware.ProxyClientIPMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -113,6 +115,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "ostium.accounts.middleware.AdminCSPMiddleware",
     "ostium.accounts.middleware.AdminSecurityMiddleware",
     "axes.middleware.AxesMiddleware",
 ]
@@ -233,10 +236,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "ostium.api.throttles.OstiumAPIThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "30/min", "user": "240/min"},
+    "DEFAULT_THROTTLE_RATES": {"api-read": "120/min", "api-write": "30/min"},
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "ostium.api.errors.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
@@ -522,7 +524,9 @@ UNFOLD = {
 OSTIUM_WORKER_HEARTBEAT_TIMEOUT = 15
 OSTIUM_CONFIG_CHECK_TIMEOUT = 30
 OSTIUM_SINGBOX_CLASH_ADDRESS = "127.0.0.1:19090"
-OSTIUM_SINGBOX_STATS_ADDRESS = "127.0.0.1:19091"
+OSTIUM_SINGBOX_CLASH_BIND = env.str("OSTIUM_CLASH_BIND", default="127.0.0.1:19090")
+OSTIUM_SINGBOX_CLASH_URL = env.str("OSTIUM_CLASH_URL", default="")
+OSTIUM_SINGBOX_STATS_ADDRESS = env.str("OSTIUM_STATS_BIND", default="127.0.0.1:19091")
 OSTIUM_QUOTA_WARN_THRESHOLDS = (0.8, 0.9)
 OSTIUM_SUPPORTED_LOCALES = ("zh-hans", "en")
 

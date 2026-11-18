@@ -33,6 +33,9 @@ class Command(BaseCommand):
             str(options["timeout"]),
             "--access-logfile",
             "-",
+            # Never write subscription paths (bearer tokens) to logs.
+            "--access-logformat",
+            "%(t)s %(h)s %(m)s %(s)s %(b)s %(L)s",
             "--error-logfile",
             "-",
             "--forwarded-allow-ips",

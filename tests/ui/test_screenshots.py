@@ -145,10 +145,97 @@ def test_screenshots_and_axe(page, live_server, browser_user):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_mobile_navigation(page, live_server, browser_user):
+def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
+    from ostium.proxy.models import ProxyUser
+
+    alice = ProxyUser.objects.get(name="alice")
+    routes = [
+        "/",
+        "/users/",
+        f"/users/{alice.pk}/",
+        "/subscriptions/",
+        "/inbounds/",
+        "/connections/",
+        "/certificates/",
+        "/logs/",
+        "/jobs/",
+        "/settings/",
+        "/audit/",
+    ]
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+    login(page, live_server)
+    for width, height in ((1440, 900), (390, 844)):
+        page.set_viewport_size({"width": width, "height": height})
+        for route in routes:
+            page.goto(f"{live_server.url}{route}")
+            page.wait_for_timeout(120)
+            assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1"), (
+                width,
+                route,
+            )
+    page.set_viewport_size({"width": 1440, "height": 900})
+    for route in routes:
+        page.goto(f"{live_server.url}{route}")
+        results = _axe(page)
+        serious = [
+            violation
+            for violation in results.response["violations"]
+            if violation.get("impact") in {"critical", "serious"}
+        ]
+        assert not serious, (route, serious)
+    assert not errors, errors
+
+
+@pytest.mark.django_db(transaction=True)
+def test_mobile_navigation_and_focus(page, live_server, browser_user):
     page.set_viewport_size({"width": 390, "height": 844})
     login(page, live_server)
+    assert page.evaluate("document.querySelector('.sidebar').inert") is True
     page.click(".mobile-menu-btn")
     assert page.locator(".sidebar.sidebar--open").is_visible()
+    assert page.evaluate("document.querySelector('.sidebar').inert") is False
     page.evaluate("document.querySelector(\".sidebar .nav-item[href='/users/']\").click()")
     page.wait_for_url(f"{live_server.url}/users/")
+
+    page.click("#command-open")
+    page.wait_for_selector("#command-palette:not(.hidden)")
+    for _ in range(12):
+        page.keyboard.press("Tab")
+    assert page.evaluate("document.getElementById('command-palette').contains(document.activeElement)") is True
+
+
+@pytest.mark.django_db(transaction=True)
+def test_long_username_does_not_overflow(page, live_server, browser_user):
+    from ostium.proxy.services import create_proxy_user
+
+    long_user, _ = create_proxy_user("x" * 64)
+    page.set_viewport_size({"width": 390, "height": 844})
+    login(page, live_server)
+    page.goto(f"{live_server.url}/users/{long_user.pk}/")
+    assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_pages_work_under_csp(page, live_server, browser_user):
+    from ostium.proxy.models import ProxyUser
+
+    proxy_user = ProxyUser.objects.get(name="alice")
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+    login(page, live_server)
+    page.goto(f"{live_server.url}/admin/proxy/proxyuser/")
+    page.wait_for_timeout(300)
+    assert page.locator("#result_list tbody tr").first.is_visible()
+    page.goto(f"{live_server.url}/admin/proxy/proxyuser/{proxy_user.pk}/change/")
+    page.wait_for_timeout(200)
+    page.goto(f"{live_server.url}/admin/proxy/proxyuser/{proxy_user.pk}/subscription/")
+    page.wait_for_timeout(300)
+    dialogs = []
+    page.once("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
+    page.locator("form[data-confirm] button[type=submit]").click()
+    page.wait_for_timeout(200)
+    assert dialogs, "rotate confirmation did not appear"
+    assert not [error for error in errors if "Content Security Policy" in error], errors

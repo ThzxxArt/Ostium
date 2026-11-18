@@ -6,7 +6,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
 
 import grpc
@@ -70,6 +70,7 @@ class StatsSampler:
     rates: dict[str, UserRate] = field(default_factory=dict)
     last_sample_at: datetime | None = None
     stats_ok: bool = False
+    initialized: bool = False
     failures: int = 0
     total_uplink: int = 0
     total_downlink: int = 0
@@ -97,24 +98,21 @@ class StatsSampler:
             elapsed = max(0.5, (now - self.last_sample_at).total_seconds())
         self.last_sample_at = now
 
-        if not self.baseline:
+        if not self.initialized:
+            # First successful sample establishes the baseline. A user who
+            # first appears later is counted from zero rather than dropped.
             self.baseline = dict(totals)
+            self.initialized = True
             for name in totals:
                 self.rates.setdefault(name, UserRate())
             self._publish()
             return True
 
-        known_names = set(totals)
-        for stale in set(self.baseline) - known_names:
-            self.baseline.pop(stale, None)
-            self.rates.pop(stale, None)
-
         for name, current in totals.items():
             previous = self.baseline.get(name)
             if previous is None:
-                self.baseline[name] = current
-                self.rates.setdefault(name, UserRate())
-                continue
+                previous = (0, 0)
+                self.baseline[name] = previous
             if current[0] < previous[0] or current[1] < previous[1]:
                 # sing-box restarted and counters were reset. Count the new
                 # value in a fresh epoch.
@@ -137,6 +135,11 @@ class StatsSampler:
                 if rate.last_activity is None or (now - rate.last_activity).total_seconds() > 10:
                     rate.uplink = 0.0
                     rate.downlink = 0.0
+
+        for name, rate in self.rates.items():
+            if name not in totals and (rate.last_activity is None or (now - rate.last_activity).total_seconds() > 10):
+                rate.uplink = 0.0
+                rate.downlink = 0.0
 
         self._publish()
         return True
@@ -172,28 +175,31 @@ class StatsSampler:
         )
 
     def flush(self) -> int:
-        """Persist pending deltas. Safe to call repeatedly."""
+        """Persist pending deltas. Safe to call repeatedly.
+
+        Pending counters are only removed after the database transaction has
+        committed. If the transaction fails, the in-memory counters must stay
+        intact so the next flush can retry without losing traffic.
+        """
 
         with self._lock:
             if not self.pending:
                 return 0
             now = timezone.now()
-            today = date.today()
+            today = timezone.localdate()
             names = list(self.pending)
             users = {user.name: user for user in ProxyUser.objects.filter(name__in=names)}
-            flushed = 0
+            flushed: list[tuple[str, int, int]] = []
             with transaction.atomic():
                 for name, (uplink, downlink) in list(self.pending.items()):
                     user = users.get(name)
-                    if user is None:
-                        self.pending.pop(name, None)
+                    if user is None or uplink + downlink <= 0:
                         continue
                     total = uplink + downlink
-                    if total <= 0:
-                        self.pending.pop(name, None)
-                        continue
                     ProxyUser.objects.filter(pk=user.pk).update(
                         used_bytes=F("used_bytes") + total,
+                        uploaded_bytes=F("uploaded_bytes") + uplink,
+                        downloaded_bytes=F("downloaded_bytes") + downlink,
                         last_seen_at=now,
                     )
                     row, created = TrafficDaily.objects.get_or_create(
@@ -206,12 +212,25 @@ class StatsSampler:
                             uplink=F("uplink") + uplink,
                             downlink=F("downlink") + downlink,
                         )
-                    self.total_uplink += uplink
-                    self.total_downlink += downlink
-                    self.pending.pop(name, None)
-                    flushed += 1
+                    flushed.append((name, uplink, downlink))
+
+            # Commit succeeded: subtract exactly what was persisted. Any bytes
+            # sampled concurrently remain pending for the next flush.
+            for name, uplink, downlink in flushed:
+                bucket = self.pending.get(name)
+                if bucket is not None:
+                    bucket[0] = max(0, bucket[0] - uplink)
+                    bucket[1] = max(0, bucket[1] - downlink)
+                    if bucket[0] + bucket[1] <= 0:
+                        self.pending.pop(name, None)
+                self.total_uplink += uplink
+                self.total_downlink += downlink
+            for name in [
+                name for name, bucket in self.pending.items() if name not in users or bucket[0] + bucket[1] <= 0
+            ]:
+                self.pending.pop(name, None)
             self._publish()
-            return flushed
+            return len(flushed)
 
     def snapshot(self) -> dict[str, Any]:
         return {

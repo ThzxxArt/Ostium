@@ -131,6 +131,9 @@ class Worker:
             if now_mono - last_limits >= 30:
                 from ostium.proxy.services import enforce_limits
 
+                # Persist before enforcing so quota state, the database and the
+                # generated configuration agree on the same counters.
+                self.sampler.flush()
                 enforce_limits()
                 last_limits = now_mono
 
@@ -148,18 +151,31 @@ class Worker:
 
     def shutdown(self) -> None:
         logger.info("worker stopping")
-        self.sampler.flush()
-        self.supervisor.stop()
-        RuntimeState.objects.filter(pk=1).update(
-            singbox_running=False,
-            singbox_pid=None,
-            worker_heartbeat=timezone.now(),
-        )
         try:
-            paths.worker_pid_path().unlink(missing_ok=True)
-        except OSError:
-            pass
-        self._release_lock()
+            if self.sampler.initialized:
+                self.sampler.sample()
+        except Exception:
+            logger.exception("final stats sample failed")
+        try:
+            self.sampler.flush()
+        except Exception:
+            logger.exception("final stats flush failed")
+        try:
+            self.supervisor.stop()
+        finally:
+            try:
+                RuntimeState.objects.filter(pk=1).update(
+                    singbox_running=False,
+                    singbox_pid=None,
+                    worker_heartbeat=timezone.now(),
+                )
+            except Exception:
+                logger.exception("could not persist worker shutdown state")
+            try:
+                paths.worker_pid_path().unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._release_lock()
 
     # -- apply -----------------------------------------------------------------
 
@@ -224,6 +240,12 @@ class Worker:
             previous_path.write_bytes(config_path.read_bytes())
             paths.secure_file(previous_path)
 
+        try:
+            if self.sampler.initialized:
+                self.sampler.sample()
+            self.sampler.flush()
+        except Exception:
+            logger.exception("could not flush stats before restarting sing-box")
         self.supervisor.stop()
         try:
             pid = self.supervisor.start(next_path)
@@ -367,20 +389,22 @@ class Worker:
                 fingerprint="disk_low",
                 detail={"free_bytes": free},
             )
+        else:
+            resolve_alert("disk_low")
 
     def _retention(self) -> None:
-        from datetime import date, timedelta
+        from datetime import timedelta
 
         from ostium.operations.models import AuditEvent, Backup
         from ostium.proxy.models import TrafficDaily
 
-        traffic_days = int(runtime_config.traffic_retention_days or 90)
-        audit_days = int(runtime_config.audit_retention_days or 365)
-        TrafficDaily.objects.filter(day__lt=date.today() - timedelta(days=traffic_days)).delete()
+        traffic_days = max(1, int(runtime_config.traffic_retention_days or 90))
+        audit_days = max(1, int(runtime_config.audit_retention_days or 365))
+        keep = max(1, int(runtime_config.auto_backup_keep or 7))
+        TrafficDaily.objects.filter(day__lt=timezone.localdate() - timedelta(days=traffic_days)).delete()
         AuditEvent.objects.filter(created_at__lt=timezone.now() - timedelta(days=audit_days)).delete()
-        for old_backup in Backup.objects.filter(
-            created_at__lt=timezone.now() - timedelta(days=30), note__startswith="auto:"
-        ):
+        automatic = list(Backup.objects.filter(note__startswith="auto:").order_by("-created_at", "-id"))
+        for old_backup in automatic[keep:]:
             try:
                 (paths.backups_dir() / old_backup.filename).unlink(missing_ok=True)
             except OSError:

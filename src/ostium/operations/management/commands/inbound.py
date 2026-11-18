@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 
 from ostium.certificates.models import Certificate
@@ -60,6 +61,10 @@ class Command(BaseCommand):
                 raise CommandError("Certificate is not ready.")
             inbound.certificate = certificate
         inbound.enabled = True
+        try:
+            inbound.full_clean()
+        except ValidationError as exc:
+            raise CommandError("; ".join(exc.messages)) from exc
         inbound.save()
         self.stdout.write(self.style.SUCCESS(f"Enabled {inbound.kind} on port {inbound.port}."))
 
@@ -85,5 +90,9 @@ class Command(BaseCommand):
         if not 1 <= options["port"] <= 65535:
             raise CommandError("Port must be between 1 and 65535.")
         inbound.port = options["port"]
+        try:
+            inbound.full_clean()
+        except ValidationError as exc:
+            raise CommandError("; ".join(exc.messages)) from exc
         inbound.save(update_fields=["port", "updated_at"])
         self.stdout.write(self.style.SUCCESS(f"{inbound.kind} now listens on {inbound.port}."))

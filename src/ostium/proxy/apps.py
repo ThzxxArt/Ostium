@@ -12,7 +12,15 @@ class ProxyConfig(AppConfig):
     verbose_name = "Proxy"
 
     def ready(self) -> None:
+        from auditlog.registry import auditlog
+
         from .models import Inbound, ProxyUser
+
+        auditlog.register(
+            ProxyUser,
+            exclude_fields=["password_enc", "ss_password_enc", "subscription_token_enc", "subscription_token_hash"],
+        )
+        auditlog.register(Inbound, exclude_fields=["params_enc"])
 
         user_fields = {
             "name",

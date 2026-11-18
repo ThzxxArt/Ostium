@@ -30,14 +30,18 @@ def _doh_server(url: str) -> dict:
         raise DNSError("DoH URL must be an https:// URL with a host.")
     if parsed.username or parsed.password:
         raise DNSError("DoH URL must not contain credentials.")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise DNSError("DoH URL contains an invalid port.") from exc
     server: dict = {
         "type": "https",
         "tag": "remote",
         "server": parsed.hostname,
         "path": parsed.path or "/dns-query",
     }
-    if parsed.port and parsed.port != 443:
-        server["server_port"] = parsed.port
+    if port and port != 443:
+        server["server_port"] = port
     return server
 
 

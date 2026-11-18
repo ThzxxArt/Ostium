@@ -72,6 +72,7 @@ class Alert(models.Model):
     message = models.TextField()
     detail = models.JSONField(default=dict, blank=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
     first_seen_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
 

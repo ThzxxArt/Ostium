@@ -14,13 +14,14 @@ class ClashError(RuntimeError):
 
 class ClashClient:
     def __init__(self, *, address: str | None = None, secret: str | None = None, timeout: float = 3.0) -> None:
-        self.address = address or settings.OSTIUM_SINGBOX_CLASH_ADDRESS
+        configured = address or settings.OSTIUM_SINGBOX_CLASH_URL or settings.OSTIUM_SINGBOX_CLASH_ADDRESS
+        self.address = configured
         self.secret = secret if secret is not None else read_clash_secret()
         self.timeout = timeout
 
     @property
     def base_url(self) -> str:
-        return f"http://{self.address}"
+        return self.address if "://" in self.address else f"http://{self.address}"
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.secret}"} if self.secret else {}

@@ -47,7 +47,7 @@
             </div>
         </div>
         {% if lines %}
-            <div class="terminal" role="log" aria-label="{{ source }} 日志">
+            <div class="terminal" role="log" tabindex="0" aria-label="{{ source }} 日志">
                 {% for line in lines %}
                     <div class="log-line"><span class="log-level log-level--{{ line.level }}">{{ line.level|default:"—" }}</span><span>{{ line.text|strip_ansi }}</span></div>
                 {% endfor %}

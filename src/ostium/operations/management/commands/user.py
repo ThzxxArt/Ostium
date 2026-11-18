@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
-from ostium.proxy.models import ProxyUser
+from ostium.proxy.models import ProxyUser, validate_user_name
 from ostium.proxy.services import create_proxy_user, parse_size
 from ostium.subscriptions.services import masked_token, subscription_links
 
@@ -44,6 +46,7 @@ class Command(BaseCommand):
         add.add_argument("--expires", default=None)
         add.add_argument("--note", default="")
         add.add_argument("--disabled", action="store_true")
+        add.add_argument("--reveal", action="store_true", help="Print the full subscription token.")
         add.add_argument("--json", action="store_true")
 
         listing = sub.add_parser("list", help="List users.")
@@ -67,6 +70,7 @@ class Command(BaseCommand):
         group = rotate.add_mutually_exclusive_group()
         group.add_argument("--credentials", action="store_true")
         group.add_argument("--subscription", action="store_true")
+        rotate.add_argument("--reveal", action="store_true", help="Print the new full subscription token.")
 
         subscription = sub.add_parser("subscription", help="Show subscription URLs.")
         subscription.add_argument("name")
@@ -79,30 +83,43 @@ class Command(BaseCommand):
 
     def _add(self, options):
         try:
+            name = validate_user_name(options["name"])
+        except ValidationError as exc:
+            raise CommandError("; ".join(exc.messages)) from exc
+        try:
             quota = parse_size(options["quota"])
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
-        if ProxyUser.objects.filter(name=options["name"]).exists():
+        expires = _datetime(options["expires"])
+        if expires is not None and expires <= timezone.now():
+            raise CommandError("Expiry must be in the future.")
+        if ProxyUser.objects.filter(name=name).exists():
             raise CommandError("A user with this name already exists.")
         user, token = create_proxy_user(
-            options["name"],
+            name,
             quota_bytes=quota,
             quota_cycle=options["cycle"],
-            expires_at=_datetime(options["expires"]),
+            expires_at=expires,
             note=options["note"],
             enabled=not options["disabled"],
         )
+        revealed = bool(options["reveal"])
         payload = {
             "id": str(user.id),
             "name": user.name,
             "uuid": str(user.uuid),
-            "token": token,
+            "token": token if revealed else masked_token(user),
+            "revealed": revealed,
         }
         if options["json"]:
             self.stdout.write(json.dumps(payload, indent=2, ensure_ascii=False))
             return
         self.stdout.write(self.style.SUCCESS(f"Created user {user.name}."))
-        self.stdout.write(f"  subscription token: {token}")
+        if revealed:
+            self.stdout.write(f"  subscription token: {token}")
+        else:
+            self.stdout.write(f"  subscription token: {payload['token']} (masked)")
+            self.stdout.write("  run 'ostium user subscription <name> --reveal' to print the full URLs.")
         self.stdout.write("  enable an inbound, then import the subscription in your client.")
 
     def _list(self, options):
@@ -183,7 +200,11 @@ class Command(BaseCommand):
         if options["subscription"]:
             token = user.rotate_subscription_token()
             self.stdout.write(self.style.SUCCESS(f"Rotated subscription token for {user.name}."))
-            self.stdout.write(token)
+            if options["reveal"]:
+                self.stdout.write(token)
+            else:
+                self.stdout.write(f"{masked_token(user)} (masked)")
+                self.stdout.write("Use --reveal to print the new token.")
         else:
             user.rotate_credentials()
             self.stdout.write(self.style.SUCCESS(f"Rotated credentials for {user.name}."))

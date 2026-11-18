@@ -272,7 +272,7 @@
             <div class="panel-head">
                 <div class="panel-title">{% icon "history" %} 最近审计</div>
                 <a class="link-quiet"
-                   href="{% url 'console:audit' %}?actor={{ user.name|urlencode }}">全部审计</a>
+                   href="{% url 'console:audit' %}?target={{ user.name|urlencode }}">全部审计</a>
             </div>
             <div class="panel-body">
                 {% if audit_events %}

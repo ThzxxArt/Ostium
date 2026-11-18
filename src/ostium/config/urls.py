@@ -8,6 +8,7 @@ from django.urls import include, path
 from health_check.views import HealthCheckView
 
 from ostium.api.docs import PublicSchemaView, StaffDocsView
+from ostium.api.errors import api_not_found
 from ostium.operations import health
 
 
@@ -26,6 +27,7 @@ urlpatterns = [
     path("accounts/", include("ostium.accounts.urls")),
     path("sub/", include("ostium.subscriptions.urls")),
     path("api/v1/", include("ostium.api.urls")),
+    path("api/v1/<path:unknown>", api_not_found),
     path("healthz", health.healthz, name="healthz"),
     path("readyz", health.readyz, name="readyz"),
     path("metrics", health.metrics, name="metrics"),

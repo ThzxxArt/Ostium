@@ -44,10 +44,19 @@ class RuntimeStateAdmin(ModelAdmin):
 
 @admin.register(Alert)
 class AlertAdmin(ModelAdmin):
-    list_display = ("level", "code", "message", "acknowledged", "last_seen_at")
-    list_filter = ("level", "acknowledged_at")
+    list_display = ("level", "code", "message", "acknowledged", "resolved_at", "last_seen_at")
+    list_filter = ("level", "acknowledged_at", "resolved_at")
     search_fields = ("code", "message")
-    readonly_fields = ("level", "code", "fingerprint", "message", "detail", "first_seen_at", "last_seen_at")
+    readonly_fields = (
+        "level",
+        "code",
+        "fingerprint",
+        "message",
+        "detail",
+        "first_seen_at",
+        "last_seen_at",
+        "resolved_at",
+    )
     actions = ("acknowledge",)
 
     @admin.display(boolean=True, description=_("Acknowledged"))
@@ -81,6 +90,17 @@ class AuditEventAdmin(ModelAdmin):
 
 @admin.register(Backup)
 class BackupAdmin(ModelAdmin):
+    def delete_model(self, request, obj) -> None:
+        from .backup import delete_backup
+
+        delete_backup(obj, actor=request.user)
+
+    def delete_queryset(self, request, queryset) -> None:
+        from .backup import delete_backup
+
+        for backup in queryset:
+            delete_backup(backup, actor=request.user)
+
     list_display = ("filename", "size", "encrypted", "created_at", "restored_at", "created_by")
     list_filter = ("encrypted", "created_at")
     search_fields = ("filename", "note")

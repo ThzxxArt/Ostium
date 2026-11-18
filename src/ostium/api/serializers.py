@@ -23,11 +23,12 @@ class ProxyUserSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "enabled",
-            "uuid",
             "expires_at",
             "quota_bytes",
             "quota_cycle",
             "used_bytes",
+            "uploaded_bytes",
+            "downloaded_bytes",
             "quota_percent",
             "remaining_bytes",
             "status",
@@ -40,8 +41,9 @@ class ProxyUserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "uuid",
             "used_bytes",
+            "uploaded_bytes",
+            "downloaded_bytes",
             "status",
             "disabled_reason",
             "last_seen_at",
@@ -59,9 +61,12 @@ class ProxyUserCreateSerializer(serializers.Serializer):
     enabled = serializers.BooleanField(default=True)
 
     def validate_name(self, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Name must not be blank.")
+        from ostium.proxy.models import validate_user_name
+
+        try:
+            value = validate_user_name(value)
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         if ProxyUser.objects.filter(name=value).exists():
             raise serializers.ValidationError("A user with this name already exists.")
         return value
@@ -115,6 +120,8 @@ class InboundSerializer(serializers.ModelSerializer):
         return {}
 
     def validate(self, attrs):
+        if "port" in attrs and not 1 <= int(attrs["port"]) <= 65535:
+            raise serializers.ValidationError({"port": "Port must be between 1 and 65535."})
         certificate_domain = attrs.pop("certificate_domain", serializers.empty)
         if certificate_domain is not serializers.empty:
             if certificate_domain:
@@ -129,6 +136,14 @@ class InboundSerializer(serializers.ModelSerializer):
         instance = self.instance
         if instance is not None and instance.needs_certificate and not attrs.get("certificate", instance.certificate):
             raise serializers.ValidationError({"certificate_domain": "This protocol requires a certificate."})
+        candidate = instance or Inbound()
+        for key, value in attrs.items():
+            setattr(candidate, key, value)
+        try:
+            candidate.full_clean()
+        except Exception as exc:
+            detail = getattr(exc, "message_dict", None) or {"detail": str(exc)}
+            raise serializers.ValidationError(detail) from exc
         return attrs
 
 
@@ -195,6 +210,7 @@ class AlertSerializer(serializers.ModelSerializer):
             "detail",
             "acknowledged",
             "acknowledged_at",
+            "resolved_at",
             "first_seen_at",
             "last_seen_at",
         )

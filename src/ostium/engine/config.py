@@ -140,6 +140,9 @@ def _build_inbound(inbound: Inbound, users: list[ProxyUser]) -> dict[str, Any]:
         return {
             "type": "shadowsocks",
             **common,
+            # Shadowsocks 2022 in this product is TCP-only. Without this
+            # field sing-box also binds UDP, which collides with Hysteria2.
+            "network": "tcp",
             "method": params.get("method") or "2022-blake3-aes-128-gcm",
             "password": params["server_key"],
             "users": [{"name": user.name, "password": user.ss_password} for user in users],
@@ -174,6 +177,28 @@ def _acl_rules() -> list[dict[str, Any]]:
             ],
             "action": "reject",
         },
+        {
+            # ip_is_private does not cover CGNAT, benchmark, documentation,
+            # multicast or reserved ranges.
+            "ip_cidr": [
+                "0.0.0.0/8",
+                "100.64.0.0/10",
+                "198.18.0.0/15",
+                "192.0.2.0/24",
+                "198.51.100.0/24",
+                "203.0.113.0/24",
+                "224.0.0.0/4",
+                "240.0.0.0/4",
+                "255.255.255.255/32",
+                "::/128",
+                "::1/128",
+                "2001:db8::/32",
+                "fc00::/7",
+                "fe80::/10",
+                "ff00::/8",
+            ],
+            "action": "reject",
+        },
     ]
     if runtime_config.block_private_egress:
         rules.append({"ip_is_private": True, "action": "reject"})
@@ -186,11 +211,15 @@ def _clash_secret() -> str:
     if path.is_file():
         secret = path.read_text(encoding="utf-8").strip()
         if secret:
+            paths.secure_file(path)
             return secret
     import secrets
 
     secret = secrets.token_urlsafe(32)
-    path.write_text(secret, encoding="utf-8")
+    temp = path.with_suffix(path.suffix + ".tmp")
+    temp.write_text(secret, encoding="utf-8")
+    paths.secure_file(temp)
+    temp.replace(path)
     paths.secure_file(path)
     return secret
 
@@ -246,7 +275,7 @@ def generate_config(*, probe_dns: bool = True) -> ConfigResult:
         },
         "experimental": {
             "clash_api": {
-                "external_controller": settings.OSTIUM_SINGBOX_CLASH_ADDRESS,
+                "external_controller": settings.OSTIUM_SINGBOX_CLASH_BIND,
                 "secret": _clash_secret(),
                 "default_mode": "rule",
             },

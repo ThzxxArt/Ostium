@@ -74,7 +74,13 @@ class ProxyUserAdmin(ModelAdmin):
         return custom + urls
 
     def subscription_view(self, request, object_id):
+        from django.core.exceptions import PermissionDenied
+
         user = get_object_or_404(ProxyUser, pk=object_id)
+        if not self.has_view_permission(request, user):
+            raise PermissionDenied
+        if request.method == "POST" and not self.has_change_permission(request, user):
+            raise PermissionDenied
         revealed = False
         if request.method == "POST":
             action_name = request.POST.get("action")
@@ -132,30 +138,35 @@ class ProxyUserAdmin(ModelAdmin):
     def enable_users(self, request, queryset):
         for user in queryset:
             user.enable()
+            record_audit(action="user.enabled", request=request, target=user.name)
         self.message_user(request, _("%(count)d user(s) enabled.") % {"count": queryset.count()})
 
     @admin.action(description=_("Disable selected users"))
     def disable_users(self, request, queryset):
         for user in queryset:
             user.disable()
+            record_audit(action="user.disabled", request=request, target=user.name)
         self.message_user(request, _("%(count)d user(s) disabled.") % {"count": queryset.count()})
 
     @admin.action(description=_("Rotate subscription tokens"))
     def rotate_subscriptions(self, request, queryset):
         for user in queryset:
             user.rotate_subscription_token()
+            record_audit(action="subscription.rotated", request=request, target=user.name)
         self.message_user(request, _("%(count)d subscription token(s) rotated.") % {"count": queryset.count()})
 
     @admin.action(description=_("Rotate credentials"))
     def rotate_credentials(self, request, queryset):
         for user in queryset:
             user.rotate_credentials()
+            record_audit(action="user.credentials_rotated", request=request, target=user.name)
         self.message_user(request, _("%(count)d credential set(s) rotated.") % {"count": queryset.count()})
 
     @admin.action(description=_("Reset usage counters"))
     def reset_usage(self, request, queryset):
         for user in queryset:
             user.reset_usage()
+            record_audit(action="user.usage_reset", request=request, target=user.name)
         self.message_user(request, _("%(count)d usage counter(s) reset.") % {"count": queryset.count()})
 
 

@@ -19,4 +19,5 @@ urlpatterns = [
     path("system/", console_views.system, name="system"),
     path("settings/", console_views.settings_view, name="settings"),
     path("audit/", console_views.audit, name="audit"),
+    path("alerts/<int:alert_id>/ack/", console_views.alert_ack, name="alert_ack"),
 ]

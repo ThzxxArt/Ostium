@@ -54,8 +54,10 @@ def test_userinfo_with_daily_and_expiry(proxy_user):
     from ostium.proxy.models import TrafficDaily
 
     TrafficDaily.objects.create(user=proxy_user, day=date.today(), uplink=10, downlink=20)
+    proxy_user.uploaded_bytes = 10
+    proxy_user.downloaded_bytes = 20
     proxy_user.expires_at = timezone.now() + timedelta(days=10)
-    proxy_user.save(update_fields=["expires_at"])
+    proxy_user.save(update_fields=["uploaded_bytes", "downloaded_bytes", "expires_at"])
     header = userinfo_header(proxy_user)
     assert "upload=10" in header
     assert "download=20" in header

@@ -31,6 +31,8 @@ def all_inbounds(inbounds, certificate):
     trojan = Inbound.objects.get(kind="trojan")
     trojan.certificate = certificate
     trojan.enabled = True
+    # VLESS already owns TCP 443; a second TCP inbound must use another port.
+    trojan.port = 8444
     trojan.save()
     return inbounds
 
@@ -72,11 +74,13 @@ def test_uri_formats(proxy_user, all_inbounds):
 
     trojan = endpoints[2].to_uri()
     assert trojan.startswith("trojan://")
+    assert "pcs=" in trojan
 
     ss = endpoints[3].to_uri()
-    payload = ss.removeprefix("ss://").split("@", 1)[0]
-    decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)).decode()
-    assert decoded == f"{endpoints[3].method}:{endpoints[3].ss_password}"
+    assert ss.startswith("ss://")
+    assert endpoints[3].method.startswith("2022-")
+    userinfo = unquote(ss.removeprefix("ss://").split("@", 1)[0])
+    assert userinfo == f"{endpoints[3].method}:{endpoints[3].ss_password}"
 
 
 @pytest.mark.django_db
@@ -97,6 +101,7 @@ def test_clash_yaml(proxy_user, all_inbounds):
     assert payload["proxy-groups"][0]["name"] == "Ostium"
     assert payload["rules"][-1] == "MATCH,Ostium"
     assert payload["proxies"][0]["reality-opts"]["public-key"]
+    assert payload["proxies"][3]["udp"] is False
 
 
 @pytest.mark.django_db
@@ -108,6 +113,8 @@ def test_singbox_json(proxy_user, all_inbounds):
     tags = [outbound["tag"] for outbound in payload["outbounds"]]
     assert "Auto" in tags and "Ostium" in tags
     assert payload["outbounds"][0]["tls"]["reality"]["public_key"]
+    assert payload["outbounds"][1]["tls"]["certificate_public_key_sha256"]
+    assert payload["outbounds"][2]["tls"]["certificate_public_key_sha256"]
 
 
 @pytest.mark.django_db

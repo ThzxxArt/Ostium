@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
-from datetime import date, timedelta
+from datetime import timedelta
 
 from constance import config as runtime_config
 from django.db.models import Sum
+from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import mixins, serializers, status, viewsets
@@ -204,7 +205,7 @@ class StatsOverviewView(APIView):
     def get(self, request):
         state = RuntimeState.load()
         usage = read_usage()
-        today = TrafficDaily.objects.filter(day=date.today()).aggregate(up=Sum("uplink"), down=Sum("downlink"))
+        today = TrafficDaily.objects.filter(day=timezone.localdate()).aggregate(up=Sum("uplink"), down=Sum("downlink"))
         return Response(
             {
                 "users_total": ProxyUser.objects.count(),
@@ -234,7 +235,7 @@ class StatsTrafficView(APIView):
             days = min(365, max(1, int(request.query_params.get("days", 7))))
         except ValueError:
             days = 7
-        start = date.today() - timedelta(days=days - 1)
+        start = timezone.localdate() - timedelta(days=days - 1)
         rows = (
             TrafficDaily.objects.filter(day__gte=start)
             .values("day")
@@ -277,11 +278,11 @@ class JobSerializer(serializers.Serializer):
     id = serializers.CharField()
     name = serializers.CharField()
     func = serializers.CharField()
-    started = serializers.DateTimeField()
-    stopped = serializers.DateTimeField()
-    success = serializers.BooleanField()
-    result = serializers.CharField()
-    group = serializers.CharField()
+    started = serializers.DateTimeField(allow_null=True)
+    stopped = serializers.DateTimeField(allow_null=True)
+    success = serializers.BooleanField(allow_null=True)
+    result = serializers.CharField(allow_blank=True)
+    group = serializers.CharField(allow_blank=True)
 
 
 class JobViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -295,25 +296,20 @@ class JobViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gene
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, id=None):
-        from django_q.models import OrmQ
+        from ostium.operations.services import cancel_queued_job
 
-        task = self.get_object()
-        if task.started is not None:
+        if cancel_queued_job(id):
+            record_audit(action="job.cancelled", request=request, target=id)
+            return Response({"cancelled": 1})
+        from django_q.models import Task
+
+        task = Task.objects.filter(pk=id).first()
+        if task is not None:
             return Response(
                 {"detail": "This task has already started and cannot be cancelled."},
                 status=status.HTTP_409_CONFLICT,
             )
-        removed = 0
-        for queue in OrmQ.objects.all():
-            payload = queue.payload
-            if isinstance(payload, list) and any(
-                item.get("id") == task.id for item in payload if isinstance(item, dict)
-            ):
-                queue.delete()
-                removed += 1
-        if not removed:
-            return Response({"detail": "Task is not queued."}, status=status.HTTP_409_CONFLICT)
-        return Response({"cancelled": removed})
+        return Response({"detail": "Task is not queued."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class BackupViewSet(
@@ -340,8 +336,9 @@ class BackupViewSet(
         return Response(BackupSerializer(backup).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
-        backup = self.get_object()
-        backup.delete()
+        from ostium.operations.backup import delete_backup
+
+        delete_backup(self.get_object(), actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
@@ -391,40 +388,45 @@ class SettingsView(APIView):
     def get(self, request):
         from django.conf import settings as django_settings
 
-        return Response({key: getattr(runtime_config, key) for key in django_settings.CONSTANCE_CONFIG})
+        from ostium.operations.runtime_settings import MASKED_SECRET, SECRET_SETTINGS
+
+        payload = {}
+        for key in django_settings.CONSTANCE_CONFIG:
+            value = getattr(runtime_config, key)
+            payload[key] = MASKED_SECRET if key in SECRET_SETTINGS and value else value
+        return Response(payload)
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
     def patch(self, request):
         from django.conf import settings as django_settings
 
+        from ostium.operations.runtime_settings import (
+            MASKED_SECRET,
+            SECRET_SETTINGS,
+            SettingValidationError,
+            coerce_setting,
+        )
+
         payload = request.data
         if not isinstance(payload, dict):
             return Response({"detail": "Expected a JSON object."}, status=status.HTTP_400_BAD_REQUEST)
-        updated = []
-        for key, definition in django_settings.CONSTANCE_CONFIG.items():
-            if key not in payload:
+        unknown = sorted(set(payload) - set(django_settings.CONSTANCE_CONFIG))
+        if unknown:
+            return Response(
+                {"detail": f"Unknown setting(s): {', '.join(unknown)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        coerced = {}
+        for key, value in payload.items():
+            if key in SECRET_SETTINGS and value == MASKED_SECRET:
                 continue
-            default = definition[0]
-            value = payload[key]
-            if isinstance(default, bool):
-                if not isinstance(value, bool):
-                    return Response({"detail": f"{key} must be a boolean."}, status=status.HTTP_400_BAD_REQUEST)
-            elif isinstance(default, int):
-                try:
-                    value = int(value)
-                except TypeError, ValueError:
-                    return Response({"detail": f"{key} must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                value = str(value)
-            if key == "server_dns_mode" and value not in {"auto", "doh", "udp"}:
-                return Response(
-                    {"detail": "server_dns_mode must be auto, doh or udp."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if key in {"server_dns_doh_url", "webhook_url"} and value and not str(value).startswith("https://"):
-                return Response({"detail": f"{key} must use https://."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                coerced[key] = coerce_setting(key, value)
+            except SettingValidationError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        for key, value in coerced.items():
             setattr(runtime_config, key, value)
-            updated.append(key)
+        updated = list(coerced)
         if updated:
             mark_dirty()
             record_audit(action="settings.updated", request=request, detail={"keys": updated})

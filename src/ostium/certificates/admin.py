@@ -67,6 +67,10 @@ class CertificateAdmin(ModelAdmin):
         return custom + urls
 
     def import_view(self, request):
+        from django.core.exceptions import PermissionDenied
+
+        if not request.user.is_superuser:
+            raise PermissionDenied
         form = CertificateImportForm(request.POST or None)
         if request.method == "POST" and form.is_valid():
             try:

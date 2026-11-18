@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import secrets
+from urllib.parse import urlsplit
 
 from constance import config
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -40,11 +42,24 @@ class Command(BaseCommand):
         except ValidationError as exc:
             raise CommandError("; ".join(exc.messages)) from exc
 
-        domain = options["domain"].strip().rstrip("/")
+        raw_domain = options["domain"].strip().rstrip("/")
         for prefix in ("https://", "http://"):
-            if domain.startswith(prefix):
-                domain = domain.removeprefix(prefix)
+            if raw_domain.startswith(prefix):
+                raw_domain = raw_domain.removeprefix(prefix)
                 break
+        parsed_domain = urlsplit(f"//{raw_domain}") if raw_domain else None
+        domain = (parsed_domain.hostname or "") if parsed_domain else ""
+        if raw_domain and not domain:
+            raise CommandError("Invalid --domain value.")
+        if parsed_domain is not None and (parsed_domain.path or parsed_domain.query):
+            raise CommandError("--domain must be a hostname, not a URL path.")
+        port = parsed_domain.port if parsed_domain else None
+        if settings.OSTIUM_PUBLIC_BASE_URL:
+            public_base_url = settings.OSTIUM_PUBLIC_BASE_URL.rstrip("/")
+        elif domain:
+            public_base_url = f"https://{domain}" + (f":{port}" if port else "")
+        else:
+            public_base_url = ""
         with transaction.atomic():
             user = User.objects.create_superuser(username=username, email=options["email"], password=password)
             AdminProfile.objects.update_or_create(
@@ -56,7 +71,7 @@ class Command(BaseCommand):
                 initialize_inbounds(enable=enable)
             if domain:
                 config.public_host = domain
-                config.public_base_url = f"https://{domain}"
+                config.public_base_url = public_base_url
                 config.server_name = domain
             mark_dirty()
 

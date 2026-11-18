@@ -163,7 +163,16 @@ def terminate_orphans(*, keep_pid: int | None = None) -> list[int]:
 
     killed: list[int] = []
     target = str(binary_path())
-    config_dir = str(paths.runtime_dir())
+    runtime = paths.runtime_dir().resolve()
+
+    def config_path_from(cmdline: list[str]) -> Path | None:
+        for index, token in enumerate(cmdline):
+            if token in {"-c", "--config"} and index + 1 < len(cmdline):
+                return Path(cmdline[index + 1])
+            if token.startswith("--config="):
+                return Path(token.split("=", 1)[1])
+        return None
+
     for proc in psutil.process_iter(["pid", "name", "cmdline", "exe"]):
         try:
             if keep_pid is not None and proc.pid == keep_pid:
@@ -173,13 +182,14 @@ def terminate_orphans(*, keep_pid: int | None = None) -> list[int]:
             if not cmdline:
                 continue
             is_singbox = os.path.basename(cmdline[0]) == "sing-box" or exe == target
-            if not is_singbox:
+            if not is_singbox or "run" not in cmdline:
                 continue
-            if "run" not in cmdline and "check" not in cmdline:
+            # Only terminate processes running a config from *our* runtime
+            # directory. Client instances and concurrent checks survive.
+            config_path = config_path_from(cmdline)
+            if config_path is None:
                 continue
-            # Only terminate processes using *our* runtime directory. A client
-            # sing-box running on the same development host must survive.
-            if config_dir not in " ".join(cmdline):
+            if config_path.resolve().parent != runtime:
                 continue
             proc.terminate()
             try:

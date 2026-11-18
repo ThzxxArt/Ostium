@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Callable
 
 from django.conf import settings
@@ -22,15 +23,15 @@ def _exempt(path: str) -> bool:
         or path.startswith("/accounts/logout")
         or path.startswith("/accounts/otp")
         or path.startswith("/accounts/totp/setup")
-        or path.startswith("/accounts/password/change")
         or path.startswith("/admin/login")
         or path.startswith("/admin/logout")
-        or path.startswith("/admin/password_change")
     )
 
 
 def _public_console_configured() -> bool:
     if settings.OSTIUM_REQUIRE_TOTP:
+        return True
+    if settings.OSTIUM_PUBLIC_BASE_URL.startswith("https://"):
         return True
     try:
         from constance import config
@@ -38,6 +39,53 @@ def _public_console_configured() -> bool:
         return bool(config.public_base_url) and str(config.public_base_url).startswith("https://")
     except Exception:
         return False
+
+
+class ProxyClientIPMiddleware:
+    """Normalize the client address when Caddy is the trusted last hop.
+
+    django-axes and django-ratelimit both read REMOTE_ADDR. Without this,
+    every request through Caddy shares 127.0.0.1 and a single rate-limit or
+    lockout bucket.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        if settings.OSTIUM_BEHIND_PROXY:
+            forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+            if forwarded:
+                candidate = forwarded.split(",")[-1].strip()
+                try:
+                    ipaddress.ip_address(candidate)
+                except ValueError:
+                    pass
+                else:
+                    request.META["REMOTE_ADDR"] = candidate
+        return self.get_response(request)
+
+
+class AdminCSPMiddleware:
+    """Allow Unfold's standard Alpine build on staff-only admin pages.
+
+    The Aurora console uses the Alpine CSP build and keeps ``unsafe-eval``
+    disabled. Unfold bundles the standard build, so the Django admin would be
+    unusable under the console policy. The relaxation is scoped to ``/admin/``.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        response = self.get_response(request)
+        if request.path.startswith("/admin/"):
+            from django.utils.csp import CSP
+
+            config = dict(settings.SECURE_CSP)
+            config["script-src"] = [CSP.SELF, CSP.NONCE, "'unsafe-eval'", "'unsafe-inline'"]
+            response._csp_config = config
+        return response
 
 
 class AdminSecurityMiddleware:
@@ -56,11 +104,20 @@ class AdminSecurityMiddleware:
             return self.get_response(request)
 
         profile = getattr(user, "ostium_profile", None)
-        if profile is not None and profile.must_change_password:
-            return redirect("accounts:password_change")
-
         has_totp = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
         verified = bool(getattr(user, "is_verified", lambda: False)())
+
+        password_path = path.startswith("/accounts/password/change") or path.startswith("/admin/password_change")
+        if password_path:
+            # A brand-new admin must be able to replace the installer password
+            # before TOTP exists. Once TOTP is confirmed, password changes
+            # require a verified session just like every other admin action.
+            if has_totp and not verified:
+                return redirect("accounts:otp")
+            return self.get_response(request)
+
+        if profile is not None and profile.must_change_password:
+            return redirect("accounts:password_change")
         if has_totp and not verified:
             return redirect("accounts:otp")
 

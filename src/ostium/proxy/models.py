@@ -21,6 +21,17 @@ from ostium.accounts.crypto import decrypt_json, decrypt_text, encrypt_json, enc
 TOKEN_BYTES = 32
 
 
+def validate_user_name(value: str) -> str:
+    """Validate a name used as a sing-box user and V2Ray stats key."""
+
+    name = (value or "").strip()
+    if not 1 <= len(name) <= 64:
+        raise ValidationError(_("User name must be between 1 and 64 characters."))
+    if ">" in name or any(ord(char) < 32 or ord(char) == 127 for char in name):
+        raise ValidationError(_("User name must not contain '>' or control characters."))
+    return name
+
+
 def generate_subscription_token() -> str:
     return secrets.token_urlsafe(TOKEN_BYTES)
 
@@ -79,6 +90,8 @@ class ProxyUser(models.Model):
     )
     cycle_started_at = models.DateTimeField(null=True, blank=True)
     used_bytes = models.BigIntegerField(default=0, verbose_name=_("used (bytes)"))
+    uploaded_bytes = models.BigIntegerField(default=0, verbose_name=_("uploaded (bytes)"))
+    downloaded_bytes = models.BigIntegerField(default=0, verbose_name=_("downloaded (bytes)"))
     subscription_token_hash = models.CharField(max_length=64, unique=True, editable=False)
     subscription_token_enc = models.TextField(editable=False)
     note = models.CharField(max_length=500, blank=True, verbose_name=_("note"))
@@ -101,6 +114,11 @@ class ProxyUser(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def clean(self) -> None:
+        self.name = validate_user_name(self.name)
+        if self.quota_bytes < 0:
+            raise ValidationError(_("Quota must not be negative."))
 
     # -- encrypted credentials -------------------------------------------------
 
@@ -168,8 +186,17 @@ class ProxyUser(models.Model):
 
     def reset_usage(self) -> None:
         self.used_bytes = 0
+        self.uploaded_bytes = 0
+        self.downloaded_bytes = 0
         self.cycle_started_at = timezone.now()
-        self.save(update_fields=["used_bytes", "cycle_started_at", "updated_at"])
+        update = ["used_bytes", "uploaded_bytes", "downloaded_bytes", "cycle_started_at", "updated_at"]
+        # A quota reset should make an automatically suspended user usable
+        # again. Administrator-disabled and expired accounts stay disabled.
+        if not self.enabled and self.disabled_reason == self.DisabledReason.QUOTA_EXCEEDED:
+            self.enabled = True
+            self.disabled_reason = ""
+            update += ["enabled", "disabled_reason"]
+        self.save(update_fields=update)
 
     def disable(self, reason: str = DisabledReason.DISABLED) -> None:
         self.enabled = False
@@ -187,12 +214,15 @@ class ProxyUser(models.Model):
         if self.quota_cycle != self.QuotaCycle.MONTHLY:
             return False
         now = now or timezone.now()
-        started = self.cycle_started_at or self.created_at
-        if (started.year, started.month) == (now.year, now.month):
+        started = timezone.localtime(self.cycle_started_at or self.created_at)
+        current = timezone.localtime(now)
+        if (started.year, started.month) == (current.year, current.month):
             return False
         self.used_bytes = 0
+        self.uploaded_bytes = 0
+        self.downloaded_bytes = 0
         self.cycle_started_at = now
-        update = ["used_bytes", "cycle_started_at", "updated_at"]
+        update = ["used_bytes", "uploaded_bytes", "downloaded_bytes", "cycle_started_at", "updated_at"]
         if not self.enabled and self.disabled_reason == self.DisabledReason.QUOTA_EXCEEDED:
             self.enabled = True
             self.disabled_reason = ""
@@ -369,6 +399,19 @@ class Inbound(models.Model):
             method = self.params.get("method", "")
             if not method.startswith("2022-"):
                 errors.append(_("Only Shadowsocks 2022 methods are supported."))
+        if self.enabled and self.kind != self.Kind.HYSTERIA2:
+            # Hysteria2 is UDP; every other inbound in this project is TCP.
+            conflict = (
+                Inbound.objects.filter(enabled=True, port=self.port)
+                .exclude(pk=self.pk)
+                .exclude(kind=self.Kind.HYSTERIA2)
+                .first()
+            )
+            if conflict is not None:
+                errors.append(
+                    _("TCP port %(port)s is already used by %(kind)s.")
+                    % {"port": self.port, "kind": conflict.get_kind_display()}
+                )
         if errors:
             raise ValidationError(errors)
 
@@ -444,4 +487,5 @@ __all__ = [
     "generate_ss_key",
     "generate_subscription_token",
     "hash_subscription_token",
+    "validate_user_name",
 ]

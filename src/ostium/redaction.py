@@ -10,12 +10,20 @@ _BASE64_RE = re.compile(r"\b[A-Za-z0-9+/]{32,}={0,2}\b")
 _PEM_RE = re.compile(r"-----BEGIN [A-Z ]+-----.*?-----END [A-Z ]+-----", re.DOTALL)
 _HEADER_RE = re.compile(r"(?i)(authorization|api-key|cookie)\s*[:=]\s*\S+")
 _URI_RE = re.compile(r"\b(vless|hysteria2|trojan|ss)://\S+")
+# Shadowsocks 2022 and Hysteria2 obfuscation secrets are shorter than the
+# generic token threshold, so redact them by their JSON field name.
+_JSON_SECRET_RE = re.compile(
+    r'(?i)("(?:password|password_enc|ss_password|private_key|public_key|short_id|server_key|'
+    r'obfs_password|subscription_token|subscription_token_enc|token|webhook_secret|secret)"\s*:\s*")'
+    r'[^"]*(")'
+)
 
 
 def redact(text: str, *, max_length: int = 4000) -> str:
     if not text:
         return ""
     text = _PEM_RE.sub("[redacted key]", text)
+    text = _JSON_SECRET_RE.sub(r"\1[redacted]\2", text)
     text = _HEADER_RE.sub(r"\1: [redacted]", text)
     text = _URI_RE.sub("[redacted uri]", text)
     text = _LONG_TOKEN_RE.sub("[redacted]", text)

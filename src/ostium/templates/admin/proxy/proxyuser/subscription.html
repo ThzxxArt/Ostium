@@ -29,7 +29,7 @@
                         </form>
                     {% endif %}
                     <form method="post"
-                          onsubmit="return confirm('{% trans "Rotate the token? Old URLs stop working immediately." %}')">
+                          data-confirm="{% trans "Rotate the token? Old URLs stop working immediately." %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="rotate">
                         <button class="btn btn--danger" type="submit">{% trans "Rotate token" %}</button>
@@ -52,7 +52,7 @@
                                     </div>
                                     <button class="btn btn--sm"
                                             type="button"
-                                            onclick="navigator.clipboard.writeText('{{ link.url|escapejs }}')">{% trans "Copy" %}</button>
+                                            data-copy="{{ link.url }}">{% trans "Copy" %}</button>
                                 </div>
                                 <div class="copy-field mt-2"><code>{{ link.url }}</code></div>
                             </div>

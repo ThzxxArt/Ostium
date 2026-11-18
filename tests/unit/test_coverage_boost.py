@@ -204,7 +204,12 @@ def test_operations_services(admin_user, settings):
     acknowledge_alert(alert)
     raise_alert(code="x", message="m2", fingerprint="x")
     alert.refresh_from_db()
-    assert alert.acknowledged_at is None
+    # Acknowledging an active condition survives periodic re-raises.
+    assert alert.acknowledged_at is not None
     resolve_alert("x")
     alert.refresh_from_db()
-    assert alert.acknowledged_at is not None
+    assert alert.resolved_at is not None
+    raise_alert(code="x", message="m3", fingerprint="x")
+    alert.refresh_from_db()
+    assert alert.acknowledged_at is None
+    assert alert.resolved_at is None

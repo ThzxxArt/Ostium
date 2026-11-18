@@ -15,7 +15,10 @@
             <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
         </div>
     </div>
-    <form id="restart-form" method="post" action="{% url 'console:system' %}">
+    <form id="restart-form"
+          method="post"
+          action="{% url 'console:system' %}"
+          data-confirm="重新应用配置会短暂重启 sing-box，已有连接会断开 1–3 秒。继续？">
         {% csrf_token %}
         <input type="hidden" name="action" value="restart_core">
     </form>
@@ -252,10 +255,14 @@
                         {% for alert in alerts %}
                             <div class="timeline-item">
                                 <span class="timeline-dot {% if alert.level == 'critical' %}timeline-dot--danger{% elif alert.level == 'warning' %}timeline-dot--warning{% else %}timeline-dot--muted{% endif %}"></span>
-                                <div>
+                                <div style="flex:1;min-width:0">
                                     <div class="timeline-title">{{ alert.message|truncatechars:90 }}</div>
                                     <div class="timeline-meta">{{ alert.code }} · {{ alert.last_seen_at|ago }}</div>
                                 </div>
+                                <form method="post" action="{% url 'console:alert_ack' alert.pk %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn--sm" type="submit">确认</button>
+                                </form>
                             </div>
                         {% endfor %}
                     </div>
@@ -316,8 +323,11 @@
                     <a class="btn btn--block" href="{% url 'console:subscriptions' %}">{% icon "link" %} 复制订阅链接</a>
                     <a class="btn btn--block"
                        href="{% url 'admin:certificates_certificate_import' %}">{% icon "certificate" %} 导入证书</a>
-                    <a class="btn btn--block" href="{% url 'console:system' %}">{% icon "download" %} 导出诊断包</a>
-                    <form method="post" action="{% url 'console:system' %}">
+                    <a class="btn btn--block"
+                       href="{% url 'console:system' %}?download=diagnostics">{% icon "download" %} 导出诊断包</a>
+                    <form method="post"
+                          action="{% url 'console:system' %}"
+                          data-confirm="重新应用配置会短暂重启 sing-box，已有连接会断开 1–3 秒。继续？">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="restart_core">
                         <button class="btn btn--block" type="submit">{% icon "refresh" %} 重启核心并应用配置</button>

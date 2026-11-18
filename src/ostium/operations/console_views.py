@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 import psutil
 from django.conf import settings
@@ -51,14 +51,12 @@ def _page(request, queryset, per_page: int = 20):
     return Paginator(queryset, per_page).get_page(request.GET.get("page"))
 
 
-def _fill_series(days: int) -> list[dict]:
-    start = date.today() - timedelta(days=days - 1)
-    rows = (
-        TrafficDaily.objects.filter(day__gte=start)
-        .values("day")
-        .annotate(uplink=Sum("uplink"), downlink=Sum("downlink"))
-        .order_by("day")
-    )
+def _fill_series(days: int, *, user: ProxyUser | None = None) -> list[dict]:
+    start = timezone.localdate() - timedelta(days=days - 1)
+    queryset = TrafficDaily.objects.filter(day__gte=start)
+    if user is not None:
+        queryset = queryset.filter(user=user)
+    rows = queryset.values("day").annotate(uplink=Sum("uplink"), downlink=Sum("downlink")).order_by("day")
     by_day = {row["day"]: row for row in rows}
     series = []
     for offset in range(days):
@@ -80,7 +78,9 @@ def dashboard(request):
     state = RuntimeState.load()
     usage = read_usage()
     now = timezone.now()
-    today_totals = TrafficDaily.objects.filter(day=date.today()).aggregate(up=Sum("uplink"), down=Sum("downlink"))
+    today_totals = TrafficDaily.objects.filter(day=timezone.localdate()).aggregate(
+        up=Sum("uplink"), down=Sum("downlink")
+    )
     online_users = list(ProxyUser.objects.filter(last_seen_at__gte=now - timedelta(seconds=60)))
     top_online = []
     for user in online_users:
@@ -278,7 +278,7 @@ def user_detail(request, user_id):
         "endpoints": endpoints,
         "qr": qr_data_uri(subscription_url(user, "base64", request)) if revealed else "",
         "userinfo": userinfo_header(user),
-        "series": _fill_series(30),
+        "series": _fill_series(30, user=user),
         "audit_events": AuditEvent.objects.filter(target=user.name)[:20],
         "live": read_usage().get("users", {}).get(user.name, {}),
     }
@@ -446,27 +446,24 @@ def logs(request):
 @require_http_methods(["GET", "POST"])
 def jobs(request):
     if request.method == "POST" and request.POST.get("action") == "cancel":
-        from django_q.models import OrmQ
+        from ostium.operations.services import cancel_queued_job
 
-        task = get_object_or_404(Task, pk=request.POST.get("task_id"))
-        if task.started is not None:
-            messages.warning(request, "任务已经开始执行，无法取消。")
+        task_id = request.POST.get("task_id", "")
+        if cancel_queued_job(task_id):
+            record_audit(action="job.cancelled", request=request, target=task_id)
+            messages.success(request, "任务已从队列移除。")
         else:
-            removed = 0
-            for queue in OrmQ.objects.all():
-                payload = queue.payload
-                if isinstance(payload, list) and any(
-                    item.get("id") == task.id for item in payload if isinstance(item, dict)
-                ):
-                    queue.delete()
-                    removed += 1
-            if removed:
-                messages.success(request, "任务已从队列移除。")
-            else:
-                messages.warning(request, "任务不在队列中。")
+            messages.warning(request, "任务已经开始或不在队列中，无法取消。")
         return redirect("console:jobs")
+    from django_q.models import OrmQ
+
     queryset = Task.objects.all().order_by("-started")
-    return render(request, "console/jobs.html", {"active_nav": "jobs", "page": _page(request, queryset, 30)})
+    queued = list(OrmQ.objects.all()[:100])
+    return render(
+        request,
+        "console/jobs.html",
+        {"active_nav": "jobs", "page": _page(request, queryset, 30), "queued": queued},
+    )
 
 
 @staff_member_required(login_url="accounts:login")
@@ -474,6 +471,7 @@ def jobs(request):
 def system(request):
     if request.GET.get("download") == "diagnostics":
         payload = build_diagnostics()
+        record_audit(action="diagnostics.exported", request=request)
         response = HttpResponse(payload, content_type="application/gzip")
         timestamp = timezone.now().strftime("%Y%m%d-%H%M%S")
         response["Content-Disposition"] = f'attachment; filename="ostium-diagnostics-{timestamp}.tar.gz"'
@@ -563,14 +561,29 @@ def settings_view(request):
 
 
 @staff_member_required(login_url="accounts:login")
+@require_http_methods(["POST"])
+def alert_ack(request, alert_id):
+    from ostium.operations.services import acknowledge_alert
+
+    alert = get_object_or_404(Alert, pk=alert_id)
+    acknowledge_alert(alert)
+    record_audit(action="alert.acknowledged", request=request, target=alert.code)
+    messages.success(request, "告警已确认。")
+    return redirect("console:dashboard")
+
+
+@staff_member_required(login_url="accounts:login")
 def audit(request):
     queryset = AuditEvent.objects.select_related("actor")
     action_filter = request.GET.get("action", "").strip()
     actor = request.GET.get("actor", "").strip()
+    target = request.GET.get("target", "").strip()
     if action_filter:
         queryset = queryset.filter(action__startswith=action_filter)
     if actor:
         queryset = queryset.filter(actor__username__icontains=actor)
+    if target:
+        queryset = queryset.filter(target__icontains=target)
     return render(
         request,
         "console/audit.html",
@@ -579,6 +592,7 @@ def audit(request):
             "page": _page(request, queryset, 50),
             "action_filter": action_filter,
             "actor": actor,
+            "target": target,
             "actions": AuditEvent.objects.values_list("action", flat=True).distinct().order_by("action")[:50],
         },
     )

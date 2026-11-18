@@ -300,7 +300,27 @@ def fingerprint_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def certificate_pins(certificate) -> tuple[str, str]:
+    """Return (certificate SHA-256 base64, SPKI SHA-256 base64).
+
+    Trojan uses the former as ``pcs``; sing-box uses the latter as
+    ``tls.certificate_public_key_sha256``.
+    """
+
+    import base64
+
+    cert = x509.load_pem_x509_certificate(certificate.cert_file.read_text(encoding="utf-8").encode("utf-8"))
+    der_digest = cert.fingerprint(hashes.SHA256())
+    spki = cert.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    spki_digest = hashlib.sha256(spki).digest()
+    return base64.b64encode(der_digest).decode("ascii"), base64.b64encode(spki_digest).decode("ascii")
+
+
 __all__ = [
+    "certificate_pins",
     "delete_certificate",
     "generate_self_signed",
     "import_certificate",
