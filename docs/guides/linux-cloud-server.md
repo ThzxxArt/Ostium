@@ -8,7 +8,7 @@
 - RHEL / Rocky Linux / AlmaLinux（dnf、firewalld）
 - Alpine / OpenRC 等非 systemd 发行版使用 `--no-service` + supervisord，见第 4.4 节
 
-> **兼容性说明**：Ubuntu 24.04 / Debian 13 是当前目标平台；截至 0.1.11，仍未在这些平台完成本轮实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
+> **兼容性说明**：Ubuntu 24.04 / Debian 13 是当前目标平台；截至 0.1.12，仍未在这些平台完成本轮实机验证，其他发行版也没有实机验证。优先使用在线安装器（wheel + 托管 Python）；Release 里的 PyInstaller DEB/AppImage 依赖构建环境，较旧发行版可能遇到 glibc 不兼容，不建议作为通用安装方式。
 
 ## 1. 主方案与端口规划
 
@@ -847,8 +847,8 @@ journalctl -u ostium -n 100 --no-pager
 
 客户端：
 
-- Windows：`Ostium-0.1.11-windows-x64-setup.exe`
-- macOS：`Ostium-0.1.11-macos-arm64.dmg`
+- Windows：`Ostium-0.1.12-windows-x64-setup.exe`
+- macOS：`Ostium-0.1.12-macos-arm64.dmg`
 - Linux：在线安装器 `install --role client`，或 DEB/AppImage
 - 也可以用 Clash/sing-box/v2rayN 等兼容客户端导入订阅
 

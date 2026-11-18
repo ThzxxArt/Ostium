@@ -1,61 +1,52 @@
-# Ostium v0.1.11
+# Ostium v0.1.12
 
-**Status: published on 2026-11-17.** Tag `v0.1.11` (`098b2be`), 23 GitHub
-Release assets, `ostium-ctl==0.1.11` on PyPI, and GHCR `0.1.11`/`v0.1.11`/`latest`.
-Release workflow `44097108605` passed.
-
-This release is about verifiability and failure containment: prove which build is
-running, make installers fail when the wrong process answers, use encrypted DNS
-by default, diagnose the actual failing layer, describe online/rate data
-honestly, and stop a dead core from blackholing the whole machine.
+**Status: published on 2026-11-18.** This is a client reliability patch for the
+Windows network state left behind by TUN and system-proxy sessions.
 
 ## Highlights
 
-- **Version provenance.** `ostium version --json`, `/healthz`, `/auth/status`,
-  `/system/info`, `/system/provenance` and the core API report comparable
-  version/commit/process facts. A stale process on the UI port is visible as a
-  PID/path mismatch instead of silently serving the old release.
-- **Installer contract.** Windows, Linux and macOS installers assert the expected
-  version and refuse to kill an unknown process on the UI port. A stale
-  `python.exe -m ostium serve` no longer makes an upgrade report success.
-- **DNS v2.** Server DNS defaults to DoH first, UDP only as an explicit fallback.
-  The dead `local2` server is gone, `CONFIG_POLICY_VERSION` is 3, and
-  `last-good.meta.json` records the mode, servers and probe time.
-- **Diagnostics v2.** Doctor covers version consistency, port ownership, core
-  readiness, configuration drift, DoH comparison, direct/proxy egress, system
-  proxy, TUN and disk. `/system/selftest` reports DNS/TCP/TLS/HTTP stage and
-  latency.
-- **Honest status.** Online means traffic seen within a configurable window
-  (default 60 s), not a TCP connection count. Rates decay and reset during
-  outages; users/subscriptions pages poll while visible.
-- **Fail-open.** If the client core is unavailable for 45 s, the system proxy is
-  disabled and direct internet is restored with a critical alert. It is
-  re-enabled after the core recovers, but never after an explicit Disconnect.
-  This is not a kill switch.
-- **No database migration.**
+- **No more stale TUN blackhole.** Windows clients now stop sing-box with
+  `CTRL_BREAK_EVENT` instead of `TerminateProcess`, and the privileged core
+  removes stale `Ostium`/`ostium0`/`sing-box` routes and adapters on startup and
+  after a TUN session. The "connect once, then TCP to the server times out until
+  reboot/uninstall" failure is fixed.
+- **No Windows WFP risk from strict routing.** Client TUN configs default to
+  `strict_route: false`. sing-box implements strict routing on Windows with WFP
+  filters; a hard kill can skip their cleanup and blackhole outbound TCP. Ostium
+  has no firewall-level kill switch, so the extra risk is not justified.
+- **The system proxy no longer lies.** Windows status checks the live WinINET
+  registry instead of the state file. If Clash or another client rewrites
+  `ProxyEnable`, `ProxyServer` or `AutoConfigURL`, Ostium reports `stale`,
+  re-applies on connect, and the watchdog takes the proxy back while connected.
+- **Changing the mixed port moves the proxy.** An enabled system proxy is moved
+  to the new `mixed_port` in the same request instead of leaving the browser on
+  a closed port.
+- **DoH is a real URL.** The client remote resolver now sends `path` and
+  `tls.server_name`, not just a bare DoH server IP.
 
 ## Upgrade
 
-- `0.1.10 -> 0.1.11` keeps the database, users, credentials, subscription tokens,
-  certificates, backups and `master.key`.
-- Read `docs/operations/upgrade-0.1.10-to-0.1.11.md`.
-- Rollback to 0.1.10 intentionally leaves the core down until the older control
-  plane regenerates a policy-2 configuration.
+- `0.1.11 -> 0.1.12` keeps the database, users, credentials, subscription
+  tokens, certificates, backups and `master.key`.
+- Read `docs/operations/upgrade-0.1.11-to-0.1.12.md`.
+- Windows users who already have a stale TUN route should update and restart the
+  `OstiumCore` service; the new startup cleanup removes it. A one-time reboot is
+  also sufficient. The repair script is in `docs/guides/tun.md`.
 
 ## Verified in the implementation workspace
 
-- Backend: 825 passed, 94.28% statements / 90.32% branches, coverage gate passed.
-- Real `1.14.4-ostium.1` core integration: 10 passed.
-- Frontend: 219 unit tests, 73 Playwright tests passed; coverage 90.78/85.04.
-- `0.1.10 -> 0.1.11` and `0.1.9 -> 0.1.11` upgrades plus encrypted-backup
-  restore passed.
-- Wheel/sdist exact `0.1.11`; wheel CLI and bundled Web `build.json` match.
-- Release preflight, shellcheck, `bash -n` and `mkdocs --strict` passed.
+- Backend non-integration suite: 836 passed.
+- Targeted proxy/fail-open/settings/config tests: 67 passed with the pinned
+  `1.14.4` core.
+- Generated client and server configs pass `sing-box check`.
+- `scripts/release-preflight.sh --version 0.1.12 --skip-git` passes.
 
 ## Not verified
 
-- Windows 11, macOS 14, Debian/RHEL, Nginx, Docker, ACME, real TUN and 72-hour
-  soak tests still require external hardware, domains or accounts.
-- Windows Authenticode and Apple Developer ID certificates are not configured.
-- Available validation evidence is recorded in `docs/release-status.md` and the
-  final implementation report; unexecuted items are not claimed as verified.
+- Windows 11/10 runtime installer, TUN, Wintun/WFP and Authenticode matrix.
+- macOS 14 launchd/utun/DMG/notarization.
+- Debian/RHEL, Nginx, Docker runtime, ACME, real TUN, 72-hour soak and
+  performance.
+- The release workflow and platform artifacts are produced from this status
+  commit; their run IDs and asset hashes are recorded in
+  `docs/release-status.md`.

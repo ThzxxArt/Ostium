@@ -63,7 +63,7 @@ describe('server pages', () => {
       overrides: {
         '/api/v1/system/provenance': {
           app: {
-            version: '0.1.11',
+            version: '0.1.12',
             commit: 'abc123',
             built_at: '2026-11-17T00:00:00+00:00',
             frozen: false,
@@ -78,12 +78,12 @@ describe('server pages', () => {
             version_source: 'version_file',
           },
           web: { available: true, version: '0.1.10', built_at: '2026-11-16T00:00:00+00:00' },
-          core: { reachable: true, running: true, version: '0.1.11', engine_version: '1.14.4' },
+          core: { reachable: true, running: true, version: '0.1.12', engine_version: '1.14.4' },
           listener: { port: 8443, host: '127.0.0.1', found: true, pid: 42, exe: '/usr/bin/ostium' },
           consistency: {
             ok: false,
-            expected_version: '0.1.11',
-            mismatches: [{ surface: 'web', expected: '0.1.11', actual: '0.1.10' }],
+            expected_version: '0.1.12',
+            mismatches: [{ surface: 'web', expected: '0.1.12', actual: '0.1.10' }],
           },
           generated_at: '2026-11-17T00:00:00+00:00',
         },
@@ -94,7 +94,7 @@ describe('server pages', () => {
     const state = stateOf(wrapper, SettingsPage)
     state.activeTab = 'about'
     await settle()
-    expect(wrapper.text()).toContain('0.1.11')
+    expect(wrapper.text()).toContain('0.1.12')
     expect(wrapper.text()).toContain('abc123')
     expect(wrapper.text()).toContain('Version mismatch')
     expect(wrapper.text()).toContain('web=0.1.10')

@@ -3,6 +3,33 @@
 All notable changes are documented here. Format: Keep a Changelog; versioning:
 SemVer.
 
+## [0.1.12] - 2026-11-18
+
+### Fixed
+
+- Windows clients no longer leave a dead TUN route behind after a crash or a
+  forced stop. The supervisor now stops sing-box with `CTRL_BREAK_EVENT`, and
+  the privileged core removes stale `Ostium`/`ostium0`/`sing-box` routes and
+  adapters on startup and after a TUN session. This fixes the "connect once,
+  then TCP to the server times out until reboot/uninstall" failure.
+- Client TUN configs default to `strict_route: false` on Windows. sing-box
+  implements strict routing with WFP filters there; a hard kill can skip their
+  cleanup and blackhole outbound TCP. Ostium has no firewall-level kill switch,
+  so the extra WFP risk is not worth it.
+- Windows system-proxy status now checks the live WinINET registry instead of
+  trusting the state file. If another client rewrites `ProxyEnable`,
+  `ProxyServer` or `AutoConfigURL`, Ostium reports `stale`, re-applies on the
+  next connect, and the watchdog takes the proxy back while connected.
+- Changing `mixed_port` now moves an enabled system proxy to the new port in the
+  same request instead of leaving the browser pointed at a closed listener.
+- The generated client DoH remote now includes `path` and
+  `tls.server_name`, not just a bare server IP.
+
+### Documentation
+
+- Added the 0.1.11 -> 0.1.12 upgrade guide and the Windows stale-TUN repair
+  steps.
+
 ## [0.1.11] - 2026-11-17
 
 ### Added

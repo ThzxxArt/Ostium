@@ -230,7 +230,7 @@ describe('client pages', () => {
       overrides: {
         '/api/v1/system/doctor': {
           generated_at: '2026-11-17T00:00:00+00:00',
-          version: '0.1.11',
+          version: '0.1.12',
           checks: [
             { id: 'version_consistency', status: 'pass', message: 'ok', fix: null, data: {} },
             { id: 'port_owner:8787', status: 'pass', message: 'ok', fix: null, data: {} },

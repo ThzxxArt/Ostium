@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
     --skip-attestation) SKIP_ATTESTATION="true"; shift ;;
     --skip-pypi) SKIP_PYPI="true"; shift ;;
     -h|--help)
-      echo "usage: $0 --version 0.1.11 [--repo owner/name] [--skip-attestation] [--skip-pypi]"
+      echo "usage: $0 --version 0.1.12 [--repo owner/name] [--skip-attestation] [--skip-pypi]"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;

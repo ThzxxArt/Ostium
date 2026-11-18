@@ -127,7 +127,7 @@ def _services(role: Role = Role.SERVER, **overrides: object) -> SimpleNamespace:
                 "running": True,
                 "pid": 42,
                 "role": role.value,
-                "core_version": "0.1.11",
+                "core_version": "0.1.12",
                 "revision": "abc",
                 "config_sha256": "0" * 64,
                 "last_error": None,
@@ -580,7 +580,7 @@ async def test_version_warns_when_web_manifest_is_missing(monkeypatch) -> None:
         "read_web_build",
         lambda dist: {"available": False, "reason": "missing"},
     )
-    result = await diagnostics._check_version(services, {"core_version": "0.1.11"})
+    result = await diagnostics._check_version(services, {"core_version": "0.1.12"})
     assert result.status == "warn"
     assert "Web build manifest" in result.message
 

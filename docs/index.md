@@ -2,16 +2,14 @@
 
 Ostium 是**双角色私人 VPN / 通用代理控制台**：同一个 Python 包可以装到服务器，也可以装到你的电脑；服务端和客户端共用一套 Web UI、CLI 和安装器。数据面是固定版本的 sing-box，控制面是 FastAPI + Vue 3。
 
-当前公开版本：**v0.1.11**（2026-11-17）。上一版本为 **v0.1.10**（2026-11-16）。发布状态与已验证/未验证项以 [发布状态](release-status.md) 为准。
+当前公开版本：**v0.1.12**（2026-11-18）。上一版本为 **v0.1.11**（2026-11-17）。发布状态与已验证/未验证项以 [发布状态](release-status.md) 为准。
 
-## 0.1.11 的变化
+## 0.1.12 的变化
 
-- 版本与构建可溯源：`/system/provenance`、`ostium version --json`、Web `build.json`、安装器精确版本断言。
-- 服务端 DNS 默认 DoH 优先、UDP 显式回退；配置策略版本 3；不再生成不会生效的第二个 DNS 服务器。
-- 诊断覆盖版本、端口归属、配置漂移、DNS 对照、TLS/代理出口、系统代理、TUN 与磁盘。
-- “在线”改为近期流量窗口；速率在无流量或采集中断后归零；用户/订阅页面自动刷新。
-- 客户端系统代理在核心故障 45 秒后默认 fail-open，核心恢复后自动恢复；显式 Disconnect 不被覆盖。
-- 升级步骤见 [0.1.10 → 0.1.11](operations/upgrade-0.1.10-to-0.1.11.md)。
+- Windows 客户端停止核心时不再直接 `TerminateProcess`，改用 `CTRL_BREAK_EVENT`，并在启动/停止时清理 `Ostium`/`ostium0` 的残留路由和虚拟网卡；TUN 默认关闭 `strict_route`，避免 WFP 过滤器残留导致 TCP 黑洞。
+- Windows 系统代理状态改为校验真实 WinINET 注册表；Clash 等程序改写代理后，Ostium 不会继续显示“已开启”。修改混合端口时同步迁移系统代理，看门狗会重新接管被外部改写的代理。
+- 客户端远程 DoH 补上 `path` 和 `tls.server_name`，不再只发送一个裸 IP。
+- 升级步骤见 [0.1.11 → 0.1.12](operations/upgrade-0.1.11-to-0.1.12.md)。
 
 > 文档以中文为主。英文概览见 [`README.en.md`](https://github.com/ThzxxArt/Ostium/blob/main/README.en.md)。
 

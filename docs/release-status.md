@@ -8,20 +8,46 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 
 | Field | Value |
 |---|---|
-| Version | **0.1.11** |
+| Version | **0.1.12** |
 | Status | **Published** |
-| Tag | `v0.1.11` (annotated, commit `098b2be`) |
-| Assets | GitHub Release `v0.1.11` — 23 assets, marked Latest |
-| PyPI | `ostium-ctl==0.1.11` (wheel + sdist) |
-| GHCR | `0.1.11`, `v0.1.11`, `latest` — linux/amd64 + linux/arm64 |
-| Release workflow | run `44097108605` — success |
-| Previous release | `v0.1.10`, published 2026-11-16 (23 assets, unchanged) |
-| Release type | Verifiability, DNS, diagnostics and failure containment |
+| Tag | `v0.1.12` (annotated) |
+| Assets | GitHub Release `v0.1.12` — produced from this status commit |
+| PyPI | `ostium-ctl==0.1.12` (wheel + sdist) |
+| GHCR | `0.1.12`, `v0.1.12`, `latest` — linux/amd64 + linux/arm64 |
+| Release workflow | release run from the `v0.1.12` tag |
+| Previous release | `v0.1.11`, published 2026-11-17 (23 assets, unchanged) |
+| Release type | Windows TUN and system-proxy state cleanup |
 | Source branch | `main` |
 
-`v0.1.11` was published on 2026-11-17. The tag targets `098b2be`; the release
-workflow passed verification, integration, upgrade-e2e, wheel, core, Windows,
-macOS, Linux package, Docker and publish jobs.
+`v0.1.12` is the current release. The status is recorded here **before** the
+tag is created: the wheel, sdist and Release assets are immutable once
+published, so the tagged tree must already say `0.1.12` / published. The tag
+must be created from this commit; artifact names, run IDs and hashes are
+appended after the release workflow completes.
+
+## 0.1.12 verification status
+
+### Verified locally
+
+- Backend non-integration suite: 836 passed / 10 deselected.
+- Targeted proxy, fail-open, settings, config-builder and Windows cleanup
+  tests: 67 passed with the pinned `1.14.4` core.
+- Generated client and server configs pass `sing-box check` with the official
+  `1.14.4` binary.
+- `scripts/release-preflight.sh --version 0.1.12 --skip-git` passes; version
+  files, README, docs and installers agree on `0.1.12`.
+- The Windows cleanup removes only `Ostium`/`ostium0`/`sing-box` routes and
+  adapters; it does not touch other VPNs.
+
+### Not verified in this workspace (0.1.12)
+
+- Windows 11/10 runtime installer, TUN, Wintun/WFP and Authenticode matrix.
+- macOS 14 launchd/utun/DMG/notarization.
+- Debian/RHEL real machines, Nginx, Docker runtime, ACME, real TUN, 72-hour
+  soak and performance.
+- The release workflow, platform assets and PyPI/GHCR publication are produced
+  from this status commit; unexecuted checks remain blockers and must not be
+  claimed as verified.
 
 `v0.1.0` and `v0.1.1` tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.
@@ -29,7 +55,7 @@ are published artifacts. They are never replaced or moved by this release.
 Known limitation: the `v0.1.1` tag and its PyPI sdist still contain the
 pre-publication README wording (“not yet published”) because they were built
 before the status update. Replacing them would rewrite published artifacts;
-0.1.11 continues to fix the status at its own tag instead of rewriting published
+0.1.12 continues to fix the status at its own tag instead of rewriting published
 artifacts.
 
 ## 0.1.11 verification status

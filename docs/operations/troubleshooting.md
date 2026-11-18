@@ -110,6 +110,17 @@ sudo cat /var/lib/ostium/runtime/last-good.meta.json
 这不是 kill switch。若关闭 fail-open，核心故障时系统代理会继续指向已停止的本地端口，
 整机流量可能黑洞。可在 Settings 中调整阈值。
 
+## Windows 断开后 TCP 仍然超时（0.1.12）
+
+0.1.11 及更早版本在 Windows 上直接用 `TerminateProcess` 停止 sing-box。如果之前用过
+TUN，`Ostium`/`ostium0` 的虚拟网卡或路由可能残留，表现为断开后 TCP 仍然超时、ping
+正常、重启或卸载才恢复。
+
+0.1.12 的 `OstiumCore` 会在启动和 TUN 停止时清理这些残留，并默认关闭 Windows 的
+`strict_route`。升级后重启一次 `OstiumCore`；仍不通时使用
+[`guides/tun.md`](../guides/tun.md) 中的管理员修复脚本，或重启一次电脑。该脚本只删除
+Ostium 自己的路由，不影响其他 VPN。
+
 ## 安装器拒绝未知端口占用
 
 0.1.11 安装器只停止可证明属于 Ostium 的监听进程。遇到未知进程时会输出 PID、路径和
