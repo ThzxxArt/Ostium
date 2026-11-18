@@ -3,6 +3,14 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.4 — 2026-11-19
+
+### Fixed
+
+- Production `SECURE_REDIRECT_EXEMPT` patterns now omit the leading slash,
+  matching how Django strips the path before matching. `/healthz`, `/readyz`
+  and `/metrics` no longer return 301 on the loopback listener.
+
 ## 0.2.3 — 2026-11-19
 
 ### Fixed

@@ -20,7 +20,8 @@ if OSTIUM_BEHIND_PROXY:  # noqa: F405
 
 SECURE_SSL_REDIRECT = env.bool("OSTIUM_SSL_REDIRECT", default=OSTIUM_BEHIND_PROXY)  # noqa: F405
 # Local health probes speak plain HTTP even when the public site redirects.
-SECURE_REDIRECT_EXEMPT = [r"^/healthz$", r"^/readyz$", r"^/metrics$"]
+# Django matches these against request.path with the leading slash removed.
+SECURE_REDIRECT_EXEMPT = [r"^healthz$", r"^readyz$", r"^metrics$"]
 SECURE_HSTS_SECONDS = 31_536_000 if SECURE_SSL_REDIRECT else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = bool(SECURE_SSL_REDIRECT)
 SECURE_HSTS_PRELOAD = bool(SECURE_SSL_REDIRECT)

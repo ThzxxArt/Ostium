@@ -82,6 +82,15 @@ def test_installer_uses_release_assets_by_default() -> None:
     assert 'if [ "$FROM_SOURCE" -eq 1 ]; then\n    prepare_source\n  else\n    prepare_release_assets' in script
 
 
+def test_health_endpoints_match_django_redirect_exempt_paths() -> None:
+    prod = (ROOT / "src/ostium/config/settings/prod.py").read_text(encoding="utf-8")
+    # Django strips the leading slash before matching SECURE_REDIRECT_EXEMPT.
+    assert 'r"^healthz$"' in prod
+    assert 'r"^readyz$"' in prod
+    assert 'r"^metrics$"' in prod
+    assert 'r"^/healthz$"' not in prod
+
+
 def test_static_source_and_chart_bundle_are_production_safe() -> None:
     assert (ROOT / "src/ostium/static_src/app.css").is_file()
     assert not (ROOT / "src/ostium/static/src/app.css").exists()
