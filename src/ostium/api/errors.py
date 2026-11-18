@@ -1,45 +1,55 @@
-"""RFC 9457-style API errors."""
+"""RFC 9457 problem-details error responses."""
 
 from __future__ import annotations
 
-from typing import Any
+import uuid
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-
-class ApiError(Exception):
-    def __init__(
-        self,
-        status_code: int,
-        detail: str,
-        code: str = "api_error",
-        *,
-        headers: dict[str, str] | None = None,
-        extra: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
-        self.code = code
-        self.headers = headers or {}
-        self.extra = extra or {}
+from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.views import exception_handler as drf_exception_handler
 
 
-def problem_response(request: Request, error: ApiError) -> JSONResponse:
-    request_id = getattr(request.state, "request_id", None)
-    payload: dict[str, Any] = {
+def _request_id(request) -> str:
+    request_id = getattr(request, "request_id", None)
+    if not request_id:
+        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request.request_id = request_id
+    return request_id
+
+
+def exception_handler(exc, context):
+    response = drf_exception_handler(exc, context)
+    request = context.get("request")
+    if response is None:
+        return None
+    if isinstance(exc, ValidationError):
+        detail = exc.detail
+        code = "validation_error"
+        title = "Request validation failed"
+    elif isinstance(exc, APIException):
+        detail = exc.detail
+        code = getattr(exc, "default_code", "api_error")
+        title = str(exc.default_detail)
+    else:
+        detail = str(exc)
+        code = "error"
+        title = "Request failed"
+
+    message = detail if isinstance(detail, dict | list) else str(detail)
+
+    body = {
         "type": "about:blank",
-        "title": "Ostium API error",
-        "status": error.status_code,
-        "detail": error.detail,
-        "code": error.code,
-        "request_id": request_id,
+        "title": title,
+        "status": response.status_code,
+        "detail": message,
+        "code": code,
+        "request_id": _request_id(request) if request is not None else "",
     }
-    payload.update(error.extra)
-    return JSONResponse(
-        status_code=error.status_code,
-        content=payload,
-        media_type="application/problem+json",
-        headers=error.headers,
-    )
+    response.data = body
+    response.content_type = "application/problem+json"
+    response["Content-Type"] = "application/problem+json"
+    if request is not None:
+        response["X-Request-ID"] = body["request_id"]
+    return response
+
+
+__all__ = ["exception_handler"]

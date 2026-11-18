@@ -1,111 +1,119 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, "rewrite/**"]
   pull_request:
 
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.14"
+
 jobs:
-  python:
-    runs-on: ubuntu-24.04
+  lint:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
         with:
-          version: "0.11.14"
-          enable-cache: true
-      - run: uv sync
-      - run: uv run ruff check src tests scripts
-      - run: uv run ruff format --check src tests scripts
-      - run: uv run mypy src/ostium
-      - run: >-
-          uv run pytest -m "not integration" --cov=ostium --cov-branch
-          --cov-report=xml --cov-report=json:coverage.json --cov-report=term
-      - run: uv run python scripts/coverage_gate.py coverage.json
-      - uses: actions/upload-artifact@v7
-        with:
-          name: coverage
-          path: coverage.xml
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src
+      - run: uv run djlint src/ostium/templates --check
+      - run: uv run python manage.py check
+        env:
+          DJANGO_SETTINGS_MODULE: ostium.config.settings.test
 
-  frontend:
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: web
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: ostium
+          POSTGRES_USER: ostium
+          POSTGRES_PASSWORD: ostium
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ostium -d ostium"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: ostium.config.settings.test
+      OSTIUM_DB_URL: ${{ matrix.database == 'postgres' && 'postgres://ostium:ostium@127.0.0.1:5432/ostium' || 'sqlite:////tmp/ostium-ci.db' }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
         with:
-          node-version: "24.19.0"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci --no-audit --no-fund
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test:coverage
-      - run: npm run build
-      - run: node ../scripts/check-web-budget.mjs
-      - run: npm run format:check
-      - uses: actions/upload-artifact@v7
-        with:
-          name: web-coverage
-          path: web/coverage
-      - uses: actions/upload-artifact@v7
-        with:
-          name: web-dist
-          path: web/dist
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev --extra postgres
+      - run: uv run pytest -q --cov=src/ostium --cov-report=term
 
-  wheel:
-    runs-on: ubuntu-24.04
-    needs: [frontend]
+  contract:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@v10.3.3
+          go-version: "1.27"
+      - uses: astral-sh/setup-uv@v6
         with:
-          version: "0.11.14"
-      - uses: actions/download-artifact@v8
-        with:
-          name: web-dist
-          path: web/dist
-      - run: test -f web/dist/index.html
-      - run: uv build
-      - run: uv run python -m pip install --force-reinstall dist/*.whl
-      - run: .venv/bin/ostium version
-      - run: >-
-          .venv/bin/python -c "from pathlib import Path; import ostium;
-          p = Path(ostium.__file__).parent / 'web' / 'dist' / 'index.html';
-          assert p.is_file(), p; print(p)"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: wheel
-          path: dist/*.whl
-
-  integration:
-    runs-on: ubuntu-24.04
-    needs: [python]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          version: "0.11.14"
-      - uses: actions/setup-go@v7
-        with:
-          go-version: "1.25.5"
-          cache: false
-      - name: Fetch pinned sing-box for integration checks
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: mkdir -p .cache/bin .cache/mihomo && SINGBOX_VERSION=1.14.4 scripts/build-core.sh
+      - run: cp dist/sing-box .cache/bin/sing-box
+      - name: Download mihomo
         run: |
-          curl -sL -o /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz
-          tar -xzf /tmp/sing-box.tar.gz -C /tmp
-          install -m 0755 /tmp/sing-box-1.14.4-linux-amd64/sing-box /usr/local/bin/sing-box
-      - name: Build the Ostium custom core
-        run: ./scripts/build-core.sh --os linux amd64
-      - run: uv sync
-      - run: >-
-          OSTIUM_TEST_ENGINE=/usr/local/bin/sing-box
-          OSTIUM_TEST_CUSTOM_ENGINE=$PWD/dist/core/ostium-core-1.14.4-ostium.1-linux-amd64/sing-box
-          uv run pytest -m integration
+          curl -fsSL --retry 5 -o /tmp/mihomo.gz \
+            https://github.com/MetaCubeX/mihomo/releases/download/v1.19.34/mihomo-linux-amd64-compatible-v1.19.34.gz
+          gunzip -c /tmp/mihomo.gz > .cache/bin/mihomo
+          chmod +x .cache/bin/mihomo
+      - name: Download GeoIP database
+        run: |
+          curl -fsSL --retry 5 -o .cache/mihomo/geoip.metadb \
+            https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb
+      - run: uv run pytest tests/contract -q
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run pip-audit
+      - run: uv run bandit -q -r src
+      - name: Django deployment checks
+        env:
+          DJANGO_SETTINGS_MODULE: ostium.config.settings.prod
+          OSTIUM_SECRET_KEY: ci-deploy-check-secret-key-0123456789
+          OSTIUM_FIELD_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+          OSTIUM_ALLOWED_HOSTS: vpn.example.com
+          OSTIUM_PUBLIC_BASE_URL: https://vpn.example.com
+          OSTIUM_REQUIRE_TOTP: "true"
+          OSTIUM_SSL_REDIRECT: "true"
+          OSTIUM_DATA_DIR: /tmp/ostium-ci
+        run: uv run python manage.py check --deploy
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --extra dev
+      - run: uv run mkdocs build --strict

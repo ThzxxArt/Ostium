@@ -1,0 +1,25 @@
+{% extends "registration/auth_base.html" %}
+{% load static ostium_ui %}
+{% block title %}恢复码{% endblock %}
+{% block auth_content %}
+    <div class="page-eyebrow" style="margin-bottom:8px">{% icon "key" "w-3.5 h-3.5" %} Recovery</div>
+    <h2>保存恢复码</h2>
+    <p class="auth-sub">每枚恢复码只能使用一次。请离线保存；关闭此页面后将无法再次查看。</p>
+    <div class="panel panel--solid mt-4">
+        <div class="panel-body">
+            <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">
+                {% for code in codes %}
+                    <div class="copy-field"><code>{{ code }}</code><button class="copy-btn"
+                                                                           type="button"
+                                                                           data-copy="{{ code }}"
+                                                                           aria-label="复制恢复码">{% icon "copy" %}</button></div>
+                {% empty %}
+                    <div class="muted text-sm">没有可显示的恢复码。</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <a class="btn btn--primary btn--block mt-4"
+       href="{% url 'console:dashboard' %}">{% icon "check" %} 我已保存，进入控制台</a>
+    <script src="{% static 'js/console.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "registration/auth_base.html" %}
+{% load ostium_ui %}
+{% block title %}登录已锁定{% endblock %}
+{% block auth_content %}
+    <div class="auth-error" style="margin-bottom:18px">{% icon "lock" %}<div>登录尝试过多，当前来源已被临时锁定。</div></div>
+    <h2>请稍后再试</h2>
+    <p class="auth-sub">连续 5 次失败会触发 15 分钟冷却。锁定按用户名与 IP 组合计算，不会影响其他来源。</p>
+    <a class="btn btn--primary btn--block mt-4"
+       href="{% url 'accounts:login' %}">返回登录</a>
+    <p class="auth-foot">如果这是你自己的服务器，也可以直接运行 <code class="mono">ostium axes_reset</code> 清除锁定。</p>
+{% endblock %}

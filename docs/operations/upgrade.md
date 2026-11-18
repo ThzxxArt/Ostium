@@ -1,78 +1,47 @@
-# 升级与回滚
+# 升级
 
-## 一键升级（推荐）
+Ostium 不提供 0.1.x 迁移路径。0.2.0 是全新安装版本。
 
-```bash
-sudo bash install-online.sh upgrade
-```
+## 升级前
 
-行为：
+1. 创建加密备份。
+2. 记录当前版本与 `ostium status --json`。
+3. 确认新版本 changelog 与 sing-box tag。
+4. 在维护窗口执行（worker 重启会中断隧道 1–3 秒）。
 
-1. 读取现有安装和运行模式（默认用户或 `--run-as-root`）。
-2. 停止控制面；核心尽量保持运行。
-3. 替换 `/opt/ostium/venv` 和核心二进制。
-4. 保留数据库、`master.key`、配置、证书、用户和订阅。
-5. 启动并做健康检查；控制面健康检查失败会自动回滚旧 venv，核心启动失败会回滚旧核心。
-   0.1.11 起健康检查同时断言 `/healthz` 的版本和监听端口归属。
-6. 0.1.0 的 `host = "0.0.0.0"` 明文配置会收敛到 `127.0.0.1`；需要保留公网明文绑定时使用
-   `--allow-insecure-bind` 并配置防火墙。
-
-指定版本：
+## systemd
 
 ```bash
-sudo bash install-online.sh upgrade --version 0.1.12
+sudo bash install.sh upgrade --from-source
 ```
 
-## 手动升级应用
-
-1. 阅读 release notes，先备份。
-2. `ostium update --check`；手动下载签名版本。
-3. 服务端只停 `ostium.service`，核心继续跑，隧道不断。
-4. 把新 wheel 安装到 `/opt/ostium/venv`。
-5. 启动时自动执行迁移。
-6. 检查 `/readyz`。
-7. 健康检查失败时回滚 wheel 和数据库备份。
+或手动：
 
 ```bash
-sudo -u ostium ostium backup create --password '...'
-sudo systemctl stop ostium
-sudo /opt/ostium/venv/bin/pip install --upgrade ./ostium_ctl-0.1.12-py3-none-any.whl
-sudo systemctl start ostium
-curl -fsS http://127.0.0.1:8443/readyz
+sudo systemctl stop ostium-web ostium-worker ostium-jobs
+sudo -u ostium /opt/ostium/venv/bin/ostium backup create --password '...'
+# 替换 /opt/ostium/venv 与 sing-box
+sudo -u ostium /opt/ostium/venv/bin/ostium migrate
+sudo -u ostium /opt/ostium/venv/bin/ostium collectstatic --noinput
+sudo systemctl start ostium-web ostium-worker ostium-jobs
 ```
 
-Ostium 不做静默自动更新，UI 不提供下载/执行按钮；请使用 CLI `ostium update --check`
-查询版本，再按本页命令手动校验并安装。
-
-## 核心升级
-
-核心版本固定在 manifest 中。`ostium core install` 会校验 SHA256 并替换二进制；下一次
-apply/重启时 supervisor 才对当前配置执行 `sing-box check`，失败时回滚配置。升级前请备份
-旧二进制，并用 `ostium core version` 确认新二进制可执行。
+## Docker
 
 ```bash
-sudo ostium core install --binary ./sing-box
-# 或
-sudo ostium core install --url https://.../ostium-core-....tar.gz --sha256 <hash>
-sudo ostium core update
+cd deploy/docker
+docker compose pull   # 若使用镜像
+docker compose up -d --build
 ```
 
-## 数据库
+## 回滚
 
-数据库迁移在启动时由 Alembic `upgrade head` 执行；`alembic_version` 高于当前代码版本时
-Ostium 会拒绝启动。release notes 会标记不可回滚的迁移；升级前必须备份。
+- 代码/镜像回滚到上一版本。
+- 数据库：用升级前备份离线恢复。
+- 若新版本已写入不兼容 schema，只能恢复备份；本项目不提供降级迁移。
 
-回滚步骤：
+## 版本策略
 
-1. 停 `ostium.service`。
-2. 安装上一版 wheel。
-3. 如果迁移不兼容，从备份恢复数据库。
-4. 启动并检查 `/readyz`、登录、订阅和核心状态。
-
-## 客户端升级
-
-- Windows：重新运行新版 `setup.exe` 覆盖安装，数据和订阅保留。
-- macOS：重新运行 `install-macos.sh` 覆盖安装，数据与订阅保留。
-- Linux：重新执行一键脚本 `upgrade` 或 `install.sh --role client`。
-
-核心升级会短暂中断隧道；UI 升级不会。升级前建议先导出配置或备份数据。
+- `0.2.x`：补丁与安全修复。
+- `0.3.x`：新功能，可能带数据库迁移。
+- 不静默自动更新；升级必须由管理员执行。

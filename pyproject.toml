@@ -1,219 +1,204 @@
-[build-system]
-requires = ["hatchling==1.27.0", "hatch-vcs==0.5.0"]
-build-backend = "hatchling.build"
-
 [project]
-name = "ostium-ctl"
-dynamic = ["version"]
-description = "Ostium — a dual-role personal VPN and universal proxy console"
+name = "ostium-server"
+version = "0.2.0"
+description = "Ostium Server — a single-host private proxy server for Linux"
 readme = "README.md"
-requires-python = ">=3.13"
-license = "GPL-3.0-or-later"
-license-files = ["LICENSE", "NOTICE"]
-authors = [{ name = "Ostium Contributors" }]
-keywords = ["vpn", "proxy", "sing-box", "reality", "hysteria2", "fastapi"]
+requires-python = ">=3.14,<3.15"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Ostium contributors" }]
+keywords = ["proxy", "sing-box", "vless", "hysteria2", "trojan", "shadowsocks", "subscription"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Web Environment",
-  "Framework :: FastAPI",
-  "Intended Audience :: End Users/Desktop",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Framework :: Django :: 6.1",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
   "Operating System :: POSIX :: Linux",
-  "Operating System :: MacOS",
-  "Operating System :: Microsoft :: Windows",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Internet :: Proxy Servers",
-  "Topic :: System :: Networking",
 ]
 dependencies = [
-  "fastapi==0.162.5",
-  "uvicorn[standard]==0.54.0",
-  "pydantic==2.14.3",
-  "pydantic-settings==2.16.2",
-  "email-validator==2.3.0",
-  "SQLAlchemy==2.1.8",
-  "greenlet==3.3.0",
-  "alembic==1.20.1",
-  "aiosqlite==0.22.1",
-  "typer==0.29.1",
-  "rich==15.0.0",
-  "structlog==26.1.0",
-  "cryptography==50.0.2",
   "argon2-cffi==25.1.0",
-  "pyotp==2.10.0",
-  "segno==1.6.6",
+  "cryptography==50.0.2",
+  "django==6.1.3",
+  "django-auditlog==3.4.2",
+  "django-axes==9.0.0",
+  "django-constance==4.5.0",
+  "django-environ==0.14.0",
+  "django-health-check==4.11.4",
+  "django-htmx==1.29.0",
+  "django-otp==1.7.5",
+  "django-q2==1.11.1",
+  "django-ratelimit==4.1.0",
+  "django-unfold==0.110.1",
+  "djangorestframework==3.18.3",
+  "djangorestframework-api-key==3.1.0",
+  "drf-spectacular==0.30.0",
+  "grpcio==1.85.3",
+  "gunicorn==27.0.1",
   "httpx==0.28.1",
-  "psutil==7.2.2",
-  "orjson==3.13.0",
-  "msgspec==0.22.0",
-  "platformdirs==4.14.5",
-  "tenacity==9.2.1",
-  "filelock==4.2.10",
-  "packaging==26.3",
-  "tomli-w==1.2.0",
-  "acme==5.10.0",
-  "josepy==2.3.0",
-  "grpcio==1.85.1",
+  "prometheus-client==0.24.1",
   "protobuf==7.36.2",
+  "psutil==7.2.2",
+  "pydantic==2.14.3",
   "PyYAML==6.0.3",
-  "python-multipart==0.0.31",
-  "aiofiles==25.1.0",
-  "pywin32==312; sys_platform == 'win32'",
+  "segno==1.6.6",
+  "structlog==26.1.0",
+  "tzdata",
+  "whitenoise==6.12.0",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
+postgres = ["psycopg[binary]==3.3.9"]
 dev = [
-  "pytest==9.2.0",
-  "pytest-asyncio==1.4.1.post1",
-  "pytest-cov==7.0.0",
-  "hypothesis==6.170.15",
-  "respx==0.22.0",
-  "ruff==0.17.4",
+  "axe-playwright-python==0.1.8",
+  "bandit==1.9.4",
+  "djlint==1.54.0",
+  "django-stubs==6.1.2",
+  "factory-boy==3.3.3",
+  "freezegun==1.5.5",
+  "mkdocs-material==9.8.1",
   "mypy==2.4.1",
-  "pip-audit==2.9.0",
-  "grpcio-tools==1.85.1",
-  "pyinstaller==6.22.3",
-  "types-PyYAML==6.0.12.20250915",
-  "pytest-timeout==2.5.0",
+  "pip-audit==2.10.1",
+  "playwright==1.65.2",
+  "pytest==9.2.0",
+  "pytest-benchmark==5.2.3",
+  "pytest-cov==7.1.0",
+  "pytest-django==4.14.0",
+  "pytest-playwright==0.10.0",
+  "respx==0.23.1",
+  "ruff==0.17.5",
 ]
 
 [project.scripts]
-ostium = "ostium.cli.main:app"
-ostium-service = "ostium.system.windows_service:main"
+ostium = "ostium.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/ThzxxArt/Ostium"
-Documentation = "https://github.com/ThzxxArt/Ostium/tree/main/docs"
-Repository = "https://github.com/ThzxxArt/Ostium"
-Issues = "https://github.com/ThzxxArt/Ostium/issues"
+Homepage = "https://github.com/ostium-dev/ostium"
+Documentation = "https://github.com/ostium-dev/ostium/tree/main/docs"
+Issues = "https://github.com/ostium-dev/ostium/issues"
 
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.version.raw-options]
-fallback_version = "0.1.12"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "src/ostium/_version.py"
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ostium"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"web/dist" = "ostium/web/dist"
-"alembic" = "ostium/db/alembic"
-
 [tool.hatch.build.targets.sdist]
-include = [
-  "/src",
-  "/tests",
-  "/docs",
-  "/scripts",
-  "/deploy",
-  "/protos",
-  "/alembic",
-  "/alembic.ini",
-  "/web/src",
-  "/web/tests",
-  "/web/public",
-  "/web/index.html",
-  "/web/pwa.ts",
-  "/web/package.json",
-  "/web/package-lock.json",
-  "/web/vite.config.ts",
-  "/web/tsconfig.json",
-  "/web/tsconfig.node.json",
-  "/web/eslint.config.js",
-  "/web/playwright.config.ts",
-  "/pyproject.toml",
-  "/README.md",
-  "/README.en.md",
-  "/assets",
-  "/VERSION",
-  "/LICENSE",
-  "/NOTICE",
-  "/CHANGELOG.md",
-  "/versions/PLAN.md",
-  "/versions/AUDIT_REPORT.md",
-]
-
-[tool.hatch.build.targets.sdist.force-include]
-"web/dist" = "web/dist"
-
-[tool.uv]
-default-groups = ["dev"]
+include = ["src/ostium", "deploy", "scripts", "docs", "manage.py", "README.md", "LICENSE", "NOTICE", "VERSION"]
 
 [tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "ostium.config.settings.test"
+pythonpath = ["src"]
 testpaths = ["tests"]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
-filterwarnings = ["ignore::DeprecationWarning"]
-addopts = "--strict-markers --strict-config"
-timeout = 180
+addopts = "-ra --strict-markers --strict-config"
 markers = [
-  "integration: requires a real sing-box binary",
+  "contract: requires real sing-box / mihomo binaries",
+  "e2e: requires a running server and sing-box client",
+  "ui: requires a browser via Playwright",
   "slow: long-running test",
+]
+filterwarnings = [
+  "error::DeprecationWarning:ostium.*",
 ]
 
 [tool.coverage.run]
-source = ["ostium"]
+source = ["src/ostium"]
 branch = true
-# SQLAlchemy's async bridge uses greenlets; without this coverage loses line
-# events after awaited database calls and under-reports real test coverage.
-concurrency = ["greenlet", "thread"]
 omit = [
-  "src/ostium/_version.py",
-  "src/ostium/engine/singbox/v2ray_stats_pb2.py",
-  "src/ostium/engine/singbox/v2ray_stats_pb2_grpc.py",
+  "src/ostium/config/*",
+  "src/ostium/*/migrations/*",
+  "src/ostium/engine/proto/*",
+  "src/ostium/engine/v2ray_stats_pb2.py",
+  "src/ostium/engine/v2ray_stats_pb2_grpc.py",
 ]
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+show_missing = true
+skip_covered = true
+fail_under = 90
 
 [tool.ruff]
-target-version = "py313"
-line-length = 100
+target-version = "py314"
+line-length = 120
 src = ["src", "tests"]
-exclude = ["src/ostium/_version.py", "src/ostium/engine/singbox/v2ray_stats_pb2*.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "PTH", "RUF", "S"]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "DJ", "S", "SIM", "RUF"]
+# Django's declarative Meta/forms attributes and fixed subprocess argv trigger
+# false positives in these rules; the codebase does not accept user commands.
 ignore = [
-  "S101",   # asserts in tests
-  "S104",   # binding all interfaces is explicit and validated
-  "B008",   # FastAPI Depends() in defaults is the documented pattern
-  "N802",   # BaseHTTPRequestHandler do_GET/do_POST naming
-  "S603",   # fixed argv lists, never shell=True
-  "S607",   # commands are resolved from PATH on purpose
-  "S110",   # best-effort cleanup must not mask the original error
-  "SIM102", # separate guards are more readable in validation code
-  "SIM105", # explicit try/except/pass is clearer in cleanup paths
-  "RUF006", # fire-and-forget event publish tasks
-  "RUF001", # Chinese punctuation in strings
+  "S101",
+  "RUF001",
   "RUF002",
   "RUF003",
-  "N818",   # domain exceptions can end with Error
+  "B008",
+  "RUF012",
+  "SIM105",
+  "S603",
+  "S606",
+  "S104",
+  "S108",
+  "DJ012",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "DTZ", "T20"]
-"src/ostium/system/proxy_windows.py" = ["S", "PTH"]
-"src/ostium/cli/**" = ["T20"]
-"scripts/**" = ["T20", "S"]
+"tests/**" = ["S105", "S106", "S108", "S311", "B017"]
+"src/ostium/*/migrations/*" = ["E501"]
+"src/ostium/config/settings/*" = ["S105", "S104"]
+"src/ostium/templatetags/ostium_ui.py" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.mypy]
-python_version = "3.13"
-strict = true
-files = ["src/ostium"]
-ignore_missing_imports = false
-warn_unused_ignores = true
-disable_error_code = ["import-untyped"]
-plugins = []
-exclude = "src/ostium/engine/singbox/v2ray_stats_pb2"
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main"]
+strict = false
+check_untyped_defs = true
+warn_unreachable = true
+warn_return_any = true
+ignore_missing_imports = true
+disable_error_code = [
+  "no-any-return",
+  "assignment",
+  "attr-defined",
+  "arg-type",
+  "union-attr",
+  "var-annotated",
+  "index",
+  "misc",
+  "unreachable",
+]
+exclude = ["src/ostium/.*/migrations/", "src/ostium/engine/.*_pb2.*", "tests/"]
+
+[tool.django-stubs]
+django_settings_module = "ostium.config.settings.test"
 
 [[tool.mypy.overrides]]
 module = [
-  "ostium.engine.singbox.v2ray_stats",
-  "ostium.system.proxy",
+  "grpc.*",
+  "django_q.*",
+  "django_prometheus.*",
+  "unfold.*",
+  "auditlog.*",
+  "axes.*",
+  "django_otp.*",
+  "otp_totp.*",
+  "rest_framework.*",
+  "rest_framework_api_key.*",
+  "drf_spectacular.*",
+  "constance.*",
+  "health_check.*",
+  "django_htmx.*",
+  "segno.*",
+  "yaml.*",
+  "psutil.*",
 ]
-ignore_errors = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["ostium.operations.console_views", "ostium.operations.management.*", "ostium.api.views"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false

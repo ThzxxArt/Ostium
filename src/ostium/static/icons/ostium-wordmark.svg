@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 64" fill="none" role="img" aria-label="Ostium">
+  <defs>
+    <linearGradient id="g" x1="12" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5EEAD4"/>
+      <stop offset="1" stop-color="#60A5FA"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#060911"/>
+  <circle cx="32" cy="32" r="22" stroke="url(#g)" stroke-width="1.8" opacity=".5"/>
+  <path d="M21 43V25.5C21 23 23.5 20.5 26 20.5H40" stroke="url(#g)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M44 22V39.5C44 42 41.5 44.5 39 44.5H25" stroke="url(#g)" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+  <circle cx="32" cy="32" r="5" fill="#0B1220" stroke="url(#g)" stroke-width="1.6"/>
+  <circle cx="32" cy="32" r="1.8" fill="#5EEAD4"/>
+  <text x="82" y="41" fill="#EDF3FF" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="600" letter-spacing="-0.5">Ostium</text>
+</svg>

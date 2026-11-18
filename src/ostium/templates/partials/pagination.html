@@ -1,0 +1,20 @@
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        <span>{{ page.paginator.count }} 条 · 第 {{ page.number }} / {{ page.paginator.num_pages }} 页</span>
+        <div class="pagination-links">
+            {% if page.has_previous %}
+                <a href="?page={{ page.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if action_filter %}&action={{ action_filter|urlencode }}{% endif %}">上一页</a>
+            {% endif %}
+            {% for number in page.paginator.page_range %}
+                {% if number == page.number %}
+                    <span class="is-current">{{ number }}</span>
+                {% elif number >= page.number|add:"-2" and number <= page.number|add:"2" %}
+                    <a href="?page={{ number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if action_filter %}&action={{ action_filter|urlencode }}{% endif %}">{{ number }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page.has_next %}
+                <a href="?page={{ page.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if action_filter %}&action={{ action_filter|urlencode }}{% endif %}">下一页</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}

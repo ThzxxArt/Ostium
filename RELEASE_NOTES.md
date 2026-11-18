@@ -1,52 +1,35 @@
-# Ostium v0.1.12
+# Ostium Server 0.2.0 — Release Notes
 
-**Status: published on 2026-11-18.** This is a client reliability patch for the
-Windows network state left behind by TUN and system-proxy sessions.
+Ostium 0.2.0 is a ground-up server-only rewrite.
 
 ## Highlights
 
-- **No more stale TUN blackhole.** Windows clients now stop sing-box with
-  `CTRL_BREAK_EVENT` instead of `TerminateProcess`, and the privileged core
-  removes stale `Ostium`/`ostium0`/`sing-box` routes and adapters on startup and
-  after a TUN session. The "connect once, then TCP to the server times out until
-  reboot/uninstall" failure is fixed.
-- **No Windows WFP risk from strict routing.** Client TUN configs default to
-  `strict_route: false`. sing-box implements strict routing on Windows with WFP
-  filters; a hard kill can skip their cleanup and blackhole outbound TCP. Ostium
-  has no firewall-level kill switch, so the extra risk is not justified.
-- **The system proxy no longer lies.** Windows status checks the live WinINET
-  registry instead of the state file. If Clash or another client rewrites
-  `ProxyEnable`, `ProxyServer` or `AutoConfigURL`, Ostium reports `stale`,
-  re-applies on connect, and the watchdog takes the proxy back while connected.
-- **Changing the mixed port moves the proxy.** An enabled system proxy is moved
-  to the new `mixed_port` in the same request instead of leaving the browser on
-  a closed port.
-- **DoH is a real URL.** The client remote resolver now sends `path` and
-  `tls.server_name`, not just a bare DoH server IP.
+- **One host, one admin.** Django + SQLite/PostgreSQL, no external control plane.
+- **Four protocols.** VLESS Reality, Hysteria2, Trojan, Shadowsocks 2022.
+- **Standard subscriptions.** Import into v2rayN, Clash Verge Rev, sing-box and others.
+- **Real data plane.** Pinned sing-box with `with_v2ray_api`; configuration validated
+  by the binary before every apply, with rollback.
+- **Aurora Console.** Dark-first, responsive, keyboard accessible, charts and quota rings.
+- **Operational maturity.** TOTP, lockout, scoped API keys, audit, encrypted backups,
+  doctor, diagnostics, Prometheus metrics, certbot sync.
 
-## Upgrade
+## Breaking changes
 
-- `0.1.11 -> 0.1.12` keeps the database, users, credentials, subscription
-  tokens, certificates, backups and `master.key`.
-- Read `docs/operations/upgrade-0.1.11-to-0.1.12.md`.
-- Windows users who already have a stale TUN route should update and restart the
-  `OstiumCore` service; the new startup cleanup removes it. A one-time reboot is
-  also sufficient. The repair script is in `docs/guides/tun.md`.
+- 0.1.x databases, configuration, certificates, tokens, APIs and subscription formats
+  are **not** read or migrated.
+- The client, TUN, system proxy, SPA and custom core API are removed.
+- Python 3.14 and Django 6.1 are required.
 
-## Verified in the implementation workspace
+## Install
 
-- Backend non-integration suite: 836 passed.
-- Targeted proxy/fail-open/settings/config tests: 67 passed with the pinned
-  `1.14.4` core.
-- Generated client and server configs pass `sing-box check`.
-- `scripts/release-preflight.sh --version 0.1.12 --skip-git` passes.
+```bash
+sudo bash install.sh --domain vpn.example.com --with-caddy
+```
 
-## Not verified
+or
 
-- Windows 11/10 runtime installer, TUN, Wintun/WFP and Authenticode matrix.
-- macOS 14 launchd/utun/DMG/notarization.
-- Debian/RHEL, Nginx, Docker runtime, ACME, real TUN, 72-hour soak and
-  performance.
-- The release workflow and platform artifacts are produced from this status
-  commit; their run IDs and asset hashes are recorded in
-  `docs/release-status.md`.
+```bash
+docker compose -f deploy/docker/compose.yml up -d --build
+```
+
+Read `docs/installation.md` and the security checklist before exposing the console.

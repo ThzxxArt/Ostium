@@ -1,65 +1,49 @@
 # Contributing
 
-## Development
+## Ground rules
+
+- Server-only: no client, TUN, SPA or Node toolchain.
+- No 0.1.x compatibility, migration or deprecated shims.
+- Do not add a custom core API; the worker supervises sing-box.
+- Every configuration change must pass the real `sing-box check`.
+- UI changes must keep WCAG 2.2 AA and the responsive breakpoints.
+
+## Setup
 
 ```bash
-uv sync
-uv run ostium init --role server --dev --no-input --password 'verysecret123'
-uv run ostium core-run &
-uv run ostium serve --reload
+uv sync --extra dev
+uv run ostium migrate
+uv run ostium init --username admin --password 'Change-This-Password-2026'
+uv run ostium web
 ```
 
-Frontend:
+Build the data-plane binary with the required tags:
 
 ```bash
-cd web
-npm ci
-npm run dev        # proxies /api to 127.0.0.1:8443
-npm run typecheck
-npm run test
-npm run build
+bash scripts/build-core.sh
+cp dist/sing-box .cache/bin/sing-box
 ```
 
-Backend quality gates:
+## Checks
 
 ```bash
-uv run ruff check src tests scripts
-uv run ruff format --check src tests scripts
-uv run mypy src/ostium
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run mypy src
 uv run pytest
+uv run pytest tests/contract
+uv run mkdocs build --strict
+uv run python manage.py check --deploy
 ```
-
-Integration tests use a real sing-box binary at `/tmp/opencode/sing-box` or
-`OSTIUM_TEST_ENGINE`. The official build covers the proxy protocols; per-user
-V2Ray stats require the Ostium custom build from `scripts/build-core.sh`.
 
 ## Pull requests
 
-- Keep the locked v0.1.1 scope. Do not silently move features or broaden the
-  protocol set.
-- Add tests for behavior changes; golden config tests must still pass
-  `sing-box check`.
-- Do not commit secrets, databases, certificates, core binaries or `web/dist`.
-- Security-sensitive changes (core API, auth, encryption, proxy config) need a
-  reviewer and a note in `SECURITY.md`/ADR if the threat model changes.
-- Run the frontend and backend gates locally; CI is mandatory.
+- Keep changes focused and explain the security impact.
+- Add tests for behavior changes.
+- Update docs and `CHANGELOG.md`.
+- Do not include secrets, generated databases, certificates or `.env` files.
+- UI screenshots are welcome; no Node-based tooling is accepted.
 
-## Release policy
+## Commit style
 
-- A release tag is created once, on the final reviewed commit. All assets are
-  built from that tag; `SHA256SUMS` and attestations cover every published file.
-- Published release assets are immutable. Do not replace, hotfix or re-upload a
-  file after publication. Any fix ships in the next patch release.
-- The GitHub release workflow uses `overwrite_files: false` and deletes only an
-  unpublished draft before a retry. A failure before PyPI is retried from the
-  same tag; a failure after PyPI re-runs with `skip-existing`, and a genuinely
-  broken published release is yanked and replaced by a patch version. Published
-  assets are never edited or re-uploaded (D-111).
-- Unsigned Windows/macOS artifacts must be labelled unsigned in the release
-  notes. Never claim Authenticode/notarization without `signtool`/`spctl`
-  evidence.
-
-## License
-
-Contributions are licensed under GPL-3.0-or-later. By submitting a PR you agree
-that your contribution may be distributed under that license.
+`feat:`, `fix:`, `docs:`, `test:`, `build:`, `ci:`, `refactor:`, `security:`.

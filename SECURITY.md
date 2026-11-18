@@ -1,40 +1,39 @@
-# Security policy
-
-Ostium is a personal VPN/proxy control plane. Security reports are taken
-seriously, especially authentication bypass, core API escapes, CSRF/DNS
-rebinding, subscription token leakage and supply-chain issues.
-
-## Reporting
-
-Please use GitHub private security advisories:
-<https://github.com/ThzxxArt/Ostium/security/advisories/new>
-
-Do not open a public issue for an exploitable problem. Include:
-
-- Ostium version and platform
-- Whether the control plane, core or a protocol is affected
-- Reproduction steps and impact
-- Any suggested fix
-
-We aim to acknowledge within 72 hours and to publish a coordinated advisory
-after a fix is available.
+# Security Policy
 
 ## Supported versions
 
-Only the latest v0.1.x release receives security fixes during the v0.1 series.
-**v0.1.12 is the current public release** (published 2026-11-18). The historical v0.1.1 default-bind
-issue is documented in
-[the advisory](docs/security/advisory-2026-11-default-bind.md).
-Operators still on v0.1.0 should upgrade as soon as possible; until then, apply
-the mitigation in `versions/V0.1.1_PLAN.md` §2: bind the UI to `127.0.0.1`, do not
-expose 8443, and enable TOTP plus a valid certificate before public access.
+| Version | Supported |
+|---|---|
+| 0.2.x | yes |
+| 0.1.x | no |
 
-## Scope notes
+## Reporting a vulnerability
 
-- Server admin UI defaults to `127.0.0.1`; non-loopback plaintext requires an
-  explicit `allow_insecure_bind` opt-in. Reports that rely on a deliberately
-  public plaintext bind are accepted but may be lower priority.
-- The core API is loopback-only; reports requiring local root or physical access
-  are lower priority unless they cross a privilege boundary.
-- TUN strict-route is not a kill switch; this is documented behavior.
-- Reality/uTLS/Hysteria2 are not claimed to be undetectable.
+Do not open a public issue. Email the maintainers with:
+
+- affected version and commit;
+- reproduction steps;
+- impact and any suggested fix;
+- whether you want public credit.
+
+We aim to acknowledge within 72 hours and provide a remediation plan within 7 days.
+
+## Deployment expectations
+
+Ostium is a private proxy server. Operators are responsible for:
+
+- keeping the host, Python environment and sing-box patched;
+- using TLS for the management plane;
+- enabling TOTP before public exposure;
+- restricting firewall ports;
+- protecting `OSTIUM_SECRET_KEY`, `OSTIUM_FIELD_KEY` and backups;
+- reviewing audit events and alerts.
+
+## Scope
+
+In scope: authentication bypass, subscription token leakage, command injection,
+path traversal, SSRF in webhooks, unsafe deserialization, privilege escalation,
+configuration injection into sing-box.
+
+Out of scope: DDoS, physical access, compromised host, third-party clients,
+misconfiguration explicitly warned about in the docs.

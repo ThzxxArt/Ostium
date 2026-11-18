@@ -1,0 +1,32 @@
+name: ui
+
+on:
+  push:
+    branches: [main, "rewrite/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: ostium.config.settings.test
+      OSTIUM_UI: "1"
+      DJANGO_ALLOW_ASYNC_UNSAFE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.14"
+          python-version: "3.14"
+      - run: uv sync --extra dev
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest tests/ui -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: tests/ui/screenshots
+          if-no-files-found: ignore

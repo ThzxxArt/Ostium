@@ -5,7 +5,6 @@ __pycache__/
 .eggs/
 build/
 dist/
-!web/dist/
 .venv/
 venv/
 .mypy_cache/
@@ -18,41 +17,29 @@ coverage.xml
 coverage.json
 .hypothesis/
 site/
-src/ostium/_version.py
 
-# Node
-node_modules/
-web/dist/*
-!web/dist/.gitkeep
-web/.vite/
-web/coverage/
-web/test-results/
-web/playwright-report/
-web/blob-report/
-web/.eslintcache
-
-# Ostium runtime data / secrets
+# Runtime data / secrets
 .env
 .env.*
 !.env.example
 *.db
 *.db-wal
 *.db-shm
-master.key
-core.token
-clash.secret
+*.sqlite3
 runtime/
 data/
+.cache/
+var/
+tests/ui/screenshots/
 *.pem
 *.key
-!web/public/icons/*.svg
-
-# Editor / OS
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
-*.swp
+!deploy/**/*.key
+ostium.env
 
 # Local notes
 HANDOFF.md
+node_modules/
+package.json
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

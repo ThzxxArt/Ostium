@@ -1,0 +1,33 @@
+{% extends "registration/auth_base.html" %}
+{% load ostium_ui %}
+{% block title %}启用两步验证{% endblock %}
+{% block auth_content %}
+    <div class="page-eyebrow" style="margin-bottom:8px">{% icon "shield" "w-3.5 h-3.5" %} Protect the console</div>
+    <h2>启用两步验证</h2>
+    <p class="auth-sub">扫描二维码，或手动输入密钥，然后输入认证器生成的 6 位验证码。</p>
+    <div class="flex gap-4 flex-wrap mt-4">
+        <div class="qr-card">
+            <img src="{{ qr }}" alt="TOTP 二维码" width="180" height="180">
+        </div>
+        <div class="stack" style="gap:10px;min-width:200px">
+            <div>
+                <div class="meta-label">手动密钥</div>
+                <div class="copy-field mt-1"><code>{{ secret }}</code></div>
+            </div>
+            <div class="meta-label">推荐应用</div>
+            <div class="muted text-xs">1Password、Bitwarden、Aegis、Google Authenticator 或任何 TOTP 客户端。</div>
+            {% if already_confirmed %}
+                <div class="alert-banner alert-banner--warning">{% icon "alert" %}<div>已有已验证设备。提交新验证码会重新绑定当前密钥。</div></div>
+            {% endif %}
+        </div>
+    </div>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        <div class="field">
+            <label for="{{ form.token.id_for_label }}">验证码</label>
+            {{ form.token }}
+            {{ form.token.errors }}
+        </div>
+        <button class="btn btn--primary btn--block" type="submit">{% icon "check" %} 确认并启用</button>
+    </form>
+{% endblock %}

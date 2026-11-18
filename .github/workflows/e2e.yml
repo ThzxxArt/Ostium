@@ -1,55 +1,49 @@
-name: E2E
+name: e2e
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
 
 jobs:
-  playwright:
-    runs-on: ubuntu-24.04
+  compose:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          version: "0.11.14"
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24.19.0"
-      - run: uv sync
-      - run: npm ci --no-audit --no-fund
-        working-directory: web
-      - run: npm run build
-        working-directory: web
-      - run: npx playwright install --with-deps chromium
-        working-directory: web
-      - name: Start Ostium
+      - uses: actions/checkout@v4
+      - name: Prepare environment
         run: |
-          export OSTIUM_ROLE=server
-          export OSTIUM_DATA_DIR=/tmp/ostium-e2e
-          export OSTIUM_PORT=18443
-          export OSTIUM_DEV=1
-          .venv/bin/ostium init --role server --no-input --password 'verysecret123' --domain example.com
-          # Run the venv entry point directly so no uv process holds the cache lock.
-          nohup .venv/bin/ostium serve > /tmp/ostium-e2e.log 2>&1 &
-          echo $! > /tmp/ostium-e2e.pid
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18443/healthz && break; sleep 1; done
-      - run: npx playwright test
-        working-directory: web
-        env:
-          OSTIUM_BASE_URL: http://127.0.0.1:18443
-          OSTIUM_ADMIN_PASSWORD: verysecret123
-      - name: Stop Ostium
+          cp deploy/docker/ostium.env.example deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_SECRET_KEY=.*|OSTIUM_SECRET_KEY=$(openssl rand -hex 32)|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_FIELD_KEY=.*|OSTIUM_FIELD_KEY=$(openssl rand -base64 32 | tr -d '\\n')|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_ALLOWED_HOSTS=.*|OSTIUM_ALLOWED_HOSTS=localhost,127.0.0.1|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_PUBLIC_BASE_URL=.*|OSTIUM_PUBLIC_BASE_URL=http://127.0.0.1:8000|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_BEHIND_PROXY=.*|OSTIUM_BEHIND_PROXY=false|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_SECURE_COOKIES=.*|OSTIUM_SECURE_COOKIES=false|" deploy/docker/ostium.env
+          sed -i "s|^OSTIUM_REQUIRE_TOTP=.*|OSTIUM_REQUIRE_TOTP=false|" deploy/docker/ostium.env
+      - name: Build and start
+        run: docker compose -f deploy/docker/compose.yml up -d --build web worker
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose -f deploy/docker/compose.yml exec -T web \
+              python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f deploy/docker/compose.yml logs --no-color
+          exit 1
+      - name: Create user and fetch subscriptions
+        run: |
+          docker compose -f deploy/docker/compose.yml exec -T web ostium init --username admin --password "Ostium-E2E-Password-2026"
+          docker compose -f deploy/docker/compose.yml exec -T web ostium user add e2e --quota 1G
+          docker compose -f deploy/docker/compose.yml exec -T web ostium status
+      - name: Logs
         if: always()
-        run: |
-          if [ -f /tmp/ostium-e2e.pid ]; then
-            kill "$(cat /tmp/ostium-e2e.pid)" 2>/dev/null || true
-          fi
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: playwright-report
-          path: web/playwright-report
+        run: docker compose -f deploy/docker/compose.yml logs --no-color
+      - name: Stop
+        if: always()
+        run: docker compose -f deploy/docker/compose.yml down -v

@@ -3,119 +3,82 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+import tempfile
+
+os.environ["OSTIUM_DATA_DIR"] = tempfile.mkdtemp(prefix="ostium-tests-")
+os.environ.setdefault("OSTIUM_SECRET_KEY", "test-secret-key-not-for-production")
+os.environ.setdefault(
+    "OSTIUM_FIELD_KEY",
+    "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+)
 
 import pytest
-from fastapi.testclient import TestClient
+from django.contrib.auth import get_user_model
 
-from ostium.api.app import build_app
-from ostium.config import Role, Settings
-from ostium.services import auth as auth_service
-
-
-def _engine_path() -> Path | None:
-    candidates = [
-        Path(os.environ.get("OSTIUM_TEST_ENGINE", "/tmp/opencode/sing-box")),
-        Path("/usr/local/bin/sing-box"),
-        Path("/usr/bin/sing-box"),
-    ]
-    return next((path for path in candidates if path.is_file()), None)
+from ostium.certificates.services import generate_self_signed
+from ostium.proxy.models import Inbound
+from ostium.proxy.services import create_proxy_user, initialize_inbounds
 
 
 @pytest.fixture(autouse=True)
-def _reset_auth_state() -> None:
-    """Keep process-global login throttling and activity clocks test-isolated."""
+def _clear_cache():
+    from django.core.cache import cache
 
-    auth_service.LIMITER.failures.clear()
-    auth_service.ACTIVITY.clear()
-
-
-@pytest.fixture
-def settings(tmp_path: Path) -> Settings:
-    data = tmp_path / "data"
-    config = tmp_path / "config"
-    state = tmp_path / "state"
-    engine = _engine_path()
-    value = Settings(
-        role=Role.SERVER,
-        host="127.0.0.1",
-        port=18443,
-        data_dir=data,
-        config_dir=config,
-        state_dir=state,
-        core_token_file=data / "runtime" / "core.token",
-        engine_path=str(engine) if engine else str(data / "core" / "sing-box"),
-        proxy_ports=[443, 8388, 14443],
-        dev=True,
-        log_level="warning",
-    )
-    value.paths.ensure()
-    value.save()
-    return value
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture
-def api_client(settings: Settings) -> TestClient:
-    app = build_app(settings)
-    with TestClient(app) as client:
-        yield client
+def admin_user(db):
+    User = get_user_model()
+    user = User.objects.create_superuser("admin", "admin@example.com", "Ostium-Test-Password-2026")
+    profile = user.ostium_profile
+    profile.must_change_password = False
+    profile.save(update_fields=["must_change_password"])
+    return user
 
 
 @pytest.fixture
-def client_settings(tmp_path: Path) -> Settings:
-    data = tmp_path / "client-data"
-    value = Settings(
-        role=Role.CLIENT,
-        host="127.0.0.1",
-        port=18444,
-        data_dir=data,
-        config_dir=tmp_path / "client-config",
-        state_dir=tmp_path / "client-state",
-        core_token_file=data / "runtime" / "core.token",
-        engine_path="/tmp/opencode/sing-box",
-        dev=True,
-        log_level="warning",
-    )
-    value.paths.ensure()
-    value.save()
-    return value
+def admin_client(client, admin_user):
+    client.force_login(admin_user)
+    return client
 
 
 @pytest.fixture
-def client_api(client_settings: Settings) -> TestClient:
-    app = build_app(client_settings)
-    with TestClient(app) as client:
-        yield client
-
-
-def csrf(client: TestClient) -> str:
-    response = client.get("/api/v1/auth/csrf")
-    assert response.status_code == 200
-    return response.json()["csrf_token"]
-
-
-def setup_admin(
-    client: TestClient,
-    username: str = "admin",
-    password: str = "verysecret123",
-    domain: str = "example.com",
-    role: str = "server",
-) -> str:
-    token = csrf(client)
-    response = client.post(
-        "/api/v1/setup",
-        json={
-            "role": role,
-            "username": username,
-            "password": password,
-            "domain": domain,
-        },
-        headers={"X-CSRF-Token": token},
-    )
-    assert response.status_code == 200, response.text
-    return token
+def proxy_user(db):
+    user, _token = create_proxy_user("alice", quota_bytes=100 * 1024**3, quota_cycle="monthly")
+    return user
 
 
 @pytest.fixture
-def session_token(api_client: TestClient) -> str:
-    return setup_admin(api_client)
+def inbounds(db):
+    return initialize_inbounds(enable=("vless", "shadowsocks"))
+
+
+@pytest.fixture
+def vless_inbound(inbounds):
+    return next(item for item in inbounds if item.kind == Inbound.Kind.VLESS)
+
+
+@pytest.fixture
+def certificate(db):
+    return generate_self_signed("vpn.example.com")
+
+
+@pytest.fixture
+def api_key(db, admin_user):
+    from ostium.accounts.models import ApiKey
+
+    key, plaintext = ApiKey.objects.create_key(name="tests", scope=ApiKey.Scope.WRITE, created_by=admin_user)
+    return key, plaintext
+
+
+@pytest.fixture
+def api_client(api_key):
+    from rest_framework.test import APIClient
+
+    _key, plaintext = api_key
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Api-Key {plaintext}")
+    return client

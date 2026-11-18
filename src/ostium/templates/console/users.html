@@ -1,0 +1,128 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}用户{% endblock %}
+{% block breadcrumb %}用户{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "users" "w-3.5 h-3.5" %} Access</div>
+            <h1 class="page-title">用户与配额</h1>
+            <p class="page-desc">创建、停用、轮换凭据与查看每个人的用量。所有变更都会自动触发核心配置更新。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn--ghost"
+               href="{% url 'admin:proxy_proxyuser_changelist' %}">{% icon "settings" %} 高级管理</a>
+            <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <section class="panel">
+        <div class="panel-head">
+            <div class="search-bar" style="flex:1">
+                <form method="get" class="search-bar" style="flex:1">
+                    <input type="hidden" name="status" value="{{ status }}">
+                    <label class="search-input">
+                        <span class="sr-only">搜索用户</span>
+                        {% icon "search" %}
+                        <input class="input"
+                               type="search"
+                               name="q"
+                               value="{{ query }}"
+                               placeholder="搜索用户名或备注…">
+                    </label>
+                    <button class="btn" type="submit">搜索</button>
+                </form>
+            </div>
+            <span class="badge">{{ total }} 个用户</span>
+        </div>
+        <div class="panel-body" style="padding-top:12px;padding-bottom:12px">
+            <div class="segmented" role="navigation" aria-label="状态筛选">
+                <a class="{% if status == 'all' %}is-active{% endif %}"
+                   href="?status=all{% if query %}&q={{ query|urlencode }}{% endif %}">全部</a>
+                <a class="{% if status == 'active' %}is-active{% endif %}"
+                   href="?status=active{% if query %}&q={{ query|urlencode }}{% endif %}">启用中</a>
+                <a class="{% if status == 'online' %}is-active{% endif %}"
+                   href="?status=online{% if query %}&q={{ query|urlencode }}{% endif %}">在线</a>
+                <a class="{% if status == 'disabled' %}is-active{% endif %}"
+                   href="?status=disabled{% if query %}&q={{ query|urlencode }}{% endif %}">已禁用</a>
+                <a class="{% if status == 'expired' %}is-active{% endif %}"
+                   href="?status=expired{% if query %}&q={{ query|urlencode }}{% endif %}">已到期</a>
+                <a class="{% if status == 'quota' %}is-active{% endif %}"
+                   href="?status=quota{% if query %}&q={{ query|urlencode }}{% endif %}">超配额</a>
+            </div>
+        </div>
+        {% if page.object_list %}
+            <div class="table-wrap">
+                <table class="data-table data-table--cards">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>状态</th>
+                            <th>配额</th>
+                            <th>已用 / 总量</th>
+                            <th>到期</th>
+                            <th>最近在线</th>
+                            <th>协议</th>
+                            <th class="cell-actions">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in page %}
+                            <tr>
+                                <td data-label="用户">
+                                    <a class="table-link" href="{% url 'console:user_detail' user.pk %}">
+                                        <span class="row-avatar">{{ user.name|first|upper }}</span>
+                                        <span>{{ user.name }}</span>
+                                    </a>
+                                </td>
+                                <td data-label="状态">
+                                    <span class="{{ user.status|status_class }}">{{ user.status|status_label }}</span>
+                                    {% if user.is_online %}<span class="badge badge--success"
+                                                                 style="margin-left:4px">在线</span>{% endif %}
+                                </td>
+                                <td data-label="配额">
+                                    {% if user.quota_percent is not None %}
+                                        <span class="quota-ring {% if user.quota_percent >= 90 %}quota-ring--danger{% elif user.quota_percent >= 80 %}quota-ring--warning{% endif %}"
+                                              style="--value:{{ user.quota_percent }}"><span>{{ user.quota_percent|floatformat:0 }}%</span></span>
+                                    {% else %}
+                                        <span class="quota-ring quota-ring--unlimited"
+                                              style="--value:100"><span>∞</span></span>
+                                    {% endif %}
+                                </td>
+                                <td data-label="已用 / 总量" class="tabular">
+                                    <strong style="color:var(--text)">{{ user.used_bytes|bytes }}</strong>
+                                    <span class="muted"> / {% if user.quota_bytes %}{{ user.quota_bytes|bytes }}{% else %}不限{% endif %}</span>
+                                </td>
+                                <td data-label="到期" class="muted">{% if user.expires_at %}{{ user.expires_at|datetimefmt }}{% else %}永不过期{% endif %}</td>
+                                <td data-label="最近在线" class="muted">{{ user.last_seen_at|ago }}</td>
+                                <td data-label="协议">
+                                    {% for inbound in inbounds %}<span class="proto-badge">{{ inbound.short_label }}</span>{% empty %}<span class="muted">—</span>{% endfor %}
+                                </td>
+                                <td class="cell-actions" data-label="操作">
+                                    <span class="table-actions">
+                                        <a class="btn btn--sm" href="{% url 'console:user_detail' user.pk %}">详情</a>
+                                        <a class="icon-btn"
+                                           href="{% url 'admin:proxy_proxyuser_change' user.pk %}"
+                                           aria-label="在 Admin 中编辑 {{ user.name }}">{% icon "settings" %}</a>
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "partials/pagination.html" with page=page query=query status=status %}
+        {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "users" %}</span>
+                <div class="empty-title">{% if query %}没有匹配的用户{% else %}还没有创建用户{% endif %}</div>
+                <div class="empty-copy">{% if query %}换一个关键词，或清除筛选条件。{% else %}创建第一个用户后，Ostium 会自动生成 UUID、密码和订阅 token。{% endif %}</div>
+                <div class="page-actions" style="justify-content:center">
+                    {% if query %}<a class="btn" href="{% url 'console:users' %}">清除筛选</a>{% endif %}
+                    <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                </div>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

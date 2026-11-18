@@ -1,0 +1,42 @@
+{% extends "registration/auth_base.html" %}
+{% load static ostium_ui %}
+{% block title %}登录{% endblock %}
+{% block auth_content %}
+    <div class="page-eyebrow" style="margin-bottom:8px">{% icon "lock" "w-3.5 h-3.5" %} Secure sign-in</div>
+    <h2>欢迎回来</h2>
+    <p class="auth-sub">使用管理员账号登录 Ostium 控制台。</p>
+    <form method="post" class="auth-form" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="auth-error">{% icon "alert" %}<div>{{ form.non_field_errors.0 }}</div></div>
+        {% endif %}
+        {% if form.username.errors %}<div class="auth-error">{% icon "alert" %}<div>{{ form.username.errors.0 }}</div></div>{% endif %}
+        <div class="field">
+            <label for="{{ form.username.id_for_label }}">用户名</label>
+            {{ form.username }}
+        </div>
+        <div class="field">
+            <label for="{{ form.password.id_for_label }}">密码</label>
+            <div style="position:relative">
+                {{ form.password }}
+                <button class="icon-btn"
+                        type="button"
+                        data-toggle-password="#{{ form.password.id_for_label }}"
+                        aria-label="显示或隐藏密码"
+                        style="position:absolute;
+                               right:4px;
+                               top:1px;
+                               width:34px;
+                               height:34px">{% icon "eye" %}</button>
+            </div>
+        </div>
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <button class="btn btn--primary btn--block" type="submit">{% icon "arrow-right" %} 登录控制台</button>
+    </form>
+    <div class="auth-foot">
+        连续失败会触发登录锁定。忘记密码时，请在服务器上运行：
+        <br>
+        <code class="mono">ostium changepassword &lt;username&gt;</code>
+    </div>
+    <script src="{% static 'js/console.js' %}"></script>
+{% endblock %}

@@ -1,8 +1,10 @@
-site_name: Ostium 文档
-site_description: 双角色私人 VPN / 通用代理控制台
-repo_url: https://github.com/ThzxxArt/Ostium
-repo_name: ThzxxArt/Ostium
-docs_dir: docs
+site_name: Ostium Server
+site_description: Linux single-host private proxy server with standard subscriptions
+site_url: https://github.com/ostium-dev/ostium
+repo_url: https://github.com/ostium-dev/ostium
+repo_name: ostium-dev/ostium
+edit_uri: edit/main/docs/
+
 theme:
   name: material
   language: zh
@@ -15,63 +17,49 @@ theme:
         name: 切换到浅色
     - scheme: default
       primary: teal
-      accent: blue
+      accent: cyan
       toggle:
         icon: material/weather-sunny
         name: 切换到深色
   features:
+    - navigation.instant
     - navigation.sections
-    - navigation.expand
     - content.code.copy
-    - search.suggest
+    - search.highlight
+
 markdown_extensions:
   - admonition
   - tables
   - toc:
       permalink: true
   - pymdownx.superfences
-  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+
 nav:
   - 首页: index.md
+  - 快速开始: getting-started.md
+  - 安装: installation.md
+  - 配置: configuration.md
+  - 订阅: subscriptions.md
+  - 协议: protocols.md
+  - 证书: certificates.md
   - 架构: architecture.md
-  - 指南:
-      - 一键安装: guides/install.md
-      - Linux 云服务器完整部署: guides/linux-cloud-server.md
-      - 服务管理: guides/service-manager.md
-      - Nginx 共存: guides/nginx.md
-      - 服务端: guides/server.md
-      - 客户端: guides/client.md
-      - TUN: guides/tun.md
-      - ACME: guides/acme.md
-      - 订阅: guides/subscription.md
-      - Web UI: guides/ui.md
-  - 参考:
-      - CLI: reference/cli.md
-      - API: reference/api.md
-      - Profile v1: reference/profile.md
-      - 端口与路径: reference/ports.md
+  - 安全: security.md
+  - API: api.md
+  - CLI: cli.md
   - 运维:
-      - 备份: operations/backup.md
+      - 备份与恢复: operations/backup-restore.md
       - 升级: operations/upgrade.md
-      - 0.1.0 → 0.1.1 迁移: operations/upgrade-0.1.0-to-0.1.1.md
-      - 0.1.1 → 0.1.2 迁移: operations/upgrade-0.1.1-to-0.1.2.md
-      - 0.1.2 → 0.1.3 迁移: operations/upgrade-0.1.2-to-0.1.3.md
-      - 0.1.9 → 0.1.10 迁移: operations/upgrade-0.1.9-to-0.1.10.md
-      - 0.1.10 → 0.1.11 迁移: operations/upgrade-0.1.10-to-0.1.11.md
-      - 0.1.11 → 0.1.12 迁移: operations/upgrade-0.1.11-to-0.1.12.md
-      - 0.1.8 → 0.1.9 迁移: operations/upgrade-0.1.8-to-0.1.9.md
-      - 0.1.7 → 0.1.8 迁移: operations/upgrade-0.1.7-to-0.1.8.md
-      - 0.1.6 → 0.1.7 迁移: operations/upgrade-0.1.6-to-0.1.7.md
-      - 0.1.5 → 0.1.6 迁移: operations/upgrade-0.1.5-to-0.1.6.md
-      - 0.1.4 → 0.1.5 迁移: operations/upgrade-0.1.4-to-0.1.5.md
-      - 0.1.3 → 0.1.4 迁移: operations/upgrade-0.1.3-to-0.1.4.md
-      - 发布状态: release-status.md
-      - 发布清单: operations/release-checklist.md
-      - 故障排查: operations/troubleshooting.md
-  - 设计:
-      - 设计系统: design-system.md
-      - UX: ux.md
-      - ADR 0001 - TypeScript 6: adr/0001-typescript-6.md
-  - 安全:
-      - 威胁模型: security/threat-model.md
-      - 公告：默认管理面绑定: security/advisory-2026-11-default-bind.md
+      - 监控: operations/monitoring.md
+      - 排障: operations/troubleshooting.md
+      - E2E 验证: operations/e2e-evidence.md
+  - 参考:
+      - 设置项: reference/settings.md
+      - 订阅格式: reference/formats.md
+      - 端口: reference/ports.md
+  - 设计文档:
+      - 最终方案: design/v0.2.0-final.md
+      - 实施决策: design/decisions.md
+
+strict: true

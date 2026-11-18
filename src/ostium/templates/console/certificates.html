@@ -1,0 +1,85 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}证书{% endblock %}
+{% block breadcrumb %}证书{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "certificate" "w-3.5 h-3.5" %} TLS inventory</div>
+            <h1 class="page-title">证书</h1>
+            <p class="page-desc">Hysteria2 与 Trojan 的 TLS 凭据。支持手动导入、自签与 certbot 同步；到期会阻止配置应用。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn--ghost"
+               href="{% url 'admin:certificates_certificate_changelist' %}">{% icon "settings" %} Admin 列表</a>
+            <a class="btn btn--primary" href="{{ import_url }}">{% icon "upload" %} 导入证书</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    {% if records %}
+        <div class="cert-grid">
+            {% for cert in records %}
+                <section class="cert-card">
+                    <div class="cert-head">
+                        <div>
+                            <div class="cert-domain">{{ cert.domain }}</div>
+                            <div class="muted text-xs" style="margin-top:2px">{{ cert.get_source_display }}</div>
+                        </div>
+                        <span class="badge {% if cert.status == 'ready' %}badge--success{% elif cert.status == 'expired' %}badge--danger{% else %}badge--warning{% endif %}">{{ cert.get_status_display }}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="quota-ring {% if cert.expiry_tone == 'danger' %}quota-ring--danger{% elif cert.expiry_tone == 'warning' %}quota-ring--warning{% endif %}"
+                             style="--value:{% widthratio cert.days_remaining 90 100 %};
+                                    width:56px;
+                                    height:56px">
+                            <span style="font-size:10px">{{ cert.days_remaining }}d</span>
+                        </div>
+                        <div>
+                            <div class="meta-label">到期时间</div>
+                            <div class="meta-value">{{ cert.expires_at|datetimefmt }}</div>
+                            <div class="muted text-xs">指纹 {{ cert.fingerprint_sha256|shorthash:16 }}</div>
+                        </div>
+                    </div>
+                    <div class="cert-meta">
+                        <div>签发者<strong>{{ cert.issuer|truncatechars:24 }}</strong></div>
+                        <div>自动续期<strong>{% if cert.auto_renew %}certbot{% else %}手动{% endif %}</strong></div>
+                        <div>线路<strong>{{ cert.inbounds.count }} 条</strong></div>
+                    </div>
+                    {% if cert.last_error %}
+                        <div class="alert-banner alert-banner--danger"
+                             style="padding:9px 11px">{{ cert.last_error|truncatechars:120 }}</div>
+                    {% endif %}
+                    <div class="form-actions" style="margin-top:0;padding-top:12px">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="certificate_id" value="{{ cert.pk }}">
+                            <button class="btn btn--sm" type="submit">{% icon "refresh" %} 重新校验</button>
+                        </form>
+                        <a class="btn btn--sm"
+                           href="{% url 'admin:certificates_certificate_change' cert.pk %}">{% icon "settings" %} 详情</a>
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
+    {% else %}
+        <section class="panel">
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "certificate" %}</span>
+                <div class="empty-title">还没有导入证书</div>
+                <div class="empty-copy">Hysteria2 与 Trojan 需要可信 TLS 证书。可以手动导入 PEM，或让 certbot 续期后通过 deploy hook 自动同步。</div>
+                <div class="page-actions" style="justify-content:center">
+                    <a class="btn btn--primary" href="{{ import_url }}">{% icon "upload" %} 导入第一张证书</a>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+    <section class="panel mt-6">
+        <div class="panel-head"><div class="panel-title">{% icon "terminal" %} certbot 自动同步</div></div>
+        <div class="panel-body text-sm muted">
+            <p>安装时若启用 certbot，deploy hook 会在每次续期后执行：</p>
+            <pre class="code-block mt-2">ostium cert sync --dir /etc/letsencrypt/live</pre>
+            <p class="mt-2">同步会校验证书链、域名与私钥匹配，并自动触发配置更新。到期 ≤30 天会在总览告警。</p>
+        </div>
+    </section>
+{% endblock %}

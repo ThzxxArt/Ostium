@@ -28,5 +28,7 @@ source files are modified; only Go build tags are selected.
 
 Trademarks and third-party assets
 ---------------------------------
-All third-party Python and npm dependencies retain their respective licenses.
-See the generated SBOM for the complete dependency inventory.
+Third-party Python packages and vendored browser assets retain their respective licenses.
+Bundled Inter is licensed under the SIL Open Font License 1.1; the license text is
+included at src/ostium/static/fonts/OFL.txt. See the generated SBOM for the complete
+dependency inventory.

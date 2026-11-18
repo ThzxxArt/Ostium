@@ -1,43 +1,41 @@
-# 端口与路径
+# 端口
 
-## 服务端
+| 端口 | 协议 | 用途 | 暴露 |
+|---|---|---|---|
+| 443/tcp | TCP | VLESS Reality / Trojan | 公网 |
+| 443/udp | QUIC | Hysteria2 | 公网 |
+| 8388/tcp | TCP | Shadowsocks 2022（默认禁用） | 可选 |
+| 8000/tcp | HTTP | Django/Gunicorn | 仅回环 |
+| 8443/tcp | HTTPS | Caddy 管理面 | 公网（可选） |
+| 80/tcp | HTTP | ACME HTTP-01 + 跳转 | 公网（使用 certbot 时） |
+| 19090/tcp | HTTP | Clash API | 仅回环 |
+| 19091/tcp | gRPC | V2Ray stats | 仅回环 |
 
-| 用途 | 值 |
-|---|---|
-| Reality / Trojan | `0.0.0.0:443/tcp` |
-| Hysteria2 | `0.0.0.0:443/udp` |
-| SS2022（默认关闭） | `0.0.0.0:8388/tcp+udp` |
-| 管理 UI | `127.0.0.1:8443`（公网时 HTTPS） |
-| ACME | 签发期间 `0.0.0.0:80/tcp` |
-| 核心 API | `127.0.0.1:8788` |
-| Clash API | `127.0.0.1:19090` |
-| V2Ray 统计 | `127.0.0.1:19091` |
+防火墙示例（ufw）：
 
-数据：`/var/lib/ostium`。配置：`/etc/ostium/config.toml`。证书：`/var/lib/ostium/certs/<domain>/`。备份：`/var/lib/ostium/backups/`。
+```bash
+ufw allow 22/tcp
+ufw allow 443/tcp
+ufw allow 443/udp
+ufw allow 8443/tcp   # 使用 Caddy 时
+ufw enable
+```
 
-管理 UI 默认只监听 `127.0.0.1:8443`。非回环明文监听必须显式
-`allow_insecure_bind = true`；公网部署优先使用 Nginx TLS 或 Public UI，并在 Settings
-中配置 `ui_allowlist`（CIDR）。allowlist 只保护管理 UI/API 与静态资源；`/sub/*`、
-`/healthz`、`/readyz` 按设计豁免，便于客户端订阅和探活。Docker 必须由宿主机防火墙限制 8443。
+不要暴露 8000、19090、19091。
 
-## 客户端
+## 端口冲突
 
-| 用途 | 值 |
-|---|---|
-| 混合代理（默认） | `127.0.0.1:7890` |
-| 混合代理（Allow LAN） | `0.0.0.0:7890`，仅可信局域网 |
-| Web UI | `127.0.0.1:8787` |
-| 核心 API | `127.0.0.1:8788` |
-| Clash API | `127.0.0.1:19090` |
-| TUN | `ostium0` / `Ostium` |
+- VLESS、Trojan、Shadowsocks 不能共用同一个 TCP 端口。
+- Hysteria2 使用 UDP，可与 TCP 443 共用数字端口。
+- 配置生成会拒绝冲突；worker 保留旧配置并告警。
 
-## 数据目录
+## 非 root 绑定
 
-| 平台 | 控制面 / UI | 核心 |
-|---|---|---|
-| Linux 服务端 | `/var/lib/ostium`、`/etc/ostium/config.toml` | 同左 |
-| Linux 客户端 | `~/.local/share/ostium`（默认）；root 模式 `/var/lib/ostium` | `/var/lib/ostium-core`、`/etc/ostium/client.toml` |
-| Windows | `%ProgramData%\Ostium`（UI） | `%ProgramData%\OstiumCore`（仅 SYSTEM/Administrators 可写） |
-| macOS | `/Library/Application Support/Ostium UI`（UI） | `/Library/Application Support/Ostium` |
+worker 通过 systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443。
+Docker 使用 `cap_add: NET_BIND_SERVICE`。
 
-关键文件：`ostium.db`、`master.key`、`config.toml`、`certs/`、`runtime/last-good.json`、`runtime/core.token`、`logs/`、`backups/`。
+没有 capability 时，改用高位端口：
+
+```bash
+ostium inbound set-port vless 8443
+```

@@ -1,0 +1,63 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}日志{% endblock %}
+{% block breadcrumb %}日志{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "terminal" "w-3.5 h-3.5" %} Diagnostics</div>
+            <h1 class="page-title">日志</h1>
+            <p class="page-desc">最多读取 2 MiB 尾部内容。敏感值已在诊断包中脱敏；此页面只做本地只读展示。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn"
+               href="?source={{ source }}&download=1{% if query %}&q={{ query|urlencode }}{% endif %}">{% icon "download" %} 下载当前日志</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <section class="panel">
+        <div class="panel-head">
+            <div class="segmented">
+                <a class="{% if source == 'sing-box' %}is-active{% endif %}"
+                   href="?source=sing-box">sing-box</a>
+                <a class="{% if source == 'ostium' %}is-active{% endif %}"
+                   href="?source=ostium">Ostium</a>
+            </div>
+            <form method="get" class="search-bar">
+                <input type="hidden" name="source" value="{{ source }}">
+                <label class="search-input" style="min-width:220px">
+                    <span class="sr-only">搜索日志</span>
+                    {% icon "search" %}
+                    <input class="input"
+                           type="search"
+                           name="q"
+                           value="{{ query }}"
+                           placeholder="过滤日志行…">
+                </label>
+                <button class="btn btn--sm" type="submit">过滤</button>
+            </form>
+        </div>
+        <div class="panel-body"
+             style="padding:12px 18px;
+                    border-bottom:1px solid var(--border)">
+            <div class="row-split flex-wrap">
+                <span class="muted text-xs mono">{{ path }}</span>
+                <span class="badge">{{ lines|length }} 行 · {{ bytes|bytes }}</span>
+            </div>
+        </div>
+        {% if lines %}
+            <div class="terminal" role="log" aria-label="{{ source }} 日志">
+                {% for line in lines %}
+                    <div class="log-line"><span class="log-level log-level--{{ line.level }}">{{ line.level|default:"—" }}</span><span>{{ line.text|strip_ansi }}</span></div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">{% icon "file" %}</span>
+                <div class="empty-title">{% if query %}没有匹配的日志行{% else %}日志文件还没有内容{% endif %}</div>
+                <div class="empty-copy">{% if query %}换一个关键词试试。{% else %}启动服务并产生流量后，日志会写入数据目录。{% endif %}</div>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

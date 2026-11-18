@@ -1,0 +1,333 @@
+{% extends "console/base.html" %}
+{% load static ostium_ui %}
+{% block title %}总览{% endblock %}
+{% block breadcrumb %}总览{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "zap" "w-3.5 h-3.5" %} Server Pulse</div>
+            <h1 class="page-title">今天的服务器，一眼看清</h1>
+            <p class="page-desc">实时掌握数据面状态、在线用户、流量走势与需要处理的事项。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn--ghost" href="{% url 'console:logs' %}">{% icon "terminal" %} 查看日志</a>
+            <button class="btn" type="submit" form="restart-form">{% icon "refresh" %} 应用配置</button>
+            <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+        </div>
+    </div>
+    <form id="restart-form" method="post" action="{% url 'console:system' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="restart_core">
+    </form>
+{% endblock %}
+{% block content %}
+    <section class="hero" aria-label="服务器状态">
+        <div class="hero-main">
+            <div>
+                <div class="hero-kicker">
+                    <span class="status-pill {% if state.worker_alive and state.singbox_running %}status-pill--success{% elif state.worker_alive %}status-pill--warning{% else %}status-pill--danger{% endif %}">
+                        {% if state.worker_alive and state.singbox_running %}运行中{% elif state.worker_alive %}降级运行{% else %}已停止{% endif %}
+                    </span>
+                    {% if pending_apply %}<span class="status-pill status-pill--warning">配置待应用</span>{% endif %}
+                    {% if maintenance_mode %}<span class="status-pill status-pill--warning">维护模式</span>{% endif %}
+                </div>
+                <h2 class="hero-title">
+                    {% if state.worker_alive and state.singbox_running %}
+                        数据面正在<span>顺畅运行</span>
+                    {% elif state.worker_alive %}
+                        数据面<span>部分降级</span>
+                    {% else %}
+                        数据面<span>需要处理</span>
+                    {% endif %}
+                </h2>
+                <p class="hero-copy">
+                    {% if state.last_error %}
+                        {{ state.last_error|truncatechars:160 }}
+                    {% else %}
+                        sing-box 由 worker 直接监督，所有线路与用户来自数据库的单一事实源。最近一次成功应用：{{ state.updated_at|ago }}。
+                    {% endif %}
+                </p>
+            </div>
+            <div class="hero-metrics">
+                <div class="hero-metric">
+                    <div class="hero-metric-label">{% icon "up" "w-3 h-3" %} 上行速率</div>
+                    <div class="hero-metric-value">{{ total_uplink_rate|bps }}</div>
+                </div>
+                <div class="hero-metric">
+                    <div class="hero-metric-label">{% icon "down" "w-3 h-3" %} 下行速率</div>
+                    <div class="hero-metric-value">{{ total_downlink_rate|bps }}</div>
+                </div>
+                <div class="hero-metric">
+                    <div class="hero-metric-label">{% icon "activity" "w-3 h-3" %} 今日流量</div>
+                    <div class="hero-metric-value">{{ today_total|bytes }}</div>
+                </div>
+                <div class="hero-metric">
+                    <div class="hero-metric-label">{% icon "clock" "w-3 h-3" %} 运行时长</div>
+                    <div class="hero-metric-value">{{ uptime_seconds|duration }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-side">
+            <div class="hero-ring-wrap">
+                <div class="hero-ring"
+                     style="--value:{% if state.worker_alive and state.singbox_running %}100{% elif state.worker_alive %}62{% else %}18{% endif %};
+                            --tone:{% if state.worker_alive and state.singbox_running %}var(--success){% elif state.worker_alive %}var(--warning){% else %}var(--danger){% endif %}">
+                    <div class="hero-ring-inner">
+                        <div class="hero-ring-value">{{ online_count }}</div>
+                        <div class="hero-ring-label">在线用户</div>
+                    </div>
+                </div>
+                <div class="hero-side-head"
+                     style="flex-direction:column;
+                            align-items:flex-start;
+                            gap:4px">
+                    <span class="hero-side-title">当前连接</span>
+                    <span class="muted text-xs">基于最近 60 秒流量</span>
+                    <span class="muted text-xs">配置 {{ state.config_sha256|shorthash }}</span>
+                </div>
+            </div>
+            <div class="hero-side-grid">
+                <div class="hero-chip">
+                    <div class="hero-chip-label">Worker</div>
+                    <div class="hero-chip-value">{% if state.worker_alive %}健康{% else %}离线{% endif %}</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-label">sing-box</div>
+                    <div class="hero-chip-value">{% if state.singbox_running %}PID {{ state.singbox_pid }}{% else %}未运行{% endif %}</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-label">已应用版本</div>
+                    <div class="hero-chip-value">{{ state.applied_revision }}</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-label">期望版本</div>
+                    <div class="hero-chip-value">{{ state.desired_revision }}</div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <div class="mt-4 kpi-grid">
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">用户总数</span>
+                <span class="stat-icon">{% icon "users" %}</span>
+            </div>
+            <div class="stat-value">{{ users_total }}<small>人</small></div>
+            <div class="stat-foot"><strong>{{ users_enabled }}</strong> 已启用 · <strong>{{ online_count }}</strong> 在线</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">今日流量</span>
+                <span class="stat-icon"
+                      style="background:var(--accent-2-soft);
+                             color:var(--accent-2)">{% icon "chart" %}</span>
+            </div>
+            <div class="stat-value">{{ today_total|bytes }}</div>
+            <div class="stat-foot">↑ {{ today_uplink|bytes }} · ↓ {{ today_downlink|bytes }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">核心状态</span>
+                <span class="stat-icon"
+                      style="background:{% if state.singbox_running %}var(--success-soft){% else %}var(--danger-soft){% endif %};
+                             color:{% if state.singbox_running %}var(--success){% else %}var(--danger){% endif %}">{% icon "server" %}</span>
+            </div>
+            <div class="stat-value">{% if state.singbox_running %}正常{% else %}停止{% endif %}</div>
+            <div class="stat-foot">{% if state.singbox_running %}已运行 {{ uptime_seconds|duration }}{% else %}等待 worker 恢复{% endif %}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">最近到期证书</span>
+                <span class="stat-icon"
+                      style="background:var(--warning-soft);
+                             color:var(--warning)">{% icon "certificate" %}</span>
+            </div>
+            {% if certificates_soon %}
+                {% with cert=certificates_soon.0 %}
+                    <div class="stat-value">{{ cert.days_remaining }}<small>天</small></div>
+                    <div class="stat-foot truncate">{{ cert.domain }}</div>
+                {% endwith %}
+            {% else %}
+                <div class="stat-value">—</div>
+                <div class="stat-foot">30 天内无到期证书</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="grid grid--12 mt-6">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-title">{% icon "chart" %} 流量走势</div>
+                    <div class="panel-sub">最近 7 天，按日聚合的上行与下行</div>
+                </div>
+                <div class="chart-legend">
+                    <span><i style="background:var(--accent)"></i> 上行</span>
+                    <span><i style="background:var(--accent-2)"></i> 下行</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="chart-box">
+                    <canvas id="traffic-chart" aria-label="最近七天流量图" role="img"></canvas>
+                </div>
+            </div>
+        </section>
+        <section class="panel span-4">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "gauge" %} 健康检查</div>
+                <a class="link-quiet" href="{% url 'console:system' %}">详情</a>
+            </div>
+            <div class="panel-body">
+                <div class="health-list">
+                    {% for item in health %}
+                        <div class="health-row">
+                            <span class="health-name"><i class="health-dot health-dot--{{ item.status }}"></i>{{ item.name }}</span>
+                            <span class="health-detail">{{ item.detail }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="divider"></div>
+                <div class="row-split">
+                    <span class="muted text-xs">统计接口</span>
+                    <span class="badge {% if usage.stats_ok %}badge--success{% else %}badge--warning{% endif %}">{% if usage.stats_ok %}正常{% else %}不可用{% endif %}</span>
+                </div>
+            </div>
+        </section>
+        <section class="panel span-7">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "wifi" %} 在线用户 Top 5</div>
+                <a class="link-quiet" href="{% url 'console:users' %}?status=online">全部在线</a>
+            </div>
+            {% if top_online %}
+                <div class="table-wrap">
+                    <table class="data-table data-table--cards">
+                        <thead>
+                            <tr>
+                                <th>用户</th>
+                                <th>上行</th>
+                                <th>下行</th>
+                                <th>配额</th>
+                                <th>最近在线</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_online %}
+                                <tr>
+                                    <td data-label="用户">
+                                        <a class="table-link"
+                                           href="{% url 'console:user_detail' item.user.pk %}">
+                                            <span class="row-avatar">{{ item.user.name|first|upper }}</span>{{ item.user.name }}
+                                        </a>
+                                    </td>
+                                    <td data-label="上行" class="mono">{{ item.uplink_rate|bps }}</td>
+                                    <td data-label="下行" class="mono">{{ item.downlink_rate|bps }}</td>
+                                    <td data-label="配额">
+                                        {% if item.user.quota_percent is not None %}
+                                            <span class="inline"><span class="quota-ring {% if item.user.quota_percent >= 90 %}quota-ring--danger{% elif item.user.quota_percent >= 80 %}quota-ring--warning{% endif %}"
+                                                                       style="--value:{{ item.user.quota_percent }}"><span>{{ item.user.quota_percent|floatformat:0 }}%</span></span></span>
+                            {% else %}<span class="badge">不限</span>{% endif %}
+                                </td>
+                                <td data-label="最近在线" class="muted">{{ item.user.last_seen_at|ago }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-icon">{% icon "wifi" %}</span>
+                    <div class="empty-title">当前没有在线用户</div>
+                    <div class="empty-copy">当客户端通过订阅连接并产生流量后，会在这里显示。</div>
+                    <a class="btn btn--sm" href="{% url 'console:subscriptions' %}">去发订阅</a>
+                </div>
+            {% endif %}
+        </section>
+        <section class="panel span-5" id="alerts">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "bell" %} 最近告警</div>
+                <span class="badge {% if unack_alerts_count %}badge--warning{% endif %}">{{ unack_alerts_count }} 未确认</span>
+            </div>
+            <div class="panel-body">
+                {% if alerts %}
+                    <div class="timeline">
+                        {% for alert in alerts %}
+                            <div class="timeline-item">
+                                <span class="timeline-dot {% if alert.level == 'critical' %}timeline-dot--danger{% elif alert.level == 'warning' %}timeline-dot--warning{% else %}timeline-dot--muted{% endif %}"></span>
+                                <div>
+                                    <div class="timeline-title">{{ alert.message|truncatechars:90 }}</div>
+                                    <div class="timeline-meta">{{ alert.code }} · {{ alert.last_seen_at|ago }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state" style="padding:26px 10px">
+                        <span class="empty-icon"
+                              style="background:var(--success-soft);
+                                     color:var(--success)">{% icon "check" %}</span>
+                        <div class="empty-title">一切正常</div>
+                        <div class="empty-copy">没有未确认的告警。</div>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+        <section class="panel span-7">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "clock" %} 最近任务</div>
+                <a class="link-quiet" href="{% url 'console:jobs' %}">全部任务</a>
+            </div>
+            {% if jobs %}
+                <div class="table-wrap">
+                    <table class="data-table data-table--cards">
+                        <thead>
+                            <tr>
+                                <th>任务</th>
+                                <th>状态</th>
+                                <th>开始</th>
+                                <th>耗时</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in jobs %}
+                                <tr>
+                                    <td data-label="任务" class="cell-strong">{{ job.name|default:job.func }}</td>
+                                    <td data-label="状态"><span class="badge {% if job.success %}badge--success{% else %}badge--danger{% endif %}">{% if job.success %}成功{% else %}失败{% endif %}</span></td>
+                                    <td data-label="开始" class="muted">{{ job.started|ago }}</td>
+                                    <td data-label="耗时" class="mono">{{ job.time_taken|floatformat:1 }}s</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state" style="padding:26px 10px">
+                    <span class="empty-icon">{% icon "clock" %}</span>
+                    <div class="empty-title">还没有后台任务</div>
+                    <div class="empty-copy">备份、证书同步等任务会显示在这里。</div>
+                </div>
+            {% endif %}
+        </section>
+        <section class="panel span-5">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "zap" %} 快捷操作</div>
+            </div>
+            <div class="panel-body">
+                <div class="grid" style="gap:8px">
+                    <a class="btn btn--block" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                    <a class="btn btn--block" href="{% url 'console:subscriptions' %}">{% icon "link" %} 复制订阅链接</a>
+                    <a class="btn btn--block"
+                       href="{% url 'admin:certificates_certificate_import' %}">{% icon "certificate" %} 导入证书</a>
+                    <a class="btn btn--block" href="{% url 'console:system' %}">{% icon "download" %} 导出诊断包</a>
+                    <form method="post" action="{% url 'console:system' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="restart_core">
+                        <button class="btn btn--block" type="submit">{% icon "refresh" %} 重启核心并应用配置</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </div>
+    {{ series|json_script:"traffic-data" }}
+{% endblock %}
+{% block scripts %}
+    <script src="{% static 'js/chart.umd.min.js' %}" defer></script>
+{% endblock %}

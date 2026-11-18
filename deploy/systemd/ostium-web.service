@@ -1,0 +1,32 @@
+[Unit]
+Description=Ostium web console (Gunicorn)
+Documentation=https://github.com/ostium-dev/ostium
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ostium
+Group=ostium
+WorkingDirectory=/var/lib/ostium
+EnvironmentFile=/etc/ostium/ostium.env
+Environment=DJANGO_SETTINGS_MODULE=ostium.config.settings.prod
+ExecStart=/opt/ostium/venv/bin/ostium web --bind 127.0.0.1:8000 --workers 2
+Restart=always
+RestartSec=2
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/ostium
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
