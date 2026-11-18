@@ -267,3 +267,39 @@ def test_init_uses_public_base_url_from_environment(settings):
     call_command("init", username="envadmin", password="Init-Test-Password-2026", domain="vpn.example.com")
     assert config.public_host == "vpn.example.com"
     assert config.public_base_url == "https://vpn.example.com:8443"
+
+
+@pytest.mark.django_db
+def test_init_rejects_invalid_domain_port():
+    from django.core.management.base import CommandError
+
+    with pytest.raises(CommandError, match="invalid port"):
+        call_command("init", username="badport", password="Init-Test-Password-2026", domain="vpn.example.com:nope")
+
+
+@pytest.mark.django_db
+def test_stats_recovery_resolves_stats_alert(monkeypatch):
+    from ostium.operations.models import Alert
+
+    Alert.objects.create(code="stats_unavailable", fingerprint="stats_unavailable", message="stats down")
+    monkeypatch.setattr("ostium.engine.stats.query_stats", lambda: {"alice": (10, 20)})
+    sampler = StatsSampler(stats_ok=False, failures=60)
+    assert sampler.sample() is True
+    assert Alert.objects.get(fingerprint="stats_unavailable").resolved_at is not None
+
+
+@pytest.mark.django_db
+def test_certificate_alerts_resolve_after_renewal(settings, tmp_path):
+    from ostium.certificates.services import generate_self_signed
+    from ostium.engine.worker import Worker
+    from ostium.operations.models import Alert
+
+    settings.OSTIUM_DATA_DIR = str(tmp_path)
+    certificate = generate_self_signed("alerts.local", days=20)
+    fingerprint = f"certificate_expiring:{certificate.pk}"
+    Worker()._check_certificates()
+    assert Alert.objects.get(fingerprint=fingerprint).resolved_at is None
+
+    generate_self_signed("alerts.local", days=60)
+    Worker()._check_certificates()
+    assert Alert.objects.get(fingerprint=fingerprint).resolved_at is not None

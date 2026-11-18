@@ -207,6 +207,61 @@ def test_mobile_navigation_and_focus(page, live_server, browser_user):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_shell_rail_and_mobile_boundary(page, live_server, browser_user):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    login(page, live_server)
+    page.goto(f"{live_server.url}/")
+    rail = page.evaluate(
+        """() => {
+            const shell = document.querySelector('.app-shell');
+            const sidebar = document.querySelector('.sidebar');
+            const before = getComputedStyle(shell, '::before');
+            return {
+                display: before.display,
+                width: parseFloat(before.width),
+                height: parseFloat(before.height),
+                sidebarWidth: parseFloat(getComputedStyle(sidebar).width),
+                shellHeight: shell.getBoundingClientRect().height,
+            };
+        }"""
+    )
+    assert rail["display"] != "none"
+    assert abs(rail["width"] - rail["sidebarWidth"]) <= 1
+    assert rail["height"] >= rail["shellHeight"] - 1
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server.url}/")
+    nav = page.locator(".mobile-nav").bounding_box()
+    assert nav is not None
+    assert abs((nav["y"] + nav["height"]) - 844) <= 1
+    metrics = page.evaluate(
+        """() => {
+            const nav = document.querySelector('.mobile-nav').getBoundingClientRect();
+            const content = document.querySelector('.content');
+            return {
+                navHeight: nav.height,
+                paddingBottom: parseFloat(getComputedStyle(content).paddingBottom),
+            };
+        }"""
+    )
+    assert metrics["paddingBottom"] >= metrics["navHeight"] - 1
+
+    page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+    page.wait_for_timeout(100)
+    overlap = page.evaluate(
+        """() => {
+            const nav = document.querySelector('.mobile-nav').getBoundingClientRect();
+            const content = document.querySelector('.content');
+            return {
+                lastBottom: content.lastElementChild.getBoundingClientRect().bottom,
+                navTop: nav.top,
+            };
+        }"""
+    )
+    assert overlap["lastBottom"] <= overlap["navTop"] + 1
+
+
+@pytest.mark.django_db(transaction=True)
 def test_long_username_does_not_overflow(page, live_server, browser_user):
     from ostium.proxy.services import create_proxy_user
 

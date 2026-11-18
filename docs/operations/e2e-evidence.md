@@ -90,4 +90,24 @@ E2E_OK
 即：自签 Trojan 客户端在仅 pin SPKI 的情况下真实连接成功；代理流量写入
 `used_bytes`；10 字节配额用户在真实流量后被禁用，订阅返回 403。
 
+## 2026-11-18 发布前复验：新构建 + 实时统计
+
+在发布前回归中使用本轮重新构建的 sing-box `v1.14.4`（Go 1.27.4）再次执行：
+
+- 临时数据目录，Trojan `0.0.0.0:8443`，自签证书 `localhost`
+- 客户端订阅使用 `tls.certificate_public_key_sha256` 做 SPKI pin
+- 客户端 mixed 入站 `127.0.0.1:7891`
+- 真实访问 `http://example.com/`
+
+```text
+CURL_RC 0
+BODY_PREFIX <!doctype html><html lang=en><head><meta charset=utf-8><link rel=icon href=data:
+STATS {'e2e': (75, 933)}
+PIN g0Ob/WAR7I1C6AUc
+E2E_OK
+```
+
+即：真实 Trojan 自签连接成功，V2Ray stats 立即记录到 `75` 上行 /
+`933` 下行字节。超配额 403 的历史证据仍见上一节。
+
 生产验收仍应在 systemd 或容器中绑定 443，并使用真实公网出口。

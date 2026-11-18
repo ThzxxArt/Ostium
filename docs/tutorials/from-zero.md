@@ -365,6 +365,15 @@ OSTIUM_BACKUP_PASSWORD=...
 
 ### 4.2 升级
 
+在线升级不需要本地 checkout：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- upgrade --ref main
+```
+
+或从本地 checkout 升级：
+
 ```bash
 cd Ostium
 git pull

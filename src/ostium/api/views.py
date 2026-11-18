@@ -39,6 +39,16 @@ from .serializers import (
 from .views_helpers import subscription_payload
 
 
+def _actor(request):
+    """Resolve the audit/ownership actor for session or API-key requests."""
+
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated:
+        return user
+    api_key = getattr(request, "api_key", None)
+    return getattr(api_key, "created_by", None)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = ProxyUser.objects.all().order_by("name")
     serializer_class = ProxyUserSerializer
@@ -162,7 +172,7 @@ class CertificateViewSet(
                 cert_pem=data["certificate"],
                 key_pem=data["private_key"],
                 auto_renew=data["auto_renew"],
-                actor=request.user if request.user.is_authenticated else None,
+                actor=_actor(request),
             )
         except Exception as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -172,7 +182,7 @@ class CertificateViewSet(
     def destroy(self, request, *args, **kwargs):
         certificate = self.get_object()
         try:
-            delete_certificate(certificate, actor=request.user if request.user.is_authenticated else None)
+            delete_certificate(certificate, actor=_actor(request))
         except Exception as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -329,7 +339,7 @@ class BackupViewSet(
         if not password:
             return Response({"detail": "A backup password is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            backup = create_backup(password=password, note=request.data.get("note", ""), actor=request.user)
+            backup = create_backup(password=password, note=request.data.get("note", ""), actor=_actor(request))
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         record_audit(action="backup.created", request=request, target=backup.filename)
@@ -338,7 +348,7 @@ class BackupViewSet(
     def destroy(self, request, *args, **kwargs):
         from ostium.operations.backup import delete_backup
 
-        delete_backup(self.get_object(), actor=request.user)
+        delete_backup(self.get_object(), actor=_actor(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
@@ -349,11 +359,18 @@ class BackupViewSet(
         password = request.data.get("password") or os.environ.get("OSTIUM_BACKUP_PASSWORD", "")
         if not password:
             return Response({"detail": "A backup password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        actor = _actor(request)
         try:
-            restore_backup(backup, password=password, actor=request.user)
+            restore_backup(backup, password=password, actor=actor)
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        record_audit(action="backup.restored", request=request, target=backup.filename)
+        # The restored database may not contain the caller, so record the event
+        # without an actor FK and keep the username in the detail payload.
+        AuditEvent.objects.create(
+            action="backup.restored",
+            target=backup.filename[:200],
+            detail={"requested_by": actor.get_username() if actor is not None else ""},
+        )
         return Response({"detail": "Backup restored. Restart the worker to apply the restored database."})
 
 

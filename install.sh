@@ -6,6 +6,8 @@ VERSION="0.2.0"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
 GO_VERSION="1.27.4"
+GO_SHA256_AMD64="7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840"
+GO_SHA256_ARM64="3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92"
 UV_VERSION="0.11.14"
 PREFIX="/opt/ostium"
 export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$PREFIX/python}"
@@ -70,8 +72,13 @@ done
 [ "$(id -u)" -eq 0 ] || die "Run as root."
 if [ -n "$DOMAIN" ]; then
   case "$DOMAIN" in
-    *://*|*/*|*" "*) die "--domain must be a bare hostname such as vpn.example.com." ;;
+    *://*|*/*|*" "*|*..*|*.-*|*-.*)
+      die "--domain must be a bare hostname such as vpn.example.com."
+      ;;
   esac
+  if ! printf '%s' "$DOMAIN" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
+    die "--domain must be a bare hostname such as vpn.example.com."
+  fi
 fi
 case "$(uname -m)" in
   x86_64|amd64) ARCH="amd64" ;;
@@ -83,13 +90,33 @@ command -v apt-get >/dev/null || warn "Only apt-based distributions are automate
 if [ "$PYPI" -eq 1 ] && [ -n "${WHEEL:-}" ]; then
   die "--pypi and --wheel cannot be used together."
 fi
+if [ "$PYPI" -eq 1 ] && [ "$FROM_SOURCE" -eq 1 ]; then
+  die "--pypi and --from-source cannot be used together."
+fi
+if [ -n "${WHEEL:-}" ] && [ "$FROM_SOURCE" -eq 1 ]; then
+  die "--wheel and --from-source cannot be used together."
+fi
+if [ "$PURGE" -eq 1 ] && [ "$MODE" != "uninstall" ]; then
+  die "--purge is only valid with the uninstall command."
+fi
+if [ "$WITH_CADDY" -eq 1 ]; then
+  [ -n "$DOMAIN" ] || die "--with-caddy requires --domain."
+  command -v caddy >/dev/null || die "Install caddy first: https://caddyserver.com/docs/install"
+  command -v certbot >/dev/null || die "Install certbot first."
+fi
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# A piped invocation has no script path. Keep ROOT empty so prepare_source
+# downloads the requested source instead of trusting the current directory.
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  ROOT=""
+fi
 
 install_packages() {
   if command -v apt-get >/dev/null; then
     apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl git
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl git tar
   fi
 }
 
@@ -97,7 +124,7 @@ prepare_source() {
   # When invoked as `curl .../install.sh | sudo bash -s -- ...`, there is no
   # checkout next to the script. Download the matching source tarball so the
   # systemd/Caddy/certbot assets are still available.
-  if [ -f "$ROOT/pyproject.toml" ] && [ -d "$ROOT/src/ostium/config" ]; then
+  if [ -n "$ROOT" ] && [ -f "$ROOT/pyproject.toml" ] && [ -d "$ROOT/src/ostium/config" ]; then
     return
   fi
   [ -n "$SOURCE_TMP" ] && return
@@ -114,6 +141,7 @@ prepare_source() {
     url="https://github.com/ThzxxArt/Ostium/archive/refs/${kind}/${SOURCE_REF}.tar.gz"
   fi
   SOURCE_TMP="$(mktemp -d)"
+  trap 'rm -rf "$SOURCE_TMP"' EXIT
   log "Downloading Ostium source (${SOURCE_REF})"
   curl -fsSL --retry 5 "$url" -o "$SOURCE_TMP/source.tar.gz" || die "Could not download $url"
   tar -xzf "$SOURCE_TMP/source.tar.gz" -C "$SOURCE_TMP"
@@ -121,7 +149,6 @@ prepare_source() {
   if [ ! -f "$ROOT/pyproject.toml" ] || [ ! -d "$ROOT/src/ostium" ]; then
     die "Downloaded source is not a valid Ostium checkout."
   fi
-  trap 'rm -rf "$SOURCE_TMP"' EXIT
 }
 
 create_user() {
@@ -173,7 +200,7 @@ install_uv() {
     curl -LsSf --retry 5 https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_VERSION="$UV_VERSION" sh
   fi
   uv python install 3.14
-  chmod -R a+rX "$PREFIX/python" 2>/dev/null || true
+  chmod -R a+rX "$UV_PYTHON_INSTALL_DIR" 2>/dev/null || true
 }
 
 install_app() {
@@ -186,7 +213,7 @@ install_app() {
     uv pip install --python "$PREFIX/venv/bin/python" "ostium-ctl==${PYPI_VERSION}"
   elif [ -n "${WHEEL:-}" ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "$WHEEL"
-  elif [ "$FROM_SOURCE" -eq 1 ] || [ -f "$ROOT/pyproject.toml" ]; then
+  elif [ "$FROM_SOURCE" -eq 1 ] || { [ -n "$ROOT" ] && [ -f "$ROOT/pyproject.toml" ]; }; then
     uv pip install --python "$PREFIX/venv/bin/python" "$ROOT"
   else
     die "No wheel supplied. Use --wheel, --from-source, or run from the repository."
@@ -199,6 +226,12 @@ singbox_binary_ok() {
   local binary="$1"
   [ -x "$binary" ] || return 1
   "$binary" version 2>/dev/null | grep -q "with_v2ray_api"
+}
+
+singbox_version_ok() {
+  local binary="$1"
+  [ -x "$binary" ] || return 1
+  "$binary" version 2>/dev/null | grep -q "version v${SINGBOX_VERSION}\$"
 }
 
 record_singbox_digest() {
@@ -219,22 +252,36 @@ EOF
   log "sing-box SHA256: ${digest}"
 }
 
+go_version_ok() {
+  local version major minor
+  version="$("$1" env GOVERSION 2>/dev/null | sed 's/^go//')"
+  major="${version%%.*}"
+  minor="${version#*.}"
+  minor="${minor%%.*}"
+  case "$major" in ''|*[!0-9]*) return 1 ;; esac
+  case "$minor" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 24 ]; }
+}
+
 install_go() {
-  if command -v go >/dev/null; then
+  if command -v go >/dev/null && go_version_ok "$(command -v go)"; then
     GO_BIN="$(command -v go)"
     return
   fi
-  local tmp url
+  local tmp url expected
   tmp="$(mktemp -d)"
   url="https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  case "$ARCH" in
+    amd64) expected="${GO_SHA256_AMD64}" ;;
+    arm64) expected="${GO_SHA256_ARM64}" ;;
+  esac
+  if [ -n "${GO_SHA256:-}" ]; then
+    expected="$GO_SHA256"
+  fi
+  [ -n "$expected" ] || die "No Go SHA256 configured for ${ARCH}; set GO_SHA256 to override."
   log "Downloading Go ${GO_VERSION} for ${ARCH}"
   curl -fsSL --retry 5 -o "$tmp/go.tar.gz" "$url"
-  if curl -fsSL --retry 3 -o "$tmp/go.tar.gz.sha256" "$url.sha256" 2>/dev/null; then
-    expected="$(awk '{print $1}' "$tmp/go.tar.gz.sha256")"
-    (cd "$tmp" && echo "${expected}  go.tar.gz" | sha256sum -c -)
-  else
-    warn "Go checksum file unavailable; continuing without verification."
-  fi
+  (cd "$tmp" && echo "${expected}  go.tar.gz" | sha256sum -c -)
   tar -xzf "$tmp/go.tar.gz" -C "$tmp"
   GO_BIN="$tmp/go/bin/go"
   GO_TMP="$tmp"
@@ -242,8 +289,8 @@ install_go() {
 
 install_singbox() {
   local target="$PREFIX/core/sing-box"
-  if [ "$MODE" = "upgrade" ] && singbox_binary_ok "$target"; then
-    log "Keeping existing sing-box binary with with_v2ray_api"
+  if [ "$MODE" = "upgrade" ] && singbox_binary_ok "$target" && singbox_version_ok "$target"; then
+    log "Keeping existing sing-box v${SINGBOX_VERSION} with with_v2ray_api"
     record_singbox_digest "$target"
     return
   fi
@@ -272,7 +319,9 @@ install_singbox() {
   tmp="$(mktemp -d)"
   git clone --depth 1 --branch "v${SINGBOX_VERSION}" https://github.com/SagerNet/sing-box.git "$tmp/src"
   (cd "$tmp/src" && CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" "$GO_BIN" build \
-    -trimpath -ldflags "-s -w" -tags "$SINGBOX_TAGS" -o "$tmp/sing-box" ./cmd/sing-box)
+    -trimpath \
+    -ldflags "-s -w -X github.com/sagernet/sing-box/constant.Version=v${SINGBOX_VERSION}" \
+    -tags "$SINGBOX_TAGS" -o "$tmp/sing-box" ./cmd/sing-box)
   install -m 0755 "$tmp/sing-box" "$target"
   rm -rf "$tmp" "${GO_TMP:-}"
   if ! singbox_binary_ok "$target"; then
@@ -335,7 +384,11 @@ setup_caddy() {
   if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
     log "Requesting certificate with certbot"
     systemctl stop caddy 2>/dev/null || true
-    certbot certonly --standalone -d "$DOMAIN" --agree-tos --non-interactive -m "admin@$DOMAIN" || warn "certbot failed; configure DNS and retry."
+    certbot certonly --standalone -d "$DOMAIN" --agree-tos --non-interactive \
+      -m "${OSTIUM_ACME_EMAIL:-admin@$DOMAIN}" || warn "certbot failed; configure DNS and retry."
+  fi
+  if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/$DOMAIN/privkey.pem" ]; then
+    die "No certificate found for $DOMAIN. Fix DNS/port 80, then rerun with --with-caddy."
   fi
   install -d -m 0750 -o root -g caddy "/etc/ostium/tls/$DOMAIN"
   install -m 0640 -o root -g caddy "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" \
@@ -394,6 +447,7 @@ do_install() {
 
 do_upgrade() {
   install_packages
+  [ -f "$CONF_DIR/ostium.env" ] || die "No existing installation found at $CONF_DIR/ostium.env."
   install_uv
   if grep -q '^OSTIUM_BACKUP_PASSWORD=..' "$CONF_DIR/ostium.env"; then
     log "Creating a pre-upgrade backup"
@@ -414,6 +468,10 @@ do_upgrade() {
 do_uninstall() {
   systemctl disable --now ostium-web.service ostium-worker.service ostium-jobs.service 2>/dev/null || true
   rm -f /etc/systemd/system/ostium-{web,worker,jobs}.service /usr/local/bin/ostium
+  rm -f /etc/systemd/system/caddy.service.d/ostium.conf
+  rm -f /etc/letsencrypt/renewal-hooks/deploy/ostium.sh \
+    /etc/letsencrypt/renewal-hooks/pre/ostium-stop-caddy.sh \
+    /etc/letsencrypt/renewal-hooks/post/ostium-start-caddy.sh
   systemctl daemon-reload
   if [ "$PURGE" -eq 1 ]; then
     warn "Purging data, certificates and configuration"

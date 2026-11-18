@@ -91,8 +91,13 @@ class StatsSampler:
             self._publish()
             return False
 
+        was_unavailable = not self.stats_ok
         self.failures = 0
         self.stats_ok = True
+        if was_unavailable:
+            from ostium.operations.services import resolve_alert
+
+            resolve_alert("stats_unavailable")
         elapsed = 5.0
         if self.last_sample_at is not None:
             elapsed = max(0.5, (now - self.last_sample_at).total_seconds())

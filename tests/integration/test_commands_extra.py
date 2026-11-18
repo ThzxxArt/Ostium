@@ -110,3 +110,50 @@ class RestoreTests(TransactionTestCase):
         assert ProxyUser.objects.filter(name="changed").exists()
         restore_file(paths.backups_dir() / backup.filename, password="a-long-backup-password")
         assert ProxyUser.objects.filter(name="restore-me").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_restore_failure_restores_previous_database(settings, tmp_path):
+    import hashlib
+    import json
+    import os
+    import tarfile
+    from io import BytesIO
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    from ostium.operations.backup import MAGIC, BackupError, _derive, restore_file
+    from ostium.proxy.services import create_proxy_user
+
+    settings.OSTIUM_DATA_DIR = str(tmp_path)
+    create_proxy_user("keep-me")
+
+    database = b"this is not a Django fixture"
+    manifest = {
+        "format": 1,
+        "product": "ostium-server",
+        "version": "0.2.0",
+        "field_key": settings.OSTIUM_FIELD_KEY,
+        "database_sha256": hashlib.sha256(database).hexdigest(),
+    }
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        for name, content in (
+            ("manifest.json", json.dumps(manifest).encode()),
+            ("database.json", database),
+        ):
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            tar.addfile(info, BytesIO(content))
+
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    payload = buffer.getvalue()
+    path = tmp_path / "bad-restore.ostb"
+    path.write_bytes(
+        MAGIC + salt + nonce + AESGCM(_derive("a-long-backup-password", salt)).encrypt(nonce, payload, MAGIC)
+    )
+
+    with pytest.raises(BackupError, match="previous database was restored"):
+        restore_file(path, password="a-long-backup-password")
+    assert ProxyUser.objects.filter(name="keep-me").exists()

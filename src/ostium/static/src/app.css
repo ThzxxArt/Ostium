@@ -168,9 +168,24 @@ button {
 /* ------------------------------------------------------------------ shell */
 
 .app-shell {
+  position: relative;
   display: grid;
   grid-template-columns: var(--sidebar) minmax(0, 1fr);
   min-height: 100vh;
+}
+
+/* The sidebar itself is sticky at 100vh. This rail keeps the left column
+   painted for the full document height, so full-page screenshots and
+   short-content pages never show a broken column below the sidebar. */
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--sidebar);
+  z-index: 0;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  pointer-events: none;
 }
 
 .sidebar {
@@ -181,9 +196,13 @@ button {
   flex-direction: column;
   height: 100vh;
   padding: 20px 14px 16px;
-  border-right: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
   backdrop-filter: blur(22px) saturate(140%);
+}
+
+.main {
+  position: relative;
+  z-index: 1;
 }
 
 .brand {
@@ -2169,12 +2188,14 @@ input[type="checkbox"] {
 
 @media (max-width: 1023px) {
   .app-shell { grid-template-columns: 1fr; }
+  .app-shell::before { display: none; }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
     width: min(292px, 86vw);
     transform: translateX(-102%);
     transition: transform 0.22s var(--ease);
+    border-right: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
     background: var(--surface-strong);
   }
@@ -2189,21 +2210,21 @@ input[type="checkbox"] {
   }
   .mobile-menu-btn { display: inline-grid; }
   .topbar { padding: 0 16px; }
-  .content { padding: 20px 16px 90px; }
+  .content { padding: 20px 16px calc(96px + env(safe-area-inset-bottom)); }
   .mobile-nav {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 30;
     display: flex;
     justify-content: space-around;
-    padding: 7px;
-    border-radius: 16px;
+    padding: 7px 7px calc(7px + env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
     border: 1px solid var(--border-strong);
-    background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
-    backdrop-filter: blur(20px);
-    box-shadow: var(--shadow-lg);
+    border-bottom: 0;
+    background: var(--surface-strong);
+    box-shadow: 0 -14px 30px -18px rgba(0, 0, 0, 0.7);
   }
   .mobile-nav a {
     display: flex;

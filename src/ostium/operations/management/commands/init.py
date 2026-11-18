@@ -53,7 +53,10 @@ class Command(BaseCommand):
             raise CommandError("Invalid --domain value.")
         if parsed_domain is not None and (parsed_domain.path or parsed_domain.query):
             raise CommandError("--domain must be a hostname, not a URL path.")
-        port = parsed_domain.port if parsed_domain else None
+        try:
+            port = parsed_domain.port if parsed_domain else None
+        except ValueError as exc:
+            raise CommandError("--domain contains an invalid port.") from exc
         if settings.OSTIUM_PUBLIC_BASE_URL:
             public_base_url = settings.OSTIUM_PUBLIC_BASE_URL.rstrip("/")
         elif domain:

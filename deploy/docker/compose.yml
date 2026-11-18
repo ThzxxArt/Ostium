@@ -73,7 +73,7 @@ services:
         condition: service_healthy
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     profiles: ["caddy"]
     restart: unless-stopped
     ports:
@@ -94,7 +94,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     profiles: ["postgres"]
     restart: unless-stopped
     environment:

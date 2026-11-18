@@ -38,10 +38,11 @@ https://{$OSTIUM_DOMAIN}:8443 {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
-		# The console relies on form POSTs with an Origin header. A
-		# no-referrer policy makes Chromium send Origin: null and breaks CSRF.
-		# Subscription responses still set no-referrer in Django.
-		Referrer-Policy "same-origin"
 		-Server
 	}
+	# The console relies on form POSTs with an Origin header. A no-referrer
+	# policy makes Chromium send Origin: null and breaks CSRF. Do not apply
+	# this to /sub/*: Django sets no-referrer there and Caddy would overwrite it.
+	@console not path /sub/*
+	header @console Referrer-Policy "same-origin"
 }

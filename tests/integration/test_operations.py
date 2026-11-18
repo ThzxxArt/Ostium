@@ -16,13 +16,28 @@ from ostium.operations.models import RuntimeState
 
 @pytest.mark.django_db
 def test_health_endpoints():
+    from django.utils import timezone
+
     client = Client()
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert response.json()["version"] == "0.2.0"
+
+    # A fresh installation has no worker heartbeat and no sing-box process.
+    response = client.get("/readyz")
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+    assert set(response.json()["checks"]) == {"database", "worker", "singbox"}
+
+    RuntimeState.objects.filter(pk=1).update(
+        worker_heartbeat=timezone.now(),
+        singbox_running=True,
+    )
     response = client.get("/readyz")
     assert response.status_code == 200
-    assert set(response.json()["checks"]) == {"database", "worker", "singbox"}
+    assert response.json()["status"] == "ready"
+
     response = client.get("/metrics")
     assert response.status_code == 200
     assert b"ostium_worker_alive" in response.content

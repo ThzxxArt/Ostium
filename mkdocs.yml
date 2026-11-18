@@ -62,8 +62,10 @@ nav:
       - 端口: reference/ports.md
       - PyPI 包说明: pypi-readme.md
   - 质量:
-      - 完成度审计: review/0.2.0-completion-audit.md
-      - 回归报告: review/0.2.0-regression-report.md
+      - 发布前验收: review/0.2.0-pre-release-audit.md
+      - 发布前回归: review/0.2.0-pre-release-regression.md
+      - 完成度审计（历史）: review/0.2.0-completion-audit.md
+      - 回归报告（历史）: review/0.2.0-regression-report.md
   - 设计文档:
       - 最终方案: design/v0.2.0-final.md
       - 实施决策: design/decisions.md

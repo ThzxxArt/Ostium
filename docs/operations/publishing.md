@@ -63,7 +63,13 @@ Actions -> release -> Run workflow
   publish_pypi: true
 ```
 
-`publish_pypi=false` 时只构建并上传 GitHub Actions artifact，不访问 PyPI。
+`publish_pypi` 默认是 **false**：默认只构建、校验并上传 GitHub Actions
+artifact，不访问 PyPI。确认要发布时才显式设为 `true`；PyPI 版本不可覆盖，
+所以不要把它当作普通的重跑按钮。
+
+发布 job 会先运行
+`uv run python scripts/verify-package.py dist`，确认 wheel 的发行名是
+`ostium-ctl`、版本与 `VERSION` 一致，并包含模板、静态资源和迁移。
 
 ## 本地发布
 

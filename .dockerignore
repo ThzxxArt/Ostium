@@ -9,7 +9,10 @@ var
 site
 dist
 tests
-docs
+# The project metadata reads docs/pypi-readme.md, so keep that one file in the
+# build context while excluding the rest of the documentation tree.
+docs/*
+!docs/pypi-readme.md
 deploy
 *.db
 *.db-wal

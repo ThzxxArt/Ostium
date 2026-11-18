@@ -166,9 +166,14 @@ def test_alerts_and_audit(api_client, admin_user):
 
 
 @pytest.mark.django_db
-def test_backup_api(api_client, settings):
+def test_backup_api(api_client, admin_user, settings):
+    from ostium.operations.models import AuditEvent, Backup
+
     response = api_client.post("/api/v1/backups", {"password": "short"}, format="json")
     assert response.status_code == 400
     response = api_client.post("/api/v1/backups", {"password": "a-long-backup-password"}, format="json")
     assert response.status_code == 201
     assert response.json()["encrypted"] is True
+    backup = Backup.objects.get()
+    assert backup.created_by == admin_user
+    assert AuditEvent.objects.get(action="backup.created").actor == admin_user

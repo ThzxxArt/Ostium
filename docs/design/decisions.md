@@ -92,3 +92,50 @@ Aurora 控制台使用 Alpine CSP build，保持 `script-src 'self' 'nonce-…'`
 `ProxyUser` 增加 `uploaded_bytes` / `downloaded_bytes`，与 `used_bytes` 一起
 在 flush 时原子累加，并在月度/手动重置时归零。`Subscription-Userinfo` 使用这
 三个权威计数，不再用可能被保留期删除的 `TrafficDaily` 反推。
+
+## 发布 workflow 默认只构建
+
+`release.yml` 的 `publish_pypi` 默认改为 `false`。手动运行 workflow 时默认只
+构建、校验并上传 GitHub Actions artifact；确认要发布时才显式设为 `true`。
+PyPI 版本不可覆盖，这样避免误点一次就产生不可撤回的发行版。
+
+## 容器基础镜像按 digest 固定
+
+Dockerfile 与 Compose 的 Python、Go、Debian、Caddy、PostgreSQL、uv 基础镜像
+均使用 `@sha256:` digest 固定；CI 的 PostgreSQL service 也使用同一 digest。
+这样 tag 被上游移动时不会静默改变发布内容。
+
+## Docker 构建路径
+
+Dockerfile 的 CSS 阶段改为在 `uv sync` 之后的最终依赖环境中运行 Tailwind。
+这样 Tailwind 同时扫描项目模板和 `.venv` 中的 Unfold 管理模板；此前把
+`app.css` 平铺到独立目录会让 `@source` 失效并静默丢掉管理端工具类。Docker
+构建上下文只保留 `docs/pypi-readme.md`，因为 `pyproject.toml` 的 readme
+指向它，而其余文档不必进入镜像。
+
+## 备份快照包含 contenttypes 与权限
+
+备份和恢复前的安全快照都包含 `contenttypes` 与 `auth.permission`，并在
+restore 的 `flush` 中使用 `inhibit_post_migrate`。否则 `auditlog` 的外键会
+指向重新生成后 ID 不同的 content type，导致备份无法恢复。恢复失败时会用
+flush 前的安全快照回滚，避免留下空数据库。
+
+## 订阅的 Referrer-Policy 作用域
+
+Caddy 只对非 `/sub/*` 响应设置 `Referrer-Policy: same-origin`，避免覆盖
+Django 在订阅响应上设置的 `no-referrer`。控制台仍使用 `same-origin` 以
+保证表单 POST 的 Origin 头正常。
+
+## 侧栏与移动端底部边界
+
+侧栏本身仍是 `position: sticky; height: 100vh`，但 `.app-shell::before` 会在
+整个文档高度上绘制左侧背景与边框，避免长页面/全页截图在视口下方出现断开的
+左栏。移动端底栏改为贴住视口底部，并预留
+`env(safe-area-inset-bottom)`；内容底部 padding 随底栏高度增加，滚动到底时
+最后一个内容块不会被底栏遮挡。
+
+## readiness 状态码与告警恢复
+
+`/readyz` 在 worker/sing-box 未就绪时返回 503，而不是 200。worker 在统计、
+证书、DNS 回退、自动备份和二进制校验恢复后显式 resolve 对应告警，避免已经
+恢复的条件永久停留在告警列表。

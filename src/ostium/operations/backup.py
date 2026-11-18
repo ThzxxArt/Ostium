@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import os
 import tarfile
 import tempfile
@@ -34,6 +35,7 @@ from .models import Backup
 MAGIC = b"OSTB1"
 SALT_BYTES = 16
 NONCE_BYTES = 12
+logger = logging.getLogger("ostium.operations.backup")
 
 
 class BackupError(RuntimeError):
@@ -75,13 +77,10 @@ def _database_dump() -> bytes:
         format="json",
         indent=2,
         stdout=buffer,
-        exclude=[
-            "contenttypes",
-            "auth.permission",
-            "sessions",
-            "admin",
-            "django_q",
-        ],
+        # Content types and permissions are part of the snapshot: auditlog
+        # entries reference them, and a dump without them cannot be loaded
+        # back without dangling foreign keys.
+        exclude=["sessions", "admin", "django_q"],
     )
     return buffer.getvalue().encode("utf-8")
 
@@ -254,13 +253,42 @@ def restore_file(source: Path, *, password: str, actor=None) -> None:
         if digest != manifest.get("database_sha256"):
             raise BackupError("Database checksum does not match the manifest.")
 
-        call_command("flush", interactive=False, verbosity=0)
-        call_command("loaddata", str(database_path), verbosity=0)
-        call_command("migrate", interactive=False, verbosity=0)
-        if _reencrypt_with_field_key(str(manifest.get("field_key") or "")):
+        # Flush is destructive and loaddata has its own transaction. Keep a
+        # dump of the current database so a malformed or incompatible backup
+        # cannot leave the instance with an empty database.
+        safety_path = staging / "previous-database.json"
+        safety_path.write_bytes(_database_dump())
+        try:
+            # inhibit_post_migrate keeps the content-type table empty so the
+            # snapshot can restore it with the exact IDs referenced by auditlog.
+            call_command("flush", interactive=False, verbosity=0, inhibit_post_migrate=True)
+            call_command("loaddata", str(database_path), verbosity=0)
+            call_command("migrate", interactive=False, verbosity=0)
+            reencrypted = _reencrypt_with_field_key(str(manifest.get("field_key") or ""))
+        except Exception as exc:
+            try:
+                call_command("flush", interactive=False, verbosity=0, inhibit_post_migrate=True)
+                call_command("loaddata", str(safety_path), verbosity=0)
+                call_command("migrate", interactive=False, verbosity=0)
+            except Exception as rollback_exc:
+                logger.exception("backup restore rollback failed")
+                raise BackupError(
+                    "Restore failed and the previous database could not be restored automatically. "
+                    "Keep the backup file and restore it manually."
+                ) from rollback_exc
+            raise BackupError("Restore failed; the previous database was restored.") from exc
+
+        if reencrypted:
             from .services import record_audit
 
-            record_audit(action="backup.field_key_reencrypted", actor=actor, target=source.name)
+            # The restored database may not contain the administrator who
+            # started the restore, so do not create a dangling actor FK.
+            record_audit(
+                action="backup.field_key_reencrypted",
+                actor=None,
+                target=source.name,
+                detail={"requested_by": getattr(actor, "get_username", lambda: "")()},
+            )
 
         source_certs = staging / "certs"
         if source_certs.is_dir():

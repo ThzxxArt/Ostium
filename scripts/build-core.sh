@@ -14,7 +14,9 @@ mkdir -p "$OUT"
 
 git clone --depth 1 --branch "v${VERSION}" https://github.com/SagerNet/sing-box.git "$WORK/src"
 cd "$WORK/src"
-CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -tags "$TAGS" -o "$OUT/sing-box" ./cmd/sing-box
+CGO_ENABLED=0 go build -trimpath \
+  -ldflags "-s -w -X github.com/sagernet/sing-box/constant.Version=v${VERSION}" \
+  -tags "$TAGS" -o "$OUT/sing-box" ./cmd/sing-box
 sha256sum "$OUT/sing-box" | awk '{print $1}' > "$OUT/sing-box.sha256"
 
 cat > "$OUT/sing-box.sbom.json" <<EOF

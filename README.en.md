@@ -346,7 +346,13 @@ ssh -L 8000:127.0.0.1:8000 user@server
 Upgrade / uninstall:
 
 ```bash
+# Online upgrade (no local checkout required)
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- upgrade --ref main
+
+# Or from a local checkout
 sudo bash install.sh upgrade --from-source
+
 sudo bash install.sh uninstall          # keep data
 sudo bash install.sh uninstall --purge  # remove data and user
 ```

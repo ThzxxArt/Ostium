@@ -61,6 +61,15 @@ ssh -L 8000:127.0.0.1:8000 user@server
 
 ### 升级
 
+在线升级不需要本地 checkout：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- upgrade --ref main
+```
+
+或从本地 checkout 升级：
+
 ```bash
 sudo bash install.sh upgrade --from-source
 ```

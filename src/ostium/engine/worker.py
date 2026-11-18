@@ -63,6 +63,7 @@ class Worker:
             return 1
 
         logger.info("worker starting, %s", message)
+        resolve_alert("singbox_binary_invalid")
         paths.worker_pid_path().write_text(str(os.getpid()), encoding="utf-8")
         self._install_signals()
         state = RuntimeState.load()
@@ -294,14 +295,17 @@ class Worker:
         self.next_retry_at = None
         self.failed_revision = None
         logger.info("configuration applied revision=%s sha256=%s dns=%s", desired, result.sha256, result.effective_dns)
-        for warning in result.warnings:
-            logger.warning(warning)
-            raise_alert(
-                code="dns_fallback",
-                level="warning",
-                message=warning,
-                fingerprint="dns_fallback",
-            )
+        if result.warnings:
+            for warning in result.warnings:
+                logger.warning(warning)
+                raise_alert(
+                    code="dns_fallback",
+                    level="warning",
+                    message=warning,
+                    fingerprint="dns_fallback",
+                )
+        else:
+            resolve_alert("dns_fallback")
         return True
 
     def _record_failure(self, message: str, desired: int, *, pid: int | None = None) -> None:
@@ -364,20 +368,27 @@ class Worker:
 
         for certificate in Certificate.objects.all():
             refresh_status(certificate)
+            expired_fingerprint = f"certificate_expired:{certificate.pk}"
+            expiring_fingerprint = f"certificate_expiring:{certificate.pk}"
             if certificate.is_expired:
+                resolve_alert(expiring_fingerprint)
                 raise_alert(
                     code="certificate_expired",
                     level="critical",
                     message=f"Certificate for {certificate.domain} has expired.",
-                    fingerprint=f"certificate_expired:{certificate.pk}",
+                    fingerprint=expired_fingerprint,
                 )
-            elif certificate.days_remaining <= 30:
-                raise_alert(
-                    code="certificate_expiring",
-                    level="warning",
-                    message=f"Certificate for {certificate.domain} expires in {certificate.days_remaining} days.",
-                    fingerprint=f"certificate_expiring:{certificate.pk}",
-                )
+            else:
+                resolve_alert(expired_fingerprint)
+                if certificate.days_remaining <= 30:
+                    raise_alert(
+                        code="certificate_expiring",
+                        level="warning",
+                        message=f"Certificate for {certificate.domain} expires in {certificate.days_remaining} days.",
+                        fingerprint=expiring_fingerprint,
+                    )
+                else:
+                    resolve_alert(expiring_fingerprint)
 
     def _check_disk(self) -> None:
         free = disk_free_bytes()
@@ -423,6 +434,7 @@ class Worker:
                 fingerprint="backup_failed:password",
             )
             return
+        resolve_alert("backup_failed:password")
         from ostium.operations.backup import create_backup
 
         last = None
@@ -433,6 +445,7 @@ class Worker:
             return
         try:
             create_backup(password=password, note="auto:worker")
+            resolve_alert("backup_failed:run")
         except Exception as exc:
             logger.exception("automatic backup failed")
             raise_alert(

@@ -20,6 +20,11 @@ class Command(BaseCommand):
         create.add_argument("name")
         create.add_argument("--scope", choices=ApiKey.Scope.values, default=ApiKey.Scope.READ)
         create.add_argument("--expires", type=int, default=0, help="Days until expiry; 0 means never.")
+        create.add_argument(
+            "--created-by",
+            default="",
+            help="Administrator username recorded as the key owner; defaults to the first superuser.",
+        )
         create.add_argument("--json", action="store_true")
 
         listing = sub.add_parser("list")
@@ -32,11 +37,21 @@ class Command(BaseCommand):
         getattr(self, f"_{options['subcommand']}")(options)
 
     def _create(self, options):
+        from django.contrib.auth import get_user_model
+
+        creator = None
+        if options["created_by"]:
+            creator = get_user_model().objects.filter(username=options["created_by"]).first()
+            if creator is None:
+                raise CommandError(f"User {options['created_by']!r} does not exist.")
+        else:
+            creator = get_user_model().objects.filter(is_superuser=True).order_by("id").first()
         expiry = timezone.now() + timedelta(days=options["expires"]) if options["expires"] else None
         key, plaintext = ApiKey.objects.create_key(
             name=options["name"],
             scope=options["scope"],
             expiry_date=expiry,
+            created_by=creator,
         )
         payload = {"name": key.name, "prefix": key.prefix, "scope": key.scope, "key": plaintext}
         if options["json"]:

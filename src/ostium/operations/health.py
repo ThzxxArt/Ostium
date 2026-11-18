@@ -13,6 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Gauge, gen
 from ostium import paths
 from ostium.engine.runtime import read_usage
 from ostium.operations.models import Alert, RuntimeState
+from ostium.version import __version__
 
 REGISTRY = CollectorRegistry(auto_describe=True)
 WORKER_ALIVE = Gauge("ostium_worker_alive", "1 when the data-plane worker heartbeat is fresh", registry=REGISTRY)
@@ -26,7 +27,7 @@ DISK_FREE = Gauge("ostium_disk_free_bytes", "Free bytes under the data directory
 @require_GET
 @never_cache
 def healthz(request: HttpRequest) -> JsonResponse:
-    return JsonResponse({"status": "ok", "version": "0.2.0"})
+    return JsonResponse({"status": "ok", "version": __version__})
 
 
 @require_GET
@@ -53,7 +54,7 @@ def readyz(request: HttpRequest) -> JsonResponse:
             "desired_revision": state.desired_revision,
             "last_error": state.last_error[:500] if state.last_error else "",
         },
-        status=200 if checks["database"] else 503,
+        status=200 if ready else 503,
     )
 
 

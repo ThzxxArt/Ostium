@@ -39,8 +39,10 @@ Ostium 0.2.0 是一个 **Linux 单机、单管理员、私人代理服务端**�
 
 ## 质量记录
 
-- [0.2.0 完成度审计](review/0.2.0-completion-audit.md)
-- [0.2.0 全量回归报告](review/0.2.0-regression-report.md)
+- [0.2.0 发布前验收矩阵](review/0.2.0-pre-release-audit.md)
+- [0.2.0 发布前全量回归](review/0.2.0-pre-release-regression.md)
+- [0.2.0 完成度审计（历史）](review/0.2.0-completion-audit.md)
+- [0.2.0 全量回归报告（历史）](review/0.2.0-regression-report.md)
 
 ## 版本与许可
 
