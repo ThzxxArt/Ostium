@@ -307,6 +307,7 @@ EOF
   install -m 0755 "$ROOT/deploy/certbot/deploy-hook.sh" /etc/letsencrypt/renewal-hooks/deploy/ostium.sh
   install -m 0755 "$ROOT/deploy/certbot/pre-hook.sh" /etc/letsencrypt/renewal-hooks/pre/ostium-stop-caddy.sh
   install -m 0755 "$ROOT/deploy/certbot/post-hook.sh" /etc/letsencrypt/renewal-hooks/post/ostium-start-caddy.sh
+  systemctl enable --now certbot.timer 2>/dev/null || warn "certbot.timer could not be enabled."
   certbot renew --dry-run >/dev/null 2>&1 || warn "certbot renew --dry-run failed; check hooks and port 80."
   log "Caddy is serving https://$DOMAIN:8443"
 }

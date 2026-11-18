@@ -40,6 +40,7 @@ nav:
   - 首页: index.md
   - 快速开始: getting-started.md
   - 安装: installation.md
+  - 从零部署教程: tutorials/from-zero.md
   - 配置: configuration.md
   - 订阅: subscriptions.md
   - 协议: protocols.md

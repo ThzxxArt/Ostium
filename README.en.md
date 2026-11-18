@@ -641,6 +641,7 @@ Local validation:
 | Document | Contents |
 |---|---|
 | [Getting started](docs/getting-started.md) | Run a development instance |
+| [Deployment tutorial (Chinese)](docs/tutorials/from-zero.md) | DNS, Caddy/certbot, systemd/Docker, first login, subscriptions, renewal, troubleshooting |
 | [Installation](docs/installation.md) | systemd / Docker / upgrade / uninstall |
 | [Configuration](docs/configuration.md) | Environment and runtime settings |
 | [Subscriptions](docs/subscriptions.md) | Four formats and client compatibility |

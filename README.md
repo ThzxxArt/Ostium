@@ -642,6 +642,7 @@ uv run mkdocs build --strict
 | 文档 | 内容 |
 |---|---|
 | [快速开始](docs/getting-started.md) | 从源码启动开发实例 |
+| [从零部署教程](docs/tutorials/from-zero.md) | DNS、Caddy/certbot、systemd/Docker、首次登录、订阅、续期、排障 |
 | [安装](docs/installation.md) | systemd / Docker / 升级 / 卸载 |
 | [配置](docs/configuration.md) | 环境变量与运行时设置 |
 | [订阅](docs/subscriptions.md) | 四种格式与客户端兼容性 |

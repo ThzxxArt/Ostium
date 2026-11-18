@@ -2,6 +2,9 @@
 
 生产环境支持两种方式：systemd 或 Docker Compose。二者都只面向 Linux。
 
+> 第一次部署建议直接看 [从零部署中文教程](tutorials/from-zero.md)：
+> 从 DNS、防火墙、Caddy/certbot、首次登录、建用户、订阅到续期和排障逐步执行。
+
 ## 方式一：systemd
 
 ### 要求

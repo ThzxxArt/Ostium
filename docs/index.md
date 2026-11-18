@@ -32,6 +32,7 @@ Ostium 0.2.0 是一个 **Linux 单机、单管理员、私人代理服务端**�
 ## 下一步
 
 - [快速开始](getting-started.md)：从源码启动一个开发实例。
+- [从零部署教程](tutorials/from-zero.md)：systemd + Caddy、Docker + Caddy、SSH 隧道。
 - [安装](installation.md)：systemd 或 Docker Compose。
 - [订阅](subscriptions.md)：把链接导入 v2rayN、Clash Verge、sing-box。
 - [安全](security.md)：公网暴露前的检查清单。
