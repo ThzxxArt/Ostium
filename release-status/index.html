@@ -2080,11 +2080,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </tr>
 <tr>
 <td>Tag</td>
-<td><code>v0.1.12</code> (annotated)</td>
+<td><code>v0.1.12</code> (annotated, commit <code>b9aa539</code>)</td>
 </tr>
 <tr>
 <td>Assets</td>
-<td>GitHub Release <code>v0.1.12</code> — produced from this status commit</td>
+<td>GitHub Release <code>v0.1.12</code> — 23 assets, marked Latest</td>
 </tr>
 <tr>
 <td>PyPI</td>
@@ -2096,7 +2096,7 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </tr>
 <tr>
 <td>Release workflow</td>
-<td>release run from the <code>v0.1.12</code> tag</td>
+<td>run <code>44231382159</code> — success</td>
 </tr>
 <tr>
 <td>Previous release</td>
@@ -2112,11 +2112,11 @@ verified, and what remains an accepted blocker. Version-specific notes live in
 </tr>
 </tbody>
 </table>
-<p><code>v0.1.12</code> is the current release. The status is recorded here <strong>before</strong> the
-tag is created: the wheel, sdist and Release assets are immutable once
-published, so the tagged tree must already say <code>0.1.12</code> / published. The tag
-must be created from this commit; artifact names, run IDs and hashes are
-appended after the release workflow completes.</p>
+<p><code>v0.1.12</code> was published on 2026-11-18. The tag targets <code>b9aa539</code>; the release
+workflow passed verification, integration, upgrade-e2e, wheel, core, Windows,
+macOS, Linux package, Docker and publish jobs. The GitHub Release has 23
+assets, PyPI serves <code>ostium-ctl==0.1.12</code> (wheel + sdist), and GHCR has the
+<code>0.1.12</code>/<code>v0.1.12</code>/<code>latest</code> tags.</p>
 <h2 id="0112-verification-status">0.1.12 verification status<a class="headerlink" href="#0112-verification-status" title="Permanent link">&para;</a></h2>
 <h3 id="verified-locally">Verified locally<a class="headerlink" href="#verified-locally" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2132,6 +2132,9 @@ appended after the release workflow completes.</p>
 <li><code>npm audit</code> gate: one exact, expiring exception for
   <code>GHSA-fc5q-39xc-vjpf</code> (<code>picomatch</code>, build/test toolchain only, no fixed
   upstream release as of 2026-11-18); all other advisories still fail.</li>
+<li>Release workflow <code>44231382159</code> passed every job; the companion Core build
+  workflow <code>44231381973</code> passed. The GitHub Release is public with 23 assets,
+  PyPI has <code>ostium-ctl==0.1.12</code>, and GHCR has <code>0.1.12</code>/<code>v0.1.12</code>/<code>latest</code>.</li>
 </ul>
 <h3 id="not-verified-in-this-workspace-0112">Not verified in this workspace (0.1.12)<a class="headerlink" href="#not-verified-in-this-workspace-0112" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2140,8 +2143,9 @@ appended after the release workflow completes.</p>
 <li>Debian/RHEL real machines, Nginx, Docker runtime, ACME, real TUN, 72-hour
   soak and performance.</li>
 <li>The release workflow, platform assets and PyPI/GHCR publication are produced
-  from this status commit; unexecuted checks remain blockers and must not be
-  claimed as verified.</li>
+  from the <code>v0.1.12</code> tag; run <code>44231382159</code> passed and the artifacts are
+  published. Unexecuted platform checks in the list above remain blockers and
+  must not be claimed as verified.</li>
 </ul>
 <p><code>v0.1.0</code> and <code>v0.1.1</code> tags, GitHub Release assets, PyPI wheels and GHCR images
 are published artifacts. They are never replaced or moved by this release.</p>
