@@ -1286,7 +1286,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ostium-server"
+name = "ostium-ctl"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [

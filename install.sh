@@ -35,7 +35,7 @@ Options:
   --no-service         Prepare files but do not enable systemd units
   --from-source        Install this checkout instead of a release wheel
   --wheel PATH         Install a specific wheel
-  --pypi               Install ostium-server from PyPI (requires a published release)
+  --pypi               Install ostium-ctl from PyPI (requires a published release)
   --ref REF            Source ref for online install (default: main)
   --source-url URL     Source tarball URL for online install
   --singbox PATH       Use a local sing-box binary instead of downloading
@@ -183,7 +183,7 @@ install_app() {
     uv venv --python 3.14 --clear "$PREFIX/venv"
   fi
   if [ "$PYPI" -eq 1 ]; then
-    uv pip install --python "$PREFIX/venv/bin/python" "ostium-server==${PYPI_VERSION}"
+    uv pip install --python "$PREFIX/venv/bin/python" "ostium-ctl==${PYPI_VERSION}"
   elif [ -n "${WHEEL:-}" ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "$WHEEL"
   elif [ "$FROM_SOURCE" -eq 1 ] || [ -f "$ROOT/pyproject.toml" ]; then

@@ -2,6 +2,16 @@
 
 本文件记录实施过程中与 `v0.2.0-final.md` 的差异，原则仍是：服务端-only、零兼容、零迁移、成熟框架、现代 UI。
 
+## PyPI 包名沿用 `ostium-ctl`
+
+0.2.0 产品名仍是 Ostium Server，但 Python 发行包名最终沿用 0.1.x 的
+`ostium-ctl`。原因是 PyPI trusted publisher 已绑定该项目的 `release.yml`
+与 `pypi` environment；继续使用同名项目可以复用现有发布链路。模块、命令和
+wheel 内代码仍是 `ostium`。
+
+`ostium-server` 仅作为产品/备份格式/Docker 镜像名保留，不再作为 Python
+发行包名。
+
 ## Python 3.14.5 而非 3.14.10
 
 截至实施日，python.org / uv 可获取的最新 CPython 3.14 是 **3.14.5**；3.14.10 尚未发布。

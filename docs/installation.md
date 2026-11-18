@@ -121,9 +121,10 @@ shell 环境或项目 `.env` 中提供。首次切换 Postgres 时先启动 post
 
 ## PyPI 包
 
-`ostium-server` 也可以作为 Python 包发布，但 PyPI wheel 只包含代码、模板和
-静态资源，不包含 systemd/Caddy/Docker 部署资产。完整服务端请使用上面的
-一键在线安装器。发布流程见 [PyPI 发布](operations/publishing.md)。
+`ostium-ctl` 也可以作为 Python 包发布（沿用 0.1.x 的 PyPI 项目名），但
+PyPI wheel 只包含代码、模板和静态资源，不包含 systemd/Caddy/Docker 部署
+资产。完整服务端请使用上面的一键在线安装器。发布流程见
+[PyPI 发布](operations/publishing.md)。
 
 ## 安装后检查
 

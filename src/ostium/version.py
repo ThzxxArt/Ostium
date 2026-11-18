@@ -25,7 +25,7 @@ def _read_version_file() -> str | None:
 
 def get_version() -> str:
     try:
-        return version("ostium-server")
+        return version("ostium-ctl")
     except PackageNotFoundError:
         return _read_version_file() or _FALLBACK
 

@@ -1,5 +1,5 @@
 [project]
-name = "ostium-server"
+name = "ostium-ctl"
 version = "0.2.0"
 description = "Ostium Server — a single-host private proxy server for Linux"
 readme = "docs/pypi-readme.md"

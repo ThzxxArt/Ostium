@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 从 PyPI 安装 Python 包（仅代码与 `ostium` 命令，不含部署资产）：
 
 ```bash
-pip install ostium-server
+pip install ostium-ctl
 ostium help
 ```
 
