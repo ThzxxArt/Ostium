@@ -58,6 +58,9 @@ nav:
       - 设置项: reference/settings.md
       - 订阅格式: reference/formats.md
       - 端口: reference/ports.md
+  - 质量:
+      - 完成度审计: review/0.2.0-completion-audit.md
+      - 回归报告: review/0.2.0-regression-report.md
   - 设计文档:
       - 最终方案: design/v0.2.0-final.md
       - 实施决策: design/decisions.md
