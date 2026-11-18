@@ -108,7 +108,27 @@ sudo ufw status
 
 云服务器还要在安全组放行同样端口。
 
-### 1.3 获取代码并安装
+### 1.3 一键在线安装
+
+不需要手动下载 `install.sh`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- --domain vpn.example.com --with-caddy
+```
+
+脚本会自动下载源码、构建 sing-box、安装 systemd 服务和申请证书。
+
+更稳妥的方式是先看脚本再执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  -o /tmp/ostium-install.sh
+less /tmp/ostium-install.sh
+sudo bash /tmp/ostium-install.sh --domain vpn.example.com --with-caddy
+```
+
+也可以手动 clone：
 
 ```bash
 git clone https://github.com/ThzxxArt/Ostium.git

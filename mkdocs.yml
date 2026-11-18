@@ -53,12 +53,14 @@ nav:
       - 备份与恢复: operations/backup-restore.md
       - 升级: operations/upgrade.md
       - 监控: operations/monitoring.md
+      - PyPI 发布: operations/publishing.md
       - 排障: operations/troubleshooting.md
       - E2E 验证: operations/e2e-evidence.md
   - 参考:
       - 设置项: reference/settings.md
       - 订阅格式: reference/formats.md
       - 端口: reference/ports.md
+      - PyPI 包说明: pypi-readme.md
   - 质量:
       - 完成度审计: review/0.2.0-completion-audit.md
       - 回归报告: review/0.2.0-regression-report.md

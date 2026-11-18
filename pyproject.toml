@@ -2,7 +2,7 @@
 name = "ostium-server"
 version = "0.2.0"
 description = "Ostium Server — a single-host private proxy server for Linux"
-readme = "README.md"
+readme = "docs/pypi-readme.md"
 requires-python = ">=3.14,<3.15"
 license = { text = "AGPL-3.0-or-later" }
 authors = [{ name = "Ostium contributors" }]

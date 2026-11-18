@@ -14,7 +14,14 @@
 - 一个指向服务器的域名（可选，但公网管理面需要）
 - 入站 443/tcp、443/udp；管理面 8443/tcp（若使用 Caddy）
 
-### 安装
+### 一键在线安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- --domain vpn.example.com --with-caddy
+```
+
+不需要手动下载脚本；安装器会自动下载源码和部署资产。也可以 clone 后执行：
 
 ```bash
 sudo bash install.sh --domain vpn.example.com --with-caddy
@@ -111,6 +118,12 @@ docker compose --profile postgres up -d
 `ostium.env` 通过 Compose 的 `env_file` 注入；`POSTGRES_PASSWORD` 必须在
 shell 环境或项目 `.env` 中提供。首次切换 Postgres 时先启动 postgres，
 等健康检查通过后再启动 web/worker。
+
+## PyPI 包
+
+`ostium-server` 也可以作为 Python 包发布，但 PyPI wheel 只包含代码、模板和
+静态资源，不包含 systemd/Caddy/Docker 部署资产。完整服务端请使用上面的
+一键在线安装器。发布流程见 [PyPI 发布](operations/publishing.md)。
 
 ## 安装后检查
 

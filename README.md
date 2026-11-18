@@ -298,6 +298,35 @@ uv run ostium user subscription alice --reveal
 
 ## 📦 生产安装
 
+### 一键在线安装（systemd + Caddy）
+
+不需要手动下载 `install.sh`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- --domain vpn.example.com --with-caddy
+```
+
+脚本会自动下载对应源码、构建带统计标签的 sing-box、安装 systemd 服务并申请证书。
+不使用 Caddy：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s --
+```
+
+> 需要先安装 `caddy`、`certbot`，并让域名解析到本机、80 端口可用。
+> 更稳妥的做法是先查看脚本内容，再执行：
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+>   -o /tmp/ostium-install.sh
+> less /tmp/ostium-install.sh
+> sudo bash /tmp/ostium-install.sh --domain vpn.example.com --with-caddy
+> ```
+
+一键安装的完整中文步骤见 [从零部署教程](docs/tutorials/from-zero.md)。
+
 ### 方式一：systemd（推荐）
 
 ```bash
@@ -652,7 +681,7 @@ uv run mkdocs build --strict
 | [安全](docs/security.md) | 控制项、公网清单、残余风险 |
 | [CLI](docs/cli.md) | 全部命令 |
 | [API](docs/api.md) | `/api/v1` 端点与错误格式 |
-| [运维](docs/operations/) | 备份、升级、监控、排障、E2E |
+| [运维](docs/operations/) | 备份、升级、监控、PyPI 发布、排障、E2E |
 | [设计](docs/design/v0.2.0-final.md) | 0.2.0 最终方案与决策记录 |
 
 ---

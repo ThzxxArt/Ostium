@@ -19,6 +19,11 @@ FROM_SOURCE=0
 PURGE=0
 MODE="install"
 SINGBOX_PATH=""
+SOURCE_REF="${OSTIUM_SOURCE_REF:-main}"
+SOURCE_URL="${OSTIUM_SOURCE_URL:-}"
+SOURCE_TMP=""
+PYPI=0
+PYPI_VERSION="${OSTIUM_PYPI_VERSION:-$VERSION}"
 
 usage() {
   cat <<'EOF'
@@ -30,6 +35,9 @@ Options:
   --no-service         Prepare files but do not enable systemd units
   --from-source        Install this checkout instead of a release wheel
   --wheel PATH         Install a specific wheel
+  --pypi               Install ostium-server from PyPI (requires a published release)
+  --ref REF            Source ref for online install (default: main)
+  --source-url URL     Source tarball URL for online install
   --singbox PATH       Use a local sing-box binary instead of downloading
   --purge              With uninstall: delete data, config and the service user
   -h, --help           Show this help
@@ -48,6 +56,9 @@ while [ $# -gt 0 ]; do
     --no-service) NO_SERVICE=1 ;;
     --from-source) FROM_SOURCE=1 ;;
     --wheel) WHEEL="${2:?}"; shift ;;
+    --pypi) PYPI=1 ;;
+    --ref) SOURCE_REF="${2:?}"; shift ;;
+    --source-url) SOURCE_URL="${2:?}"; shift ;;
     --singbox) SINGBOX_PATH="${2:?}"; shift ;;
     --purge) PURGE=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -69,6 +80,9 @@ case "$(uname -m)" in
 esac
 command -v systemctl >/dev/null || die "systemd is required (use Docker Compose otherwise)."
 command -v apt-get >/dev/null || warn "Only apt-based distributions are automated; install curl/openssl/certbot manually if needed."
+if [ "$PYPI" -eq 1 ] && [ -n "${WHEEL:-}" ]; then
+  die "--pypi and --wheel cannot be used together."
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -77,6 +91,37 @@ install_packages() {
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl git
   fi
+}
+
+prepare_source() {
+  # When invoked as `curl .../install.sh | sudo bash -s -- ...`, there is no
+  # checkout next to the script. Download the matching source tarball so the
+  # systemd/Caddy/certbot assets are still available.
+  if [ -f "$ROOT/pyproject.toml" ] && [ -d "$ROOT/src/ostium/config" ]; then
+    return
+  fi
+  [ -n "$SOURCE_TMP" ] && return
+  command -v curl >/dev/null || die "curl is required for online installation."
+  command -v tar >/dev/null || die "tar is required for online installation."
+  local url kind
+  if [ -n "$SOURCE_URL" ]; then
+    url="$SOURCE_URL"
+  else
+    case "$SOURCE_REF" in
+      v*) kind="tags" ;;
+      *) kind="heads" ;;
+    esac
+    url="https://github.com/ThzxxArt/Ostium/archive/refs/${kind}/${SOURCE_REF}.tar.gz"
+  fi
+  SOURCE_TMP="$(mktemp -d)"
+  log "Downloading Ostium source (${SOURCE_REF})"
+  curl -fsSL --retry 5 "$url" -o "$SOURCE_TMP/source.tar.gz" || die "Could not download $url"
+  tar -xzf "$SOURCE_TMP/source.tar.gz" -C "$SOURCE_TMP"
+  ROOT="$(find "$SOURCE_TMP" -maxdepth 1 -mindepth 1 -type d | head -n 1)"
+  if [ ! -f "$ROOT/pyproject.toml" ] || [ ! -d "$ROOT/src/ostium" ]; then
+    die "Downloaded source is not a valid Ostium checkout."
+  fi
+  trap 'rm -rf "$SOURCE_TMP"' EXIT
 }
 
 create_user() {
@@ -137,7 +182,9 @@ install_app() {
     log "Creating Python environment"
     uv venv --python 3.14 --clear "$PREFIX/venv"
   fi
-  if [ -n "${WHEEL:-}" ]; then
+  if [ "$PYPI" -eq 1 ]; then
+    uv pip install --python "$PREFIX/venv/bin/python" "ostium-server==${PYPI_VERSION}"
+  elif [ -n "${WHEEL:-}" ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "$WHEEL"
   elif [ "$FROM_SOURCE" -eq 1 ] || [ -f "$ROOT/pyproject.toml" ]; then
     uv pip install --python "$PREFIX/venv/bin/python" "$ROOT"
@@ -325,6 +372,7 @@ health_check() {
 
 do_install() {
   install_packages
+  prepare_source
   create_user
   write_env
   install_uv
@@ -353,6 +401,7 @@ do_upgrade() {
   else
     warn "OSTIUM_BACKUP_PASSWORD is not set; skipping the automatic pre-upgrade backup."
   fi
+  prepare_source
   install_app
   install_singbox
   run_as_ostium "$PREFIX/venv/bin/ostium" migrate --noinput

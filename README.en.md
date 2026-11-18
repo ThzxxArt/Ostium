@@ -298,6 +298,27 @@ Import the Base64 link into v2rayN / Shadowrocket, use `/clash` for Clash, `/sin
 
 ## 📦 Production Install
 
+### One-line online install (systemd + Caddy)
+
+No manual `install.sh` download:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s -- --domain vpn.example.com --with-caddy
+```
+
+The script downloads the source, builds sing-box with statistics tags, installs
+the systemd units and requests a certificate. Without Caddy:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
+  | sudo bash -s --
+```
+
+> Install `caddy` and `certbot` first; DNS must point at the host and port 80
+> must be reachable. For a reviewable install, download the script, inspect it,
+> then run it with `sudo bash`.
+
 ### systemd (recommended)
 
 ```bash
@@ -651,7 +672,7 @@ Local validation:
 | [Security](docs/security.md) | Controls, exposure checklist, residual risks |
 | [CLI](docs/cli.md) | Every command |
 | [API](docs/api.md) | `/api/v1` endpoints and error format |
-| [Operations](docs/operations/) | Backup, upgrade, monitoring, troubleshooting, E2E |
+| [Operations](docs/operations/) | Backup, upgrade, monitoring, PyPI publishing, troubleshooting, E2E |
 | [Design](docs/design/v0.2.0-final.md) | 0.2.0 final design and decisions |
 
 ---
