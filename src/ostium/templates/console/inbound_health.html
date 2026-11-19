@@ -1,0 +1,62 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}线路健康{% endblock %}
+{% block breadcrumb %}线路 / 健康{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "activity" "w-3.5 h-3.5" %} Line health</div>
+            <h1 class="page-title">线路健康与防封禁</h1>
+            <p class="page-desc">检查启用线路的端口监听、证书、密钥与混淆状态；这里不会发送代理流量。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn" href="{% url 'console:inbounds' %}">{% icon "arrow-left" %} 返回线路</a>
+            <a class="btn btn--primary" href="{% url 'console:inbound_health' %}">{% icon "refresh" %} 重新检查</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "gauge" %} 检查结果</div>
+                <span class="badge">{{ health|length }} 条线路</span>
+            </div>
+            <div class="panel-body">
+                <div class="health-list">
+                    {% for item in health %}
+                        <div class="health-row">
+                            <div class="health-name">
+                                <span class="health-dot {% if item.status == 'ok' %}health-dot--pass{% elif item.status == 'fail' %}health-dot--fail{% elif item.status == 'warn' %}health-dot--warn{% endif %}"></span>
+                                <strong>{{ item.label }}</strong>
+                            </div>
+                            <div class="health-detail">{{ item.detail }}</div>
+                            <span class="badge {% if item.status == 'ok' %}badge--success{% elif item.status == 'fail' %}badge--danger{% elif item.status == 'warn' %}badge--warning{% else %}badge--muted{% endif %}">
+                                {% if item.status == "ok" %}正常{% elif item.status == "fail" %}异常{% elif item.status == "warn" %}注意{% else %}未启用{% endif %}
+                            </span>
+                        </div>
+                        {% if item.fix and item.status != "ok" %}
+                            <div class="muted text-xs" style="padding:0 0 8px 20px">{{ item.fix }}</div>
+                        {% endif %}
+                    {% empty %}
+                        <div class="empty-state">
+                            <span class="empty-icon">{% icon "lan" %}</span>
+                            <div class="empty-title">还没有线路</div>
+                            <div class="empty-copy">先创建线路并在控制台启用。</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+        <aside class="panel span-4">
+            <div class="panel-head"><div class="panel-title">{% icon "shield" %} 防封禁建议</div></div>
+            <div class="panel-body stack text-sm muted">
+                <p><strong>Hysteria2</strong> 保持 salamander 混淆；端口正常且证书就绪时，UDP 443 通常比 TCP 更抗干扰。</p>
+                <p><strong>Trojan / Shadowsocks</strong> 可以使用随机高位端口，避免长期固定在常见端口；变更后在云防火墙放行。</p>
+                <p><strong>Reality</strong> 如果 SNI 被针对性阻断，可轮换伪装域名；轮换后所有客户端都要重新导入订阅。</p>
+                <p><strong>四线互备</strong>：客户端订阅包含 Auto 测速组，保留至少一条 TLS 线路和一条 QUIC 线路。</p>
+                <p>端口或 SNI 变更后，先确认新端口可从外网访问，再让用户更新订阅。</p>
+            </div>
+        </aside>
+    </div>
+{% endblock %}

@@ -359,8 +359,31 @@ class Worker:
     def _maintenance(self) -> None:
         self._check_certificates()
         self._check_disk()
+        self._check_inbounds()
         self._retention()
         self._maybe_backup()
+
+    def _check_inbounds(self) -> None:
+        state = RuntimeState.load()
+        if not state.singbox_running:
+            return
+        started = state.singbox_started_at
+        if started and (timezone.now() - started).total_seconds() < 15:
+            return
+        from ostium.proxy.health import check_inbounds
+
+        for health in check_inbounds(singbox_running=True):
+            fingerprint = f"inbound_health:{health.kind}"
+            if health.status != "fail":
+                resolve_alert(fingerprint)
+                continue
+            raise_alert(
+                code="inbound_unhealthy",
+                level="warning",
+                message=f"{health.label} 线路异常：{health.detail}",
+                fingerprint=fingerprint,
+                detail={"kind": health.kind, "detail": health.detail, "fix": health.fix},
+            )
 
     def _check_certificates(self) -> None:
         from ostium.certificates.models import Certificate

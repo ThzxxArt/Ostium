@@ -54,6 +54,7 @@ nav:
       - 升级: operations/upgrade.md
       - 监控: operations/monitoring.md
       - 客户端兼容性: operations/client-compatibility.md
+      - 线路稳定性与防封禁: operations/anti-blocking.md
       - PyPI 发布: operations/publishing.md
       - 排障: operations/troubleshooting.md
       - E2E 验证: operations/e2e-evidence.md
@@ -63,6 +64,7 @@ nav:
       - 端口: reference/ports.md
       - PyPI 包说明: pypi-readme.md
   - 质量:
+      - 0.2.12 线路稳定性与防封禁: review/0.2.12-line-hardening.md
       - 0.2.11 页面备份密码: review/0.2.11-backup-password.md
       - 0.2.10 客户端兼容性: review/0.2.10-client-compatibility.md
       - 0.2.9 Clash 订阅 DNS 修复: review/0.2.9-clash-dns.md

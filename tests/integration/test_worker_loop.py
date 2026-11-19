@@ -105,10 +105,16 @@ def test_maintenance_runs_all(monkeypatch, tmp_path, settings):
     settings.OSTIUM_DATA_DIR = str(tmp_path)
     worker = Worker()
     calls = []
-    for name in ("_check_certificates", "_check_disk", "_retention", "_maybe_backup"):
+    for name in ("_check_certificates", "_check_disk", "_check_inbounds", "_retention", "_maybe_backup"):
         monkeypatch.setattr(worker, name, lambda name=name: calls.append(name))
     worker._maintenance()
-    assert set(calls) == {"_check_certificates", "_check_disk", "_retention", "_maybe_backup"}
+    assert set(calls) == {
+        "_check_certificates",
+        "_check_disk",
+        "_check_inbounds",
+        "_retention",
+        "_maybe_backup",
+    }
 
 
 @pytest.mark.django_db

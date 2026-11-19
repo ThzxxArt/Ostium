@@ -6,8 +6,9 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 
 from ostium.certificates.models import Certificate
+from ostium.proxy.health import check_inbounds, pick_random_port, pick_reality_target
 from ostium.proxy.models import Inbound
-from ostium.proxy.services import initialize_inbounds
+from ostium.proxy.services import initialize_inbounds, mark_dirty
 
 
 class Command(BaseCommand):
@@ -16,6 +17,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         sub = parser.add_subparsers(dest="subcommand", required=True)
         sub.add_parser("list", help="List inbounds.")
+        check = sub.add_parser("check", help="Check enabled inbound health.")
+        check.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
         init = sub.add_parser("init", help="Create missing inbound records.")
         init.add_argument("--enable", default="vless", help="Comma-separated kinds to enable.")
 
@@ -29,6 +32,9 @@ class Command(BaseCommand):
         port = sub.add_parser("set-port", help="Change the listening port.")
         port.add_argument("kind", choices=Inbound.Kind.values)
         port.add_argument("port", type=int)
+        sub.add_parser("rotate-camouflage", help="Rotate the VLESS Reality camouflage target.")
+        random_port = sub.add_parser("randomize-port", help="Move one inbound to a random high port.")
+        random_port.add_argument("kind", choices=Inbound.Kind.values)
 
     def handle(self, *args, **options):
         getattr(self, f"_{options['subcommand'].replace('-', '_')}")(options)
@@ -41,6 +47,44 @@ class Command(BaseCommand):
                 f"{inbound.kind:14} {'enabled' if inbound.enabled else 'disabled':9} "
                 f"{inbound.listen}:{inbound.port:<6} cert={cert:24} {errors}"
             )
+
+    def _check(self, options):
+        import json
+        from dataclasses import asdict
+
+        results = check_inbounds()
+        if options["json"]:
+            self.stdout.write(json.dumps([asdict(item) for item in results], ensure_ascii=False, indent=2))
+        else:
+            for item in results:
+                self.stdout.write(f"{item.label:16} {item.status:8} {item.detail} {item.fix}".rstrip())
+        if any(item.status == "fail" for item in results):
+            raise CommandError("One or more enabled inbounds are unhealthy.")
+
+    def _rotate_camouflage(self, options):
+        inbound = Inbound.objects.filter(kind=Inbound.Kind.VLESS).first()
+        if inbound is None:
+            raise CommandError("VLESS inbound does not exist.")
+        try:
+            target = pick_reality_target(inbound.params.get("server_name"))
+        except RuntimeError as exc:
+            raise CommandError(str(exc)) from exc
+        inbound.update_params(server_name=target, handshake_server=target, handshake_port=443)
+        inbound.save(update_fields=["params_enc", "updated_at"])
+        mark_dirty()
+        self.stdout.write(self.style.SUCCESS(f"Reality camouflage rotated to {target}."))
+
+    def _randomize_port(self, options):
+        inbound = Inbound.objects.filter(kind=options["kind"]).first()
+        if inbound is None:
+            raise CommandError("Inbound does not exist.")
+        try:
+            inbound.port = pick_random_port(inbound)
+        except RuntimeError as exc:
+            raise CommandError(str(exc)) from exc
+        inbound.save(update_fields=["port", "updated_at"])
+        mark_dirty()
+        self.stdout.write(self.style.SUCCESS(f"{inbound.kind} now listens on {inbound.port}."))
 
     def _init(self, options):
         enable = tuple(item.strip() for item in options["enable"].split(",") if item.strip())

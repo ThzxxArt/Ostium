@@ -16,6 +16,7 @@ from django.urls import reverse
         "console:subscriptions",
         "console:inbounds",
         "console:connections",
+        "console:inbound_health",
         "console:certificates",
         "console:logs",
         "console:jobs",

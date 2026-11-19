@@ -45,6 +45,7 @@ scrape_configs:
 | `certificate_expiring` | 证书 ≤30 天 |
 | `certificate_expired` | 证书已过期 |
 | `disk_low` | 数据盘 <1 GiB |
+| `inbound_unhealthy` | 已启用线路端口未监听或配置异常 |
 | `quota_80` / `quota_90` | 用户配额阈值 |
 | `backup_failed` | 自动备份失败 |
 | `dns_fallback` | DoH 失败回退 UDP |

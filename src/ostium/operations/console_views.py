@@ -48,6 +48,7 @@ from ostium.operations.forms import (
 )
 from ostium.operations.models import Alert, AuditEvent, Backup, RuntimeState
 from ostium.operations.services import record_audit
+from ostium.proxy.health import check_inbounds, pick_random_port, pick_reality_target
 from ostium.proxy.models import Inbound, ProxyUser, TrafficDaily
 from ostium.proxy.services import mark_dirty
 from ostium.subscriptions.checks import check_subscription
@@ -404,10 +405,42 @@ def inbounds(request):
         record = next((item for item in records if item.kind == kind), None)
         if record is None:
             raise Http404("Unknown inbound")
-        if request.POST.get("action") == "rotate_keys":
+        action = request.POST.get("action")
+        if action == "rotate_keys":
             record.rotate_keys()
             record_audit(action="inbound.keys_rotated", request=request, target=kind)
             messages.success(request, f"{record.short_label} 密钥已轮换，客户端需要重新导入订阅。")
+            return redirect("console:inbounds")
+        if action == "randomize_port":
+            try:
+                record.port = pick_random_port(record)
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
+            else:
+                record.save(update_fields=["port", "updated_at"])
+                mark_dirty()
+                record_audit(action="inbound.port_randomized", request=request, target=kind)
+                messages.success(
+                    request,
+                    f"{record.short_label} 已切换到随机端口 {record.port}；请在云防火墙放行并重新分发订阅。",
+                )
+            return redirect("console:inbounds")
+        if action == "rotate_camouflage":
+            if record.kind != Inbound.Kind.VLESS:
+                return HttpResponseBadRequest("Only VLESS Reality has a camouflage target.")
+            try:
+                target = pick_reality_target(record.params.get("server_name"))
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
+            else:
+                record.update_params(server_name=target, handshake_server=target, handshake_port=443)
+                record.save(update_fields=["params_enc", "updated_at"])
+                mark_dirty()
+                record_audit(action="inbound.camouflage_rotated", request=request, target=kind)
+                messages.success(
+                    request,
+                    f"Reality 伪装已切换到 {target}；客户端需要重新导入订阅。",
+                )
             return redirect("console:inbounds")
         form = InboundForm(request.POST, instance=record, prefix=kind)
         if form.is_valid():
@@ -424,6 +457,19 @@ def inbounds(request):
             "records": records,
             "forms": forms,
             "state": RuntimeState.load(),
+        },
+    )
+
+
+@staff_member_required(login_url="accounts:login")
+@require_http_methods(["GET"])
+def inbound_health(request):
+    return render(
+        request,
+        "console/inbound_health.html",
+        {
+            "active_nav": "inbounds",
+            "health": check_inbounds(),
         },
     )
 

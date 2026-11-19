@@ -13,6 +13,7 @@
             <span class="status-pill {% if state.desired_revision == state.applied_revision %}status-pill--success{% else %}status-pill--warning{% endif %}">
                 {% if state.desired_revision == state.applied_revision %}配置已同步{% else %}等待应用 rev {{ state.desired_revision }}{% endif %}
             </span>
+            <a class="btn" href="{% url 'console:inbound_health' %}">{% icon "activity" %} 线路自检</a>
             <a class="btn" href="{% url 'console:certificates' %}">{% icon "certificate" %} 证书管理</a>
         </div>
     </div>
@@ -138,7 +139,23 @@
                                     name="action"
                                     value="rotate_keys"
                                     formnovalidate
-                                    data-confirm="轮换密钥会使现有客户端失效，直到重新导入订阅。继续？">{% icon "refresh" %} 轮换密钥</button>
+                                    data-confirm="{% if record.kind == 'hysteria2' %}轮换混淆密码会使现有客户端失效，直到重新导入订阅。继续？{% else %}轮换密钥会使现有客户端失效，直到重新导入订阅。继续？{% endif %}">
+                                {% icon "refresh" %} {% if record.kind == "hysteria2" %}轮换混淆{% else %}轮换密钥{% endif %}
+                            </button>
+                        {% endif %}
+                        <button class="btn btn--ghost btn--sm"
+                                type="submit"
+                                name="action"
+                                value="randomize_port"
+                                formnovalidate
+                                data-confirm="随机端口会改变订阅中的端口；请先在云防火墙放行，并让客户端重新导入订阅。继续？">{% icon "swap" %} 随机端口</button>
+                        {% if record.kind == "vless" %}
+                            <button class="btn btn--ghost btn--sm"
+                                    type="submit"
+                                    name="action"
+                                    value="rotate_camouflage"
+                                    formnovalidate
+                                    data-confirm="更换 Reality 伪装域名需要所有客户端重新导入订阅。继续？">{% icon "globe" %} 更换伪装</button>
                         {% endif %}
                         <button class="btn btn--primary btn--sm"
                                 type="submit"

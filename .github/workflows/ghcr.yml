@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Image version tag, e.g. 0.2.11"
+        description: "Image version tag, e.g. 0.2.12"
         required: true
 
 permissions:

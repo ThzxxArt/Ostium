@@ -3,6 +3,27 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.12 — 2026-11-19
+
+### Added
+
+- **线路健康** page: per-inbound port listening, certificate, key and obfs
+  checks, with actionable fixes.
+- `ostium inbound check [--json]` and `ostium inbound randomize-port` /
+  `ostium inbound rotate-camouflage`.
+- Console actions to move a single inbound to a random high port and to rotate
+  the VLESS Reality camouflage target.
+- Worker alert `inbound_unhealthy` when an enabled inbound port is not
+  listening, resolved automatically when it recovers.
+- Anti-blocking guidance: Hysteria2 salamander, high-port rotation, Reality
+  SNI rotation and multi-line fallback.
+
+### Changed
+
+- Inbound action buttons wrap correctly on mobile.
+- CLI and console actions mark the configuration dirty and require clients to
+  refresh subscriptions after port/SNI changes.
+
 ## 0.2.11 — 2026-11-19
 
 ### Added

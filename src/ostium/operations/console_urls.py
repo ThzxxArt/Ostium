@@ -13,6 +13,7 @@ urlpatterns = [
     path("users/<uuid:user_id>/subscription-check/", console_views.subscription_check, name="subscription_check"),
     path("users/<uuid:user_id>/", console_views.user_detail, name="user_detail"),
     path("inbounds/", console_views.inbounds, name="inbounds"),
+    path("inbounds/health/", console_views.inbound_health, name="inbound_health"),
     path("subscriptions/", console_views.subscriptions, name="subscriptions"),
     path("connections/", console_views.connections, name="connections"),
     path("certificates/", console_views.certificates, name="certificates"),

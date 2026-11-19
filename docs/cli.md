@@ -38,7 +38,13 @@ ostium inbound enable hysteria2 --cert vpn.example.com
 ostium inbound disable trojan
 ostium inbound rotate-keys vless
 ostium inbound set-port shadowsocks 8388
+ostium inbound check [--json]
+ostium inbound randomize-port trojan
+ostium inbound rotate-camouflage
 ```
+
+`check` 验证启用线路的端口监听、证书、密钥和混淆情况；`randomize-port`
+和 `rotate-camouflage` 会请求重新应用配置，并需要客户端重新导入订阅。
 
 ## 证书
 
