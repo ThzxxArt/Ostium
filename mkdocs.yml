@@ -64,6 +64,7 @@ nav:
       - 端口: reference/ports.md
       - PyPI 包说明: pypi-readme.md
   - 质量:
+      - 0.2.13 UDP 稳定性: review/0.2.13-udp-stability.md
       - 0.2.12 线路稳定性与防封禁: review/0.2.12-line-hardening.md
       - 0.2.11 页面备份密码: review/0.2.11-backup-password.md
       - 0.2.10 客户端兼容性: review/0.2.10-client-compatibility.md

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from django.conf import settings
 from django.db import connection
@@ -15,6 +16,8 @@ from ostium.certificates.models import Certificate
 from ostium.engine.dns import doh_available
 from ostium.engine.supervisor import disk_free_bytes, verify_binary
 from ostium.operations.models import RuntimeState
+from ostium.proxy.health import check_inbounds
+from ostium.proxy.models import Inbound
 
 from .models import Alert
 
@@ -31,6 +34,13 @@ def _port_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.3)
         return sock.connect_ex((host, port)) == 0
+
+
+def _kernel_udp_buffer(name: str) -> int | None:
+    try:
+        return int(Path(f"/proc/sys/net/core/{name}").read_text(encoding="utf-8").strip())
+    except OSError, ValueError:
+        return None
 
 
 def run_doctor() -> list[dict]:
@@ -71,6 +81,29 @@ def run_doctor() -> list[dict]:
     else:
         checks.append(Check("Disk space", "pass", f"{free / 1024**3:.1f} GiB free."))
 
+    rmem = _kernel_udp_buffer("rmem_max")
+    wmem = _kernel_udp_buffer("wmem_max")
+    if rmem is None or wmem is None:
+        checks.append(
+            Check(
+                "UDP buffers",
+                "warn",
+                "Could not read /proc/sys/net/core buffers.",
+                "Hysteria2/QUIC may be less stable on this platform.",
+            )
+        )
+    elif min(rmem, wmem) < 8 * 1024**2:
+        checks.append(
+            Check(
+                "UDP buffers",
+                "warn",
+                f"rmem_max={rmem}, wmem_max={wmem}.",
+                "Run the installer or set net.core.rmem_max/wmem_max to 16 MiB for Hysteria2.",
+            )
+        )
+    else:
+        checks.append(Check("UDP buffers", "pass", f"rmem_max={rmem}, wmem_max={wmem}."))
+
     ok, message = verify_binary()
     checks.append(
         Check(
@@ -96,6 +129,21 @@ def run_doctor() -> list[dict]:
         )
     else:
         checks.append(Check("Last apply", "pass", f"Revision {state.applied_revision} applied."))
+
+    hysteria = Inbound.objects.filter(kind=Inbound.Kind.HYSTERIA2).first()
+    if hysteria is not None:
+        if not hysteria.enabled:
+            checks.append(Check("Hysteria2", "pass", "Not enabled."))
+        else:
+            health = next(
+                (item for item in check_inbounds(singbox_running=state.singbox_running) if item.kind == hysteria.kind),
+                None,
+            )
+            if health is None:
+                checks.append(Check("Hysteria2", "warn", "No health result."))
+            else:
+                status = "pass" if health.status == "ok" else "warn" if health.status == "warn" else "fail"
+                checks.append(Check("Hysteria2", status, health.detail, health.fix))
 
     checks.append(
         Check(

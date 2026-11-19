@@ -3,6 +3,22 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.13 — 2026-11-19
+
+### Added
+
+- Installer/upgrade now tunes `net.core.rmem_max` and `wmem_max` to at least
+  16 MiB and persists them in `/etc/sysctl.d/99-ostium-udp.conf`.
+- `ostium doctor` reports UDP buffer size and Hysteria2 health.
+- Clash subscriptions add a TCP-only `Stable` fallback group; sing-box adds a
+  matching `Stable` selector.
+- Automatic backups write `backup.created` / `backup.failed` audit events.
+- Hysteria2/UDP troubleshooting documentation and Stable-group guidance.
+
+### Fixed
+
+- Doctor's missing-TOTP branch no longer passes an extra argument to `Check`.
+
 ## 0.2.12 — 2026-11-19
 
 ### Added

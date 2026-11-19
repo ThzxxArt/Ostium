@@ -467,11 +467,22 @@ class Worker:
         last = Backup.objects.filter(note__startswith="auto:").order_by("-created_at").first()
         if last and timezone.now() - last.created_at < timedelta(hours=23):
             return
+        from ostium.operations.services import record_audit
+
         try:
-            create_backup(password=password, note="auto:worker")
+            backup = create_backup(password=password, note="auto:worker")
+            record_audit(
+                action="backup.created",
+                target=backup.filename,
+                detail={"note": "auto:worker", "size": backup.size},
+            )
             resolve_alert("backup_failed:run")
         except Exception as exc:
             logger.exception("automatic backup failed")
+            record_audit(
+                action="backup.failed",
+                detail={"note": "auto:worker", "error": str(exc)[:500]},
+            )
             raise_alert(
                 code="backup_failed",
                 level="critical",

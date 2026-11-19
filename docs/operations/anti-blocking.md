@@ -62,9 +62,39 @@ www.amazon.com / www.bing.com / www.samsung.com ...
 Hysteria2 默认带 salamander 混淆。没有混淆时健康页会显示「注意」；轮换混淆
 后现有客户端会失效，需要重新导入订阅。
 
+### UDP 缓冲
+
+Hysteria2 使用 QUIC/UDP。安装器会写入：
+
+```conf
+# /etc/sysctl.d/99-ostium-udp.conf
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+```
+
+`ostium doctor` 会检查：
+
+```text
+UDP buffers   PASS/WARN
+Hysteria2     PASS/WARN/FAIL
+```
+
+`UDP buffers` 低于 8 MiB 时提示调整；Hysteria2 未监听、证书异常或缺少
+salamander 混淆时给出对应建议。
+
 ### 多线互备
 
-订阅中的 `Auto` 组会测速选择线路。建议至少保留：
+订阅中的 `Auto` 组会测速选择全部线路；新增的 `Stable` 组只包含 TCP 线路：
+
+```text
+Ostium
+  ├─ Auto     全部线路测速
+  ├─ Stable   Reality / Trojan / SS2022（不含 Hysteria2）
+  └─ 四条线路
+```
+
+如果 Hysteria2 抖动，在 Clash / sing-box 客户端选择 `Stable` 即可排除 UDP 线路。
+建议至少保留：
 
 - 一条 VLESS Reality（TCP，无证书）；
 - 一条 Hysteria2（UDP/QUIC）或 Trojan（TCP/TLS）。

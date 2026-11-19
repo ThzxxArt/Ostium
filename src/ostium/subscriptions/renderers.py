@@ -59,6 +59,7 @@ def _clash_dns() -> dict:
 def render_clash(endpoints: list[Endpoint], options: ProfileOptions | None = None) -> str:
     options = options or DEFAULT_PROFILE
     names = _proxy_names(endpoints)
+    stable_names = [endpoint.name for endpoint in endpoints if endpoint.protocol != "hysteria2"]
     # A subscription should only describe proxies, groups and routing rules.
     # Ports, LAN access, mode, logging, IPv6 and DNS belong to the client;
     # shipping them overrides the user's settings and can make imports fail on
@@ -69,7 +70,7 @@ def render_clash(endpoints: list[Endpoint], options: ProfileOptions | None = Non
             {
                 "name": "Ostium",
                 "type": "select",
-                "proxies": ["Auto", *names],
+                "proxies": ["Auto", *(["Stable"] if stable_names else []), *names],
             },
             {
                 "name": "Auto",
@@ -79,6 +80,19 @@ def render_clash(endpoints: list[Endpoint], options: ProfileOptions | None = Non
                 "tolerance": 50,
                 "proxies": names,
             },
+            *(
+                [
+                    {
+                        "name": "Stable",
+                        "type": "fallback",
+                        "url": "https://www.gstatic.com/generate_204",
+                        "interval": 180,
+                        "proxies": stable_names,
+                    }
+                ]
+                if stable_names
+                else []
+            ),
         ],
         # Avoid GEOIP/GEOSITE rules by default: they require an external
         # MMDB/geosite database. If the client has no database, mihomo refuses
@@ -118,6 +132,7 @@ def render_clash(endpoints: list[Endpoint], options: ProfileOptions | None = Non
 def render_singbox(endpoints: list[Endpoint], options: ProfileOptions | None = None) -> str:
     options = options or DEFAULT_PROFILE
     names = _proxy_names(endpoints)
+    stable_names = [endpoint.name for endpoint in endpoints if endpoint.protocol != "hysteria2"]
     outbounds: list[dict] = [endpoint.to_singbox_outbound() for endpoint in endpoints]
     outbounds.append(
         {
@@ -129,11 +144,20 @@ def render_singbox(endpoints: list[Endpoint], options: ProfileOptions | None = N
             "tolerance": 50,
         }
     )
+    if stable_names:
+        outbounds.append(
+            {
+                "type": "selector",
+                "tag": "Stable",
+                "outbounds": stable_names,
+                "default": stable_names[0],
+            }
+        )
     outbounds.append(
         {
             "type": "selector",
             "tag": "Ostium",
-            "outbounds": ["Auto", *names, "direct"],
+            "outbounds": ["Auto", *(["Stable"] if stable_names else []), *names, "direct"],
             "default": "Auto",
         }
     )

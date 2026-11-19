@@ -247,8 +247,8 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ostium Server API",
-    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.12.",
-    "VERSION": "0.2.12",
+    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.13.",
+    "VERSION": "0.2.13",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/v1",

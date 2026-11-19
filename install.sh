@@ -2,7 +2,7 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.12"
+VERSION="0.2.13"
 RELEASE_VERSION="${OSTIUM_RELEASE_VERSION:-$VERSION}"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
@@ -43,7 +43,7 @@ Options:
   --domain DOMAIN      Public hostname; configures Caddy and subscription URLs
   --with-caddy         Install and configure Caddy on 8443
   --no-service         Prepare files but do not enable systemd units
-  --version VERSION    Release version to install (default: 0.2.12)
+  --version VERSION    Release version to install (default: 0.2.13)
   --from-source        Build/install from source instead of release assets
   --wheel PATH         Install a specific wheel
   --pypi               Install ostium-ctl from PyPI (requires a published release)
@@ -130,6 +130,33 @@ install_packages() {
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl openssl git tar
   fi
+}
+
+tune_udp_buffers() {
+  # Hysteria2 runs over QUIC/UDP. The kernel defaults are often too small for
+  # high-throughput or lossy links; raise the ceiling without lowering a value
+  # the operator already configured.
+  [ -r /proc/sys/net/core/rmem_max ] || return 0
+  command -v sysctl >/dev/null 2>&1 || { warn "sysctl is unavailable; UDP buffer tuning skipped."; return 0; }
+  local rmem wmem target_rmem target_wmem config
+  rmem="$(sysctl -n net.core.rmem_max 2>/dev/null || echo 0)"
+  wmem="$(sysctl -n net.core.wmem_max 2>/dev/null || echo 0)"
+  case "$rmem" in *[!0-9]*|"") rmem=0 ;; esac
+  case "$wmem" in *[!0-9]*|"") wmem=0 ;; esac
+  target_rmem=16777216
+  target_wmem=16777216
+  [ "$rmem" -gt "$target_rmem" ] && target_rmem="$rmem"
+  [ "$wmem" -gt "$target_wmem" ] && target_wmem="$wmem"
+  config=/etc/sysctl.d/99-ostium-udp.conf
+  install -d -m 0755 /etc/sysctl.d
+  cat > "$config" <<EOF
+# Hysteria2 / QUIC receive and send buffers
+net.core.rmem_max = $target_rmem
+net.core.wmem_max = $target_wmem
+EOF
+  chmod 0644 "$config"
+  sysctl --system >/dev/null 2>&1 || warn "Could not apply UDP buffer settings from $config."
+  log "UDP buffers: rmem_max=$target_rmem wmem_max=$target_wmem"
 }
 
 prepare_release_assets() {
@@ -509,6 +536,7 @@ health_check() {
 
 do_install() {
   install_packages
+  tune_udp_buffers
   if [ "$FROM_SOURCE" -eq 1 ]; then
     prepare_source
   else
@@ -535,6 +563,7 @@ do_install() {
 
 do_upgrade() {
   install_packages
+  tune_udp_buffers
   [ -f "$CONF_DIR/ostium.env" ] || die "No existing installation found at $CONF_DIR/ostium.env."
   install_uv
   if grep -q '^OSTIUM_BACKUP_PASSWORD=..' "$CONF_DIR/ostium.env"; then

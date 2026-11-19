@@ -132,7 +132,7 @@ def test_restore_failure_restores_previous_database(settings, tmp_path):
     manifest = {
         "format": 1,
         "product": "ostium-server",
-        "version": "0.2.12",
+        "version": "0.2.13",
         "field_key": settings.OSTIUM_FIELD_KEY,
         "database_sha256": hashlib.sha256(database).hexdigest(),
     }

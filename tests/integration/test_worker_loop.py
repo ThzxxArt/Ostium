@@ -125,7 +125,7 @@ def test_maybe_backup_success(monkeypatch, tmp_path, settings):
     config.auto_backup_enabled = True
     monkeypatch.setenv("OSTIUM_BACKUP_PASSWORD", "a-long-backup-password")
     import ostium.operations.backup as backup_module
-    from ostium.operations.models import Backup
+    from ostium.operations.models import AuditEvent, Backup
 
     calls = []
     monkeypatch.setattr(
@@ -135,3 +135,4 @@ def test_maybe_backup_success(monkeypatch, tmp_path, settings):
     )
     Worker()._maybe_backup()
     assert calls
+    assert AuditEvent.objects.filter(action="backup.created", target="auto.ostb").exists()

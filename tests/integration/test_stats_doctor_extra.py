@@ -100,6 +100,33 @@ def test_doctor_pending_migrations(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_doctor_udp_buffer_warning(monkeypatch):
+    monkeypatch.setattr(doctor_module, "_kernel_udp_buffer", lambda name: 2097152)
+    checks = run_doctor()
+    names = {check["name"]: check["status"] for check in checks}
+    assert names["UDP buffers"] == "warn"
+
+
+@pytest.mark.django_db
+def test_doctor_hysteria_check(monkeypatch, inbounds, certificate):
+    from ostium.proxy.health import InboundHealth
+    from ostium.proxy.models import Inbound
+
+    hysteria = Inbound.objects.get(kind="hysteria2")
+    hysteria.certificate = certificate
+    hysteria.enabled = True
+    hysteria.save()
+    monkeypatch.setattr(
+        doctor_module,
+        "check_inbounds",
+        lambda **kwargs: [InboundHealth("hysteria2", "Hysteria2", "ok", "端口正常", "")],
+    )
+    checks = run_doctor()
+    names = {check["name"]: check["status"] for check in checks}
+    assert names["Hysteria2"] == "pass"
+
+
+@pytest.mark.django_db
 def test_doctor_alerts_and_tls(monkeypatch, certificate):
     from django.contrib.auth import get_user_model
     from django_otp.plugins.otp_totp.models import TOTPDevice

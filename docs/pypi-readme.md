@@ -16,7 +16,7 @@
 
 ## Ostium Server
 
-Ostium 0.2.12 是一个 **Linux 单机、单管理员、私人代理服务端**：
+Ostium 0.2.13 是一个 **Linux 单机、单管理员、私人代理服务端**：
 
 - VLESS Reality、Hysteria2、Trojan、Shadowsocks 2022；
 - Base64 / Clash-Mihomo / sing-box / 纯 URI 四种标准订阅；
@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 从 PyPI 安装 Python 包（仅代码与 `ostium` 命令，不含部署资产）：
 
 ```bash
-pip install ostium-ctl==0.2.12
+pip install ostium-ctl==0.2.13
 ostium help
 ```
 

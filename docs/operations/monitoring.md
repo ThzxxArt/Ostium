@@ -34,6 +34,17 @@ scrape_configs:
     metrics_path: /metrics
 ```
 
+## 审计事件
+
+自动备份成功/失败会写入审计：
+
+```text
+backup.created
+backup.failed
+```
+
+「审计」页可以按时间、目标查看，不再只依赖「系统 → 最近备份」。
+
 ## 告警码
 
 | code | 含义 |
@@ -46,6 +57,8 @@ scrape_configs:
 | `certificate_expired` | 证书已过期 |
 | `disk_low` | 数据盘 <1 GiB |
 | `inbound_unhealthy` | 已启用线路端口未监听或配置异常 |
+| `backup.created` | 审计事件：自动备份已创建 |
+| `backup.failed` | 审计事件：自动备份失败 |
 | `quota_80` / `quota_90` | 用户配额阈值 |
 | `backup_failed` | 自动备份失败 |
 | `dns_fallback` | DoH 失败回退 UDP |

@@ -1,6 +1,6 @@
 # Ostium Server
 
-Ostium 0.2.12 是一个 **Linux 单机、单管理员、私人代理服务端**。
+Ostium 0.2.13 是一个 **Linux 单机、单管理员、私人代理服务端**。
 它把管理面（Django + Aurora Console）和数据面（sing-box）放在同一台主机上，
 对外只暴露一条标准订阅链接和代理端口。
 
@@ -39,6 +39,7 @@ Ostium 0.2.12 是一个 **Linux 单机、单管理员、私人代理服务端**�
 
 ## 质量记录
 
+- [0.2.13 UDP 稳定性](review/0.2.13-udp-stability.md)
 - [0.2.12 线路稳定性与防封禁](review/0.2.12-line-hardening.md)
 - [0.2.11 页面备份密码](review/0.2.11-backup-password.md)
 - [0.2.10 客户端兼容性](review/0.2.10-client-compatibility.md)
@@ -49,4 +50,4 @@ Ostium 0.2.12 是一个 **Linux 单机、单管理员、私人代理服务端**�
 
 ## 版本与许可
 
-当前版本 `0.2.12`，AGPL-3.0-or-later。旧版本只存在于 git 历史与 `v0.1.12` tag。
+当前版本 `0.2.13`，AGPL-3.0-or-later。旧版本只存在于 git 历史与 `v0.1.12` tag。

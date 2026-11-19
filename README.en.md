@@ -368,7 +368,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.12`. Run
+Prebuilt image: `ghcr.io/thzxxart/ostium-server:0.2.13`. Run
 `docker compose pull` on first use, or `docker compose up -d --build` after
 local changes.
 
@@ -735,6 +735,6 @@ Inter is licensed under the SIL Open Font License 1.1.
 
 **One Linux box. One administrator. One universal subscription.**
 
-<sub>Ostium Server 0.2.12 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.13 · Made for the quiet corner of the internet.</sub>
 
 </div>

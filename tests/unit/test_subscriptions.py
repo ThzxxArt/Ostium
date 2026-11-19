@@ -100,6 +100,9 @@ def test_clash_yaml(proxy_user, all_inbounds):
     assert set(payload) == {"proxies", "proxy-groups", "rules"}
     assert len(payload["proxies"]) == 4
     assert payload["proxy-groups"][0]["name"] == "Ostium"
+    stable = next(group for group in payload["proxy-groups"] if group["name"] == "Stable")
+    assert stable["type"] == "fallback"
+    assert stable["proxies"] and all("Hysteria2" not in name for name in stable["proxies"])
     assert payload["rules"][-1] == "MATCH,Ostium"
     assert "GEOIP,CN,DIRECT,no-resolve" not in payload["rules"]
     assert "DOMAIN-SUFFIX,cn,DIRECT" in payload["rules"]
@@ -148,7 +151,10 @@ def test_singbox_json(proxy_user, all_inbounds):
     assert payload["inbounds"][0]["listen_port"] == 7890
     assert payload["route"]["final"] == "Ostium"
     tags = [outbound["tag"] for outbound in payload["outbounds"]]
-    assert "Auto" in tags and "Ostium" in tags
+    assert "Auto" in tags and "Stable" in tags and "Ostium" in tags
+    stable = next(outbound for outbound in payload["outbounds"] if outbound["tag"] == "Stable")
+    assert stable["type"] == "selector"
+    assert all("Hysteria2" not in tag for tag in stable["outbounds"])
     assert payload["outbounds"][0]["tls"]["reality"]["public_key"]
     assert payload["outbounds"][1]["tls"]["certificate_public_key_sha256"]
     assert payload["outbounds"][2]["tls"]["certificate_public_key_sha256"]
