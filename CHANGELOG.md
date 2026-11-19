@@ -3,6 +3,27 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.9 — 2026-11-19
+
+### Fixed
+
+- Clash / Mihomo profiles no longer embed a `dns` section. Clash Verge Rev was
+  disabling its own DNS override when importing the profile, then using the
+  hard-coded `https://1.1.1.1/dns-query` resolver. On networks where that DoH is
+  unreachable, every domain lookup failed and all inbounds appeared unusable.
+- Clash profiles now contain only proxies, proxy groups and rules. Client-owned
+  settings (`mixed-port`, `allow-lan`, `bind-address`, `mode`, `log-level`,
+  `ipv6`) are no longer overridden.
+- Removed the `GEOIP,CN,DIRECT` rule so profiles do not require an external
+  MMDB database. `DOMAIN-SUFFIX,cn,DIRECT` keeps Chinese domains direct without
+  any external data.
+- The sing-box profile likewise no longer forces DoH or
+  `default_domain_resolver`; it uses the client/system resolver.
+- Added regression tests that both profiles omit DNS configuration, client
+  settings, GeoIP rules, and `1.1.1.1`.
+- Verified real connectivity through Mihomo (all four inbounds), sing-box (all
+  four) and Xray (VLESS Reality, Trojan, SS2022).
+
 ## 0.2.8 — 2026-11-19
 
 ### Fixed

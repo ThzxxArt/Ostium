@@ -24,24 +24,11 @@ def _proxy_names(endpoints: list[Endpoint]) -> list[str]:
 
 def render_clash(endpoints: list[Endpoint]) -> str:
     names = _proxy_names(endpoints)
+    # A subscription should only describe proxies, groups and routing rules.
+    # Ports, LAN access, mode, logging, IPv6 and DNS belong to the client;
+    # shipping them overrides the user's settings and can make imports fail on
+    # clients whose defaults or ports differ.
     config = {
-        "mixed-port": 7890,
-        "allow-lan": False,
-        "bind-address": "127.0.0.1",
-        "mode": "rule",
-        "log-level": "info",
-        "ipv6": False,
-        "dns": {
-            "enable": True,
-            "ipv6": False,
-            "enhanced-mode": "fake-ip",
-            "fake-ip-range": "198.18.0.1/16",
-            "fake-ip-filter": ["*.lan", "*.local", "localhost.ptlogin2.qq.com"],
-            "default-nameserver": ["223.5.5.5", "1.1.1.1"],
-            "nameserver": ["https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query"],
-            "proxy-server-nameserver": ["https://1.1.1.1/dns-query"],
-            "fallback-filter": {"geoip": True, "geoip-code": "CN"},
-        },
         "proxies": [endpoint.to_clash_proxy() for endpoint in endpoints],
         "proxy-groups": [
             {
@@ -58,7 +45,11 @@ def render_clash(endpoints: list[Endpoint]) -> str:
                 "proxies": names,
             },
         ],
+        # Avoid GEOIP/GEOSITE rules: they require an external MMDB/geosite
+        # database. If the client has no database, mihomo refuses to load the
+        # profile. DOMAIN-SUFFIX,cn needs no external data.
         "rules": [
+            "DOMAIN,localhost,DIRECT",
             "DOMAIN-SUFFIX,local,DIRECT",
             "IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
             "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
@@ -67,7 +58,7 @@ def render_clash(endpoints: list[Endpoint]) -> str:
             "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
             "IP-CIDR,169.254.0.0/16,DIRECT,no-resolve",
             "IP-CIDR6,::1/128,DIRECT,no-resolve",
-            "GEOIP,CN,DIRECT,no-resolve",
+            "DOMAIN-SUFFIX,cn,DIRECT",
             "MATCH,Ostium",
         ],
     }
@@ -98,14 +89,8 @@ def render_singbox(endpoints: list[Endpoint]) -> str:
     outbounds.append({"type": "direct", "tag": "direct"})
     config = {
         "log": {"level": "info", "timestamp": True},
-        "dns": {
-            "servers": [
-                {"type": "https", "tag": "doh", "server": "1.1.1.1", "path": "/dns-query"},
-                {"type": "udp", "tag": "local", "server": "1.1.1.1"},
-            ],
-            "final": "doh",
-            "strategy": "ipv4_only",
-        },
+        # Keep DNS out of the generated profile; sing-box falls back to the
+        # system resolver, which is what the client already uses normally.
         "inbounds": [
             {
                 "type": "mixed",
@@ -123,7 +108,6 @@ def render_singbox(endpoints: list[Endpoint]) -> str:
             ],
             "final": "Ostium",
             "auto_detect_interface": True,
-            "default_domain_resolver": "doh",
         },
         "experimental": {"cache_file": {"enabled": True}},
     }

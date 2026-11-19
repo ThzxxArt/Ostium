@@ -53,6 +53,21 @@ def test_targets(client, proxy_user, vless_inbound, suffix, content_type):
 
 
 @pytest.mark.django_db
+def test_profiles_do_not_override_client_dns(client, proxy_user, vless_inbound):
+    import json
+
+    import yaml
+
+    clash = yaml.safe_load(client.get(url(proxy_user, "/clash")).content)
+    assert "dns" not in clash
+    assert "mixed-port" not in clash
+    assert all(not rule.startswith("GEOIP,") for rule in clash["rules"])
+    singbox = json.loads(client.get(url(proxy_user, "/singbox")).content)
+    assert "dns" not in singbox
+    assert "default_domain_resolver" not in singbox["route"]
+
+
+@pytest.mark.django_db
 def test_unknown_target(client, proxy_user, vless_inbound):
     assert client.get(url(proxy_user, "?target=nope")).status_code == 400
 

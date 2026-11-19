@@ -94,9 +94,8 @@ def test_clash_contract(mihomo, proxy_user, all_inbounds, tmp_path):
     endpoints = build_endpoints(proxy_user, "vpn.example.com")
     path = tmp_path / "config.yaml"
     path.write_text(render_clash(endpoints), encoding="utf-8")
-    geo_dir = Path(".cache/mihomo")
-    args = [mihomo, "-t", "-f", str(path)]
-    if (geo_dir / "geoip.metadb").is_file():
-        args[1:1] = ["-d", str(geo_dir)]
-    proc = subprocess.run(args, capture_output=True, text=True, check=False)
+    # The profile must not require an external GeoIP/geosite database. Running
+    # without a data dir catches accidental GEOIP rules, which make mihomo try
+    # to download MMDB and fail on restricted networks.
+    proc = subprocess.run([mihomo, "-t", "-f", str(path)], capture_output=True, text=True, check=False)
     assert proc.returncode == 0, proc.stdout + proc.stderr

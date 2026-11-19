@@ -1,28 +1,59 @@
-# Ostium Server 0.2.8 — Release Notes
+# Ostium Server 0.2.9 — Release Notes
 
-Ostium 0.2.8 fixes subscription links being clipped and makes copying them
-reliable.
+Ostium 0.2.9 fixes Clash / Mihomo subscriptions overriding client DNS and
+breaking every domain lookup.
+
+## Root cause
+
+The generated Clash profile contained:
+
+```yaml
+dns:
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
+  proxy-server-nameserver:
+    - https://1.1.1.1/dns-query
+```
+
+Clash Verge Rev detects a profile-level DNS section and disables its own DNS
+override. On networks where `https://1.1.1.1/dns-query` is unreachable, every
+domain resolution timed out, so all four inbounds appeared broken.
 
 ## Fixed
 
-- Full subscription URLs and single-node URIs now wrap at any character instead
-  of being truncated with an ellipsis. The complete link is visible and
-  selectable with one click.
-- Every full URL has an inline **复制** button.
-- Clipboard writes now fall back to the legacy copy path when the async
-  Clipboard API is denied, instead of failing silently.
-- Grid and flex children can shrink below their content width, so long links no
-  longer push subscription panels past the viewport.
+- Clash / Mihomo profiles no longer include a `dns` section. The client keeps
+  its own DNS override and resolver settings.
+- Clash profiles now contain only proxies, proxy groups and rules. They no
+  longer override client-owned settings such as `mixed-port`, `mode`, `ipv6`,
+  `log-level`, `allow-lan` or `bind-address`.
+- Removed the `GEOIP,CN,DIRECT` rule, which required an external MMDB database.
+  `DOMAIN-SUFFIX,cn,DIRECT` keeps Chinese domains direct without extra data.
+- sing-box profiles no longer force DoH or `default_domain_resolver`; they use
+  the client/system resolver.
+- Added regression tests: generated profiles must not contain `dns`,
+  `1.1.1.1`, `mixed-port` or GeoIP rules.
+- Real connectivity verified through Mihomo (all four inbounds), sing-box (all
+  four) and Xray (VLESS Reality, Trojan, SS2022). All egress IPs were the
+  server IP.
+- Server-side 443/TCP, 443/UDP, 9443/TCP and 8388/TCP are listening and
+  reachable from outside.
+
+## Client action
+
+After upgrading, update the subscription in Clash Verge (or re-import the
+Clash link), then restart the Clash core. If Clash Verge previously turned off
+“DNS 覆写”, turn it back on (or restore its default DNS settings), because the
+new profile no longer supplies DNS.
 
 ## Verification
 
-- Desktop and mobile UI tests assert full-link fields have no horizontal or
-  vertical clipping.
-- The copy button is clicked and the clipboard content is compared with the
-  complete URL.
-- 378 tests passed / 2 skipped; 8 UI tests passed.
-- Screenshots: `audit-subscription-links-1440.png`,
-  `audit-subscription-links-390.png`.
+```text
+26 targeted tests passed
+378+ full suite passed
+mihomo config check passed
+sing-box config check passed
+```
 
 ## Install
 
@@ -32,21 +63,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.8
-docker pull ghcr.io/thzxxart/ostium-server:0.2.8
+pip install ostium-ctl==0.2.9
+docker pull ghcr.io/thzxxart/ostium-server:0.2.9
 ```
 
 ## Upgrade
 
-0.2.0–0.2.7 can upgrade in place:
+0.2.0–0.2.8 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.8
+  | sudo bash -s -- upgrade --version 0.2.9
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.8/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.8` and `:latest`
-- GitHub Release: `v0.2.8`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.9/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.9` and `:latest`
+- GitHub Release: `v0.2.9`

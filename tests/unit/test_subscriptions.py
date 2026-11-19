@@ -96,12 +96,19 @@ def test_base64_round_trip(proxy_user, all_inbounds):
 def test_clash_yaml(proxy_user, all_inbounds):
     endpoints = build_endpoints(proxy_user, "vpn.example.com")
     payload = yaml.safe_load(render_clash(endpoints))
-    assert payload["mixed-port"] == 7890
+    assert set(payload) == {"proxies", "proxy-groups", "rules"}
     assert len(payload["proxies"]) == 4
     assert payload["proxy-groups"][0]["name"] == "Ostium"
     assert payload["rules"][-1] == "MATCH,Ostium"
+    assert "GEOIP,CN,DIRECT,no-resolve" not in payload["rules"]
+    assert "DOMAIN-SUFFIX,cn,DIRECT" in payload["rules"]
     assert payload["proxies"][0]["reality-opts"]["public-key"]
     assert payload["proxies"][3]["udp"] is False
+    # The profile must not override client DNS, ports, mode or GeoIP data.
+    assert "dns" not in payload
+    assert "mixed-port" not in payload
+    assert "mode" not in payload
+    assert "1.1.1.1" not in render_clash(endpoints)
 
 
 @pytest.mark.django_db
@@ -115,6 +122,9 @@ def test_singbox_json(proxy_user, all_inbounds):
     assert payload["outbounds"][0]["tls"]["reality"]["public_key"]
     assert payload["outbounds"][1]["tls"]["certificate_public_key_sha256"]
     assert payload["outbounds"][2]["tls"]["certificate_public_key_sha256"]
+    assert "dns" not in payload
+    assert "default_domain_resolver" not in payload["route"]
+    assert "1.1.1.1" not in render_singbox(endpoints)
 
 
 @pytest.mark.django_db
