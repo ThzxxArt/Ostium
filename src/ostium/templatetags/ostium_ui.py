@@ -71,6 +71,7 @@ _PATHS = {
     "wifi": '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
     "gauge": '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
     "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    "arrow-left": '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
     "upload": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
     "chevron-down": '<path d="m6 9 6 6 6-6"/>',
     "chevron-right": '<path d="m9 18 6-6-6-6"/>',
@@ -166,9 +167,16 @@ def strip_ansi(value: str) -> str:
 
 @register.filter
 def get_item(mapping, key):
-    if hasattr(mapping, "get"):
-        return mapping.get(key)
-    fields = getattr(mapping, "fields", None)
-    if fields is not None:
-        return fields.get(key)
-    return None
+    """Return a mapping value or the bound form field for ``key``.
+
+    ``Form.fields[key]`` returns an unbound Field object, which renders as
+    ``<django.forms.fields.CharField object ...>``. Use ``form[key]`` so the
+    template receives a BoundField with widget, label and errors.
+    """
+
+    try:
+        return mapping[key]
+    except KeyError, TypeError, AttributeError:
+        if hasattr(mapping, "get"):
+            return mapping.get(key)
+        return None

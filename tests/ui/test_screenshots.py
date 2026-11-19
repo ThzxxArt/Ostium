@@ -150,17 +150,17 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
 
     alice = ProxyUser.objects.get(name="alice")
     routes = [
-        "/",
-        "/users/",
-        f"/users/{alice.pk}/",
-        "/subscriptions/",
-        "/inbounds/",
-        "/connections/",
-        "/certificates/",
-        "/logs/",
-        "/jobs/",
-        "/settings/",
-        "/audit/",
+        ("dashboard", "/"),
+        ("users", "/users/"),
+        ("user-detail", f"/users/{alice.pk}/"),
+        ("subscriptions", "/subscriptions/"),
+        ("inbounds", "/inbounds/"),
+        ("connections", "/connections/"),
+        ("certificates", "/certificates/"),
+        ("logs", "/logs/"),
+        ("jobs", "/jobs/"),
+        ("settings", "/settings/"),
+        ("audit", "/audit/"),
     ]
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -168,15 +168,19 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
     login(page, live_server)
     for width, height in ((1440, 900), (390, 844)):
         page.set_viewport_size({"width": width, "height": height})
-        for route in routes:
+        for name, route in routes:
             page.goto(f"{live_server.url}{route}")
             page.wait_for_timeout(120)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1"), (
                 width,
                 route,
             )
+            page.screenshot(
+                path=str(SCREENSHOTS / f"page-{name}-{width}.png"),
+                full_page=width >= 768,
+            )
     page.set_viewport_size({"width": 1440, "height": 900})
-    for route in routes:
+    for _name, route in routes:
         page.goto(f"{live_server.url}{route}")
         results = _axe(page)
         serious = [

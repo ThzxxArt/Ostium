@@ -10,8 +10,9 @@
             <p class="page-desc">这些设置保存在数据库中，保存后自动触发核心配置更新，无需编辑环境变量。</p>
         </div>
         <div class="page-actions">
-            <span class="status-pill {% if state.desired_revision == state.applied_revision %}status-pill--success{% else %}status-pill--warning{% endif %}">
-                {% if state.desired_revision == state.applied_revision %}已应用 rev {{ state.applied_revision }}{% else %}待应用 rev {{ state.desired_revision }}{% endif %}
+            <span class="status-pill {% if state.desired_revision == state.applied_revision %}status-pill--success{% else %}status-pill--warning{% endif %}"
+                  title="内部配置修订号：{{ state.applied_revision }} / {{ state.desired_revision }}">
+                {% if state.desired_revision == state.applied_revision %}配置已应用{% else %}配置待应用{% endif %}
             </span>
         </div>
     </div>
@@ -118,7 +119,7 @@
                     {% endfor %}
                 </div>
             </section>
-            <div class="panel" style="position:sticky;bottom:16px;z-index:5">
+            <div class="panel">
                 <div class="panel-body row-split">
                     <span class="muted text-xs">保存后 worker 会自动校验并应用新配置。</span>
                     <button class="btn btn--primary" type="submit">{% icon "check" %} 保存并应用</button>

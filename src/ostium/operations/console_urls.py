@@ -14,6 +14,7 @@ urlpatterns = [
     path("subscriptions/", console_views.subscriptions, name="subscriptions"),
     path("connections/", console_views.connections, name="connections"),
     path("certificates/", console_views.certificates, name="certificates"),
+    path("certificates/import/", console_views.certificate_import, name="certificate_import"),
     path("logs/", console_views.logs, name="logs"),
     path("jobs/", console_views.jobs, name="jobs"),
     path("system/", console_views.system, name="system"),

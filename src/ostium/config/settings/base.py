@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_api_key",
     "drf_spectacular",
+    "drf_spectacular_sidecar",
     "django_htmx",
     "health_check",
     "ostium.accounts",
@@ -246,11 +247,14 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ostium Server API",
-    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.4.",
-    "VERSION": "0.2.4",
+    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.5.",
+    "VERSION": "0.2.5",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/v1",
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
 }
 
 API_KEY_CUSTOM_HEADER = None

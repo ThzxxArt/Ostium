@@ -9,7 +9,7 @@ from django.db.models.signals import post_delete, post_save
 class ProxyConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "ostium.proxy"
-    verbose_name = "Proxy"
+    verbose_name = "代理"
 
     def ready(self) -> None:
         from auditlog.registry import auditlog

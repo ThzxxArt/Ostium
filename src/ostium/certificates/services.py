@@ -25,7 +25,7 @@ _DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)
 def _sanitize_domain(domain: str) -> str:
     domain = domain.strip().lower().rstrip(".")
     if not _DOMAIN_RE.match(domain):
-        raise ValidationError("Invalid certificate domain.")
+        raise ValidationError("证书域名无效。")
     return domain
 
 
@@ -66,7 +66,7 @@ def parse_certificate(cert_pem: str, key_pem: str | None = None) -> dict:
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"))
     except ValueError as exc:
-        raise ValidationError("Certificate is not valid PEM.") from exc
+        raise ValidationError("证书不是有效的 PEM。") from exc
 
     result: dict = {
         "cert": cert,
@@ -82,21 +82,21 @@ def parse_certificate(cert_pem: str, key_pem: str | None = None) -> dict:
         try:
             key = serialization.load_pem_private_key(key_pem.encode("utf-8"), password=None)
         except (ValueError, TypeError) as exc:
-            raise ValidationError("Private key is not valid unencrypted PEM.") from exc
+            raise ValidationError("私钥不是有效的未加密 PEM。") from exc
         if not isinstance(key, rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey | ed25519.Ed25519PrivateKey):
-            raise ValidationError("Unsupported private key type.")
+            raise ValidationError("不支持这种私钥类型。")
         if _public_key_der(cert.public_key()) != _public_key_der(key.public_key()):
-            raise ValidationError("Certificate and private key do not match.")
+            raise ValidationError("证书与私钥不匹配。")
         result["key"] = key
 
     if result["expires_at"] <= datetime.now(UTC):
-        raise ValidationError("Certificate has already expired.")
+        raise ValidationError("证书已过期。")
     return result
 
 
 def _validate_domain(parsed: dict, domain: str) -> None:
     if not any(_name_matches(name, domain) for name in parsed["names"]):
-        raise ValidationError(f"Certificate is not valid for {domain}.")
+        raise ValidationError(f"证书不包含域名 {domain}。")
 
 
 def _write_pair(domain: str, cert_pem: str, key_pem: str) -> tuple[str, str]:

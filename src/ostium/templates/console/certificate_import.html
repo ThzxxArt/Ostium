@@ -1,0 +1,68 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}导入证书{% endblock %}
+{% block breadcrumb %}证书 / 导入{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "upload" "w-3.5 h-3.5" %} TLS import</div>
+            <h1 class="page-title">导入证书</h1>
+            <p class="page-desc">粘贴证书链和私钥。导入前会校验证书链、域名、有效期和私钥匹配。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn" href="{% url 'console:certificates' %}">{% icon "arrow-left" %} 返回证书</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "certificate" %} 证书与私钥</div>
+            </div>
+            <form method="post" class="panel-body stack" autocomplete="off">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="field">
+                    <label for="{{ form.domain.id_for_label }}">{{ form.domain.label }}</label>
+                    {{ form.domain }}
+                    {{ form.domain.errors }}
+                    {% if form.domain.help_text %}<span class="helptext">{{ form.domain.help_text }}</span>{% endif %}
+                </div>
+                <div class="field">
+                    <label for="{{ form.certificate.id_for_label }}">{{ form.certificate.label }}</label>
+                    {{ form.certificate }}
+                    {{ form.certificate.errors }}
+                    {% if form.certificate.help_text %}<span class="helptext">{{ form.certificate.help_text }}</span>{% endif %}
+                </div>
+                <div class="field">
+                    <label for="{{ form.private_key.id_for_label }}">{{ form.private_key.label }}</label>
+                    {{ form.private_key }}
+                    {{ form.private_key.errors }}
+                    {% if form.private_key.help_text %}<span class="helptext">{{ form.private_key.help_text }}</span>{% endif %}
+                </div>
+                <div class="field">
+                    <label class="checkbox-row" for="{{ form.auto_renew.id_for_label }}">
+                        {{ form.auto_renew }} <span>{{ form.auto_renew.label }}</span>
+                    </label>
+                    <span class="helptext">仅用于标记 certbot 管理的证书；续期后仍由 deploy hook 自动同步。</span>
+                </div>
+                <div class="form-actions">
+                    <a class="btn" href="{% url 'console:certificates' %}">取消</a>
+                    <button class="btn btn--primary" type="submit">{% icon "check" %} 校验并导入</button>
+                </div>
+            </form>
+        </section>
+        <aside class="panel span-4">
+            <div class="panel-head"><div class="panel-title">{% icon "shield" %} 导入要求</div></div>
+            <div class="panel-body stack text-sm muted">
+                <p>证书必须是未过期的 PEM，SAN 或 CN 包含上面的域名。</p>
+                <p>私钥必须与证书公钥匹配，且不能有密码保护。</p>
+                <p>证书和私钥只保存在服务端数据目录，权限收紧为 0600。</p>
+                <p>certbot 续期后，deploy hook 会自动调用 <code class="mono">ostium cert sync</code>。</p>
+            </div>
+        </aside>
+    </div>
+{% endblock %}

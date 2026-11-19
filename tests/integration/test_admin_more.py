@@ -62,10 +62,10 @@ def test_proxy_admin_lists(admin_client, proxy_user, inbounds):
 
 @pytest.mark.django_db
 def test_certificate_admin_branches(admin_client, certificate, inbounds):
-    url = reverse("admin:certificates_certificate_import")
+    url = reverse("console:certificate_import")
     response = admin_client.post(url, {"domain": "vpn.example.com", "certificate": "bad", "private_key": "bad"})
     assert response.status_code == 200
-    assert b"error" in response.content.lower() or b"invalid" in response.content.lower()
+    assert "PEM" in response.content.decode()
     changelist = reverse("admin:certificates_certificate_changelist")
     response = admin_client.post(
         changelist,

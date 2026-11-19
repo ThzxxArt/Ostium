@@ -59,7 +59,7 @@ def test_certificate_required(proxy_user, inbounds):
     hysteria.save()
     with pytest.raises(ConfigError) as exc:
         generate_config(probe_dns=False)
-    assert "certificate" in str(exc.value).lower()
+    assert "证书" in str(exc.value)
 
 
 @pytest.mark.django_db

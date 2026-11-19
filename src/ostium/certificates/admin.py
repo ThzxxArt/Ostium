@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-from django import forms
-from django.contrib import admin, messages
-from django.shortcuts import redirect, render
+from django.contrib import admin
+from django.shortcuts import redirect
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
-from ostium.operations.services import record_audit
-
 from .models import Certificate
-from .services import import_certificate, refresh_status
-
-
-class CertificateImportForm(forms.Form):
-    domain = forms.CharField(max_length=253, label=_("Domain"))
-    certificate = forms.CharField(widget=forms.Textarea(attrs={"rows": 8}), label=_("Certificate PEM"))
-    private_key = forms.CharField(widget=forms.Textarea(attrs={"rows": 8}), label=_("Private key PEM"))
-    auto_renew = forms.BooleanField(required=False, label=_("Managed by certbot"))
+from .services import refresh_status
 
 
 @admin.register(Certificate)
@@ -67,33 +57,9 @@ class CertificateAdmin(ModelAdmin):
         return custom + urls
 
     def import_view(self, request):
-        from django.core.exceptions import PermissionDenied
-
-        if not request.user.is_superuser:
-            raise PermissionDenied
-        form = CertificateImportForm(request.POST or None)
-        if request.method == "POST" and form.is_valid():
-            try:
-                certificate = import_certificate(
-                    domain=form.cleaned_data["domain"],
-                    cert_pem=form.cleaned_data["certificate"],
-                    key_pem=form.cleaned_data["private_key"],
-                    auto_renew=form.cleaned_data["auto_renew"],
-                    actor=request.user,
-                )
-            except Exception as exc:
-                form.add_error(None, str(exc))
-            else:
-                record_audit(action="certificate.imported", request=request, target=certificate.domain)
-                messages.success(request, _("Certificate imported for %(domain)s.") % {"domain": certificate.domain})
-                return redirect("admin:certificates_certificate_changelist")
-        context = {
-            **self.admin_site.each_context(request),
-            "opts": self.model._meta,
-            "title": _("Import certificate"),
-            "form": form,
-        }
-        return render(request, "admin/certificates/certificate/import.html", context)
+        # The console has a first-class Aurora import page. Keep the old admin
+        # URL as a redirect for bookmarks and dashboard links.
+        return redirect("console:certificate_import")
 
     @admin.display(description=_("Expires in"))
     def days_remaining(self, obj: Certificate):

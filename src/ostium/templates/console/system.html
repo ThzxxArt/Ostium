@@ -177,25 +177,35 @@
                 </div>
             {% endif %}
         </section>
-        <section class="panel span-12 danger-zone">
-            <div class="panel-head"><div class="panel-title">{% icon "alert" %} 应用状态</div></div>
-            <div class="panel-body detail-list">
-                <div class="detail-item">
-                    <div class="meta-label">期望版本</div>
-                    <div class="meta-value">{{ state.desired_revision }}</div>
+        <section class="panel span-12">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "activity" %} 配置应用状态</div>
+                <span class="status-pill {% if state.is_converged %}status-pill--success{% else %}status-pill--warning{% endif %}">
+                    {% if state.is_converged %}已同步{% else %}等待应用{% endif %}
+                </span>
+            </div>
+            <div class="panel-body">
+                <div class="detail-list">
+                    <div class="detail-item">
+                        <div class="meta-label">已应用时间</div>
+                        <div class="meta-value">{{ state.singbox_started_at|datetimefmt|default:"—" }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="meta-label">内部修订号</div>
+                        <div class="meta-value mono">{{ state.applied_revision }} / {{ state.desired_revision }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="meta-label">配置哈希</div>
+                        <div class="meta-value mono">{{ state.config_sha256|default:"—" }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="meta-label">最近错误</div>
+                        <div class="meta-value">{{ state.last_error|default:"无"|truncatechars:140 }}</div>
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <div class="meta-label">已应用版本</div>
-                    <div class="meta-value">{{ state.applied_revision }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="meta-label">配置哈希</div>
-                    <div class="meta-value mono">{{ state.config_sha256|default:"—" }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="meta-label">最近错误</div>
-                    <div class="meta-value">{{ state.last_error|default:"无"|truncatechars:140 }}</div>
-                </div>
+                <p class="helptext" style="margin-top:14px">
+                    内部修订号是配置变更计数，不是软件版本。左侧为 worker 已应用的版本，右侧为数据库期望的最新版本；两个数字相同表示配置已同步。
+                </p>
             </div>
         </section>
     </div>

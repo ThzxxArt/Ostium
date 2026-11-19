@@ -1,6 +1,6 @@
 [project]
 name = "ostium-ctl"
-version = "0.2.4"
+version = "0.2.5"
 description = "Ostium Server — a single-host private proxy server for Linux"
 readme = "docs/pypi-readme.md"
 requires-python = ">=3.14,<3.15"
@@ -34,6 +34,7 @@ dependencies = [
   "djangorestframework==3.18.3",
   "djangorestframework-api-key==3.1.0",
   "drf-spectacular==0.30.0",
+  "drf-spectacular-sidecar==2026.10.1",
   "grpcio==1.85.3",
   "gunicorn==27.0.1",
   "httpx==0.28.1",

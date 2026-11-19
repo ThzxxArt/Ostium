@@ -22,7 +22,9 @@ from django.views.decorators.http import require_http_methods
 from django_q.models import Task
 
 from ostium import paths
+from ostium.certificates.forms import CertificateImportForm
 from ostium.certificates.models import Certificate
+from ostium.certificates.services import import_certificate
 from ostium.engine.clash import ClashClient, ClashError
 from ostium.engine.runtime import read_usage, tail_file
 from ostium.engine.supervisor import binary_version, disk_free_bytes
@@ -383,6 +385,32 @@ def connections(request):
 
 @staff_member_required(login_url="accounts:login")
 @require_http_methods(["GET", "POST"])
+def certificate_import(request):
+    form = CertificateImportForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            certificate = import_certificate(
+                domain=form.cleaned_data["domain"],
+                cert_pem=form.cleaned_data["certificate"],
+                key_pem=form.cleaned_data["private_key"],
+                auto_renew=form.cleaned_data["auto_renew"],
+                actor=request.user,
+            )
+        except Exception as exc:
+            form.add_error(None, str(exc))
+        else:
+            record_audit(action="certificate.imported", request=request, target=certificate.domain)
+            messages.success(request, f"证书 {certificate.domain} 已导入。")
+            return redirect("console:certificates")
+    return render(
+        request,
+        "console/certificate_import.html",
+        {"active_nav": "certificates", "form": form},
+    )
+
+
+@staff_member_required(login_url="accounts:login")
+@require_http_methods(["GET", "POST"])
 def certificates(request):
     if request.method == "POST":
         certificate = get_object_or_404(Certificate, pk=request.POST.get("certificate_id"))
@@ -399,7 +427,7 @@ def certificates(request):
         {
             "active_nav": "certificates",
             "records": records,
-            "import_url": reverse("admin:certificates_certificate_import"),
+            "import_url": reverse("console:certificate_import"),
         },
     )
 

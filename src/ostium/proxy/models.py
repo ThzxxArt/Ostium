@@ -392,13 +392,13 @@ class Inbound(models.Model):
     def clean(self) -> None:
         errors = []
         if not 1 <= self.port <= 65535:
-            errors.append(_("Port must be between 1 and 65535."))
+            errors.append("端口必须在 1–65535 之间。")
         if self.enabled and self.needs_certificate and self.certificate_id is None:
-            errors.append(_("This protocol requires a TLS certificate."))
+            errors.append("这条线路需要 TLS 证书。")
         if self.kind == self.Kind.SHADOWSOCKS:
             method = self.params.get("method", "")
             if not method.startswith("2022-"):
-                errors.append(_("Only Shadowsocks 2022 methods are supported."))
+                errors.append("只支持 Shadowsocks 2022 方法。")
         if self.enabled and self.kind != self.Kind.HYSTERIA2:
             # Hysteria2 is UDP; every other inbound in this project is TCP.
             conflict = (
@@ -408,10 +408,7 @@ class Inbound(models.Model):
                 .first()
             )
             if conflict is not None:
-                errors.append(
-                    _("TCP port %(port)s is already used by %(kind)s.")
-                    % {"port": self.port, "kind": conflict.get_kind_display()}
-                )
+                errors.append(f"TCP 端口 {self.port} 已被 {conflict.get_kind_display()} 使用。")
         if errors:
             raise ValidationError(errors)
 
@@ -423,17 +420,17 @@ class Inbound(models.Model):
     def validation_errors(self) -> list[str]:
         errors: list[str] = []
         if not 1 <= self.port <= 65535:
-            errors.append(_("Port must be between 1 and 65535."))
+            errors.append("端口必须在 1–65535 之间。")
         if self.needs_certificate:
             if not self.certificate_id:
-                errors.append(_("Assign a TLS certificate."))
+                errors.append("请分配 TLS 证书。")
             elif not self.certificate.is_ready:
-                errors.append(_("The assigned certificate is not ready."))
+                errors.append("已分配的证书未就绪。")
         params = self.params
         if self.kind == self.Kind.VLESS and not params.get("private_key"):
-            errors.append(_("Reality keypair is missing."))
+            errors.append("Reality 密钥对缺失。")
         if self.kind == self.Kind.SHADOWSOCKS and not params.get("server_key"):
-            errors.append(_("Shadowsocks server key is missing."))
+            errors.append("Shadowsocks 服务器密钥缺失。")
         return [str(error) for error in errors]
 
 

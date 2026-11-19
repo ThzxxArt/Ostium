@@ -9,7 +9,7 @@ from django.db.models.signals import post_save
 class AccountsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "ostium.accounts"
-    verbose_name = "Accounts"
+    verbose_name = "账号"
 
     def ready(self) -> None:
         from auditlog.registry import auditlog

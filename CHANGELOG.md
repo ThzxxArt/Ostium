@@ -3,6 +3,28 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.5 — 2026-11-19
+
+### Fixed
+
+- The console settings page now resolves bound form fields instead of rendering
+  `<django.forms.fields.CharField object ...>`, uses Chinese labels/help text,
+  and no longer has a sticky save bar overlaying fields.
+- Certificate import moved from a broken Django admin page to a first-class
+  Aurora console page at `/certificates/import/`, with Chinese labels and the
+  same layout as the rest of the console.
+- The system page now explains configuration revisions in plain language
+  (`配置应用状态`, `已同步/等待应用`, internal revision number) instead of two raw
+  numbers labelled “expected/applied version”.
+- Swagger UI is served from `drf-spectacular-sidecar` with a CSP nonce, so
+  `/api/docs` renders instead of a blank page.
+- Django Admin app groups use Chinese names; user quota fields display
+  human-readable values such as `100.0 GiB` instead of raw bytes; protocol
+  validation messages are Chinese.
+- Added full-page screenshots and automated checks for settings, system,
+  certificates, users, subscriptions, inbounds, connections, logs, jobs, audit,
+  user detail, admin index/changelists, certificate import and API docs.
+
 ## 0.2.4 — 2026-11-19
 
 ### Fixed

@@ -7,7 +7,7 @@ from django.db.models.signals import post_delete, post_save
 class CertificatesConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "ostium.certificates"
-    verbose_name = "Certificates"
+    verbose_name = "证书"
 
     def ready(self) -> None:
         from auditlog.registry import auditlog

@@ -149,3 +149,22 @@ def test_dashboard_with_usage(admin_client, proxy_user, settings, tmp_path):
     response = admin_client.get("/")
     assert response.status_code == 200
     assert b"alice" in response.content
+
+
+@pytest.mark.django_db
+def test_console_certificate_import_page(admin_client, certificate):
+    response = admin_client.get("/certificates/import/")
+    assert response.status_code == 200
+    assert "导入证书" in response.content.decode()
+
+    response = admin_client.post(
+        "/certificates/import/",
+        {
+            "domain": certificate.domain,
+            "certificate": certificate.cert_file.read_text(),
+            "private_key": certificate.key_file.read_text(),
+            "auto_renew": "on",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/certificates/"

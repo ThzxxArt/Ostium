@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from django.forms.boundfield import BoundField
 
 from ostium.operations.forms import InboundForm, SettingsForm, UserEditForm
 from ostium.proxy.models import Inbound
+from ostium.templatetags.ostium_ui import get_item
 
 
 @pytest.mark.django_db
@@ -107,6 +109,15 @@ def test_settings_form_saves(settings):
 
     assert config.server_name == "Unit"
     assert config.public_base_url == "https://vpn.example.com"
+
+
+@pytest.mark.django_db
+def test_settings_template_receives_bound_fields_with_chinese_labels():
+    form = SettingsForm()
+    field = get_item(form, "server_name")
+    assert isinstance(field, BoundField)
+    assert field.label == "服务器名称"
+    assert "阻止私网出口" in form.fields["block_private_egress"].label
 
 
 class _Noop:

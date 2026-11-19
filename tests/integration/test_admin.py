@@ -53,15 +53,16 @@ def test_admin_actions(admin_client, proxy_user):
 
 @pytest.mark.django_db
 def test_certificate_import_view(admin_client, certificate):
-    url = reverse("admin:certificates_certificate_import")
-    response = admin_client.get(url)
+    admin_url = reverse("admin:certificates_certificate_import")
+    response = admin_client.get(admin_url, follow=True)
     assert response.status_code == 200
+    assert "导入证书" in response.content.decode()
     payload = {
         "domain": certificate.domain,
         "certificate": certificate.cert_file.read_text(),
         "private_key": certificate.key_file.read_text(),
     }
-    response = admin_client.post(url, payload)
+    response = admin_client.post(reverse("console:certificate_import"), payload)
     assert response.status_code == 302
     from ostium.certificates.models import Certificate
 
