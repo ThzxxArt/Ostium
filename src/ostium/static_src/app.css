@@ -729,6 +729,13 @@ button {
   gap: 18px;
 }
 
+/* Grid and flex children must be allowed to shrink below their content
+   width, otherwise long subscription URLs blow out the panel. */
+.grid > *,
+.stack > * {
+  min-width: 0;
+}
+
 .grid--12 {
   grid-template-columns: repeat(12, minmax(0, 1fr));
 }
@@ -1794,6 +1801,8 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
   padding: 8px 10px;
   border-radius: 9px;
   border: 1px solid var(--border);
@@ -1809,6 +1818,30 @@ input[type="checkbox"] {
   color: var(--text-2);
   font-family: var(--font-mono);
   font-size: 10.5px;
+  user-select: all;
+}
+
+.copy-field .copy-btn {
+  flex: none;
+}
+
+/* Full subscription URLs must remain readable and selectable. They are long
+   unbroken strings, so wrap anywhere instead of clipping them. */
+.copy-field--wrap {
+  align-items: flex-start;
+}
+
+.copy-field--wrap code {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  line-height: 1.55;
+}
+
+.copy-field--wrap .copy-btn {
+  margin-top: 1px;
 }
 
 /* --------------------------------------------------------------- settings */
@@ -1912,10 +1945,15 @@ input[type="checkbox"] {
 }
 
 .meta-chip {
+  min-width: 0;
   padding: 9px 11px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface-2);
+}
+
+.meta-chip .row-split > div {
+  min-width: 0;
 }
 
 .meta-label {
@@ -2562,6 +2600,18 @@ input[type="checkbox"] {
 
 .copy-btn:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .copy-btn svg { width: 14px; height: 14px; }
+
+.copy-btn--text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: auto;
+  padding: 0 9px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+}
 
 .stat-inline {
   display: flex;

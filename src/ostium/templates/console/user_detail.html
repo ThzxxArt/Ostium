@@ -180,19 +180,18 @@
                         <div class="grid" style="gap:10px">
                             {% for link in links %}
                                 <div class="meta-chip">
-                                    <div class="row-split">
-                                        <div>
-                                            <div class="meta-label">{{ link.label }}</div>
-                                            <div class="muted text-xs">{{ link.description }}</div>
-                                        </div>
-                                        <button class="copy-btn"
+                                    <div class="meta-label">{{ link.label }}</div>
+                                    <div class="muted text-xs">{{ link.description }}</div>
+                                    <div class="copy-field copy-field--wrap" style="margin-top:8px">
+                                        <code>{{ link.url }}</code>
+                                        <button class="copy-btn copy-btn--text"
                                                 type="button"
                                                 data-copy="{{ link.url }}"
-                                                aria-label="复制 {{ link.label }} 订阅">{% icon "copy" %}</button>
+                                                aria-label="复制 {{ link.label }} 订阅">{% icon "copy" %} 复制</button>
                                     </div>
-                                    <div class="copy-field" style="margin-top:8px"><code>{{ link.url }}</code></div>
                                 </div>
                             {% endfor %}
+                            <div class="muted text-xs">长链接会自动换行；点击链接文本可全选，右侧按钮直接复制。</div>
                         </div>
                         <div class="divider"></div>
                         <div class="flex items-center gap-3">
@@ -209,13 +208,13 @@
                             <div class="meta-label">单节点链接</div>
                             <div class="stack" style="gap:8px;margin-top:6px">
                                 {% for endpoint in endpoints %}
-                                    <div class="copy-field">
+                                    <div class="copy-field copy-field--wrap">
                                         <span class="proto-badge">{{ endpoint.label }}</span>
                                         <code>{{ endpoint.to_uri }}</code>
-                                        <button class="copy-btn"
+                                        <button class="copy-btn copy-btn--text"
                                                 type="button"
                                                 data-copy="{{ endpoint.to_uri }}"
-                                                aria-label="复制 {{ endpoint.label }}">{% icon "copy" %}</button>
+                                                aria-label="复制 {{ endpoint.label }}">{% icon "copy" %} 复制</button>
                                     </div>
                                 {% endfor %}
                             </div>

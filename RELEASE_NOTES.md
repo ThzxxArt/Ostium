@@ -1,28 +1,28 @@
-# Ostium Server 0.2.7 — Release Notes
+# Ostium Server 0.2.8 — Release Notes
 
-Ostium 0.2.7 removes every normal-navigation jump from the Aurora console into
-Django Admin.
+Ostium 0.2.8 fixes subscription links being clipped and makes copying them
+reliable.
 
 ## Fixed
 
-- **新增用户** is now a native console page at `/users/new/` with quota, quota
-  cycle, expiry, note and enabled state.
-- User editing, certificate management, inbound editing and audit filtering
-  all stay inside the Aurora console.
-- The console sidebar, user menu and command palette no longer expose Django
-  Admin.
-- Django Admin is now labelled **Ostium 应急管理** and remains available at
-  `/admin/` only as an emergency data-management interface.
-- Newly created users persist `expires_at` correctly.
-- Remaining visible English eyebrow labels and form headings in the console are
-  now Chinese.
+- Full subscription URLs and single-node URIs now wrap at any character instead
+  of being truncated with an ellipsis. The complete link is visible and
+  selectable with one click.
+- Every full URL has an inline **复制** button.
+- Clipboard writes now fall back to the legacy copy path when the async
+  Clipboard API is denied, instead of failing silently.
+- Grid and flex children can shrink below their content width, so long links no
+  longer push subscription panels past the viewport.
 
 ## Verification
 
-- 14 console routes assert no `href="/admin/` and no `Django Admin` text.
-- User creation asserts quota, quota cycle, expiry, note and enabled state.
-- 378 tests passed / 2 skipped; coverage 90.16%.
-- Full UI screenshot suite and axe checks pass; 57 screenshots.
+- Desktop and mobile UI tests assert full-link fields have no horizontal or
+  vertical clipping.
+- The copy button is clicked and the clipboard content is compared with the
+  complete URL.
+- 378 tests passed / 2 skipped; 8 UI tests passed.
+- Screenshots: `audit-subscription-links-1440.png`,
+  `audit-subscription-links-390.png`.
 
 ## Install
 
@@ -32,21 +32,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.7
-docker pull ghcr.io/thzxxart/ostium-server:0.2.7
+pip install ostium-ctl==0.2.8
+docker pull ghcr.io/thzxxart/ostium-server:0.2.8
 ```
 
 ## Upgrade
 
-0.2.0–0.2.6 can upgrade in place:
+0.2.0–0.2.7 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.7
+  | sudo bash -s -- upgrade --version 0.2.8
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.7/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.7` and `:latest`
-- GitHub Release: `v0.2.7`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.8/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.8` and `:latest`
+- GitHub Release: `v0.2.8`

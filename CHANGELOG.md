@@ -3,6 +3,20 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.8 — 2026-11-19
+
+### Fixed
+
+- Full subscription and single-node URLs no longer get clipped by
+  `text-overflow: ellipsis` or the subscription panel's `overflow: hidden`.
+  They wrap at any character, remain fully visible, and can be selected with
+  one click.
+- Each full URL now has an inline **复制** button. Clipboard writes fall back to
+  the legacy copy path when the async Clipboard API is denied, instead of
+  failing silently.
+- Grid and flex children can shrink below their content width, preventing long
+  links from pushing panels past the viewport.
+
 ## 0.2.7 — 2026-11-19
 
 ### Fixed

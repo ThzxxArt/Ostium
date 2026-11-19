@@ -2,7 +2,7 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.7"
+VERSION="0.2.8"
 RELEASE_VERSION="${OSTIUM_RELEASE_VERSION:-$VERSION}"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
@@ -43,7 +43,7 @@ Options:
   --domain DOMAIN      Public hostname; configures Caddy and subscription URLs
   --with-caddy         Install and configure Caddy on 8443
   --no-service         Prepare files but do not enable systemd units
-  --version VERSION    Release version to install (default: 0.2.7)
+  --version VERSION    Release version to install (default: 0.2.8)
   --from-source        Build/install from source instead of release assets
   --wheel PATH         Install a specific wheel
   --pypi               Install ostium-ctl from PyPI (requires a published release)

@@ -71,20 +71,28 @@
           if (original) button.setAttribute("aria-label", original);
         }, 1400);
       };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(value).then(done, function () {});
-      } else {
+      var fallbackCopy = function () {
         var area = document.createElement("textarea");
         area.value = value;
         area.style.position = "fixed";
         area.style.opacity = "0";
         document.body.appendChild(area);
         area.select();
+        var copied = false;
         try {
-          document.execCommand("copy");
-          done();
-        } catch (e) {}
+          copied = document.execCommand("copy");
+        } catch (e) {
+          copied = false;
+        }
         area.remove();
+        if (copied) done();
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        // Clipboard permissions can be denied even on HTTPS. Fall back to the
+        // legacy path instead of failing silently.
+        navigator.clipboard.writeText(value).then(done, fallbackCopy);
+      } else {
+        fallbackCopy();
       }
     });
   }

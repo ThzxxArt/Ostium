@@ -62,6 +62,7 @@ nav:
       - 端口: reference/ports.md
       - PyPI 包说明: pypi-readme.md
   - 质量:
+      - 0.2.8 订阅链接修复: review/0.2.8-subscription-links.md
       - 0.2.7 控制台导航审计: review/0.2.7-navigation-audit.md
       - 0.2.5 全页面 UI 审计: review/0.2.5-ui-audit.md
       - 发布前验收: review/0.2.0-pre-release-audit.md

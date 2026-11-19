@@ -101,7 +101,7 @@ docker compose pull
 docker compose up -d
 ```
 
-镜像：`ghcr.io/thzxxart/ostium-server:0.2.7`。需要本地构建时使用
+镜像：`ghcr.io/thzxxart/ostium-server:0.2.8`。需要本地构建时使用
 `docker compose up -d --build`。
 
 使用 Caddy profile 时，需要先把证书复制到宿主机 `/etc/ostium/tls/<domain>/`；

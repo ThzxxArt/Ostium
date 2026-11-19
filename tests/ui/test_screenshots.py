@@ -196,6 +196,46 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_subscription_links_wrap_and_copy(page, live_server, browser_user):
+    from ostium.proxy.models import ProxyUser
+
+    alice = ProxyUser.objects.get(name="alice")
+    detail_url = f"{live_server.url}/users/{alice.pk}/"
+    page.set_viewport_size({"width": 1440, "height": 900})
+    login(page, live_server)
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+
+    def reveal_links(width, height):
+        page.set_viewport_size({"width": width, "height": height})
+        page.goto(detail_url)
+        page.click("button:has-text('显示完整链接')")
+        page.wait_for_timeout(400)
+        fields = page.locator(".copy-field--wrap")
+        assert fields.count() >= 3
+        for index in range(fields.count()):
+            field = fields.nth(index)
+            assert field.evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+            assert field.locator("code").evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+            assert field.locator("code").evaluate("el => el.scrollHeight <= el.clientHeight + 1")
+            assert field.locator("[data-copy]").is_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
+        return fields
+
+    fields = reveal_links(1440, 900)
+    first = fields.first
+    assert first.locator("code").inner_text().startswith("http")
+    expected = first.locator("[data-copy]").get_attribute("data-copy")
+    first.locator("[data-copy]").click()
+    page.wait_for_selector(".toast")
+    assert "已复制" in page.locator(".toast").first.inner_text()
+    assert page.evaluate("navigator.clipboard.readText()") == expected
+    page.screenshot(path=str(SCREENSHOTS / "audit-subscription-links-1440.png"), full_page=True)
+
+    reveal_links(390, 844)
+    page.screenshot(path=str(SCREENSHOTS / "audit-subscription-links-390.png"), full_page=True)
+
+
+@pytest.mark.django_db(transaction=True)
 def test_mobile_navigation_and_focus(page, live_server, browser_user):
     page.set_viewport_size({"width": 390, "height": 844})
     login(page, live_server)
