@@ -19,9 +19,19 @@ ostium backup create --password 'a-long-backup-password'
 
 或在控制台「系统」页创建。密码至少 12 位；丢失密码无法解密。
 
-自动备份：设置 `auto_backup_enabled=true`，并在
-`/etc/ostium/ostium.env` 设置 `OSTIUM_BACKUP_PASSWORD`。
-worker 每天检查一次，保留 `auto_backup_keep` 份。
+自动备份：设置 `auto_backup_enabled=true`，并配置自动备份密码。worker 每
+5 分钟检查一次，距上次自动备份超过 23 小时才创建新备份，保留
+`auto_backup_keep` 份。
+
+密码来源按优先级：
+
+1. 环境变量 `OSTIUM_BACKUP_PASSWORD`；
+2. 控制台「设置 → 自动备份密码」保存的文件
+   `/var/lib/ostium/secrets/backup-password`（0600）。
+
+页面密码不会进入数据库，也不会进入 `.ostb` 备份文件。环境变量优先级更高；
+如果两者同时存在，页面会提示当前由环境变量管理。密码至少 12 位，丢失后无法
+解密备份。
 
 ## 恢复
 

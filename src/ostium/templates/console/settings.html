@@ -26,6 +26,7 @@
             <a href="#security">安全</a>
             <a href="#notifications">通知</a>
             <a href="#maintenance">维护</a>
+            <a href="#backup-password">备份密码</a>
         </aside>
         <div class="stack">
             {% if form.non_field_errors %}<div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>{% endif %}
@@ -127,4 +128,64 @@
             </div>
         </div>
     </form>
+    <section class="panel settings-section mt-4" id="backup-password">
+        <div class="panel-head">
+            <div class="panel-title">{% icon "key" %} 自动备份密码</div>
+            <span class="badge {% if backup_password_configured %}badge--success{% else %}badge--warning{% endif %}">
+                {% if backup_password_configured %}已设置{% else %}未设置{% endif %}
+            </span>
+        </div>
+        <div class="panel-body stack">
+            <div class="alert-banner alert-banner--info">
+                {% icon "lock" %}
+                <div>
+                    自动备份密码只写入服务器的 <code class="mono">secrets/backup-password</code> 文件（0600），
+                    不进入数据库、不进入备份文件，也不会在页面回显。丢失密码将无法解密备份。
+                </div>
+            </div>
+            {% if backup_password_source == "env" %}
+                <div class="alert-banner alert-banner--warning">
+                    {% icon "alert" %}
+                    <div>当前由 <code class="mono">OSTIUM_BACKUP_PASSWORD</code> 环境变量管理，优先级高于页面密码。要改用页面设置，请先从环境变量中移除它并重启 worker。</div>
+                </div>
+            {% else %}
+                {% if backup_password_source == "file" %}
+                    <div class="alert-banner alert-banner--success">
+                        {% icon "check" %}
+                        <div>页面密码文件已生效。可以更新密码，或清除后重新设置。</div>
+                    </div>
+                {% endif %}
+                <form method="post" class="stack">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_backup_password">
+                    {% if backup_form.non_field_errors %}
+                        <div class="alert-banner alert-banner--danger">{{ backup_form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="{{ backup_form.password.id_for_label }}">{{ backup_form.password.label }}</label>
+                            {{ backup_form.password }}
+                            {{ backup_form.password.errors }}
+                            {% if backup_form.password.help_text %}<span class="helptext">{{ backup_form.password.help_text }}</span>{% endif %}
+                        </div>
+                        <div class="field">
+                            <label for="{{ backup_form.confirm.id_for_label }}">{{ backup_form.confirm.label }}</label>
+                            {{ backup_form.confirm }}
+                            {{ backup_form.confirm.errors }}
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn--primary" type="submit">{% icon "check" %} 保存自动备份密码</button>
+                    </div>
+                </form>
+                {% if backup_password_source == "file" %}
+                    <form method="post" data-confirm="清除后自动备份将停止，直到重新设置密码。继续？">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="clear_backup_password">
+                        <button class="btn btn--danger btn--sm" type="submit">{% icon "trash" %} 清除页面密码</button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </div>
+    </section>
 {% endblock %}

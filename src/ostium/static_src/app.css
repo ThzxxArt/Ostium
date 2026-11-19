@@ -1769,6 +1769,11 @@ input[type="checkbox"] {
   background: var(--accent-2-soft);
 }
 
+.alert-banner--success {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--success-soft);
+}
+
 .alert-banner svg {
   width: 17px;
   height: 17px;

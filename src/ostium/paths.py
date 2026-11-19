@@ -21,6 +21,14 @@ def runtime_dir() -> Path:
     return data_dir() / "runtime"
 
 
+def secrets_dir() -> Path:
+    return data_dir() / "secrets"
+
+
+def backup_password_path() -> Path:
+    return secrets_dir() / "backup-password"
+
+
 def certs_dir() -> Path:
     return data_dir() / "certs"
 
@@ -73,7 +81,7 @@ def ostium_log_path() -> Path:
     return logs_dir() / "ostium.log"
 
 
-_DIRECTORIES = (data_dir, runtime_dir, certs_dir, logs_dir, backups_dir, imports_dir)
+_DIRECTORIES = (data_dir, runtime_dir, secrets_dir, certs_dir, logs_dir, backups_dir, imports_dir)
 
 
 def ensure() -> None:

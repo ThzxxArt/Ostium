@@ -425,17 +425,18 @@ class Worker:
     def _maybe_backup(self) -> None:
         if not runtime_config.auto_backup_enabled:
             return
-        password = os.environ.get("OSTIUM_BACKUP_PASSWORD", "")
+        from ostium.operations.backup import create_backup, get_backup_password
+
+        password = get_backup_password()
         if not password:
             raise_alert(
                 code="backup_failed",
                 level="warning",
-                message="Automatic backup is enabled but OSTIUM_BACKUP_PASSWORD is not set.",
+                message="Automatic backup is enabled but no backup password is configured.",
                 fingerprint="backup_failed:password",
             )
             return
         resolve_alert("backup_failed:password")
-        from ostium.operations.backup import create_backup
 
         last = None
         from ostium.operations.models import Backup

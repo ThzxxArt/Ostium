@@ -1299,7 +1299,7 @@ wheels = [
 
 [[package]]
 name = "ostium-ctl"
-version = "0.2.10"
+version = "0.2.11"
 source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from ostium.operations.backup import create_backup, restore_file
+from ostium.operations.backup import create_backup, get_backup_password, restore_file
 from ostium.operations.models import Backup
 
 
@@ -17,19 +16,22 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         sub = parser.add_subparsers(dest="subcommand", required=True)
         create = sub.add_parser("create", help="Create a backup.")
-        create.add_argument("--password", default=os.environ.get("OSTIUM_BACKUP_PASSWORD", ""))
+        create.add_argument("--password", default="")
         create.add_argument("--note", default="")
         sub.add_parser("list", help="List backups.")
         restore = sub.add_parser("restore", help="Restore a backup file (offline recommended).")
         restore.add_argument("path")
-        restore.add_argument("--password", default=os.environ.get("OSTIUM_BACKUP_PASSWORD", ""))
+        restore.add_argument("--password", default="")
 
     def handle(self, *args, **options):
         getattr(self, f"_{options['subcommand']}")(options)
 
     def _create(self, options):
+        options["password"] = options["password"] or get_backup_password()
         if not options["password"]:
-            raise CommandError("Provide --password or set OSTIUM_BACKUP_PASSWORD.")
+            raise CommandError(
+                "Provide --password, set OSTIUM_BACKUP_PASSWORD, or configure the backup password in Settings."
+            )
         try:
             backup = create_backup(password=options["password"], note=options["note"])
         except Exception as exc:
@@ -46,8 +48,11 @@ class Command(BaseCommand):
         path = Path(options["path"])
         if not path.is_file():
             raise CommandError(f"Backup file not found: {path}")
+        options["password"] = options["password"] or get_backup_password()
         if not options["password"]:
-            raise CommandError("Provide --password or set OSTIUM_BACKUP_PASSWORD.")
+            raise CommandError(
+                "Provide --password, set OSTIUM_BACKUP_PASSWORD, or configure the backup password in Settings."
+            )
         self.stdout.write(self.style.WARNING("Restoring replaces the current database and certificate files."))
         try:
             restore_file(path, password=options["password"])

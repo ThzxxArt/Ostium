@@ -42,6 +42,57 @@ class BackupError(RuntimeError):
     pass
 
 
+MIN_PASSWORD_LENGTH = 12
+
+
+def backup_password_path() -> Path:
+    return paths.backup_password_path()
+
+
+def get_backup_password() -> str:
+    """Return the automatic-backup password.
+
+    Environment takes precedence; the settings-page file is the fallback. The
+    password is deliberately never stored in the database or in a backup.
+    """
+
+    from_env = os.environ.get("OSTIUM_BACKUP_PASSWORD", "").strip()
+    if from_env:
+        return from_env
+    try:
+        value = backup_password_path().read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return value if len(value) >= MIN_PASSWORD_LENGTH else ""
+
+
+def backup_password_source() -> str:
+    if os.environ.get("OSTIUM_BACKUP_PASSWORD", "").strip():
+        return "env"
+    try:
+        value = backup_password_path().read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return "file" if len(value) >= MIN_PASSWORD_LENGTH else ""
+
+
+def save_backup_password(password: str) -> None:
+    password = password.strip()
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise BackupError(f"Backup password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    paths.ensure()
+    path = backup_password_path()
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(password + "\n", encoding="utf-8")
+    paths.secure_file(temp)
+    temp.replace(path)
+    paths.secure_file(path)
+
+
+def clear_backup_password() -> None:
+    backup_password_path().unlink(missing_ok=True)
+
+
 def _derive(password: str, salt: bytes) -> bytes:
     return Scrypt(salt=salt, length=32, n=2**14, r=8, p=1).derive(password.encode("utf-8"))
 

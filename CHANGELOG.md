@@ -3,6 +3,25 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.11 — 2026-11-19
+
+### Added
+
+- The settings page can now set the automatic-backup password. It is written
+  to `secrets/backup-password` with mode 0600 and is never stored in the
+  database or included in a backup archive.
+- `OSTIUM_BACKUP_PASSWORD` still takes precedence over the page password.
+- The settings page shows whether the password comes from the environment, the
+  page file, or is not configured, and can clear only the page-managed file.
+- Manual backup form labels and help text are now Chinese.
+
+### Changed
+
+- Automatic backups, `ostium backup create`, and the backup API fall back to
+  the page password file when the environment variable is absent.
+- Dashboard onboarding marks backup as ready when either password source is set
+  and automatic backup is enabled.
+
 ## 0.2.10 — 2026-11-19
 
 ### Added

@@ -1,38 +1,38 @@
-# Ostium Server 0.2.10 — Release Notes
+# Ostium Server 0.2.11 — Release Notes
 
-Ostium 0.2.10 is a client-compatibility quality release. It turns the manual
-0.2.9 Clash/Mihomo checks into an automated real-client matrix and adds
-self-check tooling.
+Ostium 0.2.11 lets you set the automatic-backup password from the console
+without storing it in the database or inside backup files.
 
 ## Added
 
-- Real-client E2E matrix:
-  - Mihomo v1.19.34: VLESS Reality, Hysteria2, Trojan, SS2022
-  - sing-box v1.14.4: all four inbounds
-  - Xray v26.11.9: VLESS Reality, Trojan, SS2022
-  - The harness starts a local server and Reality TLS target, runs real clients
-    and verifies egress through `https://example.com`.
-- `ProfileOptions` policy object. Defaults remain client-owned DNS, no client
-  port/mode overrides and no external GeoIP database.
-- `ostium subscription check --user <name> [--json] [--no-binaries]`.
-- Console **订阅兼容性自检** page, linked from subscriptions and user detail.
-- Dashboard first-deploy checklist: user, inbound, certificate, backup,
-  webhook, TOTP.
-- Client compatibility documentation and DNS troubleshooting.
+- Settings → **自动备份密码** with password + confirmation fields.
+- Password is written to `/var/lib/ostium/secrets/backup-password` with mode
+  0600. The directory is 0700.
+- The page shows whether the active password comes from the environment, the
+  page-managed file, or is not configured.
+- Page-managed passwords can be cleared from the same panel. Environment
+  passwords remain managed by `OSTIUM_BACKUP_PASSWORD`.
+- Manual backup form labels and help text are Chinese.
 
 ## Changed
 
-- Clash profiles contain only `proxies`, `proxy-groups` and `rules` by default.
-- New `tests/e2e` CI job runs the real-client matrix.
+- Worker automatic backups, `ostium backup create`, `ostium backup restore`
+  and the backup API use the environment variable first, then the page file.
+- Dashboard backup onboarding is complete when either password source is set
+  and automatic backup is enabled.
+- The backup password remains excluded from the database and from `.ostb`
+  archives.
 
 ## Verification
 
 ```text
-395 passed, 3 skipped
-coverage 90.31%
+401 passed, 3 skipped
+coverage 90.24%
 UI 8 passed
-real-client E2E: Mihomo 4/4, sing-box 4/4, Xray 3/3
 ```
+
+Covered: password save/mismatch, file permissions, environment precedence,
+worker file fallback, dashboard checklist and clearing the page password.
 
 ## Install
 
@@ -42,21 +42,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.10
-docker pull ghcr.io/thzxxart/ostium-server:0.2.10
+pip install ostium-ctl==0.2.11
+docker pull ghcr.io/thzxxart/ostium-server:0.2.11
 ```
 
 ## Upgrade
 
-0.2.0–0.2.9 can upgrade in place:
+0.2.0–0.2.10 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.10
+  | sudo bash -s -- upgrade --version 0.2.11
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.10/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.10` and `:latest`
-- GitHub Release: `v0.2.10`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.11/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.11` and `:latest`
+- GitHub Release: `v0.2.11`

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import time
@@ -31,10 +30,22 @@ from ostium.engine.clash import ClashClient, ClashError
 from ostium.engine.runtime import read_usage, tail_file
 from ostium.engine.supervisor import binary_version, disk_free_bytes
 from ostium.formatting import format_bytes
-from ostium.operations.backup import create_backup
+from ostium.operations.backup import (
+    backup_password_source,
+    clear_backup_password,
+    create_backup,
+    get_backup_password,
+    save_backup_password,
+)
 from ostium.operations.diagnostics import build_diagnostics
 from ostium.operations.doctor import doctor_summary, run_doctor
-from ostium.operations.forms import BackupForm, InboundForm, SettingsForm, UserEditForm
+from ostium.operations.forms import (
+    BackupForm,
+    BackupPasswordForm,
+    InboundForm,
+    SettingsForm,
+    UserEditForm,
+)
 from ostium.operations.models import Alert, AuditEvent, Backup, RuntimeState
 from ostium.operations.services import record_audit
 from ostium.proxy.models import Inbound, ProxyUser, TrafficDaily
@@ -148,7 +159,7 @@ def dashboard(request):
     enabled_inbounds = list(Inbound.objects.filter(enabled=True))
     cert_inbounds = [item for item in enabled_inbounds if item.needs_certificate]
     certificate_ready = all(item.certificate and item.certificate.is_ready for item in cert_inbounds)
-    backup_ready = bool(os.environ.get("OSTIUM_BACKUP_PASSWORD")) and bool(runtime_config.auto_backup_enabled)
+    backup_ready = bool(get_backup_password()) and bool(runtime_config.auto_backup_enabled)
     onboarding = [
         {
             "key": "users",
@@ -673,7 +684,30 @@ def system(request):
 @staff_member_required(login_url="accounts:login")
 @require_http_methods(["GET", "POST"])
 def settings_view(request):
-    if request.method == "POST":
+    backup_form = BackupPasswordForm()
+    backup_source = backup_password_source()
+    if request.method == "POST" and request.POST.get("action") == "save_backup_password":
+        backup_form = BackupPasswordForm(request.POST)
+        if backup_form.is_valid():
+            try:
+                save_backup_password(backup_form.cleaned_data["password"])
+            except Exception as exc:
+                backup_form.add_error(None, str(exc))
+            else:
+                record_audit(action="backup.password_updated", request=request)
+                messages.success(request, "自动备份密码已保存到服务器密码文件。")
+                return redirect("console:settings")
+        form = SettingsForm()
+    elif request.method == "POST" and request.POST.get("action") == "clear_backup_password":
+        if backup_source == "env":
+            messages.error(request, "自动备份密码由 OSTIUM_BACKUP_PASSWORD 环境变量管理，页面不能清除。")
+        else:
+            clear_backup_password()
+            record_audit(action="backup.password_cleared", request=request)
+            messages.success(request, "页面保存的自动备份密码已清除。")
+            return redirect("console:settings")
+        form = SettingsForm()
+    elif request.method == "POST":
         form = SettingsForm(request.POST)
         if form.is_valid():
             updated = form.save()
@@ -683,6 +717,7 @@ def settings_view(request):
             return redirect("console:settings")
     else:
         form = SettingsForm()
+    backup_source = backup_password_source()
     groups = {
         "General": ["server_name", "public_host", "public_base_url", "subscription_update_interval"],
         "Network": ["server_dns_mode", "server_dns_doh_url", "block_private_egress", "log_level"],
@@ -698,7 +733,15 @@ def settings_view(request):
     return render(
         request,
         "console/settings.html",
-        {"active_nav": "settings", "form": form, "groups": groups, "state": RuntimeState.load()},
+        {
+            "active_nav": "settings",
+            "form": form,
+            "backup_form": backup_form,
+            "backup_password_source": backup_source,
+            "backup_password_configured": bool(get_backup_password()),
+            "groups": groups,
+            "state": RuntimeState.load(),
+        },
     )
 
 

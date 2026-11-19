@@ -242,9 +242,32 @@ class SettingsForm(forms.Form):
 
 class BackupForm(forms.Form):
     password = forms.CharField(
-        label=_("Backup password"),
+        label="备份密码",
         min_length=12,
+        max_length=256,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
-        help_text=_("At least 12 characters. Store it outside this server."),
+        help_text="至少 12 位。请另外保存到密码管理器；丢失后无法解密备份。",
     )
-    note = forms.CharField(label=_("Note"), max_length=200, required=False)
+    note = forms.CharField(label="备注", max_length=200, required=False)
+
+
+class BackupPasswordForm(forms.Form):
+    password = forms.CharField(
+        label="自动备份密码",
+        min_length=12,
+        max_length=256,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        help_text="至少 12 位。只写入服务器上的 0600 密码文件，不进入数据库或备份文件。",
+    )
+    confirm = forms.CharField(
+        label="确认密码",
+        min_length=12,
+        max_length=256,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("password") != cleaned.get("confirm"):
+            self.add_error("confirm", "两次输入的密码不一致。")
+        return cleaned

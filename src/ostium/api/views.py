@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import timedelta
 
 from constance import config as runtime_config
@@ -333,9 +332,9 @@ class BackupViewSet(
     serializer_class = BackupSerializer
 
     def create(self, request, *args, **kwargs):
-        from ostium.operations.backup import create_backup
+        from ostium.operations.backup import create_backup, get_backup_password
 
-        password = request.data.get("password") or os.environ.get("OSTIUM_BACKUP_PASSWORD", "")
+        password = request.data.get("password") or get_backup_password()
         if not password:
             return Response({"detail": "A backup password is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -353,10 +352,10 @@ class BackupViewSet(
 
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
-        from ostium.operations.backup import restore_backup
+        from ostium.operations.backup import get_backup_password, restore_backup
 
         backup = self.get_object()
-        password = request.data.get("password") or os.environ.get("OSTIUM_BACKUP_PASSWORD", "")
+        password = request.data.get("password") or get_backup_password()
         if not password:
             return Response({"detail": "A backup password is required."}, status=status.HTTP_400_BAD_REQUEST)
         actor = _actor(request)

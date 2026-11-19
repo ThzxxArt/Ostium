@@ -66,6 +66,7 @@ def test_settings_system_admin_and_api_docs(page, live_server, browser_user):
     assert page.locator("form.settings-layout input, form.settings-layout select").count() > 5
     assert "服务器名称" in settings_text
     assert "阻止私网出口" in settings_text
+    assert "自动备份密码" in settings_text
 
     # The console certificate import page must match the rest of Aurora.
     page.goto(f"{live_server.url}/certificates/import/")
