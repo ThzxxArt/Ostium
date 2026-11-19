@@ -1,29 +1,23 @@
-# Ostium Server 0.2.13 — Release Notes
+# Ostium Server 0.2.14 — Release Notes
 
-Ostium 0.2.13 hardens UDP/Hysteria2 stability and adds a TCP-only fallback
-group so a flaky UDP path does not take down the whole subscription.
-
-## Added
-
-- Installer and upgrade automatically raise and persist UDP buffers:
-  `net.core.rmem_max` / `wmem_max` to at least 16 MiB.
-- `ostium doctor` checks UDP buffer size and Hysteria2 health.
-- Clash subscriptions add a **Stable** `fallback` group containing only TCP
-  inbounds (Reality, Trojan, SS2022). sing-box adds the matching selector.
-- Automatic backups now write `backup.created` / `backup.failed` audit events.
-- Hysteria2/UDP troubleshooting and Stable-group documentation.
+Ostium 0.2.14 fixes the upgrade pre-flight backup for installations that set
+the automatic backup password from the Settings page.
 
 ## Fixed
 
-- The doctor's no-TOTP branch now constructs its check correctly.
+- The installer/upgrade now checks both:
+  - `OSTIUM_BACKUP_PASSWORD` in `/etc/ostium/ostium.env`;
+  - `/var/lib/ostium/secrets/backup-password` written by Settings.
+- A page-managed backup password now triggers the pre-upgrade backup instead
+  of only warning and continuing.
 
 ## Verification
 
 ```text
-full test suite passes
-coverage >= 90%
-UI checks pass
-Mihomo config contract passes
+424 passed, 3 skipped
+coverage 90.04%
+UI 8 passed
+real-client E2E passed
 ```
 
 ## Install
@@ -34,21 +28,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.13
-docker pull ghcr.io/thzxxart/ostium-server:0.2.13
+pip install ostium-ctl==0.2.14
+docker pull ghcr.io/thzxxart/ostium-server:0.2.14
 ```
 
 ## Upgrade
 
-0.2.0–0.2.12 can upgrade in place:
+0.2.0–0.2.13 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.13
+  | sudo bash -s -- upgrade --version 0.2.14
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.13/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.13` and `:latest`
-- GitHub Release: `v0.2.13`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.14/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.14` and `:latest`
+- GitHub Release: `v0.2.14`

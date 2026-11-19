@@ -24,8 +24,8 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 sudo bash install.sh upgrade --from-source
 ```
 
-安装器在 `OSTIUM_BACKUP_PASSWORD` 已配置时会自动创建 pre-upgrade 备份；
-否则会明确警告并继续。也可以先手动备份：
+安装器在 `OSTIUM_BACKUP_PASSWORD` 或控制台「自动备份密码」已配置时会自动创建
+pre-upgrade 备份；否则会明确警告并继续。也可以先手动备份：
 
 ```bash
 sudo systemctl stop ostium-web ostium-worker ostium-jobs

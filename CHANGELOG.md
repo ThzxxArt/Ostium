@@ -3,6 +3,14 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.14 — 2026-11-19
+
+### Fixed
+
+- The installer/upgrade pre-flight backup now also accepts the password file
+  created by Settings → 自动备份密码, not only `OSTIUM_BACKUP_PASSWORD`. Users
+  who configured backups in the console no longer skip the pre-upgrade backup.
+
 ## 0.2.13 — 2026-11-19
 
 ### Added

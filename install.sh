@@ -2,7 +2,7 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.13"
+VERSION="0.2.14"
 RELEASE_VERSION="${OSTIUM_RELEASE_VERSION:-$VERSION}"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
@@ -43,7 +43,7 @@ Options:
   --domain DOMAIN      Public hostname; configures Caddy and subscription URLs
   --with-caddy         Install and configure Caddy on 8443
   --no-service         Prepare files but do not enable systemd units
-  --version VERSION    Release version to install (default: 0.2.13)
+  --version VERSION    Release version to install (default: 0.2.14)
   --from-source        Build/install from source instead of release assets
   --wheel PATH         Install a specific wheel
   --pypi               Install ostium-ctl from PyPI (requires a published release)
@@ -566,11 +566,11 @@ do_upgrade() {
   tune_udp_buffers
   [ -f "$CONF_DIR/ostium.env" ] || die "No existing installation found at $CONF_DIR/ostium.env."
   install_uv
-  if grep -q '^OSTIUM_BACKUP_PASSWORD=..' "$CONF_DIR/ostium.env"; then
+  if grep -q '^OSTIUM_BACKUP_PASSWORD=..' "$CONF_DIR/ostium.env" || [ -s "$DATA_DIR/secrets/backup-password" ]; then
     log "Creating a pre-upgrade backup"
     run_as_ostium "$PREFIX/venv/bin/ostium" backup create --note "pre-upgrade" || die "Pre-upgrade backup failed."
   else
-    warn "OSTIUM_BACKUP_PASSWORD is not set; skipping the automatic pre-upgrade backup."
+    warn "No backup password configured (environment or Settings page); skipping the automatic pre-upgrade backup."
   fi
   if [ "$FROM_SOURCE" -eq 1 ]; then
     prepare_source

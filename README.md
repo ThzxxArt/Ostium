@@ -376,7 +376,7 @@ cp ostium.env.example ostium.env
 docker compose up -d
 ```
 
-预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.13`。首次使用可
+预构建镜像：`ghcr.io/thzxxart/ostium-server:0.2.14`。首次使用可
 `docker compose pull`；本地改动可用 `docker compose up -d --build`。
 
 服务：
@@ -742,6 +742,6 @@ Inter 字体遵循 SIL Open Font License 1.1。
 
 **一台 Linux。一个管理员。一份通用订阅。**
 
-<sub>Ostium Server 0.2.13 · Made for the quiet corner of the internet.</sub>
+<sub>Ostium Server 0.2.14 · Made for the quiet corner of the internet.</sub>
 
 </div>
