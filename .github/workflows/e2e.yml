@@ -4,11 +4,58 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 4 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "src/ostium/subscriptions/**"
+      - "tests/e2e/**"
+      - ".github/workflows/e2e.yml"
+  pull_request:
+    paths:
+      - "src/ostium/subscriptions/**"
+      - "tests/e2e/**"
+      - ".github/workflows/e2e.yml"
 
 permissions:
   contents: read
 
 jobs:
+  clients:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.14"
+          python-version: "3.14"
+      - run: uv sync --frozen --extra dev
+      - name: Build sing-box
+        run: |
+          mkdir -p .cache/bin .cache/mihomo
+          SINGBOX_VERSION=1.14.4 scripts/build-core.sh
+          cp dist/sing-box .cache/bin/sing-box
+      - name: Download mihomo
+        run: |
+          curl -fsSL --retry 5 -o /tmp/mihomo.gz \
+            https://github.com/MetaCubeX/mihomo/releases/download/v1.19.34/mihomo-linux-amd64-compatible-v1.19.34.gz
+          gunzip -c /tmp/mihomo.gz > .cache/bin/mihomo
+          chmod +x .cache/bin/mihomo
+      - name: Download Xray
+        run: |
+          curl -fsSL --retry 5 -o /tmp/xray.zip \
+            https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-linux-64.zip
+          unzip -q /tmp/xray.zip -d /tmp/xray
+          cp /tmp/xray/xray .cache/bin/xray
+          chmod +x .cache/bin/xray
+      - name: Run real-client matrix
+        env:
+          OSTIUM_E2E: "1"
+          OSTIUM_XRAY_PATH: .cache/bin/xray
+        run: uv run pytest tests/e2e/test_client_matrix.py -q
+
   compose:
     runs-on: ubuntu-latest
     steps:

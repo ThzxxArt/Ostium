@@ -1,0 +1,55 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}订阅自检 · {{ user.name }}{% endblock %}
+{% block breadcrumb %}订阅 / {{ user.name }} / 自检{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "activity" "w-3.5 h-3.5" %} Subscription check</div>
+            <h1 class="page-title">订阅兼容性自检</h1>
+            <p class="page-desc">检查 {{ user.name }} 的 Clash、sing-box、URI / Base64 配置结构；本机安装了对应客户端时会额外执行配置校验。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn" href="{% url 'console:user_detail' user.pk %}">{% icon "arrow-left" %} 返回用户</a>
+            <a class="btn btn--primary"
+               href="{% url 'console:subscription_check' user.pk %}">{% icon "refresh" %} 重新检测</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "shield" %} 检测结果</div>
+                <span class="badge {% if all_ok %}badge--success{% else %}badge--danger{% endif %}">
+                    {% if all_ok %}全部通过{% else %}存在问题{% endif %}
+                </span>
+            </div>
+            <div class="panel-body">
+                <div class="health-list">
+                    {% for result in results %}
+                        <div class="health-row">
+                            <div class="health-name">
+                                <span class="health-dot {% if result.status == 'pass' %}health-dot--pass{% elif result.status == 'fail' %}health-dot--fail{% else %}health-dot--warn{% endif %}"></span>
+                                <strong>{{ result.label }}</strong>
+                            </div>
+                            <div class="health-detail">{{ result.detail }}</div>
+                            <span class="badge {% if result.status == 'pass' %}badge--success{% elif result.status == 'fail' %}badge--danger{% else %}badge--warning{% endif %}">
+                                {% if result.status == "pass" %}通过{% elif result.status == "fail" %}失败{% else %}跳过{% endif %}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+        <aside class="panel span-4">
+            <div class="panel-head"><div class="panel-title">{% icon "info" %} 说明</div></div>
+            <div class="panel-body stack text-sm muted">
+                <p>结构检查始终执行：线路数量、Clash YAML、sing-box JSON、URI / Base64 往返。</p>
+                <p>如果本机有 <code class="mono">mihomo</code>、<code class="mono">sing-box</code> 或 <code class="mono">xray</code>，会额外运行配置校验；未安装时显示“跳过”。</p>
+                <p>自检不会连接代理服务器，也不会发送真实流量；它验证的是订阅能否被对应客户端正确加载。</p>
+                <p>真实连通性请在客户端导入后访问 <code class="mono">https://www.gstatic.com/generate_204</code> 或常用网站确认。</p>
+            </div>
+        </aside>
+    </div>
+{% endblock %}

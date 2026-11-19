@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import time
@@ -19,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_q.models import Task
 
 from ostium import paths
@@ -37,6 +39,7 @@ from ostium.operations.models import Alert, AuditEvent, Backup, RuntimeState
 from ostium.operations.services import record_audit
 from ostium.proxy.models import Inbound, ProxyUser, TrafficDaily
 from ostium.proxy.services import mark_dirty
+from ostium.subscriptions.checks import check_subscription
 from ostium.subscriptions.endpoints import build_endpoints
 from ostium.subscriptions.services import (
     masked_token,
@@ -140,9 +143,69 @@ def dashboard(request):
             "detail": f"{len(soon)} expiring" if soon else "all healthy",
         },
     ]
+    from constance import config as runtime_config
+
+    enabled_inbounds = list(Inbound.objects.filter(enabled=True))
+    cert_inbounds = [item for item in enabled_inbounds if item.needs_certificate]
+    certificate_ready = all(item.certificate and item.certificate.is_ready for item in cert_inbounds)
+    backup_ready = bool(os.environ.get("OSTIUM_BACKUP_PASSWORD")) and bool(runtime_config.auto_backup_enabled)
+    onboarding = [
+        {
+            "key": "users",
+            "title": "创建第一个代理用户",
+            "detail": "还没有代理用户" if not ProxyUser.objects.exists() else "已有代理用户",
+            "done": ProxyUser.objects.exists(),
+            "url": reverse("console:user_create"),
+        },
+        {
+            "key": "inbounds",
+            "title": "启用至少一条线路",
+            "detail": f"已启用 {len(enabled_inbounds)} 条" if enabled_inbounds else "四条线路都未启用",
+            "done": bool(enabled_inbounds),
+            "url": reverse("console:inbounds"),
+        },
+        {
+            "key": "certificate",
+            "title": "线路证书就绪",
+            "detail": "当前无需证书"
+            if not cert_inbounds
+            else ("证书已就绪" if certificate_ready else "有线路缺少可用证书"),
+            "done": certificate_ready,
+            "url": reverse("console:certificates"),
+        },
+        {
+            "key": "backup",
+            "title": "启用加密备份",
+            "detail": "设置备份密码并开启自动备份" if not backup_ready else "自动备份已开启",
+            "done": backup_ready,
+            "url": reverse("console:settings") + "#maintenance",
+        },
+        {
+            "key": "webhook",
+            "title": "配置告警 Webhook",
+            "detail": "告警目前只显示在控制台" if not runtime_config.webhook_url else "Webhook 已配置",
+            "done": bool(runtime_config.webhook_url),
+            "url": reverse("console:settings") + "#notifications",
+        },
+        {
+            "key": "totp",
+            "title": "启用两步验证",
+            "detail": "管理员已绑定 TOTP"
+            if TOTPDevice.objects.filter(user=request.user, confirmed=True).exists()
+            else "尚未绑定 TOTP",
+            "done": TOTPDevice.objects.filter(user=request.user, confirmed=True).exists(),
+            "url": reverse("accounts:totp_setup"),
+        },
+    ]
+    onboarding_done = sum(1 for item in onboarding if item["done"])
+
     context = {
         "active_nav": "dashboard",
         "state": state,
+        "onboarding": onboarding,
+        "onboarding_done": onboarding_done,
+        "onboarding_total": len(onboarding),
+        "onboarding_incomplete": onboarding_done < len(onboarding),
         "usage": usage,
         "online_count": len(online_users),
         "users_total": ProxyUser.objects.count(),
@@ -237,6 +300,23 @@ def user_create(request):
         request,
         "console/user_create.html",
         {"active_nav": "users", "form": form},
+    )
+
+
+@staff_member_required(login_url="accounts:login")
+@require_http_methods(["GET"])
+def subscription_check(request, user_id):
+    user = get_object_or_404(ProxyUser, pk=user_id)
+    results = check_subscription(user, host=public_host(request))
+    return render(
+        request,
+        "console/subscription_check.html",
+        {
+            "active_nav": "subscriptions",
+            "user": user,
+            "results": results,
+            "all_ok": all(result.status != "fail" for result in results),
+        },
     )
 
 

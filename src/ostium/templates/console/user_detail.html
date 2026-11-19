@@ -173,6 +173,8 @@
                             <input type="hidden" name="action" value="rotate_subscription">
                             <button class="btn btn--sm" type="submit">{% icon "refresh" %} 轮换 token</button>
                         </form>
+                        <a class="btn btn--sm"
+                           href="{% url 'console:subscription_check' user.pk %}">{% icon "activity" %} 兼容性自检</a>
                     </div>
                     <div class="muted text-xs">Subscription-Userinfo：{{ userinfo }}</div>
                     {% if revealed %}

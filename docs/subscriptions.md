@@ -63,9 +63,26 @@ X-Robots-Tag: noindex, nofollow
 ## 订阅内容
 
 - **Base64**：每行一条分享 URI，整体 Base64。
-- **Clash**：fake-IP DNS、`Ostium` 选择组、`Auto` 自动测速、私有地址直连、
-  `GEOIP,CN,DIRECT`、`MATCH,Ostium`。
-- **sing-box**：完整客户端配置，mixed 入站 `127.0.0.1:7890`，不启用 TUN。
+- **Clash**：`Ostium` 选择组、`Auto` 自动测速、私有地址直连、
+  `DOMAIN-SUFFIX,cn,DIRECT`、`MATCH,Ostium`。订阅只包含 `proxies`、
+  `proxy-groups`、`rules`；DNS、端口、运行模式、IPv6 由客户端管理。
+- **sing-box**：完整客户端配置，mixed 入站 `127.0.0.1:7890`，不启用 TUN；
+  默认不覆盖客户端 DNS。
 - **URI**：便于复制单节点。
 
+默认不依赖 `GEOIP` / `GEOSITE` 数据库，因此缺少 MMDB 的客户端也能加载。
 生成的 Clash YAML 通过 `mihomo -t`，sing-box JSON 通过 `sing-box check`。
+
+## 自检
+
+控制台「订阅」页每行有「订阅自检」按钮，用户详情页的订阅面板也提供
+「兼容性自检」。它会检查四种订阅结构，并在服务器安装了
+`mihomo` / `sing-box` / `xray` 时额外运行配置校验。
+
+命令行：
+
+```bash
+ostium subscription check --user alice
+```
+
+详细矩阵见 [客户端兼容性](operations/client-compatibility.md)。

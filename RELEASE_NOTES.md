@@ -1,61 +1,37 @@
-# Ostium Server 0.2.9 — Release Notes
+# Ostium Server 0.2.10 — Release Notes
 
-Ostium 0.2.9 fixes Clash / Mihomo subscriptions overriding client DNS and
-breaking every domain lookup.
+Ostium 0.2.10 is a client-compatibility quality release. It turns the manual
+0.2.9 Clash/Mihomo checks into an automated real-client matrix and adds
+self-check tooling.
 
-## Root cause
+## Added
 
-The generated Clash profile contained:
+- Real-client E2E matrix:
+  - Mihomo v1.19.34: VLESS Reality, Hysteria2, Trojan, SS2022
+  - sing-box v1.14.4: all four inbounds
+  - Xray v26.11.9: VLESS Reality, Trojan, SS2022
+  - The harness starts a local server and Reality TLS target, runs real clients
+    and verifies egress through `https://example.com`.
+- `ProfileOptions` policy object. Defaults remain client-owned DNS, no client
+  port/mode overrides and no external GeoIP database.
+- `ostium subscription check --user <name> [--json] [--no-binaries]`.
+- Console **订阅兼容性自检** page, linked from subscriptions and user detail.
+- Dashboard first-deploy checklist: user, inbound, certificate, backup,
+  webhook, TOTP.
+- Client compatibility documentation and DNS troubleshooting.
 
-```yaml
-dns:
-  nameserver:
-    - https://1.1.1.1/dns-query
-    - https://8.8.8.8/dns-query
-  proxy-server-nameserver:
-    - https://1.1.1.1/dns-query
-```
+## Changed
 
-Clash Verge Rev detects a profile-level DNS section and disables its own DNS
-override. On networks where `https://1.1.1.1/dns-query` is unreachable, every
-domain resolution timed out, so all four inbounds appeared broken.
-
-## Fixed
-
-- Clash / Mihomo profiles no longer include a `dns` section. The client keeps
-  its own DNS override and resolver settings.
-- Clash profiles now contain only proxies, proxy groups and rules. They no
-  longer override client-owned settings such as `mixed-port`, `mode`, `ipv6`,
-  `log-level`, `allow-lan` or `bind-address`.
-- Removed the `GEOIP,CN,DIRECT` rule, which required an external MMDB database.
-  `DOMAIN-SUFFIX,cn,DIRECT` keeps Chinese domains direct without extra data.
-- sing-box profiles no longer force DoH or `default_domain_resolver`; they use
-  the client/system resolver.
-- Added regression tests: generated profiles must not contain `dns`,
-  `1.1.1.1`, `mixed-port` or GeoIP rules.
-- Real connectivity verified through Mihomo (all four inbounds), sing-box (all
-  four) and Xray (VLESS Reality, Trojan, SS2022). All egress IPs were the
-  server IP.
-- Server-side 443/TCP, 443/UDP, 9443/TCP and 8388/TCP are listening and
-  reachable from outside.
-
-## Client action
-
-After upgrading, update the subscription in Clash Verge (or re-import the
-Clash link), then restart the Clash core. If Clash Verge previously turned off
-“DNS 覆写”, turn it back on (or restore its default DNS settings), because the
-new profile no longer supplies DNS.
+- Clash profiles contain only `proxies`, `proxy-groups` and `rules` by default.
+- New `tests/e2e` CI job runs the real-client matrix.
 
 ## Verification
 
 ```text
-26 targeted tests passed
-379 full suite passed / 2 skipped
-8 UI tests passed
-mihomo config check passed (no MMDB data dir)
-sing-box config check passed
-Xray configuration check passed
-
+395 passed, 3 skipped
+coverage 90.31%
+UI 8 passed
+real-client E2E: Mihomo 4/4, sing-box 4/4, Xray 3/3
 ```
 
 ## Install
@@ -66,21 +42,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.9
-docker pull ghcr.io/thzxxart/ostium-server:0.2.9
+pip install ostium-ctl==0.2.10
+docker pull ghcr.io/thzxxart/ostium-server:0.2.10
 ```
 
 ## Upgrade
 
-0.2.0–0.2.8 can upgrade in place:
+0.2.0–0.2.9 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.9
+  | sudo bash -s -- upgrade --version 0.2.10
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.9/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.9` and `:latest`
-- GitHub Release: `v0.2.9`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.10/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.10` and `:latest`
+- GitHub Release: `v0.2.10`

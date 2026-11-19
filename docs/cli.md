@@ -58,6 +58,22 @@ ostium backup list
 ostium backup restore /var/lib/ostium/backups/ostium-backup-....ostb --password '...'
 ```
 
+## 订阅自检
+
+```bash
+ostium subscription check --user alice
+ostium subscription check --user alice --json
+ostium subscription check --user alice --no-binaries
+```
+
+自检不会连接代理服务器，只验证生成的订阅结构：
+
+- Clash YAML 不包含 `dns`、`mixed-port`、`GEOIP` 等客户端不友好内容；
+- sing-box JSON 不强制 DNS resolver；
+- URI / Base64 数量与协议一致；
+- 本机存在 `mihomo`、`sing-box`、`xray` 时，额外执行配置校验；不存在则显示
+  `SKIP`。
+
 ## 诊断
 
 ```bash

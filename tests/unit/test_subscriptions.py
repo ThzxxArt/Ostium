@@ -12,6 +12,7 @@ import yaml
 from ostium.proxy.models import Inbound
 from ostium.subscriptions.endpoints import build_endpoints
 from ostium.subscriptions.renderers import (
+    ProfileOptions,
     content_type_for,
     extension_for,
     render,
@@ -109,6 +110,35 @@ def test_clash_yaml(proxy_user, all_inbounds):
     assert "mixed-port" not in payload
     assert "mode" not in payload
     assert "1.1.1.1" not in render_clash(endpoints)
+
+
+@pytest.mark.django_db
+def test_profile_options_are_opt_in(proxy_user, all_inbounds):
+    endpoints = build_endpoints(proxy_user, "vpn.example.com")
+    payload = yaml.safe_load(
+        render_clash(
+            endpoints,
+            ProfileOptions(
+                dns_mode="system",
+                routing="global",
+                include_client_settings=True,
+                include_geodata=True,
+            ),
+        )
+    )
+    assert payload["mixed-port"] == 7890
+    assert payload["dns"]["nameserver"] == ["223.5.5.5", "119.29.29.29"]
+    assert "GEOIP,CN,DIRECT,no-resolve" in payload["rules"]
+    assert "DOMAIN-SUFFIX,cn,DIRECT" not in payload["rules"]
+
+    singbox = json.loads(
+        render_singbox(
+            endpoints,
+            ProfileOptions(dns_mode="system"),
+        )
+    )
+    assert singbox["dns"]["servers"][0]["server"] == "223.5.5.5"
+    assert singbox["route"]["default_domain_resolver"] == "local"
 
 
 @pytest.mark.django_db

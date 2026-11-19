@@ -56,8 +56,13 @@
                                     <td data-label="订阅 Token"><code class="mono text-xs">{{ user.token_masked }}</code></td>
                                     <td data-label="最近在线" class="muted">{{ user.last_seen_at|ago }}</td>
                                     <td class="cell-actions" data-label="操作">
-                                        <a class="btn btn--sm"
-                                           href="{% url 'console:user_detail' user.pk %}">{% icon "eye" %} 打开</a>
+                                        <span class="table-actions">
+                                            <a class="btn btn--sm"
+                                               href="{% url 'console:user_detail' user.pk %}">{% icon "eye" %} 打开</a>
+                                            <a class="icon-btn"
+                                               href="{% url 'console:subscription_check' user.pk %}"
+                                               aria-label="{{ user.name }} 订阅自检">{% icon "activity" %}</a>
+                                        </span>
                                     </td>
                                 </tr>
                             {% endfor %}

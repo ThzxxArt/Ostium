@@ -3,6 +3,27 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.10 — 2026-11-19
+
+### Added
+
+- Real-client E2E matrix: Mihomo (all four inbounds), sing-box (all four) and
+  Xray (VLESS Reality, Trojan, SS2022). It starts a local server, local Reality
+  TLS target and real clients, then asserts real egress through `example.com`.
+- `ProfileOptions` policy object for subscription profiles, with client-owned
+  DNS, minimal Clash settings and optional opt-in DNS/GeoIP variants.
+- `ostium subscription check --user <name>` plus a console **订阅兼容性自检**
+  page. Checks profile structure and runs `mihomo -t` / `sing-box check` /
+  `xray -test` when the binaries are available.
+- First-deploy checklist on the dashboard: users, inbounds, certificate,
+  backup, webhook and TOTP.
+- Client compatibility documentation, DNS troubleshooting and E2E instructions.
+
+### Changed
+
+- Clash profiles contain only `proxies`, `proxy-groups` and `rules` by default.
+- Added `tests/e2e` CI job for the real-client matrix.
+
 ## 0.2.9 — 2026-11-19
 
 ### Fixed

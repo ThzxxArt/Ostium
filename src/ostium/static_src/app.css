@@ -1442,6 +1442,80 @@ input[type="checkbox"] {
 
 /* ------------------------------------------------------------------- health */
 
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.onboarding-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.onboarding-item:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.onboarding-item.is-done {
+  opacity: 0.72;
+}
+
+.onboarding-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.onboarding-item.is-done .onboarding-check {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.onboarding-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.onboarding-copy strong {
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.onboarding-copy small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.onboarding-go {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 820px) {
+  .onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .health-list {
   display: flex;
   flex-direction: column;

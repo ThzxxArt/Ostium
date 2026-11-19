@@ -5,6 +5,19 @@ Ostium Server 的 Python 包名沿用 0.1.x 的 **`ostium-ctl`**，命令仍是 
 这样可以直接复用已有的 PyPI 项目和 `release.yml` trusted publisher，
 不需要为 0.2.x 新建项目名。
 
+## 0.2.10 发布记录
+
+2026-11-19 已完成全量发布：
+
+- PyPI：https://pypi.org/project/ostium-ctl/0.2.10/
+- GHCR：`ghcr.io/thzxxart/ostium-server:0.2.10` / `:latest`
+- GitHub Release：https://github.com/ThzxxArt/Ostium/releases/tag/v0.2.10
+- tag：`v0.2.10`
+
+本版是客户端兼容性质量版本：真实 Mihomo / sing-box / Xray E2E、
+`ProfileOptions` 策略、`ostium subscription check`、控制台订阅自检、
+首次部署检查清单和客户端兼容性文档。
+
 ## 0.2.9 发布记录
 
 2026-11-19 已完成全量发布：
@@ -135,7 +148,7 @@ PyPI wheel **不包含**：
 
 所以：
 
-- 只想在 Python 项目里使用 `ostium` 命令：可以 `pip install ostium-ctl==0.2.9`。
+- 只想在 Python 项目里使用 `ostium` 命令：可以 `pip install ostium-ctl==0.2.10`。
 - 要部署完整服务端：使用 [一键在线安装](../tutorials/from-zero.md) 或源码
   `install.sh`，它会同时安装部署资产。
 
@@ -151,7 +164,7 @@ uv build
 检查 wheel：
 
 ```bash
-unzip -l dist/ostium_ctl-0.2.9-py3-none-any.whl | head
+unzip -l dist/ostium_ctl-0.2.10-py3-none-any.whl | head
 ```
 
 ## GitHub Actions 可信发布
@@ -174,7 +187,7 @@ Publishing 设置中补上；GitHub 仓库的 `pypi` environment 已经存在。
 
 ```text
 Actions -> release -> Run workflow
-  version: 0.2.9
+  version: 0.2.10
   publish_pypi: true
 ```
 
@@ -201,7 +214,7 @@ UV_PUBLISH_TOKEN=... uv publish
 
 ```bash
 python -m venv /tmp/ostium-pypi
-/tmp/ostium-pypi/bin/pip install ostium-ctl==0.2.9
+/tmp/ostium-pypi/bin/pip install ostium-ctl==0.2.10
 OSTIUM_DEBUG=1 OSTIUM_DATA_DIR=/tmp/ostium-pypi-data \
   /tmp/ostium-pypi/bin/ostium help
 ```

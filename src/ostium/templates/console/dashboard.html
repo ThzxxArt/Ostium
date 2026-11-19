@@ -109,6 +109,31 @@
             </div>
         </div>
     </section>
+    {% if onboarding_incomplete %}
+        <section class="panel mt-4" aria-label="部署检查清单">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "check" %} 部署检查清单</div>
+                <span class="badge">{{ onboarding_done }} / {{ onboarding_total }} 完成</span>
+            </div>
+            <div class="panel-body onboarding-grid">
+                {% for item in onboarding %}
+                    <a class="onboarding-item {% if item.done %}is-done{% endif %}"
+                       href="{{ item.url }}">
+                        <span class="onboarding-check">
+                            {% if item.done %}
+                                {% icon "check" "w-3.5 h-3.5" %}
+                            {% endif %}
+                        </span>
+                        <span class="onboarding-copy">
+                            <strong>{{ item.title }}</strong>
+                            <small>{{ item.detail }}</small>
+                        </span>
+                        {% if not item.done %}<span class="onboarding-go">去处理</span>{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
     <div class="mt-4 kpi-grid">
         <div class="stat-card">
             <div class="stat-top">

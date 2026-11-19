@@ -154,6 +154,7 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
         ("users", "/users/"),
         ("user-create", "/users/new/"),
         ("user-detail", f"/users/{alice.pk}/"),
+        ("subscription-check", f"/users/{alice.pk}/subscription-check/"),
         ("subscriptions", "/subscriptions/"),
         ("inbounds", "/inbounds/"),
         ("connections", "/connections/"),

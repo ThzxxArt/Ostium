@@ -31,6 +31,27 @@ def test_console_pages_render(admin_client, proxy_user, vless_inbound, name):
 
 
 @pytest.mark.django_db
+def test_dashboard_onboarding_checklist(admin_client, proxy_user, vless_inbound):
+    response = admin_client.get(reverse("console:dashboard"))
+    assert response.status_code == 200
+    onboarding = response.context["onboarding"]
+    assert response.context["onboarding_total"] == 6
+    assert response.context["onboarding_done"] < 6
+    assert {item["key"] for item in onboarding} == {
+        "users",
+        "inbounds",
+        "certificate",
+        "backup",
+        "webhook",
+        "totp",
+    }
+    assert next(item for item in onboarding if item["key"] == "users")["done"] is True
+    assert next(item for item in onboarding if item["key"] == "inbounds")["done"] is True
+    assert next(item for item in onboarding if item["key"] == "backup")["done"] is False
+    assert "部署检查清单" in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_user_create_saves_quota_and_expiry(admin_client):
     from ostium.proxy.models import ProxyUser
 

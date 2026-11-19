@@ -1,6 +1,19 @@
 # E2E 验证记录
 
-本页记录 0.2.0 发布候选在开发主机上的真实代理验证。测试环境无法以普通用户绑定 443，
+## 0.2.10 自动化客户端矩阵
+
+`tests/e2e/test_client_matrix.py` 现在会在高位端口启动本地 sing-box 服务端、
+本地 Reality TLS 目标和真实客户端，验证：
+
+- Mihomo：四条线路全部出网；
+- sing-box：四条线路全部出网；
+- Xray：VLESS Reality、Trojan、SS2022 出网。
+
+CI 的 `e2e` workflow 运行同一测试。详见
+[客户端兼容性](client-compatibility.md) 和
+[0.2.10 质量记录](../review/0.2.10-client-compatibility.md)。
+
+本页以下记录保留 0.2.0 发布候选在开发主机上的真实代理验证。测试环境无法以普通用户绑定 443，
 因此 VLESS 使用 8443；systemd 单元通过 `CAP_NET_BIND_SERVICE` 在生产环境绑定 443。
 
 ## 环境
