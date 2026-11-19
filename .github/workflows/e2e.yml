@@ -58,6 +58,8 @@ jobs:
 
   compose:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: compose-e2e-only
     steps:
       - uses: actions/checkout@v4
       - name: Prepare environment
