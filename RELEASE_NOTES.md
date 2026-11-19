@@ -50,9 +50,12 @@ new profile no longer supplies DNS.
 
 ```text
 26 targeted tests passed
-378+ full suite passed
-mihomo config check passed
+379 full suite passed / 2 skipped
+8 UI tests passed
+mihomo config check passed (no MMDB data dir)
 sing-box config check passed
+Xray configuration check passed
+
 ```
 
 ## Install
