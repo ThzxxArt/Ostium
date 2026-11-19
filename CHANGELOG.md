@@ -3,6 +3,19 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.6 — 2026-11-19
+
+### Fixed
+
+- The installer now imports already-existing certbot certificates during
+  install and upgrade, instead of waiting for the next renewal hook.
+- The certificates page has a **同步 certbot** action for staged certificates.
+- Inbound TLS certificate selectors link to certificate management/import and
+  immediately list synced certificates.
+- Certificate import supports three input modes: file upload, selecting a
+  staged server certificate directory, and pasting PEM. Domain is optional and
+  auto-detected from the certificate.
+
 ## 0.2.5 — 2026-11-19
 
 ### Fixed

@@ -1,23 +1,19 @@
-# Ostium Server 0.2.5 — Release Notes
+# Ostium Server 0.2.6 — Release Notes
 
-Ostium 0.2.5 is a UI/Admin correctness release.
+Ostium 0.2.6 fixes the certificate lifecycle and import workflow.
 
 ## Fixed
 
-- **Settings page:** fields now render as real inputs instead of
-  `<django.forms.fields.CharField object ...>`; labels/help are Chinese; the
-  save bar no longer covers fields.
-- **Certificate import:** moved to the Aurora console at
-  `/certificates/import/`, with the same layout as other pages and Chinese
-  labels. The old admin URL redirects there.
-- **System page:** configuration status is now explained in plain language;
-  the two “9” values are internal revision counters, shown as
-  `配置应用状态 / 已同步 / 内部修订号`, not software versions.
-- **API docs:** Swagger UI uses the local `drf-spectacular-sidecar` assets with a
-  CSP nonce, so `/api/docs` is no longer blank.
-- **Django Admin:** app groups are labelled in Chinese.
-- **User detail:** quota shows `100.0 GiB` instead of raw bytes; quota cycle and
-  validation messages are Chinese.
+- Existing certbot certificates are imported automatically during install and
+  upgrade; the console also has a **同步 certbot** action for staged certs.
+- The inbound TLS selector lists synced certificates immediately and links to
+  certificate management/import.
+- Certificate import now supports:
+  - uploading certificate and private-key files;
+  - selecting a staged server certificate directory under
+    `/var/lib/ostium/imports`;
+  - pasting PEM as an advanced option.
+- The domain field is optional and is auto-detected from the certificate SAN.
 
 ## Install
 
@@ -27,29 +23,28 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.5
-docker pull ghcr.io/thzxxart/ostium-server:0.2.5
+pip install ostium-ctl==0.2.6
+docker pull ghcr.io/thzxxart/ostium-server:0.2.6
 ```
 
 ## Upgrade
 
-0.2.0–0.2.4 can upgrade in place:
+0.2.0–0.2.5 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.5
+  | sudo bash -s -- upgrade --version 0.2.6
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.5/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.5` and `:latest`
-- GitHub Release: `v0.2.5`
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.6/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.6` and `:latest`
+- GitHub Release: `v0.2.6`
 
 ## Verification
 
-- Full UI screenshot suite covers every console page plus admin index,
-  changelists, certificate import and API docs.
-- Settings field rendering, certificate import POST, system revision text and
-  Swagger CSP are covered by automated tests.
+- Certificate upload, staged-path import, paste import and console import view
+  are covered by automated tests.
+- Full UI screenshot suite and axe checks remain in place.
 - CI/UI run on the release commit.

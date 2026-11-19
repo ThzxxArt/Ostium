@@ -67,7 +67,12 @@
                                 <label for="{{ form.certificate.id_for_label }}">TLS 证书</label>
                                 {{ form.certificate }}
                                 {{ form.certificate.errors }}
-                                {% if not record.certificate %}<span class="helptext">此协议需要先导入并分配证书。</span>{% endif %}
+                                <span class="helptext">
+                                    此协议需要先导入/同步证书。
+                                    <a href="{% url 'console:certificates' %}">证书管理</a>
+                                    ·
+                                    <a href="{% url 'console:certificate_import' %}">导入证书</a>
+                                </span>
                             </div>
                         {% endif %}
                         <div class="field full">

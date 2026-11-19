@@ -12,6 +12,11 @@
         <div class="page-actions">
             <a class="btn btn--ghost"
                href="{% url 'admin:certificates_certificate_changelist' %}">{% icon "settings" %} Admin 列表</a>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="sync_certbot">
+                <button class="btn" type="submit">{% icon "refresh" %} 同步 certbot</button>
+            </form>
             <a class="btn btn--primary" href="{{ import_url }}">{% icon "upload" %} 导入证书</a>
         </div>
     </div>

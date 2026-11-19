@@ -6,6 +6,7 @@ import pytest
 from django.utils import timezone
 from django_q.models import Task
 
+from ostium import paths
 from ostium.proxy.models import ProxyUser
 
 
@@ -168,3 +169,78 @@ def test_console_certificate_import_page(admin_client, certificate):
     )
     assert response.status_code == 302
     assert response.headers["Location"] == "/certificates/"
+
+
+@pytest.mark.django_db
+def test_console_certificate_import_upload(admin_client, certificate):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    response = admin_client.post(
+        "/certificates/import/",
+        {
+            "certificate_file": SimpleUploadedFile("fullchain.pem", certificate.cert_file.read_bytes()),
+            "private_key_file": SimpleUploadedFile("privkey.pem", certificate.key_file.read_bytes()),
+            "auto_renew": "on",
+        },
+    )
+    assert response.status_code == 302
+    from ostium.certificates.models import Certificate
+
+    assert Certificate.objects.filter(domain=certificate.domain).exists()
+
+
+@pytest.mark.django_db
+def test_certificate_import_form_accepts_staged_server_path(settings, tmp_path, certificate):
+    from ostium import paths
+    from ostium.certificates.forms import CertificateImportForm
+
+    cert_pem = certificate.cert_file.read_bytes()
+    key_pem = certificate.key_file.read_bytes()
+    settings.OSTIUM_DATA_DIR = str(tmp_path)
+    staged = paths.imports_dir() / "letsencrypt" / certificate.domain
+    staged.mkdir(parents=True)
+    (staged / "fullchain.pem").write_bytes(cert_pem)
+    (staged / "privkey.pem").write_bytes(key_pem)
+
+    form = CertificateImportForm(data={"server_certificate": str(staged), "auto_renew": "on"})
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["domain"] == certificate.domain
+
+
+@pytest.mark.django_db
+def test_certificate_import_form_rejects_incomplete_and_invalid_inputs(settings, tmp_path, certificate):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from ostium.certificates.forms import CertificateImportForm
+
+    cert_bytes = certificate.cert_file.read_bytes()
+    settings.OSTIUM_DATA_DIR = str(tmp_path)
+    imports = paths.imports_dir()
+    if not imports.exists():
+        imports.mkdir(parents=True)
+
+    assert not CertificateImportForm(data={}).is_valid()
+    assert not CertificateImportForm(
+        data={},
+        files={"certificate_file": SimpleUploadedFile("cert.pem", cert_bytes)},
+    ).is_valid()
+    assert not CertificateImportForm(data={"server_certificate": "/etc/passwd"}).is_valid()
+    assert not CertificateImportForm(data={"certificate": "bad", "private_key": "bad"}).is_valid()
+
+
+@pytest.mark.django_db
+def test_console_syncs_staged_certbot_certificate(admin_client, settings, tmp_path, certificate):
+    from ostium.certificates.models import Certificate
+
+    cert_bytes = certificate.cert_file.read_bytes()
+    key_bytes = certificate.key_file.read_bytes()
+    settings.OSTIUM_DATA_DIR = str(tmp_path)
+    staged = paths.imports_dir() / "letsencrypt" / certificate.domain
+    staged.mkdir(parents=True)
+    (staged / "fullchain.pem").write_bytes(cert_bytes)
+    (staged / "privkey.pem").write_bytes(key_bytes)
+
+    response = admin_client.post("/certificates/", {"action": "sync_certbot"}, follow=True)
+    assert response.status_code == 200
+    assert Certificate.objects.filter(domain=certificate.domain).exists()
+    assert "已同步 1 张 certbot 证书" in response.content.decode()

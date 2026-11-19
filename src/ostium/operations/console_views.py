@@ -386,7 +386,7 @@ def connections(request):
 @staff_member_required(login_url="accounts:login")
 @require_http_methods(["GET", "POST"])
 def certificate_import(request):
-    form = CertificateImportForm(request.POST or None)
+    form = CertificateImportForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         try:
             certificate = import_certificate(
@@ -413,6 +413,24 @@ def certificate_import(request):
 @require_http_methods(["GET", "POST"])
 def certificates(request):
     if request.method == "POST":
+        if request.POST.get("action") == "sync_certbot":
+            from ostium.certificates.services import sync_directory
+
+            source = paths.imports_dir() / "letsencrypt"
+            try:
+                certificates = sync_directory(source)
+            except Exception as exc:
+                messages.error(request, f"certbot 证书同步失败：{exc}")
+            else:
+                record_audit(
+                    action="certificate.certbot_synced",
+                    request=request,
+                    target=str(source),
+                    detail={"domains": [item.domain for item in certificates]},
+                )
+                messages.success(request, f"已同步 {len(certificates)} 张 certbot 证书。")
+            return redirect("console:certificates")
+
         certificate = get_object_or_404(Certificate, pk=request.POST.get("certificate_id"))
         from ostium.certificates.services import refresh_status
 

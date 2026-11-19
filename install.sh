@@ -2,7 +2,7 @@
 # Ostium Server installer for Linux + systemd.
 set -euo pipefail
 
-VERSION="0.2.5"
+VERSION="0.2.6"
 RELEASE_VERSION="${OSTIUM_RELEASE_VERSION:-$VERSION}"
 SINGBOX_VERSION="1.14.4"
 SINGBOX_TAGS="with_quic,with_utls,with_clash_api,with_v2ray_api,badlinkname,tfogo_checklinkname0"
@@ -43,7 +43,7 @@ Options:
   --domain DOMAIN      Public hostname; configures Caddy and subscription URLs
   --with-caddy         Install and configure Caddy on 8443
   --no-service         Prepare files but do not enable systemd units
-  --version VERSION    Release version to install (default: 0.2.5)
+  --version VERSION    Release version to install (default: 0.2.6)
   --from-source        Build/install from source instead of release assets
   --wheel PATH         Install a specific wheel
   --pypi               Install ostium-ctl from PyPI (requires a published release)
@@ -485,6 +485,12 @@ EOF
   install -m 0755 "$ROOT/deploy/certbot/deploy-hook.sh" /etc/letsencrypt/renewal-hooks/deploy/ostium.sh
   install -m 0755 "$ROOT/deploy/certbot/pre-hook.sh" /etc/letsencrypt/renewal-hooks/pre/ostium-stop-caddy.sh
   install -m 0755 "$ROOT/deploy/certbot/post-hook.sh" /etc/letsencrypt/renewal-hooks/post/ostium-start-caddy.sh
+  # Import certificates that already existed before this installation, not
+  # only certificates renewed after the hook was installed.
+  if [ -x /etc/letsencrypt/renewal-hooks/deploy/ostium.sh ]; then
+    /etc/letsencrypt/renewal-hooks/deploy/ostium.sh \
+      || warn "Existing certbot certificates could not be imported; use Certificates -> Sync certbot."
+  fi
   systemctl enable --now certbot.timer 2>/dev/null || warn "certbot.timer could not be enabled."
   certbot renew --dry-run >/dev/null 2>&1 || warn "certbot renew --dry-run failed; check hooks and port 80."
   log "Caddy is serving https://$DOMAIN:8443"
@@ -546,6 +552,10 @@ do_upgrade() {
   install_singbox
   run_as_ostium "$PREFIX/venv/bin/ostium" migrate --noinput
   run_as_ostium "$PREFIX/venv/bin/ostium" collectstatic --noinput
+  if [ -x /etc/letsencrypt/renewal-hooks/deploy/ostium.sh ]; then
+    /etc/letsencrypt/renewal-hooks/deploy/ostium.sh \
+      || warn "Existing certbot certificates could not be imported; use Certificates -> Sync certbot."
+  fi
   systemctl restart ostium-web.service ostium-worker.service ostium-jobs.service
   health_check
   log "Upgrade complete."

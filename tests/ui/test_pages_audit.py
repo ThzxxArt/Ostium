@@ -70,7 +70,9 @@ def test_settings_system_admin_and_api_docs(page, live_server, browser_user):
     page.goto(f"{live_server.url}/certificates/import/")
     body = page.locator("body").inner_text()
     assert "导入证书" in body
-    assert "证书 PEM" in body
+    assert "上传证书文件" in body
+    assert page.locator("form input[type=file]").count() == 2
+    assert page.locator("form select#id_server_certificate").count() == 1
     assert page.locator("form textarea").count() == 2
 
     # Swagger UI is loaded from the local sidecar and must render under CSP.

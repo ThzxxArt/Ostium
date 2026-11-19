@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version, e.g. 0.2.5"
+        description: "Version, e.g. 0.2.6"
         required: true
       publish_pypi:
         description: "Publish the built wheel/sdist to PyPI (immutable; leave off for a build-only run)"
