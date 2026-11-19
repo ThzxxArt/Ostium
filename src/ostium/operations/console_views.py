@@ -226,6 +226,22 @@ def models_f(name: str):
 
 @staff_member_required(login_url="accounts:login")
 @require_http_methods(["GET", "POST"])
+def user_create(request):
+    form = UserEditForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        user = form.save()
+        record_audit(action="user.created", request=request, target=user.name)
+        messages.success(request, f"用户 {user.name} 已创建，订阅 token 可在详情页显示。")
+        return redirect("console:user_detail", user_id=user.pk)
+    return render(
+        request,
+        "console/user_create.html",
+        {"active_nav": "users", "form": form},
+    )
+
+
+@staff_member_required(login_url="accounts:login")
+@require_http_methods(["GET", "POST"])
 def user_detail(request, user_id):
     user = get_object_or_404(ProxyUser, pk=user_id)
     revealed = False

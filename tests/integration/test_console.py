@@ -12,6 +12,7 @@ from django.urls import reverse
     [
         "console:dashboard",
         "console:users",
+        "console:user_create",
         "console:subscriptions",
         "console:inbounds",
         "console:connections",
@@ -27,6 +28,57 @@ def test_console_pages_render(admin_client, proxy_user, vless_inbound, name):
     response = admin_client.get(reverse(name))
     assert response.status_code == 200
     assert b"Ostium" in response.content
+
+
+@pytest.mark.django_db
+def test_user_create_saves_quota_and_expiry(admin_client):
+    from ostium.proxy.models import ProxyUser
+
+    response = admin_client.post(
+        reverse("console:user_create"),
+        {
+            "name": "carol",
+            "quota": "25G",
+            "quota_cycle": "monthly",
+            "expires_at": "2027-01-31T12:00",
+            "note": "created from console",
+            "enabled": "on",
+        },
+    )
+    assert response.status_code == 302
+    user = ProxyUser.objects.get(name="carol")
+    assert response.url == reverse("console:user_detail", args=[user.pk])
+    assert user.quota_bytes == 25 * 1024**3
+    assert user.quota_cycle == ProxyUser.QuotaCycle.MONTHLY
+    assert user.expires_at is not None
+    assert user.note == "created from console"
+    assert user.enabled is True
+
+
+@pytest.mark.django_db
+def test_console_never_links_to_django_admin(admin_client, proxy_user, vless_inbound, certificate):
+    routes = [
+        reverse("console:dashboard"),
+        reverse("console:users"),
+        reverse("console:user_create"),
+        reverse("console:user_detail", args=[proxy_user.pk]),
+        reverse("console:subscriptions"),
+        reverse("console:inbounds"),
+        reverse("console:connections"),
+        reverse("console:certificates"),
+        reverse("console:certificate_import"),
+        reverse("console:logs"),
+        reverse("console:jobs"),
+        reverse("console:system"),
+        reverse("console:settings"),
+        reverse("console:audit"),
+    ]
+    for route in routes:
+        response = admin_client.get(route)
+        assert response.status_code == 200, route
+        body = response.content.decode()
+        assert 'href="/admin/' not in body, route
+        assert "Django Admin" not in body, route
 
 
 @pytest.mark.django_db

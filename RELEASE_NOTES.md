@@ -1,19 +1,28 @@
-# Ostium Server 0.2.6 — Release Notes
+# Ostium Server 0.2.7 — Release Notes
 
-Ostium 0.2.6 fixes the certificate lifecycle and import workflow.
+Ostium 0.2.7 removes every normal-navigation jump from the Aurora console into
+Django Admin.
 
 ## Fixed
 
-- Existing certbot certificates are imported automatically during install and
-  upgrade; the console also has a **同步 certbot** action for staged certs.
-- The inbound TLS selector lists synced certificates immediately and links to
-  certificate management/import.
-- Certificate import now supports:
-  - uploading certificate and private-key files;
-  - selecting a staged server certificate directory under
-    `/var/lib/ostium/imports`;
-  - pasting PEM as an advanced option.
-- The domain field is optional and is auto-detected from the certificate SAN.
+- **新增用户** is now a native console page at `/users/new/` with quota, quota
+  cycle, expiry, note and enabled state.
+- User editing, certificate management, inbound editing and audit filtering
+  all stay inside the Aurora console.
+- The console sidebar, user menu and command palette no longer expose Django
+  Admin.
+- Django Admin is now labelled **Ostium 应急管理** and remains available at
+  `/admin/` only as an emergency data-management interface.
+- Newly created users persist `expires_at` correctly.
+- Remaining visible English eyebrow labels and form headings in the console are
+  now Chinese.
+
+## Verification
+
+- 14 console routes assert no `href="/admin/` and no `Django Admin` text.
+- User creation asserts quota, quota cycle, expiry, note and enabled state.
+- 378 tests passed / 2 skipped; coverage 90.16%.
+- Full UI screenshot suite and axe checks pass; 57 screenshots.
 
 ## Install
 
@@ -23,28 +32,21 @@ curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
 ```
 
 ```bash
-pip install ostium-ctl==0.2.6
-docker pull ghcr.io/thzxxart/ostium-server:0.2.6
+pip install ostium-ctl==0.2.7
+docker pull ghcr.io/thzxxart/ostium-server:0.2.7
 ```
 
 ## Upgrade
 
-0.2.0–0.2.5 can upgrade in place:
+0.2.0–0.2.6 can upgrade in place:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThzxxArt/Ostium/main/install.sh \
-  | sudo bash -s -- upgrade --version 0.2.6
+  | sudo bash -s -- upgrade --version 0.2.7
 ```
 
 ## Published channels
 
-- PyPI: https://pypi.org/project/ostium-ctl/0.2.6/
-- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.6` and `:latest`
-- GitHub Release: `v0.2.6`
-
-## Verification
-
-- Certificate upload, staged-path import, paste import and console import view
-  are covered by automated tests.
-- Full UI screenshot suite and axe checks remain in place.
-- CI/UI run on the release commit.
+- PyPI: https://pypi.org/project/ostium-ctl/0.2.7/
+- GHCR: `ghcr.io/thzxxart/ostium-server:0.2.7` and `:latest`
+- GitHub Release: `v0.2.7`

@@ -5,7 +5,7 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "link" "w-3.5 h-3.5" %} Distribution</div>
+            <div class="page-eyebrow">{% icon "link" "w-3.5 h-3.5" %} 订阅分发</div>
             <h1 class="page-title">通用订阅</h1>
             <p class="page-desc">标准 Base64、Clash / Mihomo、sing-box 与纯 URI。不依赖私有客户端，任何主流工具都能导入。</p>
         </div>
@@ -39,7 +39,7 @@
                             <tr>
                                 <th>用户</th>
                                 <th>状态</th>
-                                <th>Token</th>
+                                <th>订阅 Token</th>
                                 <th>最近在线</th>
                                 <th class="cell-actions">操作</th>
                             </tr>
@@ -53,7 +53,7 @@
                                         </a>
                                     </td>
                                     <td data-label="状态"><span class="{{ user.status|status_class }}">{{ user.status|status_label }}</span></td>
-                                    <td data-label="Token"><code class="mono text-xs">{{ user.token_masked }}</code></td>
+                                    <td data-label="订阅 Token"><code class="mono text-xs">{{ user.token_masked }}</code></td>
                                     <td data-label="最近在线" class="muted">{{ user.last_seen_at|ago }}</td>
                                     <td class="cell-actions" data-label="操作">
                                         <a class="btn btn--sm"
@@ -70,7 +70,7 @@
                     <span class="empty-icon">{% icon "inbox" %}</span>
                     <div class="empty-title">还没有可分发订阅</div>
                     <div class="empty-copy">先创建用户，再启用至少一条线路，订阅就会自动生成。</div>
-                    <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                    <a class="btn btn--primary" href="{% url 'console:user_create' %}">{% icon "plus" %} 新增用户</a>
                 </div>
             {% endif %}
         </section>

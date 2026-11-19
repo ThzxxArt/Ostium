@@ -5,7 +5,7 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "clock" "w-3.5 h-3.5" %} Background jobs</div>
+            <div class="page-eyebrow">{% icon "clock" "w-3.5 h-3.5" %} 后台任务</div>
             <h1 class="page-title">任务</h1>
             <p class="page-desc">django-q2 执行的后台工作：备份、证书同步、维护与导出。</p>
         </div>
@@ -24,7 +24,7 @@
                         <tr>
                             <th>任务</th>
                             <th>函数</th>
-                            <th>Task ID</th>
+                            <th>任务 ID</th>
                             <th class="cell-actions">操作</th>
                         </tr>
                     </thead>
@@ -33,7 +33,7 @@
                             <tr>
                                 <td data-label="任务" class="cell-strong">{{ item.name|default:"—" }}</td>
                                 <td data-label="函数" class="mono text-xs">{{ item.func }}</td>
-                                <td data-label="Task ID" class="mono text-xs">{{ item.task_id }}</td>
+                                <td data-label="任务 ID" class="mono text-xs">{{ item.task_id }}</td>
                                 <td class="cell-actions" data-label="操作">
                                     <form method="post" data-confirm="确定从队列移除此任务？">
                                         {% csrf_token %}

@@ -45,6 +45,7 @@ def test_settings_system_admin_and_api_docs(page, live_server, browser_user):
     pages = {
         "settings": "/settings/",
         "system": "/system/",
+        "user-create": "/users/new/",
         "admin": "/admin/",
         "admin-users": "/admin/proxy/proxyuser/",
         "admin-certificates": "/admin/certificates/certificate/",

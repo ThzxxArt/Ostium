@@ -5,12 +5,9 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "history" "w-3.5 h-3.5" %} Audit trail</div>
+            <div class="page-eyebrow">{% icon "history" "w-3.5 h-3.5" %} 审计记录</div>
             <h1 class="page-title">审计日志</h1>
             <p class="page-desc">敏感操作留痕：登录、token 展示/轮换、证书、备份、设置与配置变更。敏感字段不记录。</p>
-        </div>
-        <div class="page-actions">
-            <a class="btn" href="{% url 'admin:operations_auditevent_changelist' %}">{% icon "settings" %} Admin 视图</a>
         </div>
     </div>
 {% endblock %}

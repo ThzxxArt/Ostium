@@ -247,8 +247,8 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ostium Server API",
-    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.6.",
-    "VERSION": "0.2.6",
+    "DESCRIPTION": "Control-plane API for Ostium Server 0.2.7.",
+    "VERSION": "0.2.7",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/v1",
@@ -394,9 +394,9 @@ LOGGING = {
 # ---------------------------------------------------------------------------
 
 UNFOLD = {
-    "SITE_TITLE": "Ostium Server",
-    "SITE_HEADER": "Ostium",
-    "SITE_SUBHEADER": "Private proxy server",
+    "SITE_TITLE": "Ostium 应急管理",
+    "SITE_HEADER": "Ostium 应急管理",
+    "SITE_SUBHEADER": "常规操作请返回 Aurora 控制台",
     "SITE_URL": "/",
     "SITE_SYMBOL": "shield",
     "SHOW_HISTORY": True,
@@ -425,93 +425,93 @@ UNFOLD = {
         "show_all_applications": False,
         "navigation": [
             {
-                "title": "Console",
+                "title": "返回控制台",
                 "separator": False,
                 "items": [
                     {
-                        "title": "Overview",
+                        "title": "总览",
                         "icon": "dashboard",
                         "link": reverse_lazy("console:dashboard"),
                     },
                     {
-                        "title": "Users",
+                        "title": "用户",
                         "icon": "group",
                         "link": reverse_lazy("console:users"),
                     },
                     {
-                        "title": "Subscriptions",
+                        "title": "订阅",
                         "icon": "link",
                         "link": reverse_lazy("console:subscriptions"),
                     },
                     {
-                        "title": "Inbounds",
+                        "title": "线路",
                         "icon": "lan",
                         "link": reverse_lazy("console:inbounds"),
                     },
                     {
-                        "title": "Connections",
+                        "title": "连接",
                         "icon": "swap_horiz",
                         "link": reverse_lazy("console:connections"),
                     },
                 ],
             },
             {
-                "title": "Operations",
+                "title": "控制台运维",
                 "separator": True,
                 "items": [
                     {
-                        "title": "Certificates",
+                        "title": "证书",
                         "icon": "verified_user",
                         "link": reverse_lazy("console:certificates"),
                     },
                     {
-                        "title": "Logs",
+                        "title": "日志",
                         "icon": "article",
                         "link": reverse_lazy("console:logs"),
                     },
                     {
-                        "title": "Jobs",
+                        "title": "任务",
                         "icon": "schedule",
                         "link": reverse_lazy("console:jobs"),
                     },
                     {
-                        "title": "System",
+                        "title": "系统",
                         "icon": "monitor_heart",
                         "link": reverse_lazy("console:system"),
                     },
                     {
-                        "title": "Audit",
+                        "title": "审计",
                         "icon": "history",
                         "link": reverse_lazy("console:audit"),
                     },
                     {
-                        "title": "Settings",
+                        "title": "设置",
                         "icon": "settings",
                         "link": reverse_lazy("console:settings"),
                     },
                 ],
             },
             {
-                "title": "Django admin",
+                "title": "应急数据管理",
                 "separator": True,
                 "items": [
                     {
-                        "title": "Proxy users",
+                        "title": "用户记录",
                         "icon": "manage_accounts",
                         "link": reverse_lazy("admin:proxy_proxyuser_changelist"),
                     },
                     {
-                        "title": "Inbound records",
+                        "title": "线路记录",
                         "icon": "dns",
                         "link": reverse_lazy("admin:proxy_inbound_changelist"),
                     },
                     {
-                        "title": "Certificates",
+                        "title": "证书记录",
                         "icon": "lock",
                         "link": reverse_lazy("admin:certificates_certificate_changelist"),
                     },
                     {
-                        "title": "Admins",
+                        "title": "管理员账号",
                         "icon": "admin_panel_settings",
                         "link": reverse_lazy("admin:auth_user_changelist"),
                     },

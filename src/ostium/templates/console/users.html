@@ -10,9 +10,7 @@
             <p class="page-desc">创建、停用、轮换凭据与查看每个人的用量。所有变更都会自动触发核心配置更新。</p>
         </div>
         <div class="page-actions">
-            <a class="btn btn--ghost"
-               href="{% url 'admin:proxy_proxyuser_changelist' %}">{% icon "settings" %} 高级管理</a>
-            <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+            <a class="btn btn--primary" href="{% url 'console:user_create' %}">{% icon "plus" %} 新增用户</a>
         </div>
     </div>
 {% endblock %}
@@ -103,8 +101,8 @@
                                     <span class="table-actions">
                                         <a class="btn btn--sm" href="{% url 'console:user_detail' user.pk %}">详情</a>
                                         <a class="icon-btn"
-                                           href="{% url 'admin:proxy_proxyuser_change' user.pk %}"
-                                           aria-label="在 Admin 中编辑 {{ user.name }}">{% icon "settings" %}</a>
+                                           href="{% url 'console:user_detail' user.pk %}"
+                                           aria-label="编辑 {{ user.name }}">{% icon "settings" %}</a>
                                     </span>
                                 </td>
                             </tr>
@@ -120,7 +118,7 @@
                 <div class="empty-copy">{% if query %}换一个关键词，或清除筛选条件。{% else %}创建第一个用户后，Ostium 会自动生成 UUID、密码和订阅 token。{% endif %}</div>
                 <div class="page-actions" style="justify-content:center">
                     {% if query %}<a class="btn" href="{% url 'console:users' %}">清除筛选</a>{% endif %}
-                    <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                    <a class="btn btn--primary" href="{% url 'console:user_create' %}">{% icon "plus" %} 新增用户</a>
                 </div>
             </div>
         {% endif %}

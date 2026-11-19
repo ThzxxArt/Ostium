@@ -5,14 +5,14 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "zap" "w-3.5 h-3.5" %} Server Pulse</div>
+            <div class="page-eyebrow">{% icon "zap" "w-3.5 h-3.5" %} 服务器脉搏</div>
             <h1 class="page-title">今天的服务器，一眼看清</h1>
             <p class="page-desc">实时掌握数据面状态、在线用户、流量走势与需要处理的事项。</p>
         </div>
         <div class="page-actions">
             <a class="btn btn--ghost" href="{% url 'console:logs' %}">{% icon "terminal" %} 查看日志</a>
             <button class="btn" type="submit" form="restart-form">{% icon "refresh" %} 应用配置</button>
-            <a class="btn btn--primary" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+            <a class="btn btn--primary" href="{% url 'console:user_create' %}">{% icon "plus" %} 新增用户</a>
         </div>
     </div>
     <form id="restart-form"
@@ -319,7 +319,7 @@
             </div>
             <div class="panel-body">
                 <div class="grid" style="gap:8px">
-                    <a class="btn btn--block" href="{% url 'admin:proxy_proxyuser_add' %}">{% icon "plus" %} 新增用户</a>
+                    <a class="btn btn--block" href="{% url 'console:user_create' %}">{% icon "plus" %} 新增用户</a>
                     <a class="btn btn--block" href="{% url 'console:subscriptions' %}">{% icon "link" %} 复制订阅链接</a>
                     <a class="btn btn--block"
                        href="{% url 'console:certificate_import' %}">{% icon "certificate" %} 导入证书</a>

@@ -152,6 +152,7 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
     routes = [
         ("dashboard", "/"),
         ("users", "/users/"),
+        ("user-create", "/users/new/"),
         ("user-detail", f"/users/{alice.pk}/"),
         ("subscriptions", "/subscriptions/"),
         ("inbounds", "/inbounds/"),
@@ -175,6 +176,8 @@ def test_all_console_pages_no_overflow_and_axe(page, live_server, browser_user):
                 width,
                 route,
             )
+            assert page.locator('a[href^="/admin/"]').count() == 0, route
+            assert "Django Admin" not in page.locator("body").inner_text(), route
             page.screenshot(
                 path=str(SCREENSHOTS / f"page-{name}-{width}.png"),
                 full_page=width >= 768,

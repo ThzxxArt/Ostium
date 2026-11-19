@@ -5,7 +5,7 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "users" "w-3.5 h-3.5" %} User profile</div>
+            <div class="page-eyebrow">{% icon "users" "w-3.5 h-3.5" %} 用户档案</div>
             <div class="flex items-center gap-3" style="margin-top:4px">
                 <span class="avatar"
                       style="width:44px;
@@ -23,7 +23,6 @@
         </div>
         <div class="page-actions">
             <a class="btn btn--ghost" href="{% url 'console:users' %}">返回列表</a>
-            <a class="btn" href="{% url 'admin:proxy_proxyuser_change' user.pk %}">{% icon "settings" %} Admin 编辑</a>
         </div>
     </div>
 {% endblock %}

@@ -1,0 +1,78 @@
+{% extends "console/base.html" %}
+{% load ostium_ui %}
+{% block title %}新增用户{% endblock %}
+{% block breadcrumb %}用户 / 新增{% endblock %}
+{% block page_header %}
+    <div class="page-head">
+        <div>
+            <div class="page-eyebrow">{% icon "plus" "w-3.5 h-3.5" %} 新增用户</div>
+            <h1 class="page-title">新增用户</h1>
+            <p class="page-desc">创建后会立即生成 VLESS UUID、Hysteria2/Trojan 密码、Shadowsocks 密钥和订阅 token。</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn" href="{% url 'console:users' %}">{% icon "arrow-left" %} 返回用户</a>
+        </div>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="grid grid--12">
+        <section class="panel span-8">
+            <div class="panel-head">
+                <div class="panel-title">{% icon "users" %} 账号与配额</div>
+            </div>
+            <form method="post" class="panel-body stack">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert-banner alert-banner--danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {{ form.name.errors }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.quota.id_for_label }}">{{ form.quota.label }}</label>
+                        {{ form.quota }}
+                        {{ form.quota.errors }}
+                        {% if form.quota.help_text %}<span class="helptext">{{ form.quota.help_text }}</span>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.quota_cycle.id_for_label }}">{{ form.quota_cycle.label }}</label>
+                        {{ form.quota_cycle }}
+                        {{ form.quota_cycle.errors }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+                        {{ form.expires_at }}
+                        {{ form.expires_at.errors }}
+                        {% if form.expires_at.help_text %}<span class="helptext">{{ form.expires_at.help_text }}</span>{% endif %}
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                    {{ form.note }}
+                    {{ form.note.errors }}
+                </div>
+                <div class="field">
+                    <label class="checkbox-row" for="{{ form.enabled.id_for_label }}">
+                        {{ form.enabled }} <span>创建后立即启用</span>
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <a class="btn" href="{% url 'console:users' %}">取消</a>
+                    <button class="btn btn--primary" type="submit">{% icon "plus" %} 创建用户</button>
+                </div>
+            </form>
+        </section>
+        <aside class="panel span-4">
+            <div class="panel-head"><div class="panel-title">{% icon "key" %} 创建后</div></div>
+            <div class="panel-body stack text-sm muted">
+                <p>用户详情页会显示四种订阅格式、二维码和节点信息。</p>
+                <p>token 默认打码；点击“显示完整链接”会记录审计事件。</p>
+                <p>配额为 0 表示不限；月度配额会在跨月时自动重置。</p>
+                <p>到期时间留空表示永不过期；到期后 worker 会自动禁用用户。</p>
+            </div>
+        </aside>
+    </div>
+{% endblock %}

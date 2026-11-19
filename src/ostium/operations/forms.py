@@ -30,6 +30,11 @@ class UserEditForm(forms.ModelForm):
     class Meta:
         model = ProxyUser
         fields = ("name", "enabled", "quota_cycle", "note")
+        labels = {
+            "name": "用户名",
+            "quota_cycle": "配额周期",
+            "note": "备注",
+        }
         widgets = {"note": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):
@@ -80,6 +85,7 @@ class UserEditForm(forms.ModelForm):
     def save(self, commit: bool = True) -> ProxyUser:
         user = super().save(commit=False)
         user.quota_bytes = self.cleaned_data["quota"]
+        user.expires_at = self.cleaned_data["expires_at"]
         if commit:
             user.save()
         return user

@@ -3,6 +3,25 @@
 All notable changes to Ostium Server are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.7 — 2026-11-19
+
+### Fixed
+
+- Console pages no longer link to Django Admin. The following are now native
+  Aurora pages or actions:
+  - **新增用户** (`/users/new/`) with quota, quota cycle, expiry, note and
+    enabled state;
+  - user editing remains on the console user detail page;
+  - certificate management stays on `/certificates/`;
+  - inbound editing stays on `/inbounds/`;
+  - audit filtering stays on `/audit/`.
+- The Django Admin navigation and user menu entries were removed from the
+  console shell and command palette.
+- Django Admin is now labelled **Ostium 应急管理** and clearly states that
+  normal operations belong in the Aurora console.
+- Console eyebrow labels and remaining visible form headings are Chinese.
+- New users created from the console now persist `expires_at` correctly.
+
 ## 0.2.6 — 2026-11-19
 
 ### Fixed

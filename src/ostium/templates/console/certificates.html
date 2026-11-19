@@ -5,13 +5,11 @@
 {% block page_header %}
     <div class="page-head">
         <div>
-            <div class="page-eyebrow">{% icon "certificate" "w-3.5 h-3.5" %} TLS inventory</div>
+            <div class="page-eyebrow">{% icon "certificate" "w-3.5 h-3.5" %} TLS 证书</div>
             <h1 class="page-title">证书</h1>
             <p class="page-desc">Hysteria2 与 Trojan 的 TLS 凭据。支持手动导入、自签与 certbot 同步；到期会阻止配置应用。</p>
         </div>
         <div class="page-actions">
-            <a class="btn btn--ghost"
-               href="{% url 'admin:certificates_certificate_changelist' %}">{% icon "settings" %} Admin 列表</a>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="sync_certbot">
@@ -61,8 +59,6 @@
                             <input type="hidden" name="certificate_id" value="{{ cert.pk }}">
                             <button class="btn btn--sm" type="submit">{% icon "refresh" %} 重新校验</button>
                         </form>
-                        <a class="btn btn--sm"
-                           href="{% url 'admin:certificates_certificate_change' cert.pk %}">{% icon "settings" %} 详情</a>
                     </div>
                 </section>
             {% endfor %}
